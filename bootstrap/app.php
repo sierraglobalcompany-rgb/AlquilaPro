@@ -26,10 +26,15 @@ return static function (array $settings): App {
         $app->setBasePath($basePath);
     }
 
-    $storageDirectory = dirname($lockPath);
-    $storageWritable = is_dir($storageDirectory)
-        ? is_writable($storageDirectory)
-        : is_writable(dirname($storageDirectory));
+    $storageProbe = dirname($lockPath);
+    while (!is_dir($storageProbe)) {
+        $parent = dirname($storageProbe);
+        if ($parent === $storageProbe) {
+            break;
+        }
+        $storageProbe = $parent;
+    }
+    $storageWritable = is_writable($storageProbe);
 
     $runtime = RuntimeRequirements::evaluate(PHP_VERSION, get_loaded_extensions(), $storageWritable);
     $installPath = $basePath . '/install';
