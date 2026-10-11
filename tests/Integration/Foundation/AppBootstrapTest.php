@@ -75,6 +75,31 @@ final class AppBootstrapTest extends TestCase
         self::assertStringContainsString('Propietario inicial', $body);
     }
 
+    public function testCleanInstallCanUseStoragePathThatDoesNotExistYet(): void
+    {
+        $root = $this->directory . '/clean';
+        mkdir($root, 0700, true);
+
+        $factory = require dirname(__DIR__, 3) . '/bootstrap/app.php';
+        $app = $factory([
+            'lock_path' => $root . '/storage/app/installed.lock',
+            'database_config_path' => $root . '/config/database.php',
+            'migration_directory' => $this->migrationDirectory,
+            'base_url' => 'https://alquilapro.sierraglobalcompany.com',
+            'base_path' => '',
+        ]);
+
+        $response = $app->handle(
+            (new ServerRequestFactory())->createServerRequest('GET', 'https://alquilapro.sierraglobalcompany.com/install'),
+        );
+        $body = (string) $response->getBody();
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertDoesNotMatchRegularExpression('/<button[^>]+disabled/i', $body);
+
+        @rmdir($root);
+    }
+
     public function testFailedPostDoesNotEchoPasswords(): void
     {
         $app = $this->app();
