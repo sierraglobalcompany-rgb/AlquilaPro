@@ -3,6 +3,10 @@ DirectoryIndex index.php
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
+
+    # Internal application paths are never public, even when the target file exists.
+    RewriteRule ^(?:\.github|app|bootstrap|config|database|docs|storage|tests|vendor)(?:/|$) - [F,L,NC]
+
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^ index.php [QSA,L]
