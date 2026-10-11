@@ -3,7 +3,7 @@
 Sistema privado, mobile-first y autoinstalable para administrar arrendamientos de vivienda y parqueaderos: candidatos, estudio con aseguradora, contratos, inquilinos, cartera, pagos, medios de pago, documentos, pólizas, solicitudes, mantenimiento, convivencia, recordatorios, liquidación y trazabilidad.
 
 **Dominio previsto:** `https://alquilapro.sierraglobalcompany.com`  
-**Estado actual:** F0 — especificación y plan auditados; implementación de código aún no iniciada.  
+**Estado actual:** F1 — Foundation + Installer **CLOSED y verificada en rama**; PR #1 permanece DRAFT / UNMERGED.  
 **Stack objetivo:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + Alpine.js + PHPMailer.  
 **Destino:** Hostinger, instalación web portable en subdominio o subcarpeta HTTPS.
 
@@ -19,7 +19,7 @@ No se debe reconstruir el proyecto desde memoria ni desde conversaciones anterio
 
 1. **SPEC maestra:** [`docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.1_AUDITADO.md`](docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.1_AUDITADO.md)
 2. **Plan maestro:** [`docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.1_AUDITADO.md`](docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.1_AUDITADO.md)
-3. Checkpoint más reciente en `docs/checkpoints/` cuando exista.
+3. **Checkpoint actual:** [`docs/checkpoints/F1_CLOSED_2026-10-11.md`](docs/checkpoints/F1_CLOSED_2026-10-11.md)
 4. Tests ejecutables.
 5. Código real del repositorio.
 6. Conversaciones externas solo como contexto auxiliar.
@@ -636,13 +636,15 @@ Toda nueva sesión debe ejecutar esta secuencia antes de tocar código:
 PROJECT: Alquila Pro
 REPO: sierraglobalcompany-rgb/AlquilaPro
 TARGET: alquilapro.sierraglobalcompany.com
-CURRENT_PHASE: F0
+CURRENT_PHASE: F1 CLOSED ON FEATURE BRANCH
 SPEC: V1.1 AUDITADA
 PLAN: V1.1 AUDITADO
-IMPLEMENTATION: NOT STARTED
-LATEST_CHECKPOINT: NONE YET
-LEY_1_KISS: APPLIES GLOBALLY
-LEY_2_CERO_RUIDO: APPLIES GLOBALLY
+IMPLEMENTATION: F1 VERIFIED / PR #1 DRAFT / UNMERGED
+LATEST_CHECKPOINT: docs/checkpoints/F1_CLOSED_2026-10-11.md
+FUNCTIONAL_HEAD: 019231be590da614a75319b41fe122d4c33b8b03
+FINAL_F1_QA: PHP 8.3 / 8.4 / 8.5 — 32 tests / 110 assertions
+LEY_1_KISS: PASS F1
+LEY_2_CERO_RUIDO: PASS F1
 ```
 
-Siguiente gate: revisar/aceptar la documentación F0 y arrancar F1 con TDD/local-first.
+Siguiente gate: revisar/aprobar PR #1 y fusionar F1. **No abrir F2 antes del merge/aprobación de F1.**
