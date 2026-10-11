@@ -53,5 +53,13 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      - name: Export generated lockfile
+        if: matrix.php == '8.3'
+        uses: actions/upload-artifact@v4
+        with:
+          name: composer-lock
+          path: composer.lock
+          retention-days: 1
+
       - name: Run tests
         run: vendor/bin/phpunit --testdox
