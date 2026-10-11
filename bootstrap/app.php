@@ -104,5 +104,29 @@ return static function (array $settings): App {
         return $response->withHeader('Content-Type', 'application/json; charset=utf-8');
     });
 
+    $responseFactory = $app->getResponseFactory();
+    $errorMiddleware = $app->addErrorMiddleware(false, false, false);
+    $errorMiddleware->setDefaultErrorHandler(
+        static function (
+            ServerRequestInterface $request,
+            Throwable $exception,
+            bool $displayErrorDetails,
+            bool $logErrors,
+            bool $logErrorDetails,
+        ) use ($responseFactory): ResponseInterface {
+            error_log(sprintf(
+                'AlquilaPro unhandled %s on %s %s',
+                $exception::class,
+                $request->getMethod(),
+                $request->getUri()->getPath(),
+            ));
+
+            $response = $responseFactory->createResponse(500);
+            $response->getBody()->write('Ocurrió un error interno.');
+
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8');
+        },
+    );
+
     return $app;
 };
