@@ -1,0 +1,415 @@
+<?php
+
+declare(strict_types=1);
+
+namespace AlquilaPro\Properties;
+
+use PDO;
+use Psr\Http\Message\UploadedFileInterface;
+use RuntimeException;
+use Throwable;
+
+final class UnitMediaService
+{
+    private const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+
+    private const MIME_EXTENSIONS = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+    ];
+
+    public function __construct(
+        private readonly PDO $pdo,
+        private readonly string $mediaDirectory,
+    ) {
+    }
+
+    public function addPhoto(int $unitId, UploadedFileInterface $upload): array
+    {
+        $this->requireUnit($unitId);
+
+        if ($upload->getError() !== UPLOAD_ERR_OK) {
+            throw new RuntimeException('No fue posible recibir la foto.');
+        }
+
+        $stream = $upload->getStream();
+        $size = $stream->getSize();
+        if ($size === null || $size < 1 || $size > self::MAX_PHOTO_BYTES) {
+            throw new RuntimeException('La foto supera 10 MiB o está vacía.');
+        }
+
+        $stream->rewind();
+        $bytes = $stream->getContents();
+        if (strlen($bytes) !== $size) {
+            throw new RuntimeException('No fue posible validar la foto completa.');
+        }
+
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+        if (!is_string($mime) || !isset(self::MIME_EXTENSIONS[$mime])) {
+            throw new RuntimeException('El formato de la foto no es válido.');
+        }
+
+        $this->ensureDirectory();
+        $storedName = 'photo-' . bin2hex(random_bytes(16)) . '.' . self::MIME_EXTENSIONS[$mime];
+        $path = $this->mediaPath($storedName, false);
+        if ($path === null) {
+            throw new RuntimeException('No fue posible preparar el almacenamiento de la foto.');
+        }
+
+        try {
+            $upload->moveTo($path);
+            @chmod($path, 0600);
+
+            $sortOrder = $this->nextSortOrder($unitId);
+            $statement = $this->pdo->prepare(
+                "INSERT INTO unit_media (unit_id, type, stored_name, mime_type, external_url, sort_order, is_cover) "
+                . "VALUES (:unit_id, 'photo', :stored_name, :mime_type, NULL, :sort_order, 0)",
+            );
+            $statement->execute([
+                'unit_id' => $unitId,
+                'stored_name' => $storedName,
+                'mime_type' => $mime,
+                'sort_order' => $sortOrder,
+            ]);
+        } catch (Throwable $exception) {
+            @unlink($path);
+            throw new RuntimeException('No fue posible guardar la foto.', 0, $exception);
+        }
+
+        $media = $this->findMedia($unitId, (int) $this->pdo->lastInsertId());
+        if ($media === null) {
+            @unlink($path);
+            throw new RuntimeException('No fue posible confirmar la foto guardada.');
+        }
+
+        return $media;
+    }
+
+    public function addVideoLink(int $unitId, string $url): array
+    {
+        $this->requireUnit($unitId);
+
+        $url = trim($url);
+        $parts = parse_url($url);
+        if ($url === ''
+            || strlen($url) > 1000
+            || filter_var($url, FILTER_VALIDATE_URL) === false
+            || !is_array($parts)
+            || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
+            || trim((string) ($parts['host'] ?? '')) === ''
+        ) {
+            throw new RuntimeException('El enlace de video debe ser una URL HTTPS válida.');
+        }
+
+        $statement = $this->pdo->prepare(
+            "INSERT INTO unit_media (unit_id, type, stored_name, mime_type, external_url, sort_order, is_cover) "
+            . "VALUES (:unit_id, 'video_link', NULL, NULL, :external_url, :sort_order, 0)",
+        );
+        $statement->execute([
+            'unit_id' => $unitId,
+            'external_url' => $url,
+            'sort_order' => $this->nextSortOrder($unitId),
+        ]);
+
+        $media = $this->findMedia($unitId, (int) $this->pdo->lastInsertId());
+        if ($media === null) {
+            throw new RuntimeException('No fue posible confirmar el enlace de video guardado.');
+        }
+
+        return $media;
+    }
+
+    public function remove(int $unitId, int $mediaId): void
+    {
+        $media = $this->findMedia($unitId, $mediaId);
+        if ($media === null) {
+            throw new RuntimeException('El archivo multimedia no pertenece a esta unidad.');
+        }
+
+        $path = null;
+        if ($media['type'] === 'photo' && is_string($media['stored_name'])) {
+            $path = $this->mediaPath($media['stored_name'], true);
+        }
+
+        $statement = $this->pdo->prepare('DELETE FROM unit_media WHERE id = :id AND unit_id = :unit_id');
+        $statement->execute(['id' => $mediaId, 'unit_id' => $unitId]);
+        if ($statement->rowCount() !== 1) {
+            throw new RuntimeException('No fue posible eliminar el archivo multimedia.');
+        }
+
+        if ($path !== null && is_file($path) && !@unlink($path)) {
+            throw new RuntimeException('No fue posible eliminar el archivo de la foto.');
+        }
+    }
+
+    public function setCover(int $unitId, int $mediaId): void
+    {
+        $media = $this->findMedia($unitId, $mediaId);
+        if ($media === null || $media['type'] !== 'photo') {
+            throw new RuntimeException('La portada debe ser una foto de esta unidad.');
+        }
+
+        try {
+            $this->pdo->beginTransaction();
+
+            $clear = $this->pdo->prepare('UPDATE unit_media SET is_cover = 0 WHERE unit_id = :unit_id');
+            $clear->execute(['unit_id' => $unitId]);
+
+            $set = $this->pdo->prepare(
+                "UPDATE unit_media SET is_cover = 1 WHERE id = :id AND unit_id = :unit_id AND type = 'photo'",
+            );
+            $set->execute(['id' => $mediaId, 'unit_id' => $unitId]);
+
+            $this->pdo->commit();
+        } catch (Throwable $exception) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw new RuntimeException('No fue posible definir la portada.', 0, $exception);
+        }
+    }
+
+    public function reorder(int $unitId, array $orderedMediaIds): void
+    {
+        $this->requireUnit($unitId);
+
+        $normalized = [];
+        foreach ($orderedMediaIds as $mediaId) {
+            if (is_int($mediaId)) {
+                $id = $mediaId;
+            } elseif (is_string($mediaId) && ctype_digit($mediaId)) {
+                $id = (int) $mediaId;
+            } else {
+                throw new RuntimeException('El orden de multimedia no es válido.');
+            }
+
+            if ($id <= 0 || isset($normalized[$id])) {
+                throw new RuntimeException('El orden de multimedia contiene IDs inválidos o duplicados.');
+            }
+            $normalized[$id] = true;
+        }
+        $orderedIds = array_keys($normalized);
+
+        $statement = $this->pdo->prepare('SELECT id FROM unit_media WHERE unit_id = :unit_id ORDER BY id ASC');
+        $statement->execute(['unit_id' => $unitId]);
+        $ownedIds = array_map('intval', $statement->fetchAll(PDO::FETCH_COLUMN));
+
+        $expected = $ownedIds;
+        $provided = $orderedIds;
+        sort($expected, SORT_NUMERIC);
+        sort($provided, SORT_NUMERIC);
+        if ($provided !== $expected) {
+            throw new RuntimeException('El orden debe incluir exactamente la multimedia de esta unidad.');
+        }
+
+        try {
+            $this->pdo->beginTransaction();
+            $update = $this->pdo->prepare(
+                'UPDATE unit_media SET sort_order = :sort_order WHERE id = :id AND unit_id = :unit_id',
+            );
+            foreach ($orderedIds as $index => $mediaId) {
+                $update->execute([
+                    'sort_order' => $index + 1,
+                    'id' => $mediaId,
+                    'unit_id' => $unitId,
+                ]);
+            }
+            $this->pdo->commit();
+        } catch (Throwable $exception) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw new RuntimeException('No fue posible actualizar el orden de multimedia.', 0, $exception);
+        }
+    }
+
+    public function listForUnit(int $unitId): array
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT * FROM unit_media WHERE unit_id = :unit_id ORDER BY sort_order ASC, id ASC',
+        );
+        $statement->execute(['unit_id' => $unitId]);
+
+        return array_map($this->normalizeMedia(...), $statement->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    public function publicVideoLinks(string $publicKey): array
+    {
+        $publicKey = trim($publicKey);
+        if ((new PropertyService($this->pdo))->findPublicUnit($publicKey) === null) {
+            return [];
+        }
+
+        $statement = $this->pdo->prepare(
+            "SELECT m.external_url FROM unit_media m "
+            . 'INNER JOIN units u ON u.id = m.unit_id '
+            . "WHERE u.public_key = :public_key AND m.type = 'video_link' "
+            . 'ORDER BY m.sort_order ASC, m.id ASC',
+        );
+        $statement->execute(['public_key' => $publicKey]);
+
+        $links = [];
+        foreach ($statement->fetchAll(PDO::FETCH_COLUMN) as $url) {
+            if (!is_string($url)) {
+                continue;
+            }
+            $url = trim($url);
+            $parts = parse_url($url);
+            if ($url !== ''
+                && strlen($url) <= 1000
+                && filter_var($url, FILTER_VALIDATE_URL) !== false
+                && is_array($parts)
+                && strtolower((string) ($parts['scheme'] ?? '')) === 'https'
+                && trim((string) ($parts['host'] ?? '')) !== ''
+            ) {
+                $links[] = $url;
+            }
+        }
+
+        return $links;
+    }
+
+    public function privatePhoto(int $unitId, int $mediaId): ?array
+    {
+        $media = $this->findMedia($unitId, $mediaId);
+        if ($media === null || $media['type'] !== 'photo' || !is_string($media['stored_name'])) {
+            return null;
+        }
+
+        $path = $this->mediaPath($media['stored_name'], true);
+        if ($path === null || !is_file($path)) {
+            return null;
+        }
+
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($path);
+        if (!is_string($mime) || !isset(self::MIME_EXTENSIONS[$mime]) || $mime !== $media['mime_type']) {
+            return null;
+        }
+
+        return [
+            'path' => $path,
+            'mime' => $mime,
+            'stored_name' => $media['stored_name'],
+        ];
+    }
+
+    public function publicPhoto(string $publicKey, int $position): ?array
+    {
+        $publicKey = trim($publicKey);
+        if ($position < 1 || (new PropertyService($this->pdo))->findPublicUnit($publicKey) === null) {
+            return null;
+        }
+
+        $offset = $position - 1;
+        $statement = $this->pdo->prepare(
+            "SELECT m.id, m.unit_id FROM unit_media m "
+            . 'INNER JOIN units u ON u.id = m.unit_id '
+            . "WHERE u.public_key = :public_key AND m.type = 'photo' "
+            . 'ORDER BY m.is_cover DESC, m.sort_order ASC, m.id ASC '
+            . 'LIMIT 1 OFFSET ' . $offset,
+        );
+        $statement->execute(['public_key' => $publicKey]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
+
+        return $this->privatePhoto((int) $row['unit_id'], (int) $row['id']);
+    }
+
+    public function publicPhotoPositions(string $publicKey): array
+    {
+        $publicKey = trim($publicKey);
+        if ((new PropertyService($this->pdo))->findPublicUnit($publicKey) === null) {
+            return [];
+        }
+
+        $statement = $this->pdo->prepare(
+            "SELECT COUNT(*) FROM unit_media m "
+            . 'INNER JOIN units u ON u.id = m.unit_id '
+            . "WHERE u.public_key = :public_key AND m.type = 'photo'",
+        );
+        $statement->execute(['public_key' => $publicKey]);
+        $count = (int) $statement->fetchColumn();
+
+        return $count > 0 ? range(1, $count) : [];
+    }
+
+    private function nextSortOrder(int $unitId): int
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT COALESCE(MAX(sort_order), 0) + 1 FROM unit_media WHERE unit_id = :unit_id',
+        );
+        $statement->execute(['unit_id' => $unitId]);
+
+        return (int) $statement->fetchColumn();
+    }
+
+    private function requireUnit(int $unitId): void
+    {
+        if ($unitId <= 0) {
+            throw new RuntimeException('La unidad no existe.');
+        }
+
+        $statement = $this->pdo->prepare('SELECT COUNT(*) FROM units WHERE id = :id');
+        $statement->execute(['id' => $unitId]);
+        if ((int) $statement->fetchColumn() !== 1) {
+            throw new RuntimeException('La unidad no existe.');
+        }
+    }
+
+    private function findMedia(int $unitId, int $mediaId): ?array
+    {
+        if ($unitId <= 0 || $mediaId <= 0) {
+            return null;
+        }
+
+        $statement = $this->pdo->prepare(
+            'SELECT * FROM unit_media WHERE id = :id AND unit_id = :unit_id LIMIT 1',
+        );
+        $statement->execute(['id' => $mediaId, 'unit_id' => $unitId]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $this->normalizeMedia($row) : null;
+    }
+
+    private function normalizeMedia(array $row): array
+    {
+        return [
+            'id' => (int) $row['id'],
+            'unit_id' => (int) $row['unit_id'],
+            'type' => (string) $row['type'],
+            'stored_name' => $row['stored_name'] !== null ? (string) $row['stored_name'] : null,
+            'mime_type' => $row['mime_type'] !== null ? (string) $row['mime_type'] : null,
+            'external_url' => $row['external_url'] !== null ? (string) $row['external_url'] : null,
+            'sort_order' => (int) $row['sort_order'],
+            'is_cover' => (bool) $row['is_cover'],
+            'created_at' => (string) $row['created_at'],
+        ];
+    }
+
+    private function ensureDirectory(): void
+    {
+        if (!is_dir($this->mediaDirectory)
+            && !mkdir($this->mediaDirectory, 0700, true)
+            && !is_dir($this->mediaDirectory)
+        ) {
+            throw new RuntimeException('No fue posible preparar el almacenamiento de fotos.');
+        }
+    }
+
+    private function mediaPath(string $storedName, bool $mustExist): ?string
+    {
+        if (preg_match('/^photo-[a-f0-9]{32}\.(?:jpg|png|webp)$/', $storedName) !== 1) {
+            return null;
+        }
+
+        $path = rtrim($this->mediaDirectory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $storedName;
+        if ($mustExist && !is_file($path)) {
+            return null;
+        }
+
+        return $path;
+    }
+}

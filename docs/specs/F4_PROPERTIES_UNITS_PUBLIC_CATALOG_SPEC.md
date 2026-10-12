@@ -1,785 +1,493 @@
-# ALQUILA PRO — F4 SPEC: PROPIEDADES + UNIDADES + LANDING + CATÁLOGO PÚBLICO
+# ALQUILA PRO — F4 SPEC FINAL: PROPIEDADES + UNIDADES + LANDING + CATÁLOGO PÚBLICO
 
-**Fecha:** 2026-10-11  
-**Estado:** DISEÑO F4 PARA REVISIÓN HUMANA  
+**Fecha original:** 2026-10-11  
+**Convergencia as-built:** 2026-10-12  
+**Estado:** IMPLEMENTADA / QA FUNCIONAL Y VISUAL GREEN / CIERRE FINAL EN PROGRESO  
 **Base canónica:** SPEC/PLAN Maestro V1.2  
 **Fase:** F4 — Propiedades + unidades + publicación + landing + catálogo  
-**Código de producto en esta rama:** ninguno
+**PR:** #7 — OPEN / DRAFT / NOT MERGED  
+**Merge autorizado:** NO
 
 ---
 
 # 0. AUTORIDAD Y OBJETIVO
 
-Esta SPEC aterriza F4 después de la reauditoría V1.2.
+Esta SPEC contiene el contrato final implementado de F4. Sustituye las decisiones preliminares de esta misma SPEC que hayan quedado contradichas por convergencias explícitas y verificadas mediante tests/CI.
 
-Orden de autoridad:
+Orden de autoridad para F4:
 
-`SPEC MAESTRA V1.2 → PLAN MAESTRO V1.2 → ESTA SPEC F4 → PLAN F4 → tests → código`
+`SPEC MAESTRA V1.2 → PLAN MAESTRO V1.2 → decisiones canónicas README → ESTA SPEC F4 FINAL → PLAN F4 AS-BUILT → checkpoint → tests/CI → código`.
+
+Cuando una referencia maestra anterior usa `slug` o media pública por ID interno, para F4 prevalece esta convergencia específica documentada: `public_key` de 24 hex y foto pública por `publicKey + position`.
 
 Objetivos F4:
 
 1. administrar propiedades/conjuntos;
-2. administrar unidades `apartment|parking`;
-3. guardar fotos y enlaces externos de video;
-4. controlar estado operativo y publicación;
-5. convertir el dominio raíz en landing pública para visitantes;
-6. ofrecer catálogo público de unidades realmente disponibles;
-7. preparar F5 sin crear candidatos, leads ni solicitudes todavía.
+2. administrar unidades `apartment|parking` con una sola entidad;
+3. guardar fotos y enlaces HTTPS externos de video;
+4. controlar estado operativo e intención de publicación;
+5. convertir `/` en landing pública para visitante instalado sin romper el shell autenticado;
+6. ofrecer catálogo público derivado del inventario real;
+7. preparar F5 sin crear candidatos, leads, aplicaciones ni CTA muerto.
 
-F4 **NO** implementa `Aplicar`. F5 añadirá esa capacidad usando el candidato único de V1.2.
+F4 no implementa `Aplicar`.
 
 ---
 
-# 1. LEYES SUPREMAS EN F4
+# 1. LEYES F4
 
 ## Ley 1 — KISS
 
-F4 debe mantener una sola fuente de verdad por concepto:
+F4 mantiene una sola fuente de verdad por concepto:
 
 - una tabla `units` para apartamentos y parqueaderos;
 - un precio comercial por unidad;
 - un estado operativo por unidad;
-- el catálogo consulta las mismas unidades del módulo administrativo;
+- una intención de publicación `is_public`;
+- una regla canónica de publicabilidad;
+- un catálogo derivado de `units`;
 - una tabla simple de media;
-- auth, CSRF, View, branding y shell existentes se reutilizan.
+- auth, CSRF, View, branding y shell existentes reutilizados.
 
-No crear:
-
-- `catalog_listings`;
-- tablas completas separadas `apartments` y `parking_spaces`;
-- CMS genérico;
-- buscador externo;
-- servicio propio de video;
-- framework frontend nuevo;
-- storage paralelo.
+No se crean repositorios, DTOs, factories, DI container, ORM, CMS de catálogo, segundo auth, frontend framework ni servicio de video.
 
 ## Ley 2 — Cero Ruido / Convergencia
 
 Orden:
 
-`ELIMINAR → UNIR/CONVERGER → SIMPLIFICAR → MEJORAR → AGREGAR`
+`ELIMINAR → UNIR/CONVERGER → SIMPLIFICAR → MEJORAR → AGREGAR`.
 
-Rechazado en F4:
+F4 rechaza:
 
-- boolean `available` paralelo al estado;
-- precio de catálogo paralelo;
-- descripción de catálogo paralela;
+- boolean `available` paralelo a `status`;
+- precio/descripción de catálogo paralelos;
 - permisos exclusivos de catálogo;
-- botón `Aplicar` sin endpoint F5;
+- tabla `catalog_listings`;
+- tablas completas separadas `apartments`/`parking_spaces`;
+- CTA `Aplicar` antes de F5;
+- media pública por ID interno;
 - rutas futuras de candidatos/contratos/cartera;
-- imagen duplicada en DB + filesystem;
 - upload/transcoding de video;
-- hard-delete como sustituto de un estado.
+- hard-delete como sustituto de estado.
 
 ---
 
-# 2. EXPERIENCIA PÚBLICA
+# 2. MODELO DE DATOS FINAL
 
-## 2.1 `/` — landing pública + shell autenticado
+F4 agrega exactamente tres tablas:
 
-### Antes de instalar
+- `properties`;
+- `units`;
+- `unit_media`.
 
-Se conserva Foundation: `GET /` conduce al instalador.
+## 2.1 `properties`
 
-### Instalado + visitante sin sesión
+Campos funcionales mínimos:
 
-`GET /` muestra landing pública con:
+- `id` PK;
+- `name` requerido;
+- `address` requerido y privado;
+- `city` requerido;
+- `sector` opcional;
+- `administration_name` opcional;
+- `administration_contact` opcional y privado;
+- `notes` privadas;
+- `is_active`;
+- timestamps.
 
-- branding configurado;
-- texto breve de apartamentos y parqueaderos disponibles;
-- botón **Ver catálogo** → `/catalog`;
-- botón **Iniciar sesión** → `/login`;
-- resumen de disponibilidad únicamente si existen unidades publicables;
-- cero información privada u operativa.
+No hay tablas de ciudades, sectores ni administraciones en F4.
 
-### Instalado + usuario autenticado
+## 2.2 `units`
 
-`GET /` conserva el shell privado F3.
+Una sola entidad para `apartment|parking`.
 
-Esto reemplaza intencionalmente el contrato F3 “instalado + sin sesión → `/login`”. El test F3 correspondiente se actualizará para el nuevo producto; no coexistirán dos contratos contradictorios.
+Campos comunes relevantes:
 
-## 2.2 `/catalog`
+- `id` interno;
+- `property_id`;
+- `public_key`;
+- `type`;
+- `code`;
+- `location_label` público opcional;
+- `status`;
+- `is_public`;
+- `monthly_price`;
+- `description` pública;
+- `requirements` públicos;
+- `private_notes`;
+- timestamps.
 
-Ruta pública, sin sesión.
+Restricción: `UNIQUE(property_id, code)`.
 
-Solo lista unidades cuando:
+### `public_key`
 
-`property.is_active = 1 AND unit.status = available AND unit.is_public = 1`
+Contrato final:
 
-Cards mobile-first con:
+- `CHAR(24)`;
+- generado por servidor con `bin2hex(random_bytes(12))`;
+- 24 caracteres hexadecimales;
+- único;
+- nunca aceptado desde formulario;
+- inmutable desde UI;
+- usado en detalle y media pública;
+- no existe slug adicional en F4.
 
-- foto de portada;
-- Apartamento / Parqueadero;
-- nombre de propiedad/conjunto;
-- ciudad;
-- sector;
-- `location_label` si existe;
-- canon/precio mensual;
-- administración separada cuando aplique;
-- atributos principales según tipo;
-- **Ver detalles**.
+### `type`
 
-Filtros V1:
+Valores: `apartment|parking`.
 
-- Todos / Apartamentos / Parqueaderos;
-- ciudad;
-- sector.
+El tipo queda inmutable después de crear la unidad. No se permite convertir apartamento↔parqueadero mediante edición.
 
-No entran búsqueda full-text, mapas, geocoding, favoritos, ranking ni filtros avanzados.
-
-## 2.3 `/catalog/{public_key}`
-
-Detalle público.
-
-`public_key` es obligatorio, inmutable desde UI, generado por servidor con `bin2hex(random_bytes(12))` y almacenado como 24 caracteres hexadecimales con índice único.
-
-Muestra:
-
-- galería de fotos;
-- tipo;
-- propiedad/conjunto;
-- ciudad/sector;
-- ubicación pública resumida;
-- descripción;
-- canon/precio mensual;
-- administración separada si aplica;
-- requisitos;
-- atributos del apartamento/parqueadero;
-- enlaces HTTPS de video;
-- estado público “Disponible”.
-
-No muestra:
-
-- dirección exacta;
-- notas privadas;
-- matrícula inmobiliaria;
-- contacto interno de administración;
-- ID interno;
-- observaciones operativas;
-- datos de candidato/inquilino.
-
-La dirección exacta no se publica en F4. Si se necesita posteriormente, requiere decisión explícita de producto.
-
-## 2.4 `Aplicar`
-
-No se renderiza en F4.
-
-F5 lo añadirá únicamente cuando exista el flujo real que crea/continúa el candidato y relaciona su interés con la unidad.
-
----
-
-# 3. MODELO DE DATOS
-
-F4 tiene un máximo de tres tablas nuevas.
-
-## 3.1 `properties`
-
-Agrupa unidades. Puede representar un edificio, conjunto, inmueble base o ubicación administrativa. Una propiedad puede tener una sola unidad sin problema.
-
-Campos mínimos:
-
-- `id` BIGINT UNSIGNED PK;
-- `name` VARCHAR(150) NOT NULL;
-- `address` VARCHAR(255) NOT NULL — privado;
-- `city` VARCHAR(120) NOT NULL;
-- `sector` VARCHAR(120) NULL;
-- `administration_name` VARCHAR(150) NULL;
-- `administration_contact` VARCHAR(190) NULL;
-- `notes` TEXT NULL — privadas;
-- `is_active` TINYINT(1) NOT NULL DEFAULT 1;
-- `created_at` DATETIME NOT NULL;
-- `updated_at` DATETIME NULL.
-
-No se crean tablas de ciudades, sectores ni administraciones en V1.
-
-## 3.2 `units`
-
-Una sola tabla para apartamento y parqueadero.
-
-Campos comunes:
-
-- `id` BIGINT UNSIGNED PK;
-- `property_id` BIGINT UNSIGNED FK → `properties.id`;
-- `public_key` CHAR(24) NOT NULL UNIQUE;
-- `type` VARCHAR(20) NOT NULL: `apartment|parking`;
-- `code` VARCHAR(80) NOT NULL;
-- `location_label` VARCHAR(190) NULL — texto seguro para mostrar públicamente;
-- `status` VARCHAR(24) NOT NULL;
-- `is_public` TINYINT(1) NOT NULL DEFAULT 0;
-- `monthly_price` DECIMAL(12,2) NULL;
-- `description` TEXT NULL — pública si se publica;
-- `requirements` TEXT NULL — públicos si se publica;
-- `private_notes` TEXT NULL;
-- `created_at` DATETIME NOT NULL;
-- `updated_at` DATETIME NULL.
-
-Restricción:
-
-`UNIQUE(property_id, code)`
-
-### Apartment — columnas nullable
-
-- `unit_number` VARCHAR(50) NULL — operativo/privado;
-- `tower` VARCHAR(80) NULL;
-- `floor` VARCHAR(50) NULL;
-- `area_m2` DECIMAL(8,2) NULL;
-- `bedrooms` SMALLINT UNSIGNED NULL;
-- `bathrooms` DECIMAL(4,1) NULL;
-- `administration_fee` DECIMAL(12,2) NULL;
-- `registry_number` VARCHAR(120) NULL — privado.
-
-### Parking — columnas nullable
-
-- `parking_level` VARCHAR(80) NULL;
-- `dimensions` VARCHAR(120) NULL;
-- `vehicle_type` VARCHAR(80) NULL;
-- `linked_apartment_id` BIGINT UNSIGNED NULL FK → `units.id`.
-
-### Parking → apartment
-
-Relación opcional muchos-a-uno:
-
-- solo una unidad `parking` puede tener `linked_apartment_id`;
-- el destino debe ser `apartment`;
-- debe pertenecer a la misma propiedad;
-- varios parqueaderos pueden apuntar al mismo apartamento;
-- no se crea tabla intermedia mientras la relación no tenga atributos/ciclo de vida propios.
-
-## 3.3 Estados
+### Estados
 
 Valores canónicos:
 
-- `available` — Disponible;
-- `in_process` — En proceso;
-- `occupied` — Ocupada;
-- `inactive` — Inactiva;
-- `maintenance` — Mantenimiento.
+- `available`;
+- `in_process`;
+- `occupied`;
+- `inactive`;
+- `maintenance`.
 
-No existe `available` boolean.
+No existe booleano de disponibilidad paralelo.
 
-Visibilidad pública:
+### Apartment — campos nullable
 
-`PUBLIC_VISIBLE = property.is_active && unit.status == available && unit.is_public`
+- `unit_number` privado/operativo;
+- `tower`;
+- `floor`;
+- `area_m2`;
+- `bedrooms`;
+- `bathrooms`;
+- `administration_fee`;
+- `registry_number` privado.
 
-`is_public` representa intención de publicación; el estado sigue siendo la única fuente de disponibilidad.
+### Parking — campos nullable
 
-## 3.4 Reglas para activar `is_public`
+- `parking_level`;
+- `dimensions`;
+- `vehicle_type`;
+- `linked_apartment_id` opcional.
 
-Para cambiar `is_public` de 0 → 1, la unidad debe tener:
+`linked_apartment_id` solo puede apuntar a un apartamento de la misma propiedad. Varios parqueaderos pueden apuntar al mismo apartamento. No se crea tabla puente.
 
-- `monthly_price > 0`;
-- `description` no vacía;
-- `requirements` no vacíos;
-- al menos una foto válida.
+## 2.3 `unit_media`
 
-No es obligatorio que en ese instante esté `available`; puede quedar preparada y oculta hasta volver a Disponible.
+Una sola tabla de marketing media:
 
-Una propiedad inactiva o una unidad no disponible nunca aparecen públicamente aunque `is_public = 1`.
+- `id` interno;
+- `unit_id`;
+- `type = photo|video_link`;
+- `stored_name`;
+- `mime_type`;
+- `external_url`;
+- `sort_order`;
+- `is_cover`;
+- `created_at`.
 
-## 3.5 `unit_media`
+---
 
-Una sola tabla:
+# 3. PUBLICABILIDAD CANÓNICA
 
-- `id` BIGINT UNSIGNED PK;
-- `unit_id` BIGINT UNSIGNED FK;
-- `type` VARCHAR(20) NOT NULL: `photo|video_link`;
-- `stored_name` VARCHAR(190) NULL;
-- `mime_type` VARCHAR(80) NULL;
-- `external_url` VARCHAR(1000) NULL;
-- `sort_order` INT UNSIGNED NOT NULL DEFAULT 0;
-- `is_cover` TINYINT(1) NOT NULL DEFAULT 0;
-- `created_at` DATETIME NOT NULL.
+Una unidad aparece públicamente únicamente cuando todas estas condiciones son verdaderas en el momento de lectura:
 
-### Foto
+1. propiedad activa;
+2. `unit.status = available`;
+3. `unit.is_public = 1`;
+4. `monthly_price > 0`;
+5. `description` no vacía;
+6. `requirements` no vacíos;
+7. existe al menos una foto válida.
+
+La regla es viva y se reutiliza en listado, detalle y media pública. No se persiste un segundo estado de “publicable”.
+
+Si precio, estado, propiedad, intención o foto dejan de cumplir, la unidad y su media desaparecen públicamente de inmediato.
+
+---
+
+# 4. EXPERIENCIA PÚBLICA FINAL
+
+## 4.1 `/`
+
+### Antes de instalar
+
+Se conserva el installer Foundation.
+
+### Instalado + visitante
+
+Muestra landing pública con branding, acceso a Catálogo e Iniciar sesión. El resumen de disponibilidad aparece solo cuando existe inventario realmente publicable.
+
+### Instalado + usuario autenticado
+
+Conserva el shell privado F3.
+
+## 4.2 `GET /catalog`
+
+Público y sin sesión.
+
+Lista únicamente unidades publicables. Filtros V1:
+
+- tipo (`apartment|parking`);
+- ciudad;
+- sector.
+
+Tipo inválido devuelve 422.
+
+Cards pueden mostrar:
+
+- portada;
+- tipo;
+- propiedad;
+- ciudad/sector;
+- `location_label`;
+- precio mensual;
+- administración separada cuando aplique;
+- atributos principales;
+- enlace **Ver detalles**.
+
+No hay full-text, mapas, geocoding, favoritos ni ranking.
+
+## 4.3 `GET /catalog/{publicKey}`
+
+Detalle público por `public_key` de 24 hex.
+
+Muestra únicamente allowlist pública:
+
+- galería;
+- tipo;
+- propiedad;
+- ciudad/sector;
+- ubicación resumida;
+- descripción;
+- precio;
+- administración cuando aplique;
+- requisitos;
+- atributos públicos por tipo;
+- enlaces HTTPS de video;
+- disponibilidad pública.
+
+No expone:
+
+- dirección exacta;
+- `id`;
+- `property_id`;
+- `linked_apartment_id`;
+- matrícula;
+- número interno de unidad;
+- contacto interno de administración;
+- notas privadas;
+- timestamps operativos;
+- candidato/inquilino.
+
+Claves inexistentes, malformadas o ya no publicables devuelven 404.
+
+## 4.4 Media pública
+
+Contrato final:
+
+`GET /catalog/{publicKey}/photo/{position}`
+
+`position` es ordinal público derivado del orden de fotos; no corresponde a `unit_media.id`.
+
+Antes de servir bytes:
+
+1. `publicKey` resuelve una unidad actualmente publicable;
+2. la posición resuelve una foto de esa unidad;
+3. archivo queda dentro del directorio esperado;
+4. MIME persistido procede de validación real.
+
+Si falla cualquier condición → 404.
+
+Headers mínimos:
+
+- `Content-Type` validado;
+- `X-Content-Type-Options: nosniff`;
+- `Cache-Control: no-store` en F4 para evitar media stale tras despublicación.
+
+## 4.5 Aplicar
+
+No se renderiza en F4. F5 lo añadirá únicamente con flujo real de candidato.
+
+---
+
+# 5. MEDIA SEGURA
+
+## Foto
 
 - JPEG, PNG o WebP;
-- máximo **10 MiB**, regla obligatoria;
-- MIME real por `fileinfo`;
+- máximo 10 MiB;
+- MIME real con `fileinfo`;
 - nombre aleatorio generado por servidor;
-- almacenamiento fuera del webroot;
-- `stored_name` + `mime_type` requeridos;
-- `external_url = NULL`;
-- extensión/nombre del cliente nunca son fuente de confianza.
+- fuera del webroot;
+- nombre/extensión cliente no son fuente de confianza;
+- rollback evita archivo huérfano ante fallo de persistencia;
+- eliminación respeta pertenencia de unidad;
+- máximo una portada efectiva por unidad;
+- orden exacto y propiedad de IDs verificados en administración.
 
-### Video
+## Video
 
-- solo enlace externo HTTPS;
-- `external_url` requerido;
-- `stored_name = NULL`;
-- `mime_type = NULL`;
+- enlace HTTPS externo;
 - no upload;
 - no transcoding;
 - no iframe arbitrario;
-- se abre como enlace externo seguro.
-
-### Portada y orden
-
-- máximo una foto `is_cover = 1` por unidad, garantizado por servicio/transacción;
-- si no hay portada, primera foto por `sort_order`;
-- reordenar mediante valores simples; no drag-and-drop obligatorio;
-- si no hay foto, placeholder local/CSS en administración;
-- una unidad no puede activarse como pública sin al menos una foto.
+- enlace público escapado y con wrapping visual seguro.
 
 ---
 
-# 4. PRECIO: UNA FUENTE
+# 6. ADMINISTRACIÓN PRIVADA
 
-`units.monthly_price` es el canon/precio comercial vigente de F4.
-
-No crear `catalog_price` ni `suggested_rent` paralelo.
-
-`administration_fee` permanece separado para apartamentos.
-
-En catálogo:
-
-- mostrar canon/precio;
-- si `administration_fee > 0`, mostrarlo separado, sin sumarlo silenciosamente.
-
-En contratos futuros, el valor contractual será snapshot propio; cambios posteriores al precio de unidad no modificarán contratos existentes.
-
----
-
-# 5. ADMINISTRACIÓN Y PERMISOS
-
-Agregar exactamente:
+Permisos exactamente:
 
 - `properties.view`;
 - `properties.manage`.
 
-Owner mantiene bypass.
+Owner conserva bypass.
 
-`properties.view`:
+`properties.view` permite lectura y preview privado. `properties.manage` permite mutaciones.
 
-- leer propiedades;
-- leer unidades;
-- previsualizar media.
+Rutas privadas implementadas bajo `/admin/properties` y `/admin/units`, reutilizando sesión, forced-password guard, CSRF global y base path existentes.
 
-`properties.manage`:
+La UI privada incluye:
 
-- crear/editar propiedades;
-- crear/editar unidades;
-- cambiar estado;
-- cambiar intención de publicación;
-- precio/requisitos;
-- media.
-
-No agregar `catalog.manage`, `catalog.view`, `units.manage` ni permisos equivalentes.
-
-## Launcher Apps
-
-“Propiedades” aparece solo cuando:
-
-- la ruta real F4 existe;
-- el usuario tiene `properties.view` o es owner.
-
-No aparecen Candidatos, Contratos, Cartera ni Solicitudes antes de sus fases.
-
----
-
-# 6. PANTALLAS PRIVADAS MÍNIMAS
-
-## Propiedades
-
-Cards con:
-
-- nombre;
-- ciudad/sector;
-- activa/inactiva;
-- conteos simples de unidades por estado;
-- acceso al detalle.
-
-## Detalle de propiedad
-
-- datos privados;
-- activar/desactivar;
-- unidades relacionadas;
-- crear apartamento/parqueadero.
-
-## Detalle de unidad
-
-- datos comunes;
+- listado/cards de propiedades;
+- conteos simples por estado;
+- detalle/edición de propiedad;
+- activación/inactivación;
+- creación de unidad;
+- detalle/edición de unidad;
+- tipo inmutable;
 - campos contextuales por tipo;
-- precio;
-- estado;
-- intención de publicación;
-- descripción;
-- requisitos;
-- media;
-- parking→apartment opcional;
-- preview público solo si `PUBLIC_VISIBLE`.
+- parking→apartment de la misma propiedad;
+- estado/publicación;
+- precio, descripción y requisitos;
+- fotos, videos, portada y orden;
+- preview privado;
+- enlace público cuando corresponde.
 
-No wizard genérico. No editor drag-and-drop.
+Launcher **Propiedades** aparece solo para owner o usuario con `properties.view`.
 
 ---
 
-# 7. CONTRATOS DE RUTA
+# 7. SEGURIDAD Y PRIVACIDAD
 
-Paths exactos se congelan en el PLAN, pero la capacidad mínima es:
+F4 reutiliza las fronteras existentes y añade cobertura específica:
 
-## Públicas
-
-- `GET /` — landing visitante / shell autenticado;
-- `GET /catalog`;
-- `GET /catalog/{public_key}`;
-- `GET /catalog/media/{id}`.
-
-## Privadas
-
-- listar/crear/ver/editar propiedad;
-- activar/desactivar propiedad;
-- crear/ver/editar unidad;
-- cambiar estado/publicación;
-- cargar/eliminar/reordenar/seleccionar portada;
-- agregar/eliminar video links.
-
-Mutaciones privadas:
-
-- sesión;
-- `properties.manage`;
-- CSRF global existente;
-- validación server-side.
-
-Lecturas privadas:
-
-- sesión;
-- `properties.view` o owner.
-
----
-
-# 8. MEDIA Y FRONTERA PÚBLICA
-
-Fotos físicas fuera del webroot.
-
-La ruta de media recibe ID de `unit_media`, nunca path del cliente.
-
-Para visitante, antes de servir foto:
-
-1. media existe y es `photo`;
-2. unidad existe;
-3. propiedad activa;
-4. unidad `status = available`;
-5. unidad `is_public = 1`;
-6. archivo resuelto queda dentro del directorio esperado.
-
-Si falla → 404.
-
-Usuario autenticado con `properties.view` puede previsualizar media no pública sin duplicar el archivo.
-
-Headers:
-
-- `Content-Type` persistido tras validación real;
-- `X-Content-Type-Options: nosniff`;
-- cache pública solo cuando la media sea públicamente visible.
-
----
-
-# 9. VALIDACIONES
-
-## Property
-
-- nombre requerido;
-- dirección privada requerida;
-- ciudad requerida;
-- sector opcional.
-
-## Unit
-
-- property existente y activa al crear;
-- `type` exacto;
-- `code` requerido y único por property;
-- estado canónico;
-- precio no negativo cuando exista;
-- `public_key` solo servidor;
-- `is_public` boolean;
-- publicación 0→1 exige precio, descripción, requisitos y foto.
-
-## Apartment
-
-- área/habitaciones/baños no negativos;
-- columnas parking no deben dirigir comportamiento.
-
-## Parking
-
-- `linked_apartment_id` opcional;
-- mismo property;
-- destino apartment;
-- no autoenlace.
-
-## Media
-
+- CSRF global en POST privados;
+- forced password change;
+- permisos;
+- subfolder/base-path público y privado;
+- escape HTML;
+- allowlist pública explícita;
+- no IDOR en preview privado;
+- media física fuera del webroot;
+- bloqueo directo de storage por boundary existente;
 - MIME real;
-- máximo 10 MiB;
-- JPEG/PNG/WebP;
-- SVG rechazado;
-- fallo DB posterior al movimiento elimina archivo nuevo;
-- borrado evita archivo huérfano;
-- URL de video HTTPS válida.
+- path containment;
+- no IDs internos en URLs públicas;
+- media desaparece cuando deja de ser publicable.
 
 ---
 
-# 10. INACTIVACIÓN / BORRADO
+# 8. UX / VISUAL
 
-No hay hard-delete operacional de properties ni units en F4.
+F4 reutiliza el sistema visual F3 y un layout público ligero. No agrega framework frontend ni segundo design system.
 
-## Property inactiva
-
-- conserva unidades/media;
-- desaparece todo su catálogo;
-- sigue visible en administración.
-
-## Unit `inactive`
-
-- conserva datos/media;
-- desaparece del catálogo.
-
-`unit_media` sí puede eliminarse explícitamente por usuario autorizado, retirando registro y archivo físico cuando aplique.
-
-No crear sistema de auditoría paralelo en F4.
-
----
-
-# 11. SEGURIDAD Y PRIVACIDAD
-
-Debe bloquear:
-
-- IDOR administrativo;
-- path traversal;
-- PHP disfrazado de imagen;
-- SVG activo;
-- XSS en descripción/requisitos/video;
-- edición sin permiso;
-- mutación sin CSRF;
-- publicación accidental de `private_notes`;
-- exposición de `registry_number`;
-- exposición de dirección exacta;
-- exposición de administración/contacto privado;
-- media de unidad no visible a visitante.
-
-Texto dinámico escapado.
-
-Video externo validado HTTPS y, al abrir nueva pestaña, `rel="noopener noreferrer"`.
-
----
-
-# 12. UX / RESPONSIVE
-
-Reutilizar F3:
-
-- `View`;
-- tokens/classes CSS existentes;
-- branding;
-- shell;
-- Apps;
-- safe areas;
-- focus visible;
-- touch targets;
-- reduced motion.
-
-Landing/catalog pueden requerir layout público pequeño, pero no un segundo design system.
-
-No carousel library.
-
-JS solo si una interacción real no queda bien con HTML/CSS.
-
-QA visual:
+QA visual final verificada con Chromium/Playwright sobre DOM/CSS/JS reales:
 
 - 360×800;
 - 390×844;
 - 412×915;
 - 768×1024;
-- desktop ≥1280 px;
-- zoom equivalente 200%;
-- teclado/focus;
-- textos largos;
-- foto ausente;
-- cero overflow horizontal.
+- 1280×900;
+- reflow equivalente a 200%.
+
+Pantallas:
+
+- landing;
+- catálogo;
+- detalle público;
+- propiedades;
+- detalle propiedad;
+- detalle unidad.
+
+Verificado:
+
+- sin overflow horizontal normal;
+- imágenes responsivas;
+- URLs largas con wrapping;
+- foco visible;
+- dialog Apps;
+- bottom nav sin solapamiento;
+- controles privados con primitivas CSS locales.
 
 ---
 
-# 13. PERFORMANCE KISS
+# 9. ARQUITECTURA FINAL F4
 
-Escala inicial: decenas de unidades.
+F4 conserva:
 
-Usar:
+- 1 app PHP;
+- 1 DB;
+- 1 repo;
+- 1 auth;
+- 1 entidad `units`;
+- 1 regla de publicabilidad;
+- 1 `PropertyService`;
+- 1 `UnitMediaService`;
+- 1 archivo `app/Properties/routes.php` para rutas F4 públicas y privadas;
+- 1 layout público ligero;
+- CSS/JS nativos existentes.
 
-- PDO directo/simple;
-- índices útiles en FK, `public_key` y consulta pública;
-- `loading="lazy"` para imágenes no críticas.
-
-No usar:
-
-- ElasticSearch;
-- Redis;
-- CDN obligatoria;
-- pipeline thumbnails;
-- paginación obligatoria sin volumen real;
-- cache de aplicación sin medición.
-
----
-
-# 14. TESTS OBLIGATORIOS
-
-## Schema
-
-- instalación desde cero;
-- MigrationRunner idempotente;
-- solo `properties`, `units`, `unit_media` nuevas;
-- FK/unique esperados;
-- no `catalog_listings`;
-- no tablas separadas apartment/parking.
-
-## Persistencia/reglas
-
-- crear property;
-- apartment;
-- parking;
-- `public_key` generado, 24 hex, único;
-- code único por property;
-- estados válidos/invalidos;
-- parking→apartment válido;
-- rechazo cross-property/cross-type;
-- publicación exige contenido mínimo;
-- desactivación no borra;
-- una fuente de precio.
-
-## Media
-
-- JPEG/PNG/WebP válidos;
-- MIME falso/SVG rechazados;
-- >10 MiB rechazado;
-- fuera del webroot;
-- eliminación limpia;
-- video HTTPS válido;
-- URL inválida rechazada;
-- portada única.
-
-## HTTP privado
-
-- auth;
-- `properties.view`;
-- `properties.manage`;
-- CSRF;
-- owner bypass;
-- must-change-password;
-- Apps muestra Propiedades solo con ruta+permiso.
-
-## HTTP público
-
-- preinstall `/` conserva installer;
-- visitante instalado `/` landing;
-- autenticado `/` shell;
-- `/catalog` público;
-- solo `property active + available + is_public`;
-- detalle no visible/inexistente → 404;
-- no filtra dirección/notas/matrícula/contacto privado;
-- media no visible → 404;
-- basePath/subcarpeta correcto.
-
-## Regresión
-
-- F1/F2/F3 completas;
-- PHP 8.3/8.4/8.5.
+Delta de dependencias runtime: 0.  
+Delta Node/npm: 0.  
+ORM/repository/DTO/DI container: 0.
 
 ---
 
-# 15. DELTA ARQUITECTÓNICO MÁXIMO
+# 10. FUERA DE ALCANCE F4
 
-```text
-DB_TABLES_DELTA: +3 máximo
-- properties
-- units
-- unit_media
-
-NEW_PERMISSIONS: +2
-- properties.view
-- properties.manage
-
-COMPOSER_DEPENDENCIES_DELTA: +0
-NODE_NPM_DELTA: +0
-AUTH_SYSTEMS_DELTA: +0
-CATALOG_TABLES_DUPLICADAS: +0
-PUBLIC_APPLICATION_TABLES: +0
-```
-
-Techo runtime esperado, no cuota:
-
-- un `PropertyService` o equivalente;
-- un archivo de rutas F4;
-- vistas SSR necesarias;
-- CSS existente ampliado mínimamente.
-
-Separar un helper de media solo si reduce complejidad real; no por patrón.
-
----
-
-# 16. FUERA DE F4
-
+- candidatos;
 - Aplicar;
-- candidates/references;
-- consentimiento candidato;
-- portal/login candidato;
+- estudio aseguradora;
 - contratos;
-- tenant/lease;
+- leases/tenant portal;
 - cartera/pagos;
-- visitas;
-- WhatsApp/email;
-- mapas;
-- favoritos;
-- chat;
-- analítica de catálogo;
-- SEO avanzado;
-- upload/transcoding de video;
-- firma;
 - documentos privados;
-- inventarios de entrega;
-- CMS genérico;
-- multiempresa/SaaS.
+- inventarios;
+- upload/transcoding video;
+- SEO avanzado;
+- CMS independiente;
+- analytics decorativa.
 
 ---
 
-# 17. PRE-KISS
+# 11. EVIDENCIA DE CIERRE FUNCIONAL
+
+Último GREEN de producto previo a convergencia documental:
+
+`54836fa6a3baae49f0f60085e39d7ccb1f4d8198`
+
+CI:
+
+- run `38211673768`;
+- PHP 8.3 PASS;
+- PHP 8.4 PASS;
+- PHP 8.5 PASS;
+- Composer validate PASS;
+- PHPUnit: **151 tests / 873 assertions / 0 failures**.
+
+F4 todavía no se considera mergeada hasta completar convergencia documental, limpieza segura, gate final y aprobación explícita del usuario.
+
+---
+
+# 12. GATE ACTUAL
 
 ```text
-ONE_UNIT_MODEL: YES
-ONE_CATALOG_SOURCE: YES
-ONE_PRICE_SOURCE: YES
-ONE_AUTH: YES
-CATALOG_LISTINGS_TABLE: NO
-SEPARATE_APARTMENT_TABLE: NO
-SEPARATE_PARKING_TABLE: NO
-PUBLIC_LEAD_TABLE: NO
-VIDEO_HOSTING: NO
-CSS_FRAMEWORK_NEW: NO
-JS_FRAMEWORK_NEW: NO
-COMPOSER_NEW: NO
-FUTURE_BUTTONS: NO
+F4.8A CODE CONVERGENCE + VISUAL QA: CLOSED / GREEN
+F4.8B DOCUMENT CONVERGENCE: IN PROGRESS
+F4.8C SAFE CHECKPOINT CLEANUP: PENDING
+F4.8D FINAL TWO-LAWS GATE + F4_CLOSED: PENDING
+F4.8E PR REVIEW: PENDING
+MERGE: NOT AUTHORIZED
+F5: BLOCKED
 ```
-
----
-
-# 18. TWO-LAWS DESIGN GATE
-
-## Ley 1 KISS — PASS de diseño
-
-Porque inventario y catálogo comparten `units`; precio, disponibilidad, media, auth, CSRF, branding y shell no se duplican.
-
-## Ley 2 Cero Ruido — PASS de diseño
-
-Porque se rechazan explícitamente catálogo paralelo, lead/application paralelo, estados/precios/permisos duplicados, video hosting, rutas futuras y hard-delete operacional.
-
-El PASS documental no cierra F4. Implementación, diff, tests, CI y QA visual deben volver a demostrar ambas leyes.
-
----
-
-# 19. GATE
-
-Antes de cualquier código F4:
-
-1. usuario revisa/aprueba esta SPEC;
-2. se escribe PLAN F4 RED→GREEN;
-3. usuario revisa/aprueba PLAN;
-4. se integra documentación aprobada;
-5. se crea rama limpia de implementación desde `main`;
-6. comienza TDD.
-
-Hasta entonces: **cero migration, cero clase, cero ruta y cero vista de producto F4**.

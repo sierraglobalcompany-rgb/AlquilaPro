@@ -29,9 +29,11 @@ final class MigrationRunnerTest extends TestCase
             'password' => getenv('TEST_DB_PASSWORD') ?: 'root',
         ]));
 
-        foreach (['migration_probe', 'settings', 'users', 'schema_migrations'] as $table) {
+        $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+        foreach (['migration_probe', 'unit_media', 'units', 'properties', 'settings', 'users', 'schema_migrations'] as $table) {
             $this->pdo->exec(sprintf('DROP TABLE IF EXISTS `%s`', $table));
         }
+        $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
     }
 
     public function testAppliesProjectMigrationsAndSecondRunIsIdempotent(): void
@@ -45,16 +47,24 @@ final class MigrationRunnerTest extends TestCase
         $first = MigrationRunner::migrate($this->pdo, $directory);
         $second = MigrationRunner::migrate($this->pdo, $directory);
 
-        self::assertSame(3, $first['applied']);
+        self::assertSame(4, $first['applied']);
         self::assertSame(
-            ['001_create_users.sql', '002_create_settings.sql', '003_extend_users_for_auth.sql'],
+            [
+                '001_create_users.sql',
+                '002_create_settings.sql',
+                '003_extend_users_for_auth.sql',
+                '004_create_properties_units_media.sql',
+            ],
             $first['migrations'],
         );
         self::assertSame(0, $second['applied']);
         self::assertSame([], $second['migrations']);
-        self::assertSame(3, (int) $this->pdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn());
+        self::assertSame(4, (int) $this->pdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn());
         self::assertSame(1, $this->tableExists('users'));
         self::assertSame(1, $this->tableExists('settings'));
+        self::assertSame(1, $this->tableExists('properties'));
+        self::assertSame(1, $this->tableExists('units'));
+        self::assertSame(1, $this->tableExists('unit_media'));
     }
 
     public function testFailedMigrationIsNotRecordedAsApplied(): void

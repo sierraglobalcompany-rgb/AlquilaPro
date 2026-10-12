@@ -39,22 +39,6 @@ return static function (App $app, array $deps): void {
         return $user;
     };
 
-    $app->get('/', static function (ServerRequestInterface $request, ResponseInterface $response) use ($guard, $view, $csrf): ResponseInterface {
-        $user = $guard($response);
-        if ($user instanceof ResponseInterface) {
-            return $user;
-        }
-
-        $response->getBody()->write($view->renderApp('home', [
-            'pageTitle' => 'Inicio',
-            'user' => $user,
-            'activeNav' => 'home',
-            'csrfToken' => $csrf->token(),
-        ]));
-
-        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
-    });
-
     $app->get('/account', static function (ServerRequestInterface $request, ResponseInterface $response) use ($guard, $view, $csrf): ResponseInterface {
         $user = $guard($response);
         if ($user instanceof ResponseInterface) {

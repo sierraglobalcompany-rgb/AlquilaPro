@@ -28,9 +28,11 @@ final class UserServiceTest extends TestCase
             'password' => getenv('TEST_DB_PASSWORD') ?: 'root',
         ]));
 
-        foreach (['settings', 'users', 'schema_migrations'] as $table) {
+        $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+        foreach (['unit_media', 'units', 'properties', 'settings', 'users', 'schema_migrations'] as $table) {
             $this->pdo->exec(sprintf('DROP TABLE IF EXISTS `%s`', $table));
         }
+        $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
 
         MigrationRunner::migrate($this->pdo, dirname(__DIR__, 3) . '/database/migrations');
     }
@@ -43,11 +45,21 @@ final class UserServiceTest extends TestCase
         self::assertTrue($permissions::allows(['role' => 'admin', 'permissions' => ['users.view']], 'users.view'));
         self::assertFalse($permissions::allows(['role' => 'admin', 'permissions' => ['users.view']], 'users.manage'));
         self::assertTrue($permissions::allows(['role' => 'gestor', 'permissions' => ['users.permissions']], 'users.permissions'));
+        self::assertTrue($permissions::allows(['role' => 'gestor', 'permissions' => ['properties.view']], 'properties.view'));
         self::assertFalse($permissions::allows(['role' => 'gestor', 'permissions' => []], 'users.view'));
 
         self::assertSame(
-            ['users.view', 'users.permissions'],
-            $permissions::sanitize(['users.view', 'unknown.permission', 'users.view', 123, 'users.permissions']),
+            ['users.view', 'users.manage', 'users.permissions', 'properties.view', 'properties.manage'],
+            $permissions::sanitize([
+                'users.view',
+                'users.manage',
+                'users.permissions',
+                'properties.view',
+                'properties.manage',
+                'unknown.permission',
+                'properties.view',
+                123,
+            ]),
         );
     }
 

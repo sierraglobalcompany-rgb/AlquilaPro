@@ -33,9 +33,11 @@ final class ShellRoutesTest extends TestCase
             'password' => getenv('TEST_DB_PASSWORD') ?: 'root',
         ]));
 
-        foreach (['settings', 'users', 'schema_migrations'] as $table) {
+        $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+        foreach (['unit_media', 'units', 'properties', 'settings', 'users', 'schema_migrations'] as $table) {
             $this->pdo->exec(sprintf('DROP TABLE IF EXISTS `%s`', $table));
         }
+        $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
         MigrationRunner::migrate($this->pdo, dirname(__DIR__, 3) . '/database/migrations');
 
         $this->directory = sys_get_temp_dir() . '/alquila_shell_' . bin2hex(random_bytes(6));
@@ -59,12 +61,16 @@ final class ShellRoutesTest extends TestCase
         @rmdir($this->directory);
     }
 
-    public function testInstalledRootWithoutSessionRedirectsToLogin(): void
+    public function testInstalledRootWithoutSessionRendersPublicLanding(): void
     {
         $response = $this->request($this->app(), 'GET', '/');
+        $body = (string) $response->getBody();
 
-        self::assertSame(302, $response->getStatusCode());
-        self::assertSame('/login', $response->getHeaderLine('Location'));
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringContainsString('data-public-shell', $body);
+        self::assertStringContainsString('href="/catalog"', $body);
+        self::assertStringContainsString('href="/login"', $body);
+        self::assertStringNotContainsString('data-f3-app-shell', $body);
     }
 
     public function testAuthenticatedRootRendersSemanticMobileShell(): void
@@ -87,7 +93,7 @@ final class ShellRoutesTest extends TestCase
         self::assertStringContainsString('aria-current="page"', $body);
         self::assertStringNotContainsString('Cartera', $body);
         self::assertStringNotContainsString('Solicitudes', $body);
-        self::assertStringNotContainsString('Propiedades', $body);
+        self::assertStringContainsString('Propiedades', $body);
     }
 
     public function testAccountRequiresLoginAndRendersCurrentUser(): void

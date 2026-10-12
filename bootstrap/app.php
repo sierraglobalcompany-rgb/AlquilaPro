@@ -11,6 +11,8 @@ use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
 use AlquilaPro\Foundation\Installer;
 use AlquilaPro\Foundation\RuntimeRequirements;
+use AlquilaPro\Properties\PropertyService;
+use AlquilaPro\Properties\UnitMediaService;
 use AlquilaPro\UI\Branding;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
@@ -28,6 +30,7 @@ return static function (array $settings): App {
     $basePath = $basePath === '/' ? '' : $basePath;
     $viewsPath = dirname(__DIR__) . '/resources/views';
     $logoDirectory = (string) ($settings['logo_directory'] ?? dirname(__DIR__) . '/storage/branding');
+    $unitMediaDirectory = (string) ($settings['unit_media_directory'] ?? dirname(__DIR__) . '/storage/unit-media');
 
     $lock = new InstallationLock($lockPath);
     $installer = new Installer($lock, $migrationDirectory, $databaseConfigPath);
@@ -134,6 +137,8 @@ return static function (array $settings): App {
             $session = new SessionGuard();
             $branding = new Branding($pdo, $logoDirectory);
             $view = new View($viewsPath, $branding, $basePath);
+            $properties = new PropertyService($pdo);
+            $unitMedia = new UnitMediaService($pdo, $unitMediaDirectory);
 
             $currentUser = static function () use ($session, $auth): ?array {
                 $userId = $session->userId(time());
@@ -166,6 +171,12 @@ return static function (array $settings): App {
 
             $uiRoutes = require dirname(__DIR__) . '/app/UI/routes.php';
             $uiRoutes($app, $shared);
+
+            $propertyRoutes = require dirname(__DIR__) . '/app/Properties/routes.php';
+            $propertyRoutes($app, $shared + [
+                'properties' => $properties,
+                'unit_media' => $unitMedia,
+            ]);
         }
     }
 
