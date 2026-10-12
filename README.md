@@ -1,37 +1,39 @@
 # Alquila Pro
 
-Aplicación web mobile-first y autoinstalable para administrar arrendamientos de vivienda y parqueaderos, con **superficie pública de catálogo** y operación privada para administración/inquilinos.
+Aplicación web mobile-first y autoinstalable para administrar arrendamientos de vivienda y parqueaderos, con superficie pública de catálogo y operación privada para administración e inquilinos.
 
 **Dominio objetivo:** `https://alquilapro.sierraglobalcompany.com`  
-**Estado:** F0–F3 **CLOSED / VERIFIED / MERGED**  
-**Fase siguiente:** F4 — Propiedades + unidades + landing + catálogo público  
 **Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + CSS/JS mínimo  
-**Destino:** Hostinger; subdominio o subcarpeta HTTPS.
+**Destino:** Hostinger; subdominio o subcarpeta HTTPS.  
+**Estado actual:** F0–F3 CLOSED / VERIFIED / MERGED; F4 implementación funcional y QA completadas, cierre documental/ceremonial en progreso en PR #7.  
+**Merge F4 autorizado:** NO.
 
 ---
 
 # 1. PUNTO DE ENTRADA OBLIGATORIO
 
-Toda persona, ChatGPT, Codex, Antigravity u otra IA debe leer en este orden antes de tocar código:
+Antes de tocar código:
 
-1. [`README.md`](README.md)
-2. [`docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.2_AUDITADO.md`](docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.2_AUDITADO.md)
-3. [`docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.2_AUDITADO.md`](docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.2_AUDITADO.md)
-4. [`docs/checkpoints/ARCH_REAUDIT_V1_2_PUBLIC_CATALOG_2026-10-11.md`](docs/checkpoints/ARCH_REAUDIT_V1_2_PUBLIC_CATALOG_2026-10-11.md)
-5. checkpoint más reciente de la fase cerrada/abierta
-6. SPEC/plan específico de fase, si existe
-7. tests y CI reales
-8. código real del repositorio
+1. `README.md`;
+2. `docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.2_AUDITADO.md`;
+3. `docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.2_AUDITADO.md`;
+4. `docs/specs/F4_PROPERTIES_UNITS_PUBLIC_CATALOG_SPEC.md` cuando F4 sea relevante;
+5. `docs/plans/F4_PROPERTIES_UNITS_PUBLIC_CATALOG_IMPLEMENTATION_PLAN.md` cuando F4 sea relevante;
+6. checkpoint más reciente de la fase;
+7. tests y CI reales;
+8. código real del repositorio.
 
-Orden de autoridad:
+Regla de autoridad:
 
-`SPEC V1.2 → PLAN V1.2 → README/decisiones canónicas → SPEC/PLAN de fase → checkpoint → tests/CI → código`
+`SPEC maestra → PLAN maestro → decisiones canónicas README → SPEC/PLAN específica de fase → checkpoint → tests/CI → código`.
 
-V1.1 queda histórica y no debe usarse como autoridad para trabajo nuevo.
+Cuando una decisión específica posterior de fase documenta explícitamente una convergencia de un contrato preliminar del maestro, prevalece para esa fase hasta la siguiente revisión maestra. Esto evita revivir contratos históricos ya sustituidos.
+
+V1.1 queda histórica.
 
 ---
 
-# 2. LAS DOS LEYES SUPREMAS
+# 2. LEYES SUPREMAS
 
 ## LEY 1 — KISS
 
@@ -43,36 +45,36 @@ Orden obligatorio:
 
 > **ELIMINAR → UNIR / CONVERGER → SIMPLIFICAR → MEJORAR → AGREGAR**
 
-Ruido incluye:
+Antes de eliminar:
 
-- código muerto;
-- duplicación;
-- tablas equivalentes;
-- dos fuentes de precio/disponibilidad;
-- segundo auth;
-- CMS de catálogo paralelo;
-- lead/application paralelo al candidato;
-- rutas/botones futuros;
-- dependencias no usadas;
-- checkpoints/docs obsoletos.
+`REFERENCIAS → AUTORIDAD → REEMPLAZO → TEST → ELIMINAR → CI`.
 
-Toda fase cierra con:
-
-```text
-LEY_1_KISS: PASS
-LEY_2_CERO_RUIDO: PASS
-```
+No introducir código muerto, fuentes paralelas, módulos futuros, dependencias no usadas ni checkpoints redundantes sin una razón demostrable.
 
 ---
 
-# 3. ESTADO REAL DEL REPOSITORIO
+# 3. METODOLOGÍA
+
+Roles:
+
+- **ChatGPT:** producto, SPEC, arquitectura, UX, planes, auditoría, TDD, checkpoints y continuidad GitHub.
+- **Codex:** implementación concreta, tests y refactor controlado cuando aporte valor.
+- **Antigravity:** auditoría independiente/QA cuando aporte valor.
+
+Ciclo:
+
+`SCOPE → PRE-KISS → SPEC/DESIGN → PLAN → RED → VERIFY RED → MINIMAL GREEN → VERIFY GREEN → CONVERGE → QA → TWO LAWS GATE → CHECKPOINT → REVIEW → MERGE`.
+
+No merge sin aprobación explícita del usuario.
+
+---
+
+# 4. ESTADO REAL DEL REPOSITORIO
 
 ```text
 PROJECT: Alquila Pro
 REPO: sierraglobalcompany-rgb/AlquilaPro
 TARGET: alquilapro.sierraglobalcompany.com
-SPEC: V1.2 AUDITADA (rama documental hasta aprobar/mergear)
-PLAN: V1.2 AUDITADO (rama documental hasta aprobar/mergear)
 
 F0: CLOSED
 F1: CLOSED / VERIFIED / MERGED
@@ -80,136 +82,144 @@ F1_MERGE_SHA: a5225151358aaeca4698adf8cb85d815752a5ac4
 
 F2: CLOSED / VERIFIED / MERGED
 F2_MERGE_SHA: 96a4fa59ca82604d821061c6aed7d9edb3849ae1
-F2_QA: PHP 8.3 / 8.4 / 8.5 — 60 tests / 254 assertions
 
 F3: CLOSED / VERIFIED / MERGED
 F3_MERGE_SHA: b35c32b9f8c99646879e22b1af92e6a54690ceca
-F3_QA: PHP 8.3 / 8.4 / 8.5 — 94 tests / 458 assertions / 0 warnings
-F3_VISUAL_QA: PASS
-F3_MERGED_CHECKPOINT: docs/checkpoints/F3_MERGED_2026-10-11.md
 
-F4: NOT STARTED
-CURRENT_GATE: revisión/merge documentación V1.2 → SPEC específica F4
+F4: IMPLEMENTED / FUNCTIONAL QA GREEN / FINAL CLOSURE IN PROGRESS
+F4_BRANCH: impl/f4-properties-catalog-20261011
+F4_PR: #7 OPEN / DRAFT / NOT MERGED
+F4_LAST_PRODUCT_GREEN: 54836fa6a3baae49f0f60085e39d7ccb1f4d8198
+F4_LAST_CI: PHP 8.3 / 8.4 / 8.5 PASS — 151 tests / 873 assertions
+F4_VISUAL_QA: PASS
+CURRENT_GATE: F4.8B documentación → F4.8C limpieza segura → F4.8D gate final → F4.8E review
+MERGE_AUTHORIZED: NO
 ```
 
-No reimplementar F1–F3 sin evidencia de regresión.
+No reimplementar F1–F3. No reabrir tareas F4 ya certificadas sin evidencia de regresión.
 
 ---
 
-# 4. DECISIONES CANÓNICAS V1.2
+# 5. DECISIONES CANÓNICAS
 
-## 4.1 Una sola autenticación
+## 5.1 Auth único
 
-Propietario, administrador, gestor e inquilino usan el **mismo módulo de login, sesión, CSRF, cambio, recuperación y logout**.
+Propietario, administrador, gestor e inquilino usan el mismo login, sesión, CSRF, recuperación, cambio de contraseña y logout. F8 debe evolucionar el auth existente, no duplicarlo.
 
-No crear:
+No crear `tenant-login`, `admin-login`, segundo `AuthService` ni segunda tabla de sesiones.
 
-- tenant login;
-- admin login;
-- segundo AuthService;
-- segunda tabla de sesiones.
+## 5.2 Inventario único
 
-### Hueco real auditado
+F4 usa exactamente:
 
-El código F2 actual autentica por `users.email` únicamente.
+- `properties`;
+- `units` para `apartment|parking`;
+- `unit_media`.
 
-Cuando F8 implemente inquilinos debe **evolucionar** el mismo auth, no duplicarlo.
+No existen tablas paralelas de catálogo, apartamentos o parqueaderos.
 
-Diseño preferido a congelar en SPEC F8:
+## 5.3 Precio y disponibilidad
 
-- `users.login_identifier` UNIQUE;
-- backfill de usuarios existentes con email normalizado;
-- inquilino usa documento normalizado como `login_identifier`;
-- email continúa como contacto;
-- mismo AuthService/SessionGuard/CSRF/reset;
-- login UI puede decir `Correo o documento`.
+- precio comercial: `units.monthly_price`;
+- disponibilidad: `units.status`;
+- intención de publicación: `units.is_public`;
+- publicabilidad real: propiedad activa + `available` + `is_public=1` + precio + descripción + requisitos + al menos una foto válida.
 
-No implementar esto antes de F8 salvo necesidad real demostrada.
+No crear `catalog_price`, `available` boolean paralelo ni cache de publicabilidad independiente.
 
-## 4.2 Landing pública
+## 5.4 Identificador público F4
 
-Una vez instalada:
+El identificador público canónico es:
 
-- visitante sin sesión en `/` → landing pública;
-- landing tiene **Iniciar sesión** y **Catálogo**;
-- usuario autenticado en `/` conserva el shell privado;
-- antes de instalar, `/` conserva installer.
+`public_key = bin2hex(random_bytes(12))`
 
-No crear otro sitio/aplicación para catálogo.
+- 24 caracteres hexadecimales;
+- generado por servidor;
+- único;
+- no editable desde UI;
+- no usar slug adicional en F4.
 
-## 4.3 Catálogo = unidades, no CMS paralelo
+Detalle público:
 
-El catálogo público es una proyección de `units`.
+`GET /catalog/{publicKey}`.
 
-No crear:
+## 5.5 Media pública F4
 
-- `catalog_listings`;
-- `apartment_catalog`;
-- `parking_catalog`;
-- copia de precio/disponibilidad.
+Las fotos se almacenan fuera del webroot y se sirven únicamente mientras la unidad siga publicable.
 
-Una unidad se publica solo si:
+Contrato canónico:
 
-- `is_public = true`;
-- estado = `Disponible`;
-- propiedad activa;
-- datos públicos mínimos válidos.
+`GET /catalog/{publicKey}/photo/{position}`.
 
-`En proceso`, `Ocupada`, `Inactiva` o `Mantenimiento` desaparecen del catálogo automáticamente.
+No se expone `unit_media.id` en URLs públicas. `position` es un ordinal público derivado del orden de fotos. Cache fail-closed: `no-store` en F4 para que una despublicación sea efectiva inmediatamente.
 
-## 4.4 Unidades
+Video V1: enlace HTTPS externo; sin upload, transcoding ni iframe arbitrario.
 
-Una sola tabla/entidad `units` para:
+## 5.6 Superficie pública
 
-- apartamento;
-- parqueadero.
+- visitante instalado en `/` → landing pública;
+- usuario autenticado en `/` → shell privado F3;
+- `/catalog` → listado público;
+- `/catalog/{publicKey}` → detalle;
+- F4 no muestra CTA **Aplicar**.
 
-No CRUD/tablas paralelas mientras campos nullable por tipo sean claros.
+F5 añadirá Aplicar cuando exista el flujo real de candidato.
 
-Una sola fuente de precio comercial en unidad. El contrato posterior guarda el canon final como snapshot.
+## 5.7 Permisos F4
 
-## 4.5 Media
-
-- fotos de marketing: `unit_media`;
-- JPEG/PNG/WebP;
-- fuera del webroot;
-- MIME real + tamaño + nombres aleatorios;
-- solo se sirven públicamente si la unidad sigue publicable;
-- video V1: URL HTTPS externa;
-- video self-hosted/transcoding: P2.
-
-## 4.6 Aplicar = candidato único
-
-No tabla/CRM `lead` o `application` paralela.
-
-F5 activa el CTA `Aplicar` y crea/continúa el mismo `candidate`, enlazado a la unidad.
-
-El candidato puede continuar mediante token seguro sin segundo login tradicional.
-
-F4 **no muestra botón Aplicar** hasta que F5 tenga ruta real.
-
-## 4.7 Administración de catálogo
-
-Publicación/precio/fotos/descripción viven dentro de Propiedades/Unidades.
-
-Puede existir una vista UI “Catálogo”, pero comparte datos y permisos.
-
-Permisos previstos mínimos:
+Exactamente:
 
 - `properties.view`;
 - `properties.manage`.
 
-No `catalog.manage` salvo necesidad independiente futura.
+Owner conserva bypass. No `catalog.manage` ni permisos equivalentes.
 
 ---
 
-# 5. ROADMAP V1.2
+# 6. F4 — RESULTADO IMPLEMENTADO
+
+F4 incluye y ya tiene cobertura automatizada para:
+
+- CRUD/inactivación de propiedades;
+- unidades apartamento/parqueadero en una sola entidad;
+- relación parking → apartment del mismo property;
+- `unit.type` inmutable después de creación;
+- estados canónicos;
+- precio, descripción, requisitos y notas privadas;
+- intención/publicabilidad;
+- fotos JPEG/PNG/WebP por MIME real, máximo 10 MiB y fuera de webroot;
+- video HTTPS externo;
+- portada y orden;
+- administración privada;
+- launcher Propiedades;
+- CSRF/permisos/subfolder/IDOR;
+- landing pública;
+- catálogo y filtros mínimos;
+- detalle por `public_key`;
+- media pública sin IDs internos;
+- privacidad mediante allowlist pública;
+- QA visual responsive y reflow 200%.
+
+F4 NO incluye:
+
+- candidato;
+- Aplicar;
+- contratos;
+- leases;
+- documentos privados;
+- video upload/transcoding;
+- SEO avanzado;
+- CMS paralelo.
+
+---
+
+# 7. ROADMAP V1.2
 
 - F0 — SPEC + plan ✅
 - F1 — Foundation + installer ✅
 - F2 — Auth + usuarios + permisos ✅
 - F3 — Shell móvil + sistema visual ✅
-- **F4 — Propiedades + unidades + landing + catálogo público ← SIGUIENTE**
+- **F4 — Propiedades + unidades + landing + catálogo público — cierre final en progreso**
 - F5 — Aplicaciones + candidatos + referencias
 - F6 — Aseguradora/SURA
 - F7 — Contratos
@@ -233,81 +243,37 @@ No `catalog.manage` salvo necesidad independiente futura.
 - F25 — SERVER_READY
 - F26 — Hostinger + smoke test
 
----
-
-# 6. F4 — ALCANCE MACRO, TODAVÍA NO IMPLEMENTADO
-
-F4 debe incluir:
-
-- properties;
-- units;
-- unit_media;
-- apartment/parking;
-- estados;
-- precio comercial;
-- publicación;
-- fotos;
-- video URL;
-- requisitos públicos resumidos;
-- UI administrativa;
-- landing pública;
-- `/catalog`;
-- `/catalog/{slug}`;
-- media pública controlada;
-- permisos properties;
-- subfolder/security/tests.
-
-F4 NO incluye:
-
-- candidate;
-- CTA Aplicar;
-- contratos;
-- leases;
-- documentos privados;
-- video upload/transcoding;
-- SEO avanzado;
-- CMS paralelo.
-
-Antes de código F4 se requiere SPEC específica + plan ejecutable aprobados.
+F5 permanece bloqueada hasta que F4 se cierre y el usuario autorice el merge.
 
 ---
 
-# 7. PROTOCOLO DE RECUPERACIÓN
+# 8. PROTOCOLO DE RECUPERACIÓN
 
-Una nueva IA debe:
+Al retomar trabajo:
 
-1. leer este README;
-2. leer SPEC V1.2;
-3. leer PLAN V1.2;
-4. leer checkpoint de reauditoría V1.2;
-5. verificar `main`, ramas y PRs reales;
-6. revisar CI/tests;
-7. identificar primer gate abierto;
-8. aplicar ambas leyes;
-9. no reabrir fases cerradas sin evidencia;
-10. no implementar F5 antes de cerrar/mergear F4;
-11. no hacer merge sin aprobación explícita.
+1. verificar branch, PR y HEAD reales;
+2. leer el checkpoint más reciente;
+3. comparar documentación con tests/CI/código;
+4. identificar el primer gate abierto;
+5. continuar solo ese gate;
+6. cerrar con evidencia;
+7. crear checkpoint antes de abrir el siguiente bloque cuando el trabajo sea largo;
+8. no mergear sin aprobación.
 
-Prompt mínimo:
+Checkpoint de recuperación actual mientras F4 siga abierta:
 
-> Audita `sierraglobalcompany-rgb/AlquilaPro`. Lee `README.md`, SPEC V1.2, PLAN V1.2 y el checkpoint V1.2 más reciente. Recupera el estado real desde Git/tests/CI y continúa únicamente desde el primer gate abierto. Respeta Ley 1 KISS y Ley 2 Cero Ruido/Convergencia. Mantén un solo auth, un solo modelo de units, catálogo derivado de units y candidato único. No introduzcas módulos futuros ni fuentes paralelas.
+`docs/checkpoints/F4_CHECKPOINT_TASK8_VISUAL_QA_GREEN_DOC_CONVERGENCE_PENDING_2026-10-12.md`.
 
 ---
 
-# 8. GATE ACTUAL
+# 9. GATE ACTUAL
 
-La arquitectura V1.2 está documentada en la rama:
-
-`spec/v1.2-public-catalog-reaudit-20261011`
-
-Siguiente acción correcta:
-
-1. revisar SPEC/PLAN V1.2;
-2. integrar documentación a `main` tras aprobación;
-3. crear SPEC específica F4;
-4. revisar/aprobar SPEC F4;
-5. escribir plan F4;
-6. revisar/aprobar plan;
-7. entonces TDD.
-
-**No hay código F4 iniciado.**
+```text
+PHASE: F4
+MICROPHASE: F4.8B — CONVERGENCIA DOCUMENTAL
+NEXT: F4.8C — LIMPIEZA SEGURA DE CHECKPOINTS
+AFTER: F4.8D — GATE FINAL + F4_CLOSED
+THEN: F4.8E — REVIEW PR #7
+MERGE: BLOQUEADO HASTA APROBACIÓN EXPLÍCITA
+F5: NO INICIAR
+```
