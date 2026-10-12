@@ -199,7 +199,7 @@ final class CandidateReferencesTest extends TestCase
 
         $withDocument = $service->startCandidate($current['public_key'], $this->candidateInput('7005'), self::NOW + 20);
         $requirement = $this->pdo->prepare(
-            "INSERT INTO unit_application_requirements (unit_id, code, label) VALUES (:unit_id, 'identity', 'Documento')",
+            "INSERT INTO unit_application_requirements (unit_id, code, label, is_required) VALUES (:unit_id, 'identity', 'Documento', 0)",
         );
         $requirement->execute(['unit_id' => $current['id']]);
         $requirementId = (int) $this->pdo->lastInsertId();
