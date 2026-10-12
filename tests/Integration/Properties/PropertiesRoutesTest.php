@@ -14,6 +14,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
 use Slim\App;
 use Slim\Psr7\Factory\ServerRequestFactory;
+use Slim\Psr7\UploadedFile;
 
 final class PropertiesRoutesTest extends TestCase
 {
@@ -21,6 +22,7 @@ final class PropertiesRoutesTest extends TestCase
     private string $directory;
     private string $lockPath;
     private string $mediaDirectory;
+    private array $temporaryFiles = [];
 
     protected function setUp(): void
     {
@@ -54,6 +56,9 @@ final class PropertiesRoutesTest extends TestCase
     protected function tearDown(): void
     {
         $_SESSION = [];
+        foreach ($this->temporaryFiles as $file) {
+            @unlink($file);
+        }
         foreach (glob($this->mediaDirectory . '/*') ?: [] as $file) {
             @unlink($file);
         }
@@ -115,6 +120,140 @@ final class PropertiesRoutesTest extends TestCase
         self::assertSame(200, $this->request($ownerApp, 'GET', '/admin/properties')->getStatusCode());
     }
 
+    public function testManagerCanCreateEditAndToggleProperty(): void
+    {
+        $this->insertUser('manager@example.com', 'ManagerPassword123', 'admin', ['properties.view', 'properties.manage']);
+        $app = $this->app();
+        $this->login($app, 'manager@example.com', 'ManagerPassword123');
+
+        $create = $this->request($app, 'POST', '/admin/properties', [
+            'name' => 'Edificio Norte',
+            'address' => 'Calle 10 # 20-30',
+            'city' => 'Medellín',
+            'sector' => 'Calasanz',
+        ]);
+        self::assertSame(303, $create->getStatusCode());
+        $propertyId = (int) $this->pdo->query("SELECT id FROM properties WHERE name = 'Edificio Norte'")->fetchColumn();
+        self::assertGreaterThan(0, $propertyId);
+        self::assertSame('/admin/properties/' . $propertyId, $create->getHeaderLine('Location'));
+
+        $update = $this->request($app, 'POST', '/admin/properties/' . $propertyId, [
+            'name' => 'Edificio Norte Renovado',
+            'address' => 'Calle 10 # 20-30',
+            'city' => 'Medellín',
+            'sector' => 'La América',
+        ]);
+        self::assertSame(303, $update->getStatusCode());
+        self::assertSame('Edificio Norte Renovado', (string) $this->pdo->query('SELECT name FROM properties WHERE id = ' . $propertyId)->fetchColumn());
+
+        $status = $this->request($app, 'POST', '/admin/properties/' . $propertyId . '/status', ['active' => '0']);
+        self::assertSame(303, $status->getStatusCode());
+        self::assertSame(0, (int) $this->pdo->query('SELECT is_active FROM properties WHERE id = ' . $propertyId)->fetchColumn());
+    }
+
+    public function testManagerCanCreateEditAndPublishUnitAfterPhoto(): void
+    {
+        $this->insertUser('manager@example.com', 'ManagerPassword123', 'admin', ['properties.view', 'properties.manage']);
+        $propertyId = $this->insertProperty('Edificio Central');
+        $app = $this->app();
+        $this->login($app, 'manager@example.com', 'ManagerPassword123');
+
+        $create = $this->request($app, 'POST', '/admin/properties/' . $propertyId . '/units', [
+            'type' => 'apartment',
+            'code' => 'A-201',
+            'status' => 'available',
+            'monthly_price' => '1800000',
+            'description' => 'Apartamento iluminado',
+            'requirements' => 'Ingresos demostrables',
+            'bedrooms' => '3',
+            'bathrooms' => '2',
+        ]);
+        self::assertSame(303, $create->getStatusCode());
+        $unitId = (int) $this->pdo->query("SELECT id FROM units WHERE code = 'A-201'")->fetchColumn();
+        self::assertGreaterThan(0, $unitId);
+        self::assertSame('/admin/units/' . $unitId, $create->getHeaderLine('Location'));
+
+        $photo = $this->request(
+            $app,
+            'POST',
+            '/admin/units/' . $unitId . '/media/photo',
+            [],
+            ['photo' => $this->upload($this->pngBytes(), 'apartment.png', 'image/png')],
+        );
+        self::assertSame(303, $photo->getStatusCode());
+        self::assertSame(1, (int) $this->pdo->query("SELECT COUNT(*) FROM unit_media WHERE unit_id = $unitId AND type = 'photo'")->fetchColumn());
+
+        $update = $this->request($app, 'POST', '/admin/units/' . $unitId, [
+            'type' => 'apartment',
+            'code' => 'A-201',
+            'status' => 'available',
+            'monthly_price' => '1850000',
+            'description' => 'Apartamento iluminado y renovado',
+            'requirements' => 'Ingresos demostrables',
+            'bedrooms' => '3',
+            'bathrooms' => '2',
+            'is_public' => '1',
+        ]);
+        self::assertSame(303, $update->getStatusCode());
+        $row = $this->pdo->query('SELECT monthly_price, is_public FROM units WHERE id = ' . $unitId)->fetch(PDO::FETCH_ASSOC);
+        self::assertSame('1850000.00', $row['monthly_price']);
+        self::assertSame(1, (int) $row['is_public']);
+    }
+
+    public function testManagerCanManageVideoCoverOrderAndDeleteMedia(): void
+    {
+        $this->insertUser('manager@example.com', 'ManagerPassword123', 'admin', ['properties.view', 'properties.manage']);
+        $propertyId = $this->insertProperty('Edificio Multimedia');
+        $unitId = $this->insertUnit($propertyId, 'A-301');
+        $app = $this->app();
+        $this->login($app, 'manager@example.com', 'ManagerPassword123');
+
+        $photo = $this->request(
+            $app,
+            'POST',
+            '/admin/units/' . $unitId . '/media/photo',
+            [],
+            ['photo' => $this->upload($this->pngBytes(), 'photo.png', 'image/png')],
+        );
+        self::assertSame(303, $photo->getStatusCode());
+        $photoId = (int) $this->pdo->query("SELECT id FROM unit_media WHERE unit_id = $unitId AND type = 'photo'")->fetchColumn();
+
+        $video = $this->request($app, 'POST', '/admin/units/' . $unitId . '/media/video', [
+            'url' => 'https://video.example.com/tour',
+        ]);
+        self::assertSame(303, $video->getStatusCode());
+        $videoId = (int) $this->pdo->query("SELECT id FROM unit_media WHERE unit_id = $unitId AND type = 'video_link'")->fetchColumn();
+
+        self::assertSame(303, $this->request($app, 'POST', '/admin/units/' . $unitId . '/media/' . $photoId . '/cover')->getStatusCode());
+        self::assertSame(1, (int) $this->pdo->query('SELECT is_cover FROM unit_media WHERE id = ' . $photoId)->fetchColumn());
+
+        self::assertSame(303, $this->request($app, 'POST', '/admin/units/' . $unitId . '/media/order', [
+            'media_ids' => [$videoId, $photoId],
+        ])->getStatusCode());
+        $ordered = $this->pdo->query('SELECT id FROM unit_media WHERE unit_id = ' . $unitId . ' ORDER BY sort_order ASC')->fetchAll(PDO::FETCH_COLUMN);
+        self::assertSame([$videoId, $photoId], array_map('intval', $ordered));
+
+        self::assertSame(303, $this->request($app, 'POST', '/admin/units/' . $unitId . '/media/' . $videoId . '/delete')->getStatusCode());
+        self::assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM unit_media WHERE id = ' . $videoId)->fetchColumn());
+    }
+
+    public function testInvalidPropertyMutationReturns422WithoutRow(): void
+    {
+        $this->insertUser('manager@example.com', 'ManagerPassword123', 'admin', ['properties.view', 'properties.manage']);
+        $app = $this->app();
+        $this->login($app, 'manager@example.com', 'ManagerPassword123');
+
+        $response = $this->request($app, 'POST', '/admin/properties', [
+            'name' => '',
+            'address' => 'Calle 1',
+            'city' => 'Medellín',
+        ]);
+
+        self::assertSame(422, $response->getStatusCode());
+        self::assertStringContainsString('nombre de la propiedad', (string) $response->getBody());
+        self::assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM properties')->fetchColumn());
+    }
+
     private function app(string $basePath = ''): App
     {
         $factory = require dirname(__DIR__, 3) . '/bootstrap/app.php';
@@ -140,8 +279,13 @@ final class PropertiesRoutesTest extends TestCase
         self::assertSame(303, $response->getStatusCode());
     }
 
-    private function request(App $app, string $method, string $path, array $body = []): ResponseInterface
-    {
+    private function request(
+        App $app,
+        string $method,
+        string $path,
+        array $body = [],
+        array $uploads = [],
+    ): ResponseInterface {
         $request = (new ServerRequestFactory())->createServerRequest(
             $method,
             'https://alquilapro.sierraglobalcompany.com' . $path,
@@ -152,6 +296,9 @@ final class PropertiesRoutesTest extends TestCase
         }
         if ($body !== []) {
             $request = $request->withParsedBody($body);
+        }
+        if ($uploads !== []) {
+            $request = $request->withUploadedFiles($uploads);
         }
 
         return $app->handle($request);
@@ -179,5 +326,56 @@ final class PropertiesRoutesTest extends TestCase
         ]);
 
         return (int) $this->pdo->lastInsertId();
+    }
+
+    private function insertProperty(string $name): int
+    {
+        $statement = $this->pdo->prepare(
+            'INSERT INTO properties (name, address, city, sector) VALUES (:name, :address, :city, :sector)',
+        );
+        $statement->execute([
+            'name' => $name,
+            'address' => 'Calle 1 # 2-3',
+            'city' => 'Medellín',
+            'sector' => 'Calasanz',
+        ]);
+
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    private function insertUnit(int $propertyId, string $code): int
+    {
+        $statement = $this->pdo->prepare(
+            "INSERT INTO units (property_id, public_key, type, code, status) VALUES (:property_id, :public_key, 'apartment', :code, 'available')",
+        );
+        $statement->execute([
+            'property_id' => $propertyId,
+            'public_key' => bin2hex(random_bytes(12)),
+            'code' => $code,
+        ]);
+
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    private function upload(string $bytes, string $clientName, string $clientType): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'alquila_property_upload_');
+        if ($path === false || file_put_contents($path, $bytes) === false) {
+            self::fail('Unable to create upload fixture.');
+        }
+        $this->temporaryFiles[] = $path;
+
+        return new UploadedFile($path, $clientName, $clientType, strlen($bytes), UPLOAD_ERR_OK, false);
+    }
+
+    private function pngBytes(): string
+    {
+        $bytes = base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+            true,
+        );
+        self::assertIsString($bytes);
+
+        return $bytes;
     }
 }
