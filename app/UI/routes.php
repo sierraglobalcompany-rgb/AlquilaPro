@@ -39,10 +39,18 @@ return static function (App $app, array $deps): void {
         return $user;
     };
 
-    $app->get('/', static function (ServerRequestInterface $request, ResponseInterface $response) use ($guard, $view, $csrf): ResponseInterface {
-        $user = $guard($response);
-        if ($user instanceof ResponseInterface) {
-            return $user;
+    $app->get('/', static function (ServerRequestInterface $request, ResponseInterface $response) use ($currentUser, $session, $path, $view, $csrf): ResponseInterface {
+        $user = $currentUser();
+        if ($user === null) {
+            $response->getBody()->write($view->renderPublic('public_landing', [
+                'pageTitle' => 'Inicio',
+            ]));
+
+            return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+        }
+
+        if ($session->mustChangePassword()) {
+            return $response->withHeader('Location', $path('/account/password'))->withStatus(302);
         }
 
         $response->getBody()->write($view->renderApp('home', [

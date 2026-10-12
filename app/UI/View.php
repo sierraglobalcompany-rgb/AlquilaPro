@@ -26,6 +26,19 @@ final class View
         return (string) ob_get_clean();
     }
 
+    public function renderPublic(string $view, array $data = []): string
+    {
+        $content = $this->renderPartial($view, $data);
+        $branding = $this->branding->current();
+        $basePath = $this->basePath;
+        $pageTitle = trim((string) ($data['pageTitle'] ?? ''));
+
+        ob_start();
+        require $this->viewsPath . '/layouts/public.php';
+
+        return (string) ob_get_clean();
+    }
+
     public function renderApp(string $view, array $data = []): string
     {
         $content = $this->renderPartial($view, $data);
