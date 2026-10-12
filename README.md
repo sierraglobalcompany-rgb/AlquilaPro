@@ -5,9 +5,9 @@ Aplicación web mobile-first y autoinstalable para administrar arrendamientos de
 **Dominio objetivo:** `https://alquilapro.sierraglobalcompany.com`  
 **Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + CSS/JS mínimo  
 **Destino:** Hostinger; subdominio o subcarpeta HTTPS.  
-**Estado actual:** F0–F3 CLOSED / VERIFIED / MERGED; F4 CLOSED / VERIFIED en PR #7, pendiente de review/merge.  
-**Merge F4 autorizado:** NO.  
-**F5:** BLOQUEADA hasta autorización y merge de F4.
+**Estado actual:** F0–F4 CLOSED / VERIFIED / MERGED.  
+**F4 merge SHA:** `3226feeea0b1740659df46fae6499842dfbc894a`.  
+**F5:** NOT STARTED; siguiente fase autorizada para diseño/implementación.
 
 ---
 
@@ -18,18 +18,15 @@ Antes de tocar código:
 1. `README.md`;
 2. `docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.2_AUDITADO.md`;
 3. `docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.2_AUDITADO.md`;
-4. `docs/specs/F4_PROPERTIES_UNITS_PUBLIC_CATALOG_SPEC.md` cuando F4 sea relevante;
-5. `docs/plans/F4_PROPERTIES_UNITS_PUBLIC_CATALOG_IMPLEMENTATION_PLAN.md` cuando F4 sea relevante;
-6. `docs/decisions/F4_CONVERGENCIA_CONTRATOS_PUBLICOS_2026-10-12.md` para contratos públicos F4 refinados;
-7. `docs/checkpoints/F4_CLOSED_2026-10-12.md`;
-8. tests y CI reales;
-9. código real del repositorio.
+4. `docs/checkpoints/F4_MERGED_2026-10-12.md`;
+5. `docs/checkpoints/F4_CLOSED_2026-10-12.md` para detalle de F4;
+6. `docs/specs/F4_PROPERTIES_UNITS_PUBLIC_CATALOG_SPEC.md` y `docs/plans/F4_PROPERTIES_UNITS_PUBLIC_CATALOG_IMPLEMENTATION_PLAN.md` solo cuando F4 sea relevante;
+7. tests y CI reales;
+8. código real del repositorio.
 
 Regla de autoridad:
 
 `SPEC maestra → PLAN maestro → decisiones canónicas README → SPEC/PLAN específica de fase → decisiones específicas posteriores documentadas → checkpoint → tests/CI → código`.
-
-Cuando una decisión específica posterior de fase documenta explícitamente una convergencia de un contrato preliminar del maestro, prevalece para esa fase hasta la siguiente revisión maestra. Esto evita revivir contratos históricos ya sustituidos.
 
 V1.1 queda histórica.
 
@@ -88,23 +85,24 @@ F2_MERGE_SHA: 96a4fa59ca82604d821061c6aed7d9edb3849ae1
 F3: CLOSED / VERIFIED / MERGED
 F3_MERGE_SHA: b35c32b9f8c99646879e22b1af92e6a54690ceca
 
-F4: CLOSED / VERIFIED / NOT MERGED
-F4_BRANCH: impl/f4-properties-catalog-20261011
-F4_PR: #7 OPEN / DRAFT / NOT MERGED
-F4_LAST_PRODUCT_GREEN: 54836fa6a3baae49f0f60085e39d7ccb1f4d8198
-F4_PRE_CLOSE_HEAD: ea9f063ace6e2cddc83cfc18677f434ab72ef5e2
-F4_PRE_CLOSE_CI: 38213153654 — PHP 8.3 / 8.4 / 8.5 PASS — 151 tests / 873 assertions
+F4: CLOSED / VERIFIED / MERGED
+F4_FINAL_HEAD: 5e1faa5d18b4397fcaac1b834d33c1d4fbd8bdea
+F4_PR: #7 CLOSED / MERGED
+F4_MERGE_SHA: 3226feeea0b1740659df46fae6499842dfbc894a
+F4_FINAL_CI: 38213578871 — PHP 8.3 / 8.4 / 8.5 PASS — 151 tests / 873 assertions
 F4_VISUAL_QA: PASS
-CURRENT_GATE: F4.8E — REVIEW FINAL PR #7
-MERGE_AUTHORIZED: NO
-F5: BLOCKED
+LEY_1_KISS: PASS
+LEY_2_CERO_RUIDO: PASS
+
+CURRENT_GATE: F5 — NOT STARTED
+NEXT: F5 SCOPE / PRE-KISS / SPEC / PLAN
 ```
 
-No reimplementar F1–F3. No reabrir F4 sin evidencia de regresión o una nueva SPEC aprobada.
+No reimplementar F1–F4. No reabrir F4 sin evidencia de regresión o una nueva SPEC aprobada.
 
 ---
 
-# 5. DECISIONES CANÓNICAS F4
+# 5. DECISIONES CANÓNICAS HEREDADAS DE F4
 
 ## 5.1 Auth único
 
@@ -131,31 +129,23 @@ No existen tablas paralelas de catálogo, apartamentos o parqueaderos.
 
 No crear `catalog_price`, booleano paralelo de disponibilidad ni caché independiente de publicabilidad.
 
-## 5.4 Identificador público
+## 5.4 Identificador y media pública
 
-`public_key = bin2hex(random_bytes(12))`
-
-- 24 caracteres hexadecimales;
-- generado por servidor;
-- único;
-- no editable desde UI;
-- no usar slug adicional en F4.
+`public_key = bin2hex(random_bytes(12))` → 24 caracteres hexadecimales, generado por servidor y no editable.
 
 Detalle público:
 
 `GET /catalog/{publicKey}`.
 
-## 5.5 Media pública
-
-Contrato canónico:
+Foto pública:
 
 `GET /catalog/{publicKey}/photo/{position}`.
 
-No se expone `unit_media.id` en URLs públicas. Las fotos viven fuera del webroot y solo se sirven mientras la unidad siga publicable. Cache F4: `no-store` para despublicación inmediata.
+No se expone `unit_media.id` en URLs públicas. Las fotos viven fuera del webroot y solo se sirven mientras la unidad siga publicable. Cache F4: `no-store`.
 
 Video V1: enlace HTTPS externo; sin upload, transcoding ni iframe arbitrario.
 
-## 5.6 Superficie pública
+## 5.5 Superficie pública
 
 - visitante instalado en `/` → landing pública;
 - usuario autenticado en `/` → shell privado F3;
@@ -163,22 +153,22 @@ Video V1: enlace HTTPS externo; sin upload, transcoding ni iframe arbitrario.
 - `/catalog/{publicKey}` → detalle;
 - F4 no muestra CTA **Aplicar**.
 
-F5 añadirá Aplicar cuando exista el flujo real de candidato.
+F5 podrá añadir **Aplicar** únicamente cuando exista el flujo real de candidato.
 
-## 5.7 Permisos
+## 5.6 Permisos F4
 
 Exactamente:
 
 - `properties.view`;
 - `properties.manage`.
 
-Owner conserva bypass. No `catalog.manage` ni permisos equivalentes.
+Owner conserva bypass.
 
 ---
 
 # 6. RESULTADO F4
 
-F4 quedó implementada y verificada con:
+F4 quedó implementada, verificada y mergeada con:
 
 - CRUD/inactivación de propiedades;
 - unidades apartamento/parqueadero en una sola entidad;
@@ -207,16 +197,7 @@ F4 quedó implementada y verificada con:
 - un solo auth;
 - una sola fuente de precio y disponibilidad.
 
-F4 NO incluye:
-
-- candidato;
-- Aplicar;
-- contratos;
-- leases;
-- documentos privados;
-- video upload/transcoding;
-- SEO avanzado;
-- CMS paralelo.
+F4 NO incluye candidato, Aplicar, contratos, leases, documentos privados, video upload/transcoding, SEO avanzado ni CMS paralelo.
 
 ---
 
@@ -226,8 +207,8 @@ F4 NO incluye:
 - F1 — Foundation + installer ✅
 - F2 — Auth + usuarios + permisos ✅
 - F3 — Shell móvil + sistema visual ✅
-- **F4 — Propiedades + unidades + landing + catálogo público ✅ CLOSED / VERIFIED / pendiente merge**
-- F5 — Aplicaciones + candidatos + referencias
+- F4 — Propiedades + unidades + landing + catálogo público ✅ CLOSED / VERIFIED / MERGED
+- **F5 — Aplicaciones + candidatos + referencias — NEXT / NOT STARTED**
 - F6 — Aseguradora/SURA
 - F7 — Contratos
 - F8 — Inquilino + lease + portal usando auth único
@@ -250,30 +231,29 @@ F4 NO incluye:
 - F25 — SERVER_READY
 - F26 — Hostinger + smoke test
 
-F5 permanece bloqueada hasta autorización explícita y merge de F4.
-
 ---
 
 # 8. PROTOCOLO DE RECUPERACIÓN
 
 Al retomar trabajo:
 
-1. verificar branch, PR y HEAD reales;
-2. leer `docs/checkpoints/F4_CLOSED_2026-10-12.md` mientras PR #7 no esté mergeado;
-3. comparar documentación con tests/CI/código;
-4. si F4 sigue sin merge, trabajar únicamente review/merge;
-5. no abrir F5 antes del merge autorizado;
-6. no reabrir contratos F4 ya certificados sin evidencia.
+1. verificar `main` y HEAD reales;
+2. leer `docs/checkpoints/F4_MERGED_2026-10-12.md`;
+3. contrastar SPEC/PLAN maestra con el alcance exacto de F5;
+4. ejecutar PRE-KISS antes de diseñar F5;
+5. crear SPEC/PLAN específica de F5 si hace falta para eliminar ambigüedad;
+6. implementar F5 por microfases cerrables con TDD;
+7. crear checkpoint entre microfases largas;
+8. no reabrir contratos F4 certificados sin evidencia.
 
 ---
 
 # 9. GATE ACTUAL
 
 ```text
-PHASE: F4
-STATUS: CLOSED / VERIFIED / NOT MERGED
-MICROPHASE: F4.8E — FINAL PR REVIEW
-PR: #7 OPEN / DRAFT
-MERGE: BLOQUEADO HASTA APROBACIÓN EXPLÍCITA
-F5: NO INICIAR
+LAST_PHASE: F4 CLOSED / VERIFIED / MERGED
+MERGE_SHA: 3226feeea0b1740659df46fae6499842dfbc894a
+NEXT_PHASE: F5 — APLICACIONES + CANDIDATOS + REFERENCIAS
+F5_STATUS: NOT STARTED
+NEXT_ACTION: SCOPE → PRE-KISS → SPEC/DESIGN → PLAN
 ```
