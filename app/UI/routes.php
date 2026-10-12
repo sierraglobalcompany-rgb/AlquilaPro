@@ -8,6 +8,7 @@ use AlquilaPro\UI\Branding;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\UploadedFileInterface;
 use RuntimeException;
 use Slim\App;
 
@@ -122,12 +123,15 @@ return static function (App $app, array $deps): void {
         $form = (array) ($request->getParsedBody() ?? []);
         $uploads = $request->getUploadedFiles();
         $logo = $uploads['logo'] ?? null;
+        if ($logo instanceof UploadedFileInterface && $logo->getError() === UPLOAD_ERR_NO_FILE) {
+            $logo = null;
+        }
 
         try {
             $branding->update(
                 (string) ($form['app_name'] ?? ''),
                 (string) ($form['primary_color'] ?? ''),
-                $logo,
+                $logo instanceof UploadedFileInterface ? $logo : null,
             );
         } catch (RuntimeException $exception) {
             $response->getBody()->write($view->renderApp('appearance', [
