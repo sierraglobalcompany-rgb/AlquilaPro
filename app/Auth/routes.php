@@ -201,13 +201,18 @@ return static function (App $app, array $deps): void {
         }
 
         $form = (array) ($request->getParsedBody() ?? []);
+        $requestedPermissions = is_array($form['permissions'] ?? null) ? $form['permissions'] : [];
+        if ($requestedPermissions !== [] && !Permissions::allows($authorized, 'users.permissions')) {
+            return $response->withStatus(403);
+        }
+
         try {
             $users->create(
                 (string) ($form['full_name'] ?? ''),
                 (string) ($form['email'] ?? ''),
                 (string) ($form['role'] ?? ''),
                 (string) ($form['temporary_password'] ?? ''),
-                is_array($form['permissions'] ?? null) ? $form['permissions'] : [],
+                $requestedPermissions,
             );
         } catch (Throwable) {
             return $response->withStatus(422);
