@@ -152,6 +152,94 @@ final class UnitMediaServiceTest extends TestCase
         self::assertNull($service->privatePhoto($unitId, $media['id']));
     }
 
+    public function testVideoLinkRequiresHttpsAndStoresOnlyExternalUrl(): void
+    {
+        $unitId = $this->unitId();
+        $service = $this->service();
+
+        $video = $service->addVideoLink($unitId, '  https://video.example.com/watch?v=abc123  ');
+        self::assertSame('video_link', $video['type']);
+        self::assertSame('https://video.example.com/watch?v=abc123', $video['external_url']);
+        self::assertNull($video['stored_name']);
+        self::assertNull($video['mime_type']);
+
+        foreach (['', 'http://video.example.com/watch', 'javascript:alert(1)', '//video.example.com/watch'] as $invalid) {
+            try {
+                $service->addVideoLink($unitId, $invalid);
+                self::fail('Only absolute HTTPS video links may be stored.');
+            } catch (RuntimeException $exception) {
+                self::assertNotSame('', $exception->getMessage());
+            }
+        }
+
+        self::assertCount(1, $service->listForUnit($unitId));
+    }
+
+    public function testCoverIsUniquePhotoAndRejectsVideoOrForeignMedia(): void
+    {
+        $unitId = $this->unitId('A-10');
+        $otherUnitId = $this->unitId('A-20');
+        $service = $this->service();
+        $first = $service->addPhoto($unitId, $this->upload($this->pngBytes(), 'first.png', 'image/png'));
+        $second = $service->addPhoto($unitId, $this->upload($this->pngBytes(), 'second.png', 'image/png'));
+        $video = $service->addVideoLink($unitId, 'https://video.example.com/one');
+        $foreign = $service->addPhoto($otherUnitId, $this->upload($this->pngBytes(), 'foreign.png', 'image/png'));
+
+        $service->setCover($unitId, $first['id']);
+        $listed = $service->listForUnit($unitId);
+        self::assertTrue($listed[0]['is_cover']);
+        self::assertFalse($listed[1]['is_cover']);
+
+        $service->setCover($unitId, $second['id']);
+        $listed = $service->listForUnit($unitId);
+        self::assertFalse($listed[0]['is_cover']);
+        self::assertTrue($listed[1]['is_cover']);
+        self::assertSame(1, array_sum(array_map(static fn (array $media): int => $media['is_cover'] ? 1 : 0, $listed)));
+
+        foreach ([$video['id'], $foreign['id']] as $invalidId) {
+            try {
+                $service->setCover($unitId, $invalidId);
+                self::fail('Cover must be a photo owned by the unit.');
+            } catch (RuntimeException $exception) {
+                self::assertNotSame('', $exception->getMessage());
+            }
+        }
+    }
+
+    public function testReorderRequiresExactOwnedMediaSetWithoutDuplicates(): void
+    {
+        $unitId = $this->unitId('A-30');
+        $otherUnitId = $this->unitId('A-40');
+        $service = $this->service();
+        $first = $service->addPhoto($unitId, $this->upload($this->pngBytes(), 'first.png', 'image/png'));
+        $second = $service->addPhoto($unitId, $this->upload($this->pngBytes(), 'second.png', 'image/png'));
+        $video = $service->addVideoLink($unitId, 'https://video.example.com/two');
+        $foreign = $service->addPhoto($otherUnitId, $this->upload($this->pngBytes(), 'foreign.png', 'image/png'));
+
+        $service->reorder($unitId, [$video['id'], $second['id'], $first['id']]);
+        $listed = $service->listForUnit($unitId);
+        self::assertSame([$video['id'], $second['id'], $first['id']], array_column($listed, 'id'));
+        self::assertSame([1, 2, 3], array_column($listed, 'sort_order'));
+
+        foreach ([
+            [$first['id'], $first['id'], $second['id']],
+            [$first['id'], $second['id']],
+            [$first['id'], $second['id'], $foreign['id']],
+        ] as $invalidOrder) {
+            try {
+                $service->reorder($unitId, $invalidOrder);
+                self::fail('Reorder must contain each owned media id exactly once.');
+            } catch (RuntimeException $exception) {
+                self::assertNotSame('', $exception->getMessage());
+            }
+        }
+
+        self::assertSame(
+            [$video['id'], $second['id'], $first['id']],
+            array_column($service->listForUnit($unitId), 'id'),
+        );
+    }
+
     private function service(): UnitMediaService
     {
         if (!class_exists(UnitMediaService::class)) {
