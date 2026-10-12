@@ -62,14 +62,11 @@ return static function (array $settings): App {
         return (string) ob_get_clean();
     };
 
-    $app->get('/', static function (ServerRequestInterface $request, ResponseInterface $response) use ($lock, $installPath): ResponseInterface {
-        if (!$lock->isInstalled()) {
+    if (!$lock->isInstalled()) {
+        $app->get('/', static function (ServerRequestInterface $request, ResponseInterface $response) use ($installPath): ResponseInterface {
             return $response->withHeader('Location', $installPath)->withStatus(302);
-        }
-
-        $response->getBody()->write('Alquila Pro');
-        return $response;
-    });
+        });
+    }
 
     $app->get('/install', static function (ServerRequestInterface $request, ResponseInterface $response) use ($lock, $renderInstaller): ResponseInterface {
         if ($lock->isInstalled()) {
@@ -133,19 +130,42 @@ return static function (array $settings): App {
         }
 
         if ($pdo instanceof \PDO) {
+            $auth = new AuthService($pdo);
+            $session = new SessionGuard();
             $branding = new Branding($pdo, $logoDirectory);
             $view = new View($viewsPath, $branding, $basePath);
-            $routes = require dirname(__DIR__) . '/app/Auth/routes.php';
-            $routes($app, [
-                'auth' => new AuthService($pdo),
-                'users' => new UserService($pdo),
-                'session' => new SessionGuard(),
+
+            $currentUser = static function () use ($session, $auth): ?array {
+                $userId = $session->userId(time());
+                if ($userId === null) {
+                    return null;
+                }
+
+                $user = $auth->findUser($userId);
+                if ($user === null || !$user['is_active']) {
+                    $session->logout();
+                    return null;
+                }
+
+                return $user;
+            };
+
+            $shared = [
+                'auth' => $auth,
+                'session' => $session,
                 'csrf' => $csrf,
                 'base_path' => $basePath,
                 'base_url' => $baseUrl,
                 'views' => $viewsPath,
                 'view' => $view,
-            ]);
+                'current_user' => $currentUser,
+            ];
+
+            $authRoutes = require dirname(__DIR__) . '/app/Auth/routes.php';
+            $authRoutes($app, $shared + ['users' => new UserService($pdo)]);
+
+            $uiRoutes = require dirname(__DIR__) . '/app/UI/routes.php';
+            $uiRoutes($app, $shared);
         }
     }
 
