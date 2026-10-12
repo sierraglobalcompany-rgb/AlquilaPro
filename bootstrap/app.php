@@ -11,7 +11,6 @@ use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
 use AlquilaPro\Foundation\Installer;
 use AlquilaPro\Foundation\RuntimeRequirements;
-use PDO;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\App;
@@ -118,14 +117,14 @@ return static function (array $settings): App {
 
     if ($lock->isInstalled()) {
         $pdo = $settings['pdo'] ?? null;
-        if (!$pdo instanceof PDO && is_file($databaseConfigPath)) {
+        if (!$pdo instanceof \PDO && is_file($databaseConfigPath)) {
             $database = require $databaseConfigPath;
             if (is_array($database)) {
                 $pdo = DatabaseConnector::connect(DatabaseConfig::fromArray($database));
             }
         }
 
-        if ($pdo instanceof PDO) {
+        if ($pdo instanceof \PDO) {
             $routes = require dirname(__DIR__) . '/app/Auth/routes.php';
             $routes($app, [
                 'auth' => new AuthService($pdo),
