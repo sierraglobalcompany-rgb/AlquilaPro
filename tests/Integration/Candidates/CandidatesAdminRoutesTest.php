@@ -93,11 +93,11 @@ final class CandidatesAdminRoutesTest extends TestCase
         $_SESSION = [];
         $this->insertUser('forced@example.com', 'ForcedPassword123', 'admin', ['candidates.view'], true);
         $forcedApp = $this->app('/sub');
-        $forcedLogin = $this->request($forcedApp, 'POST', '/sub/login', [
+        $login = $this->request($forcedApp, 'POST', '/sub/login', [
             'email' => 'forced@example.com',
             'password' => 'ForcedPassword123',
         ]);
-        self::assertSame('/sub/account/password', $forcedLogin->getHeaderLine('Location'));
+        self::assertSame('/sub/account/password', $login->getHeaderLine('Location'));
         $blocked = $this->request($forcedApp, 'GET', '/sub/admin/candidates');
         self::assertSame(302, $blocked->getStatusCode());
         self::assertSame('/sub/account/password', $blocked->getHeaderLine('Location'));
@@ -115,17 +115,17 @@ final class CandidatesAdminRoutesTest extends TestCase
         $this->insertUser('viewer@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
         $viewerApp = $this->app('/sub');
         $this->login($viewerApp, 'viewer@example.com', 'ViewerPassword123', '/sub');
-        $viewerHome = (string) $this->request($viewerApp, 'GET', '/sub/')->getBody();
-        self::assertStringContainsString('href="/sub/admin/candidates"', $viewerHome);
-        self::assertStringContainsString('Candidatos', $viewerHome);
+        $viewerHtml = (string) $this->request($viewerApp, 'GET', '/sub/')->getBody();
+        self::assertStringContainsString('href="/sub/admin/candidates"', $viewerHtml);
+        self::assertStringContainsString('Candidatos', $viewerHtml);
 
         $_SESSION = [];
         $this->insertUser('restricted@example.com', 'RestrictedPassword123', 'admin', ['properties.view']);
         $restrictedApp = $this->app('/sub');
         $this->login($restrictedApp, 'restricted@example.com', 'RestrictedPassword123', '/sub');
-        $restrictedHome = (string) $this->request($restrictedApp, 'GET', '/sub/')->getBody();
-        self::assertStringNotContainsString('/sub/admin/candidates', $restrictedHome);
-        self::assertStringNotContainsString('Candidatos', $restrictedHome);
+        $restrictedHtml = (string) $this->request($restrictedApp, 'GET', '/sub/')->getBody();
+        self::assertStringNotContainsString('/sub/admin/candidates', $restrictedHtml);
+        self::assertStringNotContainsString('Candidatos', $restrictedHtml);
     }
 
     public function testListAndDetailEscapeCandidateReferenceAndOriginalFilename(): void
@@ -142,20 +142,7 @@ final class CandidatesAdminRoutesTest extends TestCase
             'phone' => '3001112233',
             'email' => 'ref@example.com',
         ]);
-
-        $unitId = (int) $this->pdo->query('SELECT unit_id FROM candidates WHERE id = ' . $candidateId)->fetchColumn();
-        $documents = new CandidateDocumentService($this->pdo, $this->documentDirectory);
-        $documents->createRequirement($unitId, [
-            'code' => 'identity',
-            'label' => 'Identidad',
-            'is_required' => 1,
-            'is_active' => 1,
-        ]);
-        $document = $documents->addOrReplaceDocument(
-            $candidateId,
-            'identity',
-            $this->upload($this->pdfBytes(), '<img src=x onerror=alert(1)>.pdf', 'application/pdf'),
-        );
+        $document = $this->addDocument($candidateId, '<img src=x onerror=alert(1)>.pdf');
 
         $this->insertUser('viewer@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
         $app = $this->app();
@@ -182,7 +169,6 @@ final class CandidatesAdminRoutesTest extends TestCase
     public function testStatusMutationRequiresManageAndCannotSimulatePublicSubmit(): void
     {
         $candidateId = $this->insertCandidate('STATUS-1', 'Estado Candidato');
-
         $this->insertUser('viewer@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
         $viewerApp = $this->app();
         $this->login($viewerApp, 'viewer@example.com', 'ViewerPassword123');
@@ -195,11 +181,10 @@ final class CandidatesAdminRoutesTest extends TestCase
         $this->insertUser('manager@example.com', 'ManagerPassword123', 'admin', ['candidates.view', 'candidates.manage']);
         $managerApp = $this->app();
         $this->login($managerApp, 'manager@example.com', 'ManagerPassword123');
-
-        $forbiddenTransition = $this->request($managerApp, 'POST', '/admin/candidates/' . $candidateId . '/status', [
+        $invalid = $this->request($managerApp, 'POST', '/admin/candidates/' . $candidateId . '/status', [
             'status' => 'verification',
         ]);
-        self::assertSame(422, $forbiddenTransition->getStatusCode());
+        self::assertSame(422, $invalid->getStatusCode());
         self::assertSame('new', $this->candidateStatus($candidateId));
 
         $withdraw = $this->request($managerApp, 'POST', '/admin/candidates/' . $candidateId . '/status', [
@@ -213,8 +198,8 @@ final class CandidatesAdminRoutesTest extends TestCase
     public function testPrivateDocumentReadRequiresViewAndRejectsCrossCandidateIdor(): void
     {
         $candidateA = $this->insertCandidate('DOC-A', 'Candidato A');
-        $candidateB = $this->insertCandidate('DOC-B', 'Candidato B');
-        $unitId = (int) $this->pdo->query('SELECT unit_id FROM candidates WHERE id = ' . $candidateA)->fetchColumn();
+        $unitId = $this->candidateUnitId($candidateA);
+        $candidateB = $this->insertCandidate('DOC-B', 'Candidato B', 'new', null, $unitId);
         $documents = new CandidateDocumentService($this->pdo, $this->documentDirectory);
         $documents->createRequirement($unitId, [
             'code' => 'identity',
@@ -243,9 +228,11 @@ final class CandidatesAdminRoutesTest extends TestCase
         self::assertSame('nosniff', $owned->getHeaderLine('X-Content-Type-Options'));
         self::assertSame('private, no-store', $owned->getHeaderLine('Cache-Control'));
         self::assertSame($this->pdfBytes(), (string) $owned->getBody());
-
-        $idor = $this->request($app, 'GET', '/admin/candidates/' . $candidateA . '/documents/' . $documentB['id']);
-        self::assertSame(404, $idor->getStatusCode());
+        self::assertSame(404, $this->request(
+            $app,
+            'GET',
+            '/admin/candidates/' . $candidateA . '/documents/' . $documentB['id'],
+        )->getStatusCode());
 
         $_SESSION = [];
         $this->insertUser('restricted@example.com', 'RestrictedPassword123', 'admin', ['properties.view']);
@@ -266,41 +253,31 @@ final class CandidatesAdminRoutesTest extends TestCase
         $app = $this->app('/sub', 'https://tenant.example.test/sub');
         $this->login($app, 'manager@example.com', 'ManagerPassword123', '/sub');
 
-        $response = $this->request(
-            $app,
-            'POST',
-            '/sub/admin/candidates/' . $candidateId . '/token/regenerate',
-        );
+        $response = $this->request($app, 'POST', '/sub/admin/candidates/' . $candidateId . '/token/regenerate');
         self::assertSame(200, $response->getStatusCode());
         $html = (string) $response->getBody();
-        self::assertMatchesRegularExpression(
-            '#https://tenant\.example\.test/sub/apply/continue/([a-f0-9]{64})#',
-            $html,
-        );
+        self::assertMatchesRegularExpression('#https://tenant\.example\.test/sub/apply/continue/([a-f0-9]{64})#', $html);
         preg_match('#/apply/continue/([a-f0-9]{64})#', $html, $matches);
         $newToken = (string) ($matches[1] ?? '');
         self::assertNotSame('', $newToken);
         self::assertNotSame($oldToken, $newToken);
         self::assertStringNotContainsString($oldToken, $html);
 
-        $row = $this->pdo->query(
+        $hash = (string) $this->pdo->query(
             'SELECT continuation_token_hash FROM candidates WHERE id = ' . $candidateId,
-        )->fetch(PDO::FETCH_ASSOC);
-        self::assertIsArray($row);
-        self::assertSame(hash('sha256', $newToken), $row['continuation_token_hash']);
-        self::assertNotSame($newToken, $row['continuation_token_hash']);
-
+        )->fetchColumn();
+        self::assertSame(hash('sha256', $newToken), $hash);
+        self::assertNotSame($newToken, $hash);
         self::assertSame(404, $this->request($app, 'GET', '/sub/apply/continue/' . $oldToken)->getStatusCode());
         self::assertSame(200, $this->request($app, 'GET', '/sub/apply/continue/' . $newToken)->getStatusCode());
 
-        $detail = (string) $this->request($app, 'GET', '/sub/admin/candidates/' . $candidateId)->getBody();
-        self::assertStringNotContainsString($newToken, $detail);
+        $detailHtml = (string) $this->request($app, 'GET', '/sub/admin/candidates/' . $candidateId)->getBody();
+        self::assertStringNotContainsString($newToken, $detailHtml);
     }
 
     private function app(string $basePath = '', ?string $baseUrl = null): App
     {
         $factory = require dirname(__DIR__, 3) . '/bootstrap/app.php';
-
         return $factory([
             'lock_path' => $this->lockPath,
             'database_config_path' => $this->directory . '/database.php',
@@ -314,13 +291,8 @@ final class CandidatesAdminRoutesTest extends TestCase
         ]);
     }
 
-    private function request(
-        App $app,
-        string $method,
-        string $path,
-        array $body = [],
-        bool $withCsrf = true,
-    ): ResponseInterface {
+    private function request(App $app, string $method, string $path, array $body = [], bool $withCsrf = true): ResponseInterface
+    {
         $request = (new ServerRequestFactory())->createServerRequest(
             $method,
             'https://alquilapro.sierraglobalcompany.com' . $path,
@@ -331,29 +303,21 @@ final class CandidatesAdminRoutesTest extends TestCase
         if ($body !== []) {
             $request = $request->withParsedBody($body);
         }
-
         return $app->handle($request);
     }
 
     private function login(App $app, string $email, string $password, string $basePath = ''): void
     {
-        $response = $this->request($app, 'POST', $basePath . '/login', [
+        self::assertSame(303, $this->request($app, 'POST', $basePath . '/login', [
             'email' => $email,
             'password' => $password,
-        ]);
-        self::assertSame(303, $response->getStatusCode());
+        ])->getStatusCode());
     }
 
-    private function insertUser(
-        string $email,
-        string $password,
-        string $role,
-        array $permissions = [],
-        bool $mustChangePassword = false,
-    ): int {
+    private function insertUser(string $email, string $password, string $role, array $permissions = [], bool $mustChangePassword = false): int
+    {
         $statement = $this->pdo->prepare(
-            'INSERT INTO users '
-            . '(role, full_name, email, password_hash, is_active, permissions_json, must_change_password) '
+            'INSERT INTO users (role, full_name, email, password_hash, is_active, permissions_json, must_change_password) '
             . 'VALUES (:role, :full_name, :email, :password_hash, 1, :permissions_json, :must_change_password)',
         );
         $statement->execute([
@@ -364,7 +328,6 @@ final class CandidatesAdminRoutesTest extends TestCase
             'permissions_json' => $permissions === [] ? null : json_encode($permissions, JSON_THROW_ON_ERROR),
             'must_change_password' => $mustChangePassword ? 1 : 0,
         ]);
-
         return (int) $this->pdo->lastInsertId();
     }
 
@@ -373,23 +336,25 @@ final class CandidatesAdminRoutesTest extends TestCase
         string $fullName,
         string $status = 'new',
         ?string $rawToken = null,
+        ?int $unitId = null,
     ): int {
-        $property = $this->pdo->prepare(
-            "INSERT INTO properties (name, address, city, sector, is_active) VALUES (:name, 'Calle 1', 'Medellín', 'Calasanz', 1)",
-        );
-        $property->execute(['name' => 'Propiedad ' . $documentNumber]);
-        $propertyId = (int) $this->pdo->lastInsertId();
-
-        $unit = $this->pdo->prepare(
-            "INSERT INTO units (property_id, public_key, type, code, status, is_public) "
-            . "VALUES (:property_id, :public_key, 'apartment', :code, 'available', 0)",
-        );
-        $unit->execute([
-            'property_id' => $propertyId,
-            'public_key' => bin2hex(random_bytes(12)),
-            'code' => 'A-' . substr(hash('sha256', $documentNumber), 0, 8),
-        ]);
-        $unitId = (int) $this->pdo->lastInsertId();
+        if ($unitId === null) {
+            $property = $this->pdo->prepare(
+                "INSERT INTO properties (name, address, city, sector, is_active) VALUES (:name, 'Calle 1', 'Medellín', 'Calasanz', 1)",
+            );
+            $property->execute(['name' => 'Propiedad ' . $documentNumber]);
+            $propertyId = (int) $this->pdo->lastInsertId();
+            $unit = $this->pdo->prepare(
+                "INSERT INTO units (property_id, public_key, type, code, status, is_public) "
+                . "VALUES (:property_id, :public_key, 'apartment', :code, 'available', 0)",
+            );
+            $unit->execute([
+                'property_id' => $propertyId,
+                'public_key' => bin2hex(random_bytes(12)),
+                'code' => 'A-' . substr(hash('sha256', $documentNumber), 0, 8),
+            ]);
+            $unitId = (int) $this->pdo->lastInsertId();
+        }
 
         $token = $rawToken ?? bin2hex(random_bytes(32));
         $candidate = $this->pdo->prepare(
@@ -409,8 +374,23 @@ final class CandidatesAdminRoutesTest extends TestCase
             'expires_at' => '2099-01-01 00:00:00',
             'consent_at' => '2026-10-12 12:00:00',
         ]);
-
         return (int) $this->pdo->lastInsertId();
+    }
+
+    private function addDocument(int $candidateId, string $name): array
+    {
+        $documents = new CandidateDocumentService($this->pdo, $this->documentDirectory);
+        $documents->createRequirement($this->candidateUnitId($candidateId), [
+            'code' => 'identity',
+            'label' => 'Identidad',
+            'is_required' => 1,
+            'is_active' => 1,
+        ]);
+        return $documents->addOrReplaceDocument(
+            $candidateId,
+            'identity',
+            $this->upload($this->pdfBytes(), $name, 'application/pdf'),
+        );
     }
 
     private function upload(string $bytes, string $clientName, string $clientType): UploadedFile
@@ -420,7 +400,6 @@ final class CandidatesAdminRoutesTest extends TestCase
             self::fail('Unable to create candidate admin upload fixture.');
         }
         $this->temporaryFiles[] = $path;
-
         return new UploadedFile($path, $clientName, $clientType, strlen($bytes), UPLOAD_ERR_OK, false);
     }
 
@@ -429,10 +408,13 @@ final class CandidatesAdminRoutesTest extends TestCase
         return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<<>>\n%%EOF\n";
     }
 
+    private function candidateUnitId(int $candidateId): int
+    {
+        return (int) $this->pdo->query('SELECT unit_id FROM candidates WHERE id = ' . $candidateId)->fetchColumn();
+    }
+
     private function candidateStatus(int $candidateId): string
     {
-        return (string) $this->pdo->query(
-            'SELECT status FROM candidates WHERE id = ' . $candidateId,
-        )->fetchColumn();
+        return (string) $this->pdo->query('SELECT status FROM candidates WHERE id = ' . $candidateId)->fetchColumn();
     }
 }
