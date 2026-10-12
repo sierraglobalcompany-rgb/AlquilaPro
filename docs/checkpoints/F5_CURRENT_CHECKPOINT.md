@@ -1,4 +1,4 @@
-# F5 CURRENT CHECKPOINT — F5.1 CLOSED / VERIFIED
+# F5 CURRENT CHECKPOINT — F5.2 CLOSED / VERIFIED
 
 **Fecha:** 2026-10-12 (America/Bogota)  
 **Proyecto:** Alquila Pro  
@@ -16,12 +16,13 @@ F0-F4: CLOSED / VERIFIED / MERGED
 F5_SPEC: APPROVED
 F5_PLAN: APPROVED
 F5.1_SCHEMA_PERMISSIONS: CLOSED / VERIFIED
-F5.2_CANDIDATE_CORE_TOKEN: NOT STARTED
-F5.3-F5.8: NOT STARTED
+F5.2_CANDIDATE_CORE_TOKEN: CLOSED / VERIFIED
+F5.3_PUBLIC_START_CONTINUE: NOT STARTED
+F5.4-F5.8: NOT STARTED
 MERGE_ALLOWED: NO
 ```
 
-No abrir F5.2 sin retomar desde este checkpoint y reconfirmar HEAD/CI/PR.
+No abrir F5.3 sin retomar desde este checkpoint y reconfirmar HEAD/CI/PR.
 
 ---
 
@@ -44,170 +45,243 @@ Leyes:
 
 ---
 
-## 3. F5.1 — RESULTADO
+## 3. F5.1 — FUNDACIÓN CERRADA
 
-F5.1 agrega únicamente la fundación de datos y permisos.
+F5.1 quedó CLOSED / VERIFIED con:
 
-### Schema delta
+- exactamente +4 tablas: `candidates`, `candidate_references`, `unit_application_requirements`, `candidate_documents`;
+- exactamente +2 permisos: `candidates.view`, `candidates.manage`;
+- +0 dependencias runtime;
+- +0 npm;
+- sin `lead`, `applications`, `rental_applications`, login candidato ni segunda sesión.
 
-Exactamente +4 tablas:
+GREEN final F5.1:
 
-- `candidates`
-- `candidate_references`
-- `unit_application_requirements`
-- `candidate_documents`
-
-No existen:
-
-- `leads`
-- `applications`
-- `rental_applications`
-- tabla de auth/sesión candidato
-- tabla pública paralela
-
-Constraints fijados por tests:
-
-- `UNIQUE(candidates.document_type, candidates.document_number)`
-- `UNIQUE(candidates.continuation_token_hash)`
-- `UNIQUE(unit_application_requirements.unit_id, code)`
-- `UNIQUE(candidate_documents.candidate_id, requirement_id)`
-- FKs candidaturas/referencias/requisitos/documentos según SPEC.
-
-### Permissions delta
-
-Exactamente +2:
-
-- `candidates.view`
-- `candidates.manage`
-
-### Dependencies
-
-- Composer runtime delta: 0
-- npm delta: 0
-- servicios F5: 0 todavía
-- rutas F5: 0 todavía
-- vistas F5: 0 todavía
+- producto/test isolation: `a9449e8f87c345e6baafeda9bd26a5aa8f86b882`;
+- CI: `38263081173`;
+- PHP 8.3 / 8.4 / 8.5: PASS;
+- PHPUnit PHP 8.3: **157 tests / 905 assertions / 0 failures / 0 errors**.
 
 ---
 
-## 4. TDD / EVIDENCIA
+## 4. F5.2 — CANDIDATE CORE + SECURE CONTINUATION TOKEN
 
-### RED 1
+### Scope aplicado
 
-Commit: `e7e2613a789636cfebfb47cdc3f2a5b5b3b383e9`  
-CI: `38261771347`
+F5.2 agregó únicamente:
 
-Resultado esperado:
+- `app/Candidates/CandidateService.php`;
+- `tests/Integration/Candidates/CandidateServiceTest.php`.
 
-- PHP 8.3 / 8.4 / 8.5: FAIL
-- 156 tests / 880 assertions / 4 fallos en PHP 8.4 observado
-- fallos únicamente por tablas/índices/FKs/permisos F5 ausentes.
+No agregó:
 
-### RED 2 — contrato de columnas exactas
+- rutas;
+- vistas;
+- bootstrap wiring público;
+- nuevas tablas;
+- nuevas dependencias;
+- segundo auth/session;
+- referencias runtime;
+- documentos runtime;
+- cambio de unidad runtime.
 
-Commit: `1baff8bbcc6c9be8762908bdaef285e55868ada6`  
-CI: `38262110842`
+### Contratos cerrados
 
-Resultado observado:
+`CandidateService` implementa en F5.2:
 
-- 157 tests / 881 assertions / 5 fallos
-- se añadió RED de columnas exactas
-- sin regresión funcional F1-F4.
+- `startCandidate()`;
+- `findByToken()`;
+- `updateByToken()`;
+- `submitByToken()`;
+- `listCandidates()`;
+- `findCandidate()`;
+- `transitionStatus()`;
+- `regenerateToken()`.
 
-### GREEN producto inicial
-
-Commit: `bf81f7f4670e7407340ab179dc6fe390c0b19391`
-
-Implementó:
-
-- migration 005
-- dos permisos F5
-- contrato MigrationRunner a 5 migraciones
-
-La suite focal F5 pasó, pero el full suite reveló contaminación histórica de BD de tests: nuevas tablas hijas permanecían entre métodos y setups antiguos intentaban borrar padres F1-F4.
-
-No se relajaron FKs ni schema productivo.
-
-### Corrección de causa raíz — test isolation
-
-Commit: `a9449e8f87c345e6baafeda9bd26a5aa8f86b882`  
-CI: `38263081173`
-
-Se centralizó aislamiento de BD **solo en tests** mediante PHPUnit 11:
-
-- `tests/Support/DatabaseIsolationExtension.php`
-- `phpunit.xml`
-
-La extensión vacía la BD de prueba después de cada test con FK checks desactivados durante cleanup. No modifica runtime/producción.
-
-### GREEN final F5.1
-
-CI `38263081173`:
-
-- PHP 8.3: PASS
-- PHP 8.4: PASS
-- PHP 8.5: PASS
-- Composer validate --strict: PASS
-- PHPUnit PHP 8.3: **157 tests / 905 assertions / 0 failures / 0 errors**
+`changeUnitByToken()` y `replaceReferencesByToken()` **no se agregaron como stubs**. Su comportamiento pertenece a la microfase F5.4 — Profile Completion + References + Controlled Unit Change. Esta convergencia evita código muerto y no cambia el contrato funcional futuro del PLAN.
 
 ---
 
-## 5. F5.1 TWO LAWS GATE
+## 5. TOKEN / IDENTIDAD
+
+Contrato comprobado:
+
+- raw token = `bin2hex(random_bytes(32))`;
+- exactamente 64 caracteres hex lowercase;
+- DB persiste únicamente `hash('sha256', $rawToken)`;
+- TTL por defecto = `604800` segundos / 7 días;
+- expiración es fail-closed;
+- token inválido no resuelve candidato;
+- regeneración invalida inmediatamente el raw token anterior;
+- raw token se devuelve únicamente al crear/regenerar, nunca se persiste.
+
+Normalización mínima y no destructiva fijada para F5:
+
+- `document_type`: `trim` + lowercase;
+- `document_number`: `trim` + uppercase;
+- no se eliminan puntos, guiones u otros caracteres internos porque SPEC/PLAN no definen esa transformación.
+
+Identidad:
+
+- `document_type` + `document_number` son inmutables mediante actualización pública;
+- identidad duplicada normalizada no crea segunda fila;
+- error de duplicado es genérico: no incluye candidate ID, token, nombre, email, unidad ni estado.
+
+---
+
+## 6. PUBLICABILIDAD Y CONTINUIDAD
+
+`startCandidate()` reutiliza `PropertyService::findPublicUnit()` como gate de F4; no duplica el predicado de publicabilidad.
+
+Reglas verificadas:
+
+- unidad actualmente publicable -> puede iniciar candidato;
+- unidad no publicable -> no acepta candidato nuevo;
+- candidato creado válidamente antes de despublicar la unidad -> su token sigue resolviendo;
+- F5 no altera `units.status`.
+
+No se creó segunda fuente de disponibilidad/precio/publicación.
+
+---
+
+## 7. ESTADOS Y SUBMIT F5.2
+
+Estados F5 siguen siendo exactamente:
+
+- `new`;
+- `incomplete`;
+- `verification`;
+- `pending_screening`;
+- `withdrawn`.
+
+Regla aplicada en F5.2:
+
+- creación pública -> `new`;
+- `submitByToken()` es la única operación F5.2 que puede producir `new|incomplete -> verification`;
+- `transitionStatus()` no puede simular submit desde `new|incomplete`;
+- admin/core permite `new -> incomplete|withdrawn`;
+- `incomplete -> withdrawn` vía transición administrativa;
+- `verification -> pending_screening|withdrawn`;
+- `pending_screening -> withdrawn`;
+- `withdrawn` terminal.
+
+El salto `incomplete -> verification` sigue disponible por `submitByToken()`, no por transición administrativa.
+
+Submit F5.2 valida:
+
+- token vigente;
+- estado editable `new|incomplete`;
+- datos básicos persistidos;
+- consentimiento;
+- regla laboral determinística: si cualquiera de `employment_status`, `employer_name`, `occupation`, `monthly_income`, `employment_notes` fue iniciado, `employment_status` debe estar presente;
+- al pasar, fija `status = verification` y `submitted_at`.
+
+La completitud por requisitos/documentos se añadirá en F5.5, que es la microfase propietaria de `CandidateDocumentService` y requisitos estructurados.
+
+F5.4 añadirá validaciones extendidas de perfil/referencias y promoción de guardado parcial `new -> incomplete`.
+
+---
+
+## 8. TDD / EVIDENCIA F5.2
+
+### RED
+
+Commit: `6d08aec9383de0e77ec3a6a0ffcc63969ee70bf6`  
+CI: `38264567979`
+
+PHP 8.3 observado:
+
+- **164 tests / 912 assertions / 7 failures**;
+- los 7 fallos fueron exactamente los tests nuevos F5.2 por ausencia de `CandidateService`;
+- F1-F4 y F5.1 permanecieron verdes.
+
+Casos RED:
+
+1. candidato nuevo + token/hash/TTL;
+2. token inválido/expirado + continuidad tras despublicación;
+3. identidad duplicada normalizada sin segunda fila/fuga;
+4. identidad inmutable + bloqueo de edición tras submit;
+5. regeneración invalida token anterior;
+6. regla laboral + submit como único camino público a verification;
+7. matriz de transiciones y `withdrawn` terminal.
+
+### GREEN producto
+
+Commit: `511dc595b8265794f19dd3b5a04fef1ceaa62d36`  
+CI push: `38264989604`
+
+Resultado:
+
+- PHP 8.3: PASS;
+- PHP 8.4: PASS;
+- PHP 8.5: PASS;
+- Composer validate --strict: PASS;
+- PHPUnit PHP 8.3: **164 tests / 968 assertions / 0 failures / 0 errors**;
+- los 7 tests `CandidateService` pasan;
+- regresión F1-F4 + F5.1 completa verde.
+
+---
+
+## 9. F5.2 TWO LAWS GATE
 
 ```text
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
-ADDED_PRODUCT: migration 005 + 2 permissions
-ADDED_TEST_INFRA: one database-isolation extension
-REMOVED: 0
-MERGED_OR_CONVERGED: DB test cleanup centralized instead of editing ~25 setup arrays
+ADDED_PRODUCT: +1 CandidateService
+ADDED_TESTS: +1 CandidateServiceTest
+ADDED_ROUTES: 0
+ADDED_VIEWS: 0
+ADDED_TABLES_F5.2: 0
 DEPENDENCIES_DELTA: 0
-DB_SCHEMA_DELTA: +4 tables exactly
-PUBLIC_ROUTES_DELTA: 0
+NPM_DELTA: 0
+SECOND_AUTH: NO
+PARALLEL_APPLICATION_ENTITY: NO
+PUBLICABILITY_DUPLICATION: NO
+DEAD_STUBS_FOR_F5.4: NO
 ```
 
-No se añadió CandidateService, rutas, UI, CTA Aplicar ni documentos runtime fuera del schema.
+No se agregaron repository/DTO/interface/factory, workflow engine, token table, candidate session, CRM ni abstracciones futuras.
 
 ---
 
-## 6. PR
+## 10. PR
 
-PR #8:
+PR #8 debe permanecer:
 
-- title: `F5: Applications, candidates and references`
-- state: OPEN
-- draft: YES
-- merged: NO
+- state: OPEN;
+- draft: YES;
+- merged: NO;
 - merge no autorizado.
 
+No marcar Ready todavía: F5.3-F5.8 siguen abiertas.
+
 ---
 
-## 7. SIGUIENTE MICROFASE — NO INICIADA
+## 11. SIGUIENTE MICROFASE — NO INICIADA
 
-F5.2 — Candidate Core + Secure Continuation Token.
+F5.3 — Public Start + Continue Surface.
 
 Orden exacto al retomar:
 
-1. reconfirmar branch HEAD / PR #8 / CI;
-2. releer SPEC §4–§7, decisión de privacidad/transiciones y PLAN F5.2;
-3. escribir `tests/Integration/Candidates/CandidateServiceTest.php` RED;
-4. verificar RED exacto;
-5. implementar únicamente `app/Candidates/CandidateService.php` GREEN mínimo;
-6. verificar focal + full CI 8.3/8.4/8.5;
-7. actualizar este mismo checkpoint, no crear WIP paralelo;
-8. no abrir F5.3 hasta F5.2 GREEN.
+1. reconfirmar branch HEAD / PR #8 / CI del checkpoint;
+2. releer PLAN F5.3 y contratos de privacidad/throttle/subfolder;
+3. crear RED `tests/Integration/Candidates/PublicCandidateApplyTest.php`;
+4. verificar RED real antes de producción;
+5. registrar `CandidateService` y exactamente un `app/Candidates/routes.php` en bootstrap;
+6. crear `resources/views/public_apply_start.php` y `resources/views/public_candidate_continue.php`;
+7. implementar solo start/continue + throttle local mínimo + CSRF/basePath;
+8. verificar focal + regresión F4 public detail + full CI PHP 8.3/8.4/8.5;
+9. actualizar este mismo checkpoint;
+10. no abrir F5.4 antes de F5.3 GREEN.
 
-Interfaces F5.2 previstas por PLAN:
+F5.3 debe mantener:
 
-- `startCandidate()`
-- `findByToken()`
-- `updateByToken()`
-- `changeUnitByToken()`
-- `replaceReferencesByToken()`
-- `submitByToken()`
-- `listCandidates()`
-- `findCandidate()`
-- `transitionStatus()`
-- `regenerateToken()`
-
-F5.2 debe seguir sin rutas/UI públicas.
+- ninguna segunda auth/session;
+- ningún candidate ID público;
+- ningún token hash público;
+- duplicate identity sin token/contexto privado;
+- un solo route file F5;
+- throttle V1 local/session, sin Redis/tabla/worker/dependencia;
+- rutas/forms/redirects compatibles con `basePath`;
+- PR #8 Draft;
+- NO MERGE sin aprobación humana explícita.
