@@ -30,6 +30,7 @@ return static function (App $app, array $deps): void {
     /** @var Closure(): ?array $currentUser */
     $currentUser = $deps['current_user'];
     $basePath = (string) ($deps['base_path'] ?? '');
+    $baseUrl = rtrim((string) ($deps['base_url'] ?? ''), '/');
 
     $path = static fn (string $value): string => $basePath . $value;
 
@@ -213,6 +214,130 @@ return static function (App $app, array $deps): void {
         }
 
         return $response->withHeader('Location', $path('/admin/units/' . $unitId))->withStatus(303);
+    });
+
+    $app->get('/admin/candidates', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ) use ($adminGuard, $candidates, $view, $csrf): ResponseInterface {
+        $user = $adminGuard($response, 'candidates.view');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $response->getBody()->write($view->renderApp('candidates', [
+            'pageTitle' => 'Candidatos',
+            'user' => $user,
+            'activeNav' => 'apps',
+            'csrfToken' => $csrf->token(),
+            'candidates' => $candidates->listCandidates(),
+        ]));
+
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    });
+
+    $app->get('/admin/candidates/{id:[0-9]+}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminGuard, $candidates, $candidateDocuments, $view, $csrf): ResponseInterface {
+        $user = $adminGuard($response, 'candidates.view');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $candidate = $candidates->findCandidate((int) $args['id']);
+        if ($candidate === null) {
+            return $response->withStatus(404);
+        }
+
+        $response->getBody()->write($view->renderApp('candidate_detail', [
+            'pageTitle' => 'Candidato',
+            'user' => $user,
+            'activeNav' => 'apps',
+            'csrfToken' => $csrf->token(),
+            'candidate' => $candidate,
+            'documents' => $candidateDocuments->listDocumentsForCandidate((int) $candidate['id']),
+            'canManageCandidates' => Permissions::allows($user, 'candidates.manage'),
+        ]));
+
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    });
+
+    $app->post('/admin/candidates/{id:[0-9]+}/status', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminGuard, $candidates, $path): ResponseInterface {
+        $user = $adminGuard($response, 'candidates.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $candidateId = (int) $args['id'];
+        $body = (array) ($request->getParsedBody() ?? []);
+        try {
+            $candidates->transitionStatus($candidateId, (string) ($body['status'] ?? ''));
+        } catch (RuntimeException $exception) {
+            $response->getBody()->write($exception->getMessage());
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+
+        return $response->withHeader('Location', $path('/admin/candidates/' . $candidateId))->withStatus(303);
+    });
+
+    $app->post('/admin/candidates/{id:[0-9]+}/token/regenerate', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminGuard, $candidates, $baseUrl, $path): ResponseInterface {
+        $user = $adminGuard($response, 'candidates.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        try {
+            $token = $candidates->regenerateToken((int) $args['id'], time());
+        } catch (RuntimeException $exception) {
+            $response->getBody()->write($exception->getMessage());
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+
+        $continuePath = '/apply/continue/' . $token;
+        $link = $baseUrl !== '' ? $baseUrl . $continuePath : $path($continuePath);
+        $response->getBody()->write($link);
+
+        return $response
+            ->withHeader('Content-Type', 'text/plain; charset=utf-8')
+            ->withHeader('Cache-Control', 'private, no-store');
+    });
+
+    $app->get('/admin/candidates/{id:[0-9]+}/documents/{documentId:[0-9]+}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminGuard, $candidateDocuments): ResponseInterface {
+        $user = $adminGuard($response, 'candidates.view');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $document = $candidateDocuments->privateDocument((int) $args['id'], (int) $args['documentId']);
+        if ($document === null) {
+            return $response->withStatus(404);
+        }
+
+        $bytes = file_get_contents((string) $document['path']);
+        if ($bytes === false) {
+            return $response->withStatus(404);
+        }
+
+        $response->getBody()->write($bytes);
+
+        return $response
+            ->withHeader('Content-Type', (string) $document['mime'])
+            ->withHeader('X-Content-Type-Options', 'nosniff')
+            ->withHeader('Cache-Control', 'private, no-store');
     });
 
     $app->get('/apply/{publicKey}', static function (
