@@ -5,6 +5,7 @@ declare(strict_types=1);
 /** @var array{ok: bool, checks: array<string, array<string, mixed>>} $runtime */
 /** @var string|null $error */
 /** @var string $action */
+/** @var string $csrfToken */
 
 $label = static fn (bool $ok): string => $ok ? 'OK' : 'FALTA';
 ?>
@@ -50,6 +51,7 @@ $label = static fn (bool $ok): string => $ok ? 'OK' : 'FALTA';
     <?php endif; ?>
 
     <form method="post" action="<?= htmlspecialchars($action, ENT_QUOTES, 'UTF-8') ?>" autocomplete="off">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
         <section>
             <h2>Base de datos</h2>
             <label for="db_host">Servidor</label>

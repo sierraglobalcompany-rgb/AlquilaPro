@@ -34,7 +34,7 @@ final class MigrationRunnerTest extends TestCase
         }
     }
 
-    public function testAppliesF1MigrationsAndSecondRunIsIdempotent(): void
+    public function testAppliesProjectMigrationsAndSecondRunIsIdempotent(): void
     {
         if (!class_exists(MigrationRunner::class)) {
             self::fail('MigrationRunner must exist before this behavior can pass.');
@@ -45,11 +45,14 @@ final class MigrationRunnerTest extends TestCase
         $first = MigrationRunner::migrate($this->pdo, $directory);
         $second = MigrationRunner::migrate($this->pdo, $directory);
 
-        self::assertSame(2, $first['applied']);
-        self::assertSame(['001_create_users.sql', '002_create_settings.sql'], $first['migrations']);
+        self::assertSame(3, $first['applied']);
+        self::assertSame(
+            ['001_create_users.sql', '002_create_settings.sql', '003_extend_users_for_auth.sql'],
+            $first['migrations'],
+        );
         self::assertSame(0, $second['applied']);
         self::assertSame([], $second['migrations']);
-        self::assertSame(2, (int) $this->pdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn());
+        self::assertSame(3, (int) $this->pdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn());
         self::assertSame(1, $this->tableExists('users'));
         self::assertSame(1, $this->tableExists('settings'));
     }

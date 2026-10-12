@@ -3,8 +3,8 @@
 Sistema privado, mobile-first y autoinstalable para administrar arrendamientos de vivienda y parqueaderos.
 
 **Dominio previsto:** `https://alquilapro.sierraglobalcompany.com`  
-**Estado actual:** F1 — Foundation + Installer **CLOSED / VERIFIED / MERGED**.  
-**Siguiente fase permitida:** **F2 — Autenticación, usuarios y permisos**.  
+**Estado actual:** F2 — Autenticación, usuarios y permisos **CLOSED / VERIFIED / NOT MERGED**.  
+**Siguiente gate permitido:** verificar HEAD documental → PR #2 Ready for review → aprobación de merge.  
 **Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + Alpine.js + PHPMailer.  
 **Destino:** Hostinger, instalación portable en subdominio o subcarpeta HTTPS.
 
@@ -197,22 +197,25 @@ PLAN: V1.1 AUDITADO
 F0: CLOSED
 F1: CLOSED / VERIFIED / MERGED
 F1_MERGE_SHA: a5225151358aaeca4698adf8cb85d815752a5ac4
-F1_QA: PHP 8.3 / 8.4 / 8.5 — 32 tests / 110 assertions
-LEY_1_KISS_F1: PASS
-LEY_2_CERO_RUIDO_F1: PASS
-LATEST_MERGED_CHECKPOINT: docs/checkpoints/F1_MERGED_2026-10-11.md
-NEXT: F2 — AUTH / USERS / PERMISSIONS
+F2: CLOSED / VERIFIED / NOT MERGED
+F2_IMPLEMENTATION_SHA: f4ac9e8b386aab0e0b83226f5012a5e7e86d102b
+F2_QA: PHP 8.3 / 8.4 / 8.5 — 60 tests / 254 assertions
+LEY_1_KISS_F2: PASS
+LEY_2_CERO_RUIDO_F2: PASS
+LATEST_CHECKPOINT: docs/checkpoints/F2_CLOSED_2026-10-11.md
+OPEN_PR: #2 — F2 Auth + users + permissions
+NEXT_GATE: VERIFY DOCUMENTATION HEAD -> READY FOR REVIEW -> MERGE APPROVAL
 ```
 
-F1 quedó integrada mediante PR #1.
+F1 está integrada a `main`. F2 está cerrada y verificada en su rama, pero **todavía no está fusionada**.
 
 ---
 
 # 8. ROADMAP
 
-- F0 — Spec + plan
+- F0 — Spec + plan ✅
 - F1 — Foundation + installer ✅
-- F2 — Auth + usuarios + permisos
+- F2 — Auth + usuarios + permisos ✅ *(pendiente merge)*
 - F3 — Shell móvil + sistema visual
 - F4 — Propiedades + unidades
 - F5 — Candidatos + referencias
@@ -268,4 +271,7 @@ Prompt mínimo:
 
 # 10. SIGUIENTE PASO
 
-Crear rama nueva desde `main` y ejecutar **F2 — Autenticación, usuarios y permisos** con mini-plan propio y TDD.
+1. verificar CI del HEAD documental final de F2;
+2. marcar PR #2 **Ready for review**;
+3. no fusionar sin aprobación explícita;
+4. después del merge, abrir una rama nueva desde `main` para **F3 — Shell móvil + sistema visual**.

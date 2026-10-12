@@ -2,11 +2,18 @@
 
 declare(strict_types=1);
 
+use AlquilaPro\Auth\AuthService;
+use AlquilaPro\Auth\Csrf;
+use AlquilaPro\Auth\SessionGuard;
+use AlquilaPro\Auth\UserService;
+use AlquilaPro\Foundation\DatabaseConfig;
+use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
 use AlquilaPro\Foundation\Installer;
 use AlquilaPro\Foundation\RuntimeRequirements;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\RequestHandlerInterface;
 use Slim\App;
 use Slim\Factory\AppFactory;
 
@@ -20,6 +27,7 @@ return static function (array $settings): App {
 
     $lock = new InstallationLock($lockPath);
     $installer = new Installer($lock, $migrationDirectory, $databaseConfigPath);
+    $csrf = new Csrf();
     $app = AppFactory::create();
 
     if ($basePath !== '') {
@@ -41,8 +49,9 @@ return static function (array $settings): App {
     $homePath = $basePath . '/';
     $view = dirname(__DIR__) . '/resources/views/install.php';
 
-    $renderInstaller = static function (?string $error = null) use ($runtime, $installPath, $view): string {
+    $renderInstaller = static function (?string $error = null) use ($runtime, $installPath, $view, $csrf): string {
         $action = $installPath;
+        $csrfToken = $csrf->token();
         ob_start();
         require $view;
         return (string) ob_get_clean();
@@ -109,7 +118,45 @@ return static function (array $settings): App {
         return $response->withHeader('Content-Type', 'application/json; charset=utf-8');
     });
 
+    if ($lock->isInstalled()) {
+        $pdo = $settings['pdo'] ?? null;
+        if (!$pdo instanceof \PDO && is_file($databaseConfigPath)) {
+            $database = require $databaseConfigPath;
+            if (is_array($database)) {
+                $pdo = DatabaseConnector::connect(DatabaseConfig::fromArray($database));
+            }
+        }
+
+        if ($pdo instanceof \PDO) {
+            $routes = require dirname(__DIR__) . '/app/Auth/routes.php';
+            $routes($app, [
+                'auth' => new AuthService($pdo),
+                'users' => new UserService($pdo),
+                'session' => new SessionGuard(),
+                'csrf' => $csrf,
+                'base_path' => $basePath,
+                'base_url' => $baseUrl,
+                'views' => dirname(__DIR__) . '/resources/views',
+            ]);
+        }
+    }
+
     $responseFactory = $app->getResponseFactory();
+    $app->add(static function (ServerRequestInterface $request, RequestHandlerInterface $handler) use ($csrf, $responseFactory): ResponseInterface {
+        if (strtoupper($request->getMethod()) === 'POST') {
+            $body = $request->getParsedBody();
+            $token = is_array($body) ? (string) ($body['csrf_token'] ?? '') : '';
+
+            if (!$csrf->validate($token)) {
+                $response = $responseFactory->createResponse(403);
+                $response->getBody()->write('Solicitud inválida.');
+                return $response->withHeader('Content-Type', 'text/plain; charset=utf-8');
+            }
+        }
+
+        return $handler->handle($request);
+    });
+
     $errorMiddleware = $app->addErrorMiddleware(false, false, false);
     $errorMiddleware->setDefaultErrorHandler(
         static function (
