@@ -1,12 +1,13 @@
 # Alquila Pro
 
-Aplicación web mobile-first y autoinstalable para administrar arrendamientos de vivienda y parqueaderos, con superficie pública de catálogo y operación privada para administración e inquilinos.
+Aplicación web mobile-first y autoinstalable para administrar arrendamientos de vivienda y parqueaderos, con superficie pública de catálogo y operación privada para administración/inquilinos.
 
 **Dominio objetivo:** `https://alquilapro.sierraglobalcompany.com`  
 **Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + CSS/JS mínimo  
 **Destino:** Hostinger; subdominio o subcarpeta HTTPS.  
-**Estado actual:** F0–F3 CLOSED / VERIFIED / MERGED; F4 implementación funcional y QA completadas, cierre documental/ceremonial en progreso en PR #7.  
-**Merge F4 autorizado:** NO.
+**Estado actual:** F0–F3 CLOSED / VERIFIED / MERGED; F4 CLOSED / VERIFIED en PR #7, pendiente de review/merge.  
+**Merge F4 autorizado:** NO.  
+**F5:** BLOQUEADA hasta autorización y merge de F4.
 
 ---
 
@@ -19,13 +20,14 @@ Antes de tocar código:
 3. `docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.2_AUDITADO.md`;
 4. `docs/specs/F4_PROPERTIES_UNITS_PUBLIC_CATALOG_SPEC.md` cuando F4 sea relevante;
 5. `docs/plans/F4_PROPERTIES_UNITS_PUBLIC_CATALOG_IMPLEMENTATION_PLAN.md` cuando F4 sea relevante;
-6. checkpoint más reciente de la fase;
-7. tests y CI reales;
-8. código real del repositorio.
+6. `docs/decisions/F4_CONVERGENCIA_CONTRATOS_PUBLICOS_2026-10-12.md` para contratos públicos F4 refinados;
+7. `docs/checkpoints/F4_CLOSED_2026-10-12.md`;
+8. tests y CI reales;
+9. código real del repositorio.
 
 Regla de autoridad:
 
-`SPEC maestra → PLAN maestro → decisiones canónicas README → SPEC/PLAN específica de fase → checkpoint → tests/CI → código`.
+`SPEC maestra → PLAN maestro → decisiones canónicas README → SPEC/PLAN específica de fase → decisiones específicas posteriores documentadas → checkpoint → tests/CI → código`.
 
 Cuando una decisión específica posterior de fase documenta explícitamente una convergencia de un contrato preliminar del maestro, prevalece para esa fase hasta la siguiente revisión maestra. Esto evita revivir contratos históricos ya sustituidos.
 
@@ -86,21 +88,23 @@ F2_MERGE_SHA: 96a4fa59ca82604d821061c6aed7d9edb3849ae1
 F3: CLOSED / VERIFIED / MERGED
 F3_MERGE_SHA: b35c32b9f8c99646879e22b1af92e6a54690ceca
 
-F4: IMPLEMENTED / FUNCTIONAL QA GREEN / FINAL CLOSURE IN PROGRESS
+F4: CLOSED / VERIFIED / NOT MERGED
 F4_BRANCH: impl/f4-properties-catalog-20261011
 F4_PR: #7 OPEN / DRAFT / NOT MERGED
 F4_LAST_PRODUCT_GREEN: 54836fa6a3baae49f0f60085e39d7ccb1f4d8198
-F4_LAST_CI: PHP 8.3 / 8.4 / 8.5 PASS — 151 tests / 873 assertions
+F4_PRE_CLOSE_HEAD: ea9f063ace6e2cddc83cfc18677f434ab72ef5e2
+F4_PRE_CLOSE_CI: 38213153654 — PHP 8.3 / 8.4 / 8.5 PASS — 151 tests / 873 assertions
 F4_VISUAL_QA: PASS
-CURRENT_GATE: F4.8B documentación → F4.8C limpieza segura → F4.8D gate final → F4.8E review
+CURRENT_GATE: F4.8E — REVIEW FINAL PR #7
 MERGE_AUTHORIZED: NO
+F5: BLOCKED
 ```
 
-No reimplementar F1–F3. No reabrir tareas F4 ya certificadas sin evidencia de regresión.
+No reimplementar F1–F3. No reabrir F4 sin evidencia de regresión o una nueva SPEC aprobada.
 
 ---
 
-# 5. DECISIONES CANÓNICAS
+# 5. DECISIONES CANÓNICAS F4
 
 ## 5.1 Auth único
 
@@ -125,11 +129,9 @@ No existen tablas paralelas de catálogo, apartamentos o parqueaderos.
 - intención de publicación: `units.is_public`;
 - publicabilidad real: propiedad activa + `available` + `is_public=1` + precio + descripción + requisitos + al menos una foto válida.
 
-No crear `catalog_price`, `available` boolean paralelo ni cache de publicabilidad independiente.
+No crear `catalog_price`, booleano paralelo de disponibilidad ni caché independiente de publicabilidad.
 
-## 5.4 Identificador público F4
-
-El identificador público canónico es:
+## 5.4 Identificador público
 
 `public_key = bin2hex(random_bytes(12))`
 
@@ -143,15 +145,13 @@ Detalle público:
 
 `GET /catalog/{publicKey}`.
 
-## 5.5 Media pública F4
-
-Las fotos se almacenan fuera del webroot y se sirven únicamente mientras la unidad siga publicable.
+## 5.5 Media pública
 
 Contrato canónico:
 
 `GET /catalog/{publicKey}/photo/{position}`.
 
-No se expone `unit_media.id` en URLs públicas. `position` es un ordinal público derivado del orden de fotos. Cache fail-closed: `no-store` en F4 para que una despublicación sea efectiva inmediatamente.
+No se expone `unit_media.id` en URLs públicas. Las fotos viven fuera del webroot y solo se sirven mientras la unidad siga publicable. Cache F4: `no-store` para despublicación inmediata.
 
 Video V1: enlace HTTPS externo; sin upload, transcoding ni iframe arbitrario.
 
@@ -165,7 +165,7 @@ Video V1: enlace HTTPS externo; sin upload, transcoding ni iframe arbitrario.
 
 F5 añadirá Aplicar cuando exista el flujo real de candidato.
 
-## 5.7 Permisos F4
+## 5.7 Permisos
 
 Exactamente:
 
@@ -176,9 +176,9 @@ Owner conserva bypass. No `catalog.manage` ni permisos equivalentes.
 
 ---
 
-# 6. F4 — RESULTADO IMPLEMENTADO
+# 6. RESULTADO F4
 
-F4 incluye y ya tiene cobertura automatizada para:
+F4 quedó implementada y verificada con:
 
 - CRUD/inactivación de propiedades;
 - unidades apartamento/parqueadero en una sola entidad;
@@ -186,7 +186,7 @@ F4 incluye y ya tiene cobertura automatizada para:
 - `unit.type` inmutable después de creación;
 - estados canónicos;
 - precio, descripción, requisitos y notas privadas;
-- intención/publicabilidad;
+- publicabilidad viva;
 - fotos JPEG/PNG/WebP por MIME real, máximo 10 MiB y fuera de webroot;
 - video HTTPS externo;
 - portada y orden;
@@ -198,7 +198,14 @@ F4 incluye y ya tiene cobertura automatizada para:
 - detalle por `public_key`;
 - media pública sin IDs internos;
 - privacidad mediante allowlist pública;
-- QA visual responsive y reflow 200%.
+- QA visual responsive y reflow equivalente a 200%;
+- +3 tablas exactas;
+- +2 permisos exactos;
+- +0 dependencias runtime;
+- +0 npm;
+- un solo archivo de rutas F4;
+- un solo auth;
+- una sola fuente de precio y disponibilidad.
 
 F4 NO incluye:
 
@@ -219,7 +226,7 @@ F4 NO incluye:
 - F1 — Foundation + installer ✅
 - F2 — Auth + usuarios + permisos ✅
 - F3 — Shell móvil + sistema visual ✅
-- **F4 — Propiedades + unidades + landing + catálogo público — cierre final en progreso**
+- **F4 — Propiedades + unidades + landing + catálogo público ✅ CLOSED / VERIFIED / pendiente merge**
 - F5 — Aplicaciones + candidatos + referencias
 - F6 — Aseguradora/SURA
 - F7 — Contratos
@@ -243,7 +250,7 @@ F4 NO incluye:
 - F25 — SERVER_READY
 - F26 — Hostinger + smoke test
 
-F5 permanece bloqueada hasta que F4 se cierre y el usuario autorice el merge.
+F5 permanece bloqueada hasta autorización explícita y merge de F4.
 
 ---
 
@@ -252,17 +259,11 @@ F5 permanece bloqueada hasta que F4 se cierre y el usuario autorice el merge.
 Al retomar trabajo:
 
 1. verificar branch, PR y HEAD reales;
-2. leer el checkpoint más reciente;
+2. leer `docs/checkpoints/F4_CLOSED_2026-10-12.md` mientras PR #7 no esté mergeado;
 3. comparar documentación con tests/CI/código;
-4. identificar el primer gate abierto;
-5. continuar solo ese gate;
-6. cerrar con evidencia;
-7. crear checkpoint antes de abrir el siguiente bloque cuando el trabajo sea largo;
-8. no mergear sin aprobación.
-
-Checkpoint de recuperación actual mientras F4 siga abierta:
-
-`docs/checkpoints/F4_CHECKPOINT_TASK8_VISUAL_QA_GREEN_DOC_CONVERGENCE_PENDING_2026-10-12.md`.
+4. si F4 sigue sin merge, trabajar únicamente review/merge;
+5. no abrir F5 antes del merge autorizado;
+6. no reabrir contratos F4 ya certificados sin evidencia.
 
 ---
 
@@ -270,10 +271,9 @@ Checkpoint de recuperación actual mientras F4 siga abierta:
 
 ```text
 PHASE: F4
-MICROPHASE: F4.8B — CONVERGENCIA DOCUMENTAL
-NEXT: F4.8C — LIMPIEZA SEGURA DE CHECKPOINTS
-AFTER: F4.8D — GATE FINAL + F4_CLOSED
-THEN: F4.8E — REVIEW PR #7
+STATUS: CLOSED / VERIFIED / NOT MERGED
+MICROPHASE: F4.8E — FINAL PR REVIEW
+PR: #7 OPEN / DRAFT
 MERGE: BLOQUEADO HASTA APROBACIÓN EXPLÍCITA
 F5: NO INICIAR
 ```
