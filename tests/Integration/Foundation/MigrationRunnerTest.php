@@ -30,7 +30,19 @@ final class MigrationRunnerTest extends TestCase
         ]));
 
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (['migration_probe', 'unit_media', 'units', 'properties', 'settings', 'users', 'schema_migrations'] as $table) {
+        foreach ([
+            'migration_probe',
+            'candidate_documents',
+            'candidate_references',
+            'unit_application_requirements',
+            'candidates',
+            'unit_media',
+            'units',
+            'properties',
+            'settings',
+            'users',
+            'schema_migrations',
+        ] as $table) {
             $this->pdo->exec(sprintf('DROP TABLE IF EXISTS `%s`', $table));
         }
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
@@ -47,24 +59,29 @@ final class MigrationRunnerTest extends TestCase
         $first = MigrationRunner::migrate($this->pdo, $directory);
         $second = MigrationRunner::migrate($this->pdo, $directory);
 
-        self::assertSame(4, $first['applied']);
+        self::assertSame(5, $first['applied']);
         self::assertSame(
             [
                 '001_create_users.sql',
                 '002_create_settings.sql',
                 '003_extend_users_for_auth.sql',
                 '004_create_properties_units_media.sql',
+                '005_create_candidates_references_requirements_documents.sql',
             ],
             $first['migrations'],
         );
         self::assertSame(0, $second['applied']);
         self::assertSame([], $second['migrations']);
-        self::assertSame(4, (int) $this->pdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn());
+        self::assertSame(5, (int) $this->pdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn());
         self::assertSame(1, $this->tableExists('users'));
         self::assertSame(1, $this->tableExists('settings'));
         self::assertSame(1, $this->tableExists('properties'));
         self::assertSame(1, $this->tableExists('units'));
         self::assertSame(1, $this->tableExists('unit_media'));
+        self::assertSame(1, $this->tableExists('candidates'));
+        self::assertSame(1, $this->tableExists('candidate_references'));
+        self::assertSame(1, $this->tableExists('unit_application_requirements'));
+        self::assertSame(1, $this->tableExists('candidate_documents'));
     }
 
     public function testFailedMigrationIsNotRecordedAsApplied(): void

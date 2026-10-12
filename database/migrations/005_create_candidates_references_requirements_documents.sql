@@ -1,0 +1,81 @@
+CREATE TABLE candidates (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    unit_id BIGINT UNSIGNED NOT NULL,
+    document_type VARCHAR(24) NOT NULL,
+    document_number VARCHAR(64) NOT NULL,
+    full_name VARCHAR(190) NOT NULL,
+    birth_date DATE NULL,
+    phone VARCHAR(50) NOT NULL,
+    email VARCHAR(190) NOT NULL,
+    current_address VARCHAR(255) NULL,
+    employment_status VARCHAR(80) NULL,
+    employer_name VARCHAR(190) NULL,
+    occupation VARCHAR(190) NULL,
+    monthly_income DECIMAL(12,2) NULL,
+    employment_notes TEXT NULL,
+    occupants_count SMALLINT UNSIGNED NULL,
+    occupants_notes TEXT NULL,
+    pets_declared TINYINT(1) NOT NULL DEFAULT 0,
+    pets_notes TEXT NULL,
+    status VARCHAR(32) NOT NULL,
+    continuation_token_hash CHAR(64) NOT NULL,
+    continuation_token_expires_at DATETIME NOT NULL,
+    consent_at DATETIME NOT NULL,
+    submitted_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY candidates_identity_unique (document_type, document_number),
+    UNIQUE KEY candidates_token_hash_unique (continuation_token_hash),
+    KEY candidates_unit_id_index (unit_id),
+    CONSTRAINT candidates_unit_id_fk FOREIGN KEY (unit_id) REFERENCES units (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE candidate_references (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    candidate_id BIGINT UNSIGNED NOT NULL,
+    reference_type VARCHAR(40) NULL,
+    name VARCHAR(190) NOT NULL,
+    relationship VARCHAR(120) NULL,
+    phone VARCHAR(50) NOT NULL,
+    email VARCHAR(190) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL,
+    PRIMARY KEY (id),
+    KEY candidate_references_candidate_id_index (candidate_id),
+    CONSTRAINT candidate_references_candidate_id_fk FOREIGN KEY (candidate_id) REFERENCES candidates (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE unit_application_requirements (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    unit_id BIGINT UNSIGNED NOT NULL,
+    code VARCHAR(80) NOT NULL,
+    label VARCHAR(190) NOT NULL,
+    description TEXT NULL,
+    is_required TINYINT(1) NOT NULL DEFAULT 1,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    sort_order INT UNSIGNED NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY unit_application_requirements_unit_code_unique (unit_id, code),
+    KEY unit_application_requirements_unit_id_index (unit_id),
+    CONSTRAINT unit_application_requirements_unit_id_fk FOREIGN KEY (unit_id) REFERENCES units (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE candidate_documents (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    candidate_id BIGINT UNSIGNED NOT NULL,
+    requirement_id BIGINT UNSIGNED NOT NULL,
+    stored_name VARCHAR(190) NOT NULL,
+    original_name VARCHAR(255) NULL,
+    mime_type VARCHAR(80) NOT NULL,
+    size_bytes BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY candidate_documents_candidate_requirement_unique (candidate_id, requirement_id),
+    KEY candidate_documents_requirement_id_index (requirement_id),
+    CONSTRAINT candidate_documents_candidate_id_fk FOREIGN KEY (candidate_id) REFERENCES candidates (id) ON DELETE CASCADE,
+    CONSTRAINT candidate_documents_requirement_id_fk FOREIGN KEY (requirement_id) REFERENCES unit_application_requirements (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
