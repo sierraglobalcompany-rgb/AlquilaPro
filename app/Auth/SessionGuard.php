@@ -11,6 +11,10 @@ final class SessionGuard
 
     public function login(array $user, int $now): void
     {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
+        }
+
         $_SESSION[self::SESSION_KEY] = [
             'user_id' => (int) $user['id'],
             'must_change_password' => (bool) ($user['must_change_password'] ?? false),
