@@ -229,13 +229,19 @@ final class PropertyService
         }
 
         $statement = $this->pdo->prepare(
-            'SELECT u.*, p.name AS property_name, p.city AS property_city, p.sector AS property_sector '
+            'SELECT u.*, p.name AS property_name, p.city AS property_city, p.sector AS property_sector, '
+            . "EXISTS (SELECT 1 FROM unit_media pm WHERE pm.unit_id = u.id AND pm.type = 'photo') AS has_photo "
             . 'FROM units u INNER JOIN properties p ON p.id = u.property_id '
             . 'WHERE ' . implode(' AND ', $where) . ' ORDER BY u.id ASC',
         );
         $statement->execute($params);
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+        $rows = array_values(array_filter(
+            $rows,
+            fn (array $row): bool => $this->publicationFieldsComplete($row, (bool) $row['has_photo']),
+        ));
 
-        return array_map($this->normalizePublicUnit(...), $statement->fetchAll(PDO::FETCH_ASSOC));
+        return array_map($this->normalizePublicUnit(...), $rows);
     }
 
     public function findPublicUnit(string $publicKey): ?array
@@ -246,15 +252,19 @@ final class PropertyService
         }
 
         $statement = $this->pdo->prepare(
-            'SELECT u.*, p.name AS property_name, p.city AS property_city, p.sector AS property_sector '
+            'SELECT u.*, p.name AS property_name, p.city AS property_city, p.sector AS property_sector, '
+            . "EXISTS (SELECT 1 FROM unit_media pm WHERE pm.unit_id = u.id AND pm.type = 'photo') AS has_photo "
             . 'FROM units u INNER JOIN properties p ON p.id = u.property_id '
             . "WHERE u.public_key = :public_key AND p.is_active = 1 AND u.status = 'available' AND u.is_public = 1 "
             . 'LIMIT 1',
         );
         $statement->execute(['public_key' => $publicKey]);
         $row = $statement->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row) || !$this->publicationFieldsComplete($row, (bool) $row['has_photo'])) {
+            return null;
+        }
 
-        return is_array($row) ? $this->normalizePublicUnit($row) : null;
+        return $this->normalizePublicUnit($row);
     }
 
     public function isUnitPublicable(int $unitId): bool
@@ -266,7 +276,9 @@ final class PropertyService
 
         $property = $this->findProperty($unit['property_id']);
 
-        return $property !== null && $property['is_active'];
+        return $property !== null
+            && $property['is_active']
+            && $this->publicationDataComplete($unitId, $unit);
     }
 
     private function validateProperty(array $input): array
@@ -372,11 +384,16 @@ final class PropertyService
 
     private function publicationDataComplete(int $unitId, array $data): bool
     {
+        return $this->publicationFieldsComplete($data, $this->hasPhoto($unitId));
+    }
+
+    private function publicationFieldsComplete(array $data, bool $hasPhoto): bool
+    {
         return $data['monthly_price'] !== null
             && (float) $data['monthly_price'] > 0
             && trim((string) ($data['description'] ?? '')) !== ''
             && trim((string) ($data['requirements'] ?? '')) !== ''
-            && $this->hasPhoto($unitId);
+            && $hasPhoto;
     }
 
     private function hasPhoto(int $unitId): bool
