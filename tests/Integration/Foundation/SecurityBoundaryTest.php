@@ -39,6 +39,7 @@ final class SecurityBoundaryTest extends TestCase
             self::assertMatchesRegularExpression('/\\b' . preg_quote($directory, '/') . '\\b/i', $rules, $directory . ' must be blocked from direct HTTP access.');
         }
 
+        self::assertDoesNotMatchRegularExpression('/\\bassets\\b/i', $rules, 'The real public assets directory must remain web-accessible.');
         self::assertMatchesRegularExpression('/\\[F(?:,|\\])/', $rules, 'Sensitive path rule must fail the request instead of rewriting it.');
     }
 
