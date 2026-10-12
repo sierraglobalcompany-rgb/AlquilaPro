@@ -281,6 +281,7 @@ final class PropertyServiceTest extends TestCase
         ]);
 
         $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('El tipo de la unidad no se puede cambiar.');
         $service->updateUnit($apartment['id'], [
             'type' => 'parking',
             'code' => 'A-TYPE',
@@ -297,6 +298,7 @@ final class PropertyServiceTest extends TestCase
         ]);
 
         $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('El tipo de la unidad no se puede cambiar.');
         $service->updateUnit($parking['id'], [
             'type' => 'apartment',
             'code' => 'P-TYPE',
