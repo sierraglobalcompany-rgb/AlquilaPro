@@ -149,12 +149,16 @@ final class PropertyService
         }
 
         $data = $this->validateUnit($existing['property_id'], $input, $unitId);
+        $data['is_public'] = $this->normalizePublicFlag($input, $existing['is_public']);
+        if ($data['is_public']) {
+            $this->assertPublicationComplete($unitId, $data);
+        }
         $data['id'] = $unitId;
 
         $statement = $this->pdo->prepare(
             'UPDATE units SET '
             . 'type = :type, code = :code, location_label = :location_label, status = :status, '
-            . 'monthly_price = :monthly_price, description = :description, requirements = :requirements, '
+            . 'is_public = :is_public, monthly_price = :monthly_price, description = :description, requirements = :requirements, '
             . 'private_notes = :private_notes, unit_number = :unit_number, tower = :tower, floor = :floor, '
             . 'area_m2 = :area_m2, bedrooms = :bedrooms, bathrooms = :bathrooms, '
             . 'administration_fee = :administration_fee, registry_number = :registry_number, '
@@ -204,7 +208,15 @@ final class PropertyService
             throw new RuntimeException('El tipo de unidad no es válido.');
         }
 
-        $where = ['p.is_active = 1', "u.status = 'available'", 'u.is_public = 1'];
+        $where = [
+            'p.is_active = 1',
+            "u.status = 'available'",
+            'u.is_public = 1',
+            'u.monthly_price > 0',
+            "TRIM(COALESCE(u.description, '')) <> ''",
+            "TRIM(COALESCE(u.requirements, '')) <> ''",
+            "EXISTS (SELECT 1 FROM unit_media m WHERE m.unit_id = u.id AND m.type = 'photo')",
+        ];
         $params = [];
 
         if ($type !== null) {
@@ -245,6 +257,9 @@ final class PropertyService
             'SELECT u.*, p.name AS property_name, p.city AS property_city, p.sector AS property_sector '
             . 'FROM units u INNER JOIN properties p ON p.id = u.property_id '
             . "WHERE u.public_key = :public_key AND p.is_active = 1 AND u.status = 'available' AND u.is_public = 1 "
+            . "AND u.monthly_price > 0 AND TRIM(COALESCE(u.description, '')) <> '' "
+            . "AND TRIM(COALESCE(u.requirements, '')) <> '' "
+            . "AND EXISTS (SELECT 1 FROM unit_media m WHERE m.unit_id = u.id AND m.type = 'photo') "
             . 'LIMIT 1',
         );
         $statement->execute(['public_key' => $publicKey]);
@@ -262,7 +277,9 @@ final class PropertyService
 
         $property = $this->findProperty($unit['property_id']);
 
-        return $property !== null && $property['is_active'];
+        return $property !== null
+            && $property['is_active']
+            && $this->publicationDataComplete($unitId, $unit);
     }
 
     private function validateProperty(array $input): array
@@ -338,6 +355,51 @@ final class PropertyService
         }
 
         return $data;
+    }
+
+    private function normalizePublicFlag(array $input, bool $default): bool
+    {
+        if (!array_key_exists('is_public', $input)) {
+            return $default;
+        }
+
+        $value = $input['is_public'];
+        if ($value === true || $value === 1 || $value === '1') {
+            return true;
+        }
+        if ($value === false || $value === 0 || $value === '0') {
+            return false;
+        }
+
+        throw new RuntimeException('El estado de publicación no es válido.');
+    }
+
+    private function assertPublicationComplete(int $unitId, array $data): void
+    {
+        if (!$this->publicationDataComplete($unitId, $data)) {
+            throw new RuntimeException(
+                'Para publicar la unidad debes definir precio, descripción, requisitos y al menos una foto.',
+            );
+        }
+    }
+
+    private function publicationDataComplete(int $unitId, array $data): bool
+    {
+        return $data['monthly_price'] !== null
+            && (float) $data['monthly_price'] > 0
+            && trim((string) ($data['description'] ?? '')) !== ''
+            && trim((string) ($data['requirements'] ?? '')) !== ''
+            && $this->hasPhoto($unitId);
+    }
+
+    private function hasPhoto(int $unitId): bool
+    {
+        $statement = $this->pdo->prepare(
+            "SELECT 1 FROM unit_media WHERE unit_id = :unit_id AND type = 'photo' LIMIT 1",
+        );
+        $statement->execute(['unit_id' => $unitId]);
+
+        return $statement->fetchColumn() !== false;
     }
 
     private function validateLinkedApartment(int $propertyId, mixed $value, ?int $unitId): ?int
