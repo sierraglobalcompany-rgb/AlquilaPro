@@ -294,22 +294,46 @@ final class UnitMediaService
         ];
     }
 
-    public function publicPhoto(int $mediaId): ?array
+    public function publicPhoto(string $publicKey, int $position): ?array
     {
-        if ($mediaId <= 0) {
+        $publicKey = trim($publicKey);
+        if ($position < 1 || (new PropertyService($this->pdo))->findPublicUnit($publicKey) === null) {
             return null;
+        }
+
+        $offset = $position - 1;
+        $statement = $this->pdo->prepare(
+            "SELECT m.id, m.unit_id FROM unit_media m "
+            . 'INNER JOIN units u ON u.id = m.unit_id '
+            . "WHERE u.public_key = :public_key AND m.type = 'photo' "
+            . 'ORDER BY m.is_cover DESC, m.sort_order ASC, m.id ASC '
+            . 'LIMIT 1 OFFSET ' . $offset,
+        );
+        $statement->execute(['public_key' => $publicKey]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
+
+        return $this->privatePhoto((int) $row['unit_id'], (int) $row['id']);
+    }
+
+    public function publicPhotoPositions(string $publicKey): array
+    {
+        $publicKey = trim($publicKey);
+        if ((new PropertyService($this->pdo))->findPublicUnit($publicKey) === null) {
+            return [];
         }
 
         $statement = $this->pdo->prepare(
-            "SELECT unit_id FROM unit_media WHERE id = :id AND type = 'photo' LIMIT 1",
+            "SELECT COUNT(*) FROM unit_media m "
+            . 'INNER JOIN units u ON u.id = m.unit_id '
+            . "WHERE u.public_key = :public_key AND m.type = 'photo'",
         );
-        $statement->execute(['id' => $mediaId]);
-        $unitId = $statement->fetchColumn();
-        if ($unitId === false || !(new PropertyService($this->pdo))->isUnitPublicable((int) $unitId)) {
-            return null;
-        }
+        $statement->execute(['public_key' => $publicKey]);
+        $count = (int) $statement->fetchColumn();
 
-        return $this->privatePhoto((int) $unitId, $mediaId);
+        return $count > 0 ? range(1, $count) : [];
     }
 
     private function nextSortOrder(int $unitId): int
