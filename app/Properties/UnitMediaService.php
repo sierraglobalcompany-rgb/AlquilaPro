@@ -265,15 +265,11 @@ final class UnitMediaService
         }
 
         $statement = $this->pdo->prepare(
-            'SELECT m.unit_id FROM unit_media m '
-            . 'INNER JOIN units u ON u.id = m.unit_id '
-            . 'INNER JOIN properties p ON p.id = u.property_id '
-            . "WHERE m.id = :id AND m.type = 'photo' AND p.is_active = 1 "
-            . "AND u.status = 'available' AND u.is_public = 1 LIMIT 1",
+            "SELECT unit_id FROM unit_media WHERE id = :id AND type = 'photo' LIMIT 1",
         );
         $statement->execute(['id' => $mediaId]);
         $unitId = $statement->fetchColumn();
-        if ($unitId === false) {
+        if ($unitId === false || !(new PropertyService($this->pdo))->isUnitPublicable((int) $unitId)) {
             return null;
         }
 
