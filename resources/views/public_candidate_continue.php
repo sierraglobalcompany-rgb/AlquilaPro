@@ -7,6 +7,10 @@ $candidate = is_array($candidate ?? null) ? $candidate : [];
 $action = (string) ($action ?? '');
 $referencesAction = (string) ($referencesAction ?? '');
 $unitAction = (string) ($unitAction ?? '');
+$submitAction = (string) ($submitAction ?? '');
+$documentActionBase = rtrim((string) ($documentActionBase ?? ''), '/');
+$applicationRequirements = is_array($applicationRequirements ?? null) ? array_values($applicationRequirements) : [];
+$documentsByRequirement = is_array($documentsByRequirement ?? null) ? $documentsByRequirement : [];
 $availableUnits = is_array($availableUnits ?? null) ? $availableUnits : [];
 $references = is_array($candidate['references'] ?? null) ? array_values($candidate['references']) : [];
 $csrfToken = (string) ($csrfToken ?? '');
@@ -181,6 +185,39 @@ $editable = in_array((string) ($candidate['status'] ?? ''), ['new', 'incomplete'
             <?php else: ?>
                 <p>No hay unidades publicables para cambiar en este momento.</p>
             <?php endif; ?>
+        </section>
+
+        <section>
+            <h2>Documentos</h2>
+            <?php if ($applicationRequirements === []): ?>
+                <p class="hint">Esta unidad no tiene documentos adicionales configurados.</p>
+            <?php else: ?>
+                <?php foreach ($applicationRequirements as $requirement): ?>
+                    <?php $hasDocument = !empty($documentsByRequirement[$requirement['code']]); ?>
+                    <article>
+                        <h3><?= $escape($requirement['label']) ?></h3>
+                        <?php if ($requirement['description'] !== null): ?><p><?= nl2br($escape($requirement['description'])) ?></p><?php endif; ?>
+                        <p class="hint"><?= $requirement['is_required'] ? 'Obligatorio' : 'Opcional' ?> · <?= $hasDocument ? 'Adjunto' : 'Pendiente' ?></p>
+                        <form method="post" enctype="multipart/form-data" action="<?= $escape($documentActionBase . '/' . $requirement['code']) ?>">
+                            <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                            <label>
+                                <?= $hasDocument ? 'Reemplazar documento' : 'Adjuntar documento' ?>
+                                <input type="file" name="document" accept="application/pdf,image/jpeg,image/png" required>
+                            </label>
+                            <button type="submit"><?= $hasDocument ? 'Reemplazar' : 'Subir documento' ?></button>
+                        </form>
+                    </article>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </section>
+
+        <section>
+            <h2>Enviar solicitud</h2>
+            <p class="hint">Antes de enviar, verifica tus datos y adjunta todos los documentos obligatorios.</p>
+            <form method="post" action="<?= $escape($submitAction) ?>">
+                <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                <button type="submit">Enviar solicitud</button>
+            </form>
         </section>
     <?php else: ?>
         <p>Esta solicitud ya no admite edición pública.</p>
