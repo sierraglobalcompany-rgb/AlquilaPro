@@ -1,57 +1,41 @@
 # Alquila Pro
 
-Sistema privado, mobile-first y autoinstalable para administrar arrendamientos de vivienda y parqueaderos.
+Aplicación web mobile-first y autoinstalable para administrar arrendamientos de vivienda y parqueaderos, con **superficie pública de catálogo** y operación privada para administración/inquilinos.
 
-**Dominio previsto:** `https://alquilapro.sierraglobalcompany.com`  
-**Estado actual:** F3 — Shell móvil + sistema visual **CLOSED / VERIFIED / MERGED**.  
-**Siguiente fase:** F4 — Propiedades + unidades.  
-**Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + JS mínimo. Alpine.js solo cuando aporte valor real.  
-**Destino:** Hostinger, instalación portable en subdominio o subcarpeta HTTPS.
+**Dominio objetivo:** `https://alquilapro.sierraglobalcompany.com`  
+**Estado:** F0–F3 **CLOSED / VERIFIED / MERGED**  
+**Fase siguiente:** F4 — Propiedades + unidades + landing + catálogo público  
+**Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + CSS/JS mínimo  
+**Destino:** Hostinger; subdominio o subcarpeta HTTPS.
 
 ---
 
 # 1. PUNTO DE ENTRADA OBLIGATORIO
 
-Toda persona, ChatGPT, Codex, Antigravity u otra IA que retome este proyecto debe leer, antes de tocar código:
+Toda persona, ChatGPT, Codex, Antigravity u otra IA debe leer en este orden antes de tocar código:
 
 1. [`README.md`](README.md)
-2. [`docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.1_AUDITADO.md`](docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.1_AUDITADO.md)
-3. [`docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.1_AUDITADO.md`](docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.1_AUDITADO.md)
-4. checkpoint más reciente en [`docs/checkpoints/`](docs/checkpoints/)
-5. SPEC/plan específico de la fase abierta, si existe
-6. tests y CI reales
-7. código real del repositorio
+2. [`docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.2_AUDITADO.md`](docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.2_AUDITADO.md)
+3. [`docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.2_AUDITADO.md`](docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.2_AUDITADO.md)
+4. [`docs/checkpoints/ARCH_REAUDIT_V1_2_PUBLIC_CATALOG_2026-10-11.md`](docs/checkpoints/ARCH_REAUDIT_V1_2_PUBLIC_CATALOG_2026-10-11.md)
+5. checkpoint más reciente de la fase cerrada/abierta
+6. SPEC/plan específico de fase, si existe
+7. tests y CI reales
+8. código real del repositorio
 
 Orden de autoridad:
 
-`SPEC MAESTRA → PLAN MAESTRO → DECISIONES/ACLARACIONES CANÓNICAS DEL README → SPEC DE FASE → PLAN DE FASE → CHECKPOINT → TESTS/CI → CÓDIGO REAL`
+`SPEC V1.2 → PLAN V1.2 → README/decisiones canónicas → SPEC/PLAN de fase → checkpoint → tests/CI → código`
 
-Si hay contradicción, no se adivina: se audita y se corrige la fuente correspondiente.
+V1.1 queda histórica y no debe usarse como autoridad para trabajo nuevo.
 
 ---
 
 # 2. LAS DOS LEYES SUPREMAS
 
-## LEY 1 — KISS / ARQUITECTURA SIMPLE
+## LEY 1 — KISS
 
-Toda solución debe ser simple, sencilla, optimizada, eficiente, eficaz, rápida, fácil de auditar, actualizar, mejorar y desplegar.
-
-> Entre dos soluciones correctas gana la que use menos piezas, menos estados, menos dependencias y menos capas, siempre que mantenga seguridad, trazabilidad y requisitos.
-
-Arquitectura base:
-
-- 1 aplicación PHP;
-- 1 base MariaDB/MySQL;
-- 1 repositorio;
-- HTML server-side;
-- JS mínimo;
-- Alpine.js solo por necesidad real;
-- sin microservicios;
-- sin Redis;
-- sin workers;
-- sin event bus;
-- sin SPA completa;
-- sin capas genéricas por costumbre.
+Elegir la solución correcta con menos piezas, tablas, estados, dependencias y capas, conservando seguridad, trazabilidad e integridad.
 
 ## LEY 2 — CERO RUIDO / CONVERGENCIA
 
@@ -59,73 +43,36 @@ Orden obligatorio:
 
 > **ELIMINAR → UNIR / CONVERGER → SIMPLIFICAR → MEJORAR → AGREGAR**
 
-Ruido incluye código muerto, duplicación, rutas repetidas, tablas sin ciclo de vida propio, estados equivalentes, capas que solo delegan, dependencias sin uso, documentación obsoleta, flags permanentes y módulos/botones futuros sin función real.
+Ruido incluye:
 
-Cada fase debe cerrar con:
+- código muerto;
+- duplicación;
+- tablas equivalentes;
+- dos fuentes de precio/disponibilidad;
+- segundo auth;
+- CMS de catálogo paralelo;
+- lead/application paralelo al candidato;
+- rutas/botones futuros;
+- dependencias no usadas;
+- checkpoints/docs obsoletos.
+
+Toda fase cierra con:
 
 ```text
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
 ```
 
-Y demostrar added/removed/merged, delta de dependencias/esquema/rutas y pruebas.
-
 ---
 
-# 3. VISIÓN Y UX
-
-Alquila Pro centraliza propiedades, candidatos, estudios de aseguradora, contratos, inquilinos, cartera, pagos, pólizas, servicios, solicitudes, visitas, convivencia, inventarios, documentos y cierre contractual.
-
-Dirección visual: **Residential OS / PropTech premium**.
-
-Administrador objetivo:
-
-**Inicio · Cartera · [APPS] · Solicitudes · Cuenta**
-
-Inquilino objetivo:
-
-**Inicio · Pagos · [APPS] · Solicitudes · Cuenta**
-
-Principios:
-
-- mobile-first;
-- navegación inferior;
-- Apps central;
-- tarjetas con jerarquía clara;
-- touch targets cómodos;
-- progressive disclosure;
-- cero gráficas decorativas;
-- cero tablas cuando una tarjeta resuelve mejor;
-- no mostrar botones de módulos que todavía no existen.
-
----
-
-# 4. DECISIÓN CANÓNICA — AUTENTICACIÓN ÚNICA
-
-Alquila Pro usa **un solo módulo de autenticación** para todos los usuarios humanos de la aplicación.
-
-Esto significa:
-
-- propietario, administrador, gestor e inquilino usan el mismo endpoint/pantalla de login;
-- no se crea un `tenant login`, `admin login` ni segundo sistema de sesiones;
-- no se duplica recuperación de contraseña, CSRF, rate limiting ni cierre de sesión;
-- la diferencia ocurre **después de autenticar**, según rol, permisos, estado y contexto del usuario;
-- F8 puede crear/activar credenciales del inquilino y su portal, pero debe reutilizar el `AuthService`, `SessionGuard`, CSRF, recuperación y vistas/base auth existentes;
-- las credenciales iniciales del inquilino siguen la SPEC: documento como usuario/identificador y contraseña inicial igual al documento, con cambio obligatorio en primer acceso, salvo revisión posterior explícita de producto/seguridad;
-- cualquier propuesta futura que requiera un segundo módulo de login debe tratarse como conflicto con Ley 1 KISS y Ley 2 Cero Ruido hasta demostrar necesidad real.
-
-Esta decisión **aclara y hace explícito** el presupuesto ya definido en SPEC/PLAN: `1 auth`.
-
----
-
-# 5. ESTADO REAL DEL REPOSITORIO
+# 3. ESTADO REAL DEL REPOSITORIO
 
 ```text
 PROJECT: Alquila Pro
 REPO: sierraglobalcompany-rgb/AlquilaPro
 TARGET: alquilapro.sierraglobalcompany.com
-SPEC: V1.1 AUDITADA
-PLAN: V1.1 AUDITADO
+SPEC: V1.2 AUDITADA (rama documental hasta aprobar/mergear)
+PLAN: V1.2 AUDITADO (rama documental hasta aprobar/mergear)
 
 F0: CLOSED
 F1: CLOSED / VERIFIED / MERGED
@@ -137,62 +84,136 @@ F2_QA: PHP 8.3 / 8.4 / 8.5 — 60 tests / 254 assertions
 
 F3: CLOSED / VERIFIED / MERGED
 F3_MERGE_SHA: b35c32b9f8c99646879e22b1af92e6a54690ceca
-F3_VERIFIED_IMPLEMENTATION_HEAD: 76574f2c4e37bc9386bc00e81aabc9a75c3205a0
-F3_DOCUMENTATION_HEAD: cfc07f9e750f80771b7b14fdb237ea38e57fbee6
 F3_QA: PHP 8.3 / 8.4 / 8.5 — 94 tests / 458 assertions / 0 warnings
-F3_VISUAL_QA: PASS — 360x800 / 390x844 / 412x915 / 768x1024 / 1440x1000 + 200% equivalent
-LEY_1_KISS_F3: PASS
-LEY_2_CERO_RUIDO_F3: PASS
-LATEST_CLOSED_CHECKPOINT: docs/checkpoints/F3_CLOSED_2026-10-11.md
+F3_VISUAL_QA: PASS
+F3_MERGED_CHECKPOINT: docs/checkpoints/F3_MERGED_2026-10-11.md
 
-CURRENT_PHASE: F4 — Propiedades + unidades
-NEXT_GATE: recuperar alcance F4 → PRE-KISS → SPEC/mini-plan de fase → TDD
+F4: NOT STARTED
+CURRENT_GATE: revisión/merge documentación V1.2 → SPEC específica F4
 ```
+
+No reimplementar F1–F3 sin evidencia de regresión.
 
 ---
 
-# 6. F3 — QUÉ QUEDÓ ENTREGADO
+# 4. DECISIONES CANÓNICAS V1.2
 
-F3 cerró el sistema visual real sin abrir módulos futuros:
+## 4.1 Una sola autenticación
 
-- shell autenticado mobile-first;
-- topbar y bottom navigation `Inicio · Apps · Cuenta`;
-- launcher Apps mediante `<dialog>` nativo;
-- Inicio y Cuenta reales;
-- administración de usuarios F2 convergida al mismo shell;
-- branding configurable con nombre, un color primario y logo opcional;
-- logo almacenado fuera del webroot y servido por ruta controlada;
-- auth e installer convergidos sobre una única hoja CSS;
-- `resources/` protegido contra acceso HTTP directo;
-- safe-area, foco visible, touch targets y reduced-motion;
-- soporte de subcarpeta;
-- cero rutas/botones de Cartera, Solicitudes o Propiedades antes de sus fases.
+Propietario, administrador, gestor e inquilino usan el **mismo módulo de login, sesión, CSRF, cambio, recuperación y logout**.
 
-Deltas arquitectónicos F3:
+No crear:
 
-```text
-COMPOSER_DEPENDENCIES_DELTA: +0
-DB_MIGRATIONS_DELTA: +0
-DB_TABLES_DELTA: +0
-NODE_NPM_BUILD_DELTA: +0
-NEW_REAL_ROUTES: /account, /admin/appearance, /brand/logo
-INSTALLED_ROOT: plain text -> authenticated app shell
-FUTURE_MODULE_ROUTES: +0
-```
+- tenant login;
+- admin login;
+- segundo AuthService;
+- segunda tabla de sesiones.
+
+### Hueco real auditado
+
+El código F2 actual autentica por `users.email` únicamente.
+
+Cuando F8 implemente inquilinos debe **evolucionar** el mismo auth, no duplicarlo.
+
+Diseño preferido a congelar en SPEC F8:
+
+- `users.login_identifier` UNIQUE;
+- backfill de usuarios existentes con email normalizado;
+- inquilino usa documento normalizado como `login_identifier`;
+- email continúa como contacto;
+- mismo AuthService/SessionGuard/CSRF/reset;
+- login UI puede decir `Correo o documento`.
+
+No implementar esto antes de F8 salvo necesidad real demostrada.
+
+## 4.2 Landing pública
+
+Una vez instalada:
+
+- visitante sin sesión en `/` → landing pública;
+- landing tiene **Iniciar sesión** y **Catálogo**;
+- usuario autenticado en `/` conserva el shell privado;
+- antes de instalar, `/` conserva installer.
+
+No crear otro sitio/aplicación para catálogo.
+
+## 4.3 Catálogo = unidades, no CMS paralelo
+
+El catálogo público es una proyección de `units`.
+
+No crear:
+
+- `catalog_listings`;
+- `apartment_catalog`;
+- `parking_catalog`;
+- copia de precio/disponibilidad.
+
+Una unidad se publica solo si:
+
+- `is_public = true`;
+- estado = `Disponible`;
+- propiedad activa;
+- datos públicos mínimos válidos.
+
+`En proceso`, `Ocupada`, `Inactiva` o `Mantenimiento` desaparecen del catálogo automáticamente.
+
+## 4.4 Unidades
+
+Una sola tabla/entidad `units` para:
+
+- apartamento;
+- parqueadero.
+
+No CRUD/tablas paralelas mientras campos nullable por tipo sean claros.
+
+Una sola fuente de precio comercial en unidad. El contrato posterior guarda el canon final como snapshot.
+
+## 4.5 Media
+
+- fotos de marketing: `unit_media`;
+- JPEG/PNG/WebP;
+- fuera del webroot;
+- MIME real + tamaño + nombres aleatorios;
+- solo se sirven públicamente si la unidad sigue publicable;
+- video V1: URL HTTPS externa;
+- video self-hosted/transcoding: P2.
+
+## 4.6 Aplicar = candidato único
+
+No tabla/CRM `lead` o `application` paralela.
+
+F5 activa el CTA `Aplicar` y crea/continúa el mismo `candidate`, enlazado a la unidad.
+
+El candidato puede continuar mediante token seguro sin segundo login tradicional.
+
+F4 **no muestra botón Aplicar** hasta que F5 tenga ruta real.
+
+## 4.7 Administración de catálogo
+
+Publicación/precio/fotos/descripción viven dentro de Propiedades/Unidades.
+
+Puede existir una vista UI “Catálogo”, pero comparte datos y permisos.
+
+Permisos previstos mínimos:
+
+- `properties.view`;
+- `properties.manage`.
+
+No `catalog.manage` salvo necesidad independiente futura.
 
 ---
 
-# 7. ROADMAP
+# 5. ROADMAP V1.2
 
-- F0 — Spec + plan ✅
+- F0 — SPEC + plan ✅
 - F1 — Foundation + installer ✅
 - F2 — Auth + usuarios + permisos ✅
 - F3 — Shell móvil + sistema visual ✅
-- **F4 — Propiedades + unidades ← ACTUAL**
-- F5 — Candidatos + referencias
+- **F4 — Propiedades + unidades + landing + catálogo público ← SIGUIENTE**
+- F5 — Aplicaciones + candidatos + referencias
 - F6 — Aseguradora/SURA
 - F7 — Contratos
-- F8 — Inquilino + portal
+- F8 — Inquilino + lease + portal usando auth único
 - F9 — Cargos + cartera
 - F10 — Medios de pago
 - F11 — Reporte + conciliación
@@ -209,51 +230,84 @@ FUTURE_MODULE_ROUTES: +0
 - F22 — Seguridad + privacidad
 - F23 — Dashboard final con datos reales
 - F24 — QA PHP 8.3/8.4/8.5
-- F25 — `SERVER_READY`
+- F25 — SERVER_READY
 - F26 — Hostinger + smoke test
 
-Ciclo por fase:
+---
 
-`SCOPE → PRE-KISS → SPEC/DISEÑO → PLAN → RED → GREEN → CONVERGE → QA → TWO LAWS GATE → CHECKPOINT`
+# 6. F4 — ALCANCE MACRO, TODAVÍA NO IMPLEMENTADO
+
+F4 debe incluir:
+
+- properties;
+- units;
+- unit_media;
+- apartment/parking;
+- estados;
+- precio comercial;
+- publicación;
+- fotos;
+- video URL;
+- requisitos públicos resumidos;
+- UI administrativa;
+- landing pública;
+- `/catalog`;
+- `/catalog/{slug}`;
+- media pública controlada;
+- permisos properties;
+- subfolder/security/tests.
+
+F4 NO incluye:
+
+- candidate;
+- CTA Aplicar;
+- contratos;
+- leases;
+- documentos privados;
+- video upload/transcoding;
+- SEO avanzado;
+- CMS paralelo.
+
+Antes de código F4 se requiere SPEC específica + plan ejecutable aprobados.
 
 ---
 
-# 8. GUARDRAILS CLAVE
+# 7. PROTOCOLO DE RECUPERACIÓN
 
-- no introducir funcionalidades futuras como botones muertos;
-- no crear PSE, WhatsApp API o módulos incompletos por anticipación;
-- no modificar contratos históricos;
-- no exponer documentos privados;
-- no automatizar decisiones jurídicas;
-- no duplicar fuentes de verdad;
-- no agregar dependencia si CSS/PHP/HTML/JS mínimo resuelven mejor;
-- no crear un login separado para inquilinos, candidatos o administradores mientras el auth único pueda resolverlo;
-- no abrir F5 mientras F4 permanezca abierta.
+Una nueva IA debe:
 
----
-
-# 9. PROTOCOLO DE RECUPERACIÓN
-
-Una nueva sesión debe:
-
-1. leer README;
-2. leer SPEC y PLAN maestros;
-3. leer checkpoint más reciente;
-4. revisar rama/PR de la fase actual;
-5. revisar SPEC/plan específico de fase;
+1. leer este README;
+2. leer SPEC V1.2;
+3. leer PLAN V1.2;
+4. leer checkpoint de reauditoría V1.2;
+5. verificar `main`, ramas y PRs reales;
 6. revisar CI/tests;
-7. identificar el primer gate abierto;
-8. confirmar ambas leyes;
-9. no repetir fases cerradas sin evidencia de regresión;
-10. no abrir una fase futura mientras la actual esté abierta;
-11. no hacer merge sin gate y aprobación.
+7. identificar primer gate abierto;
+8. aplicar ambas leyes;
+9. no reabrir fases cerradas sin evidencia;
+10. no implementar F5 antes de cerrar/mergear F4;
+11. no hacer merge sin aprobación explícita.
 
 Prompt mínimo:
 
-> Audita `sierraglobalcompany-rgb/AlquilaPro`. Lee README, SPEC, PLAN y el checkpoint más reciente. Recupera el estado real desde Git/tests/CI y continúa únicamente desde el primer gate abierto. Respeta Ley 1 KISS y Ley 2 Cero Ruido/Convergencia. No introduzcas sobrearquitectura ni código futuro sin uso real.
+> Audita `sierraglobalcompany-rgb/AlquilaPro`. Lee `README.md`, SPEC V1.2, PLAN V1.2 y el checkpoint V1.2 más reciente. Recupera el estado real desde Git/tests/CI y continúa únicamente desde el primer gate abierto. Respeta Ley 1 KISS y Ley 2 Cero Ruido/Convergencia. Mantén un solo auth, un solo modelo de units, catálogo derivado de units y candidato único. No introduzcas módulos futuros ni fuentes paralelas.
 
 ---
 
-# 10. SIGUIENTE PASO
+# 8. GATE ACTUAL
 
-Recuperar y congelar el alcance exacto de **F4 — Propiedades + unidades**, aplicar PRE-KISS y crear la SPEC/mini-plan de fase antes del primer RED.
+La arquitectura V1.2 está documentada en la rama:
+
+`spec/v1.2-public-catalog-reaudit-20261011`
+
+Siguiente acción correcta:
+
+1. revisar SPEC/PLAN V1.2;
+2. integrar documentación a `main` tras aprobación;
+3. crear SPEC específica F4;
+4. revisar/aprobar SPEC F4;
+5. escribir plan F4;
+6. revisar/aprobar plan;
+7. entonces TDD.
+
+**No hay código F4 iniciado.**
