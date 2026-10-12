@@ -272,33 +272,36 @@ final class PropertyServiceTest extends TestCase
         ]);
     }
 
-    public function testUnitTypeCannotChangeAfterCreation(): void
+    public function testApartmentTypeCannotChangeAfterCreation(): void
     {
         $service = $this->service();
-        $property = $this->property($service, 'Tipos');
+        $property = $this->property($service, 'Tipos apartamento');
         $apartment = $service->createUnit($property['id'], [
             'type' => 'apartment', 'code' => 'A-TYPE', 'status' => 'available',
         ]);
+
+        $this->expectException(RuntimeException::class);
+        $service->updateUnit($apartment['id'], [
+            'type' => 'parking',
+            'code' => 'A-TYPE',
+            'status' => 'available',
+        ]);
+    }
+
+    public function testParkingTypeCannotChangeAfterCreation(): void
+    {
+        $service = $this->service();
+        $property = $this->property($service, 'Tipos parqueadero');
         $parking = $service->createUnit($property['id'], [
             'type' => 'parking', 'code' => 'P-TYPE', 'status' => 'available',
         ]);
 
-        foreach ([
-            [$apartment['id'], 'parking', 'apartment', 'A-TYPE'],
-            [$parking['id'], 'apartment', 'parking', 'P-TYPE'],
-        ] as [$unitId, $requestedType, $expectedType, $code]) {
-            try {
-                $service->updateUnit($unitId, [
-                    'type' => $requestedType,
-                    'code' => $code,
-                    'status' => 'available',
-                ]);
-                self::fail('Existing unit type must be immutable.');
-            } catch (RuntimeException $exception) {
-                self::assertNotSame('', $exception->getMessage());
-                self::assertSame($expectedType, $service->findUnit($unitId)['type']);
-            }
-        }
+        $this->expectException(RuntimeException::class);
+        $service->updateUnit($parking['id'], [
+            'type' => 'apartment',
+            'code' => 'P-TYPE',
+            'status' => 'available',
+        ]);
     }
 
     public function testUnitReadsUpdatesAndPublicQueriesUseCompleteActiveAvailablePublishedInventory(): void
