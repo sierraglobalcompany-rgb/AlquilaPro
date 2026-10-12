@@ -220,11 +220,18 @@ return static function (array $settings): App {
             bool $logErrors,
             bool $logErrorDetails,
         ) use ($responseFactory): ResponseInterface {
+            $requestPath = $request->getUri()->getPath();
+            $safePath = preg_replace(
+                '#(/apply/continue/)[a-f0-9]{64}(?=/|$)#i',
+                '$1[redacted]',
+                $requestPath,
+            ) ?? $requestPath;
+
             error_log(sprintf(
                 'AlquilaPro unhandled %s on %s %s',
                 $exception::class,
                 $request->getMethod(),
-                $request->getUri()->getPath(),
+                $safePath,
             ));
 
             $response = $responseFactory->createResponse(500);
