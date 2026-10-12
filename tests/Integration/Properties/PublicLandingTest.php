@@ -79,6 +79,58 @@ final class PublicLandingTest extends TestCase
         self::assertStringNotContainsString('Apps', $html);
     }
 
+    public function testLandingAvailabilitySummaryAppearsOnlyForLivePublicableInventory(): void
+    {
+        $property = $this->pdo->prepare(
+            'INSERT INTO properties (name, address, city, sector, is_active) '
+            . 'VALUES (:name, :address, :city, :sector, 1)',
+        );
+        $property->execute([
+            'name' => 'Edificio Resumen',
+            'address' => 'Dirección privada',
+            'city' => 'Medellín',
+            'sector' => 'Calasanz',
+        ]);
+        $propertyId = (int) $this->pdo->lastInsertId();
+
+        $unit = $this->pdo->prepare(
+            'INSERT INTO units '
+            . '(property_id, public_key, type, code, status, is_public, monthly_price, description, requirements) '
+            . 'VALUES (:property_id, :public_key, :type, :code, :status, 1, :monthly_price, :description, :requirements)',
+        );
+        $unit->execute([
+            'property_id' => $propertyId,
+            'public_key' => str_repeat('d', 24),
+            'type' => 'apartment',
+            'code' => 'A-RESUMEN',
+            'status' => 'available',
+            'monthly_price' => '1200000.00',
+            'description' => 'Descripción pública',
+            'requirements' => 'Requisitos públicos',
+        ]);
+        $unitId = (int) $this->pdo->lastInsertId();
+        $app = $this->app();
+
+        $withoutPhoto = (string) $this->requestRoot($app)->getBody();
+        self::assertStringNotContainsString('unidad disponible ahora', $withoutPhoto);
+
+        $this->pdo->prepare(
+            "INSERT INTO unit_media (unit_id, type, stored_name, mime_type, sort_order, is_cover) "
+            . "VALUES (:unit_id, 'photo', :stored_name, 'image/jpeg', 1, 1)",
+        )->execute([
+            'unit_id' => $unitId,
+            'stored_name' => 'photo-summary.jpg',
+        ]);
+
+        $withPhoto = (string) $this->requestRoot($app)->getBody();
+        self::assertStringContainsString('1 unidad disponible ahora', $withPhoto);
+
+        $this->pdo->prepare('UPDATE units SET status = :status WHERE id = :id')
+            ->execute(['status' => 'occupied', 'id' => $unitId]);
+        $occupied = (string) $this->requestRoot($app)->getBody();
+        self::assertStringNotContainsString('unidad disponible ahora', $occupied);
+    }
+
     public function testPublicLandingRespectsSubfolderBasePath(): void
     {
         $app = $this->app('/miapp');
@@ -112,6 +164,16 @@ final class PublicLandingTest extends TestCase
             'unit_media_directory' => $this->directory . '/unit-media',
             'pdo' => $this->pdo,
         ]);
+    }
+
+    private function requestRoot(App $app): \Psr\Http\Message\ResponseInterface
+    {
+        return $app->handle(
+            (new ServerRequestFactory())->createServerRequest(
+                'GET',
+                'https://alquilapro.sierraglobalcompany.com/',
+            ),
+        );
     }
 
     private function upsertSetting(string $key, string $value): void
