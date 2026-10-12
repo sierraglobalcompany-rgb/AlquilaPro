@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 $unit = is_array($unit ?? null) ? $unit : [];
+$photoPositions = is_array($photoPositions ?? null) ? $photoPositions : [];
 $videoLinks = is_array($videoLinks ?? null) ? $videoLinks : [];
 $isApartment = ($unit['type'] ?? null) === 'apartment';
 ?>
@@ -15,6 +16,19 @@ $isApartment = ($unit['type'] ?? null) === 'apartment';
         <p><?= $escape($unit['location_label']) ?></p>
     <?php endif; ?>
     <p><strong>Disponible</strong></p>
+
+    <?php if ($photoPositions !== []): ?>
+        <section class="surface">
+            <h2>Fotos</h2>
+            <?php foreach ($photoPositions as $position): ?>
+                <img
+                    src="<?= $escape($basePath) ?>/catalog/<?= $escape($unit['public_key'] ?? '') ?>/photo/<?= $escape($position) ?>"
+                    alt="Foto <?= $escape($position) ?> de <?= $escape($unit['property_name'] ?? '') ?>"
+                    loading="lazy"
+                >
+            <?php endforeach; ?>
+        </section>
+    <?php endif; ?>
 
     <section class="surface">
         <h2>Canon mensual</h2>
