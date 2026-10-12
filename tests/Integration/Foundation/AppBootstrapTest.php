@@ -32,9 +32,11 @@ final class AppBootstrapTest extends TestCase
             'password' => getenv('TEST_DB_PASSWORD') ?: 'root',
         ]));
 
-        foreach (['settings', 'users', 'schema_migrations'] as $table) {
+        $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+        foreach (['unit_media', 'units', 'properties', 'settings', 'users', 'schema_migrations'] as $table) {
             $this->pdo->exec(sprintf('DROP TABLE IF EXISTS `%s`', $table));
         }
+        $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
 
         $this->directory = sys_get_temp_dir() . '/alquila_app_' . bin2hex(random_bytes(6));
         mkdir($this->directory, 0700, true);
