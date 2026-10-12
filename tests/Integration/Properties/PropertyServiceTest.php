@@ -272,25 +272,34 @@ final class PropertyServiceTest extends TestCase
         ]);
     }
 
-    public function testUnitReadsUpdatesAndPublicQuerySkeletonUseOnlyActiveAvailablePublishedInventory(): void
+    public function testUnitReadsUpdatesAndPublicQueriesUseCompleteActiveAvailablePublishedInventory(): void
     {
         $service = $this->service();
         $property = $this->property($service, 'Catálogo', 'Medellín', 'Calasanz');
         $otherProperty = $this->property($service, 'Otra', 'Bello', 'Cabañas');
 
-        $apartment = $service->createUnit($property['id'], [
+        $complete = [
+            'monthly_price' => 1500000,
+            'description' => 'Unidad lista para publicar',
+            'requirements' => 'Ingresos demostrables',
+        ];
+        $apartment = $service->createUnit($property['id'], array_merge($complete, [
             'type' => 'apartment', 'code' => 'A-201', 'status' => 'available',
             'location_label' => 'Torre Norte',
-        ]);
-        $parking = $service->createUnit($property['id'], [
+        ]));
+        $parking = $service->createUnit($property['id'], array_merge($complete, [
             'type' => 'parking', 'code' => 'P-201', 'status' => 'available',
-        ]);
-        $occupied = $service->createUnit($property['id'], [
+        ]));
+        $occupied = $service->createUnit($property['id'], array_merge($complete, [
             'type' => 'apartment', 'code' => 'A-202', 'status' => 'occupied',
-        ]);
-        $bello = $service->createUnit($otherProperty['id'], [
+        ]));
+        $bello = $service->createUnit($otherProperty['id'], array_merge($complete, [
             'type' => 'apartment', 'code' => 'B-101', 'status' => 'available',
-        ]);
+        ]));
+
+        foreach ([$apartment, $parking, $occupied, $bello] as $unit) {
+            $this->insertPhoto($unit['id']);
+        }
 
         $this->pdo->exec(
             'UPDATE units SET is_public = 1 WHERE id IN ('
@@ -305,6 +314,9 @@ final class PropertyServiceTest extends TestCase
             'code' => 'A-201-R',
             'status' => 'maintenance',
             'location_label' => 'Torre Sur',
+            'monthly_price' => $complete['monthly_price'],
+            'description' => $complete['description'],
+            'requirements' => $complete['requirements'],
         ]);
         self::assertSame('A-201-R', $updated['code']);
         self::assertSame('maintenance', $updated['status']);
@@ -357,6 +369,18 @@ final class PropertyServiceTest extends TestCase
             'address' => 'Calle 1 # 2-3',
             'city' => $city,
             'sector' => $sector,
+        ]);
+    }
+
+    private function insertPhoto(int $unitId): void
+    {
+        $statement = $this->pdo->prepare(
+            "INSERT INTO unit_media (unit_id, type, stored_name, mime_type, sort_order, is_cover) "
+            . "VALUES (:unit_id, 'photo', :stored_name, 'image/png', 1, 1)",
+        );
+        $statement->execute([
+            'unit_id' => $unitId,
+            'stored_name' => 'photo-' . bin2hex(random_bytes(16)) . '.png',
         ]);
     }
 }
