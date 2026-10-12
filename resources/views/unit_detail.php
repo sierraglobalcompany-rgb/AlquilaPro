@@ -11,10 +11,16 @@ $statusLabels = [
     'maintenance' => 'Mantenimiento',
 ];
 $propertyUnits = is_array($propertyUnits ?? null) ? $propertyUnits : [];
+$applicationRequirements = is_array($applicationRequirements ?? null) ? array_values($applicationRequirements) : [];
+$canManageApplicationRequirements = (bool) ($canManageApplicationRequirements ?? false);
+$canViewPropertyDetails = (bool) ($canViewPropertyDetails ?? $canManage ?? false);
 $mediaIds = array_map(static fn (array $item): int => (int) $item['id'], $media);
+$requirementIds = array_map(static fn (array $item): int => (int) $item['id'], $applicationRequirements);
 ?>
 <section class="page-stack" aria-labelledby="unit-title">
-    <a class="text-link" href="<?= $escape($basePath) ?>/admin/properties/<?= (int) $property['id'] ?>">← <?= $escape($property['name']) ?></a>
+    <?php if ($canViewPropertyDetails): ?>
+        <a class="text-link" href="<?= $escape($basePath) ?>/admin/properties/<?= (int) $property['id'] ?>">← <?= $escape($property['name']) ?></a>
+    <?php endif; ?>
 
     <header class="page-heading">
         <div>
@@ -95,7 +101,7 @@ $mediaIds = array_map(static fn (array $item): int => (int) $item['id'], $media)
                 <button class="button button--quiet" type="submit">Agregar video</button>
             </form>
         </article>
-    <?php else: ?>
+    <?php elseif ($canViewPropertyDetails): ?>
         <article class="content-card content-card--stacked">
             <h2>Información</h2>
             <dl class="detail-list">
@@ -108,64 +114,136 @@ $mediaIds = array_map(static fn (array $item): int => (int) $item['id'], $media)
         </article>
     <?php endif; ?>
 
-    <section aria-labelledby="media-title">
-        <div class="section-heading">
-            <h2 id="media-title">Multimedia</h2>
-            <span><?= count($media) ?></span>
-        </div>
-
-        <?php if ($media === []): ?>
-            <p class="empty-state">Esta unidad aún no tiene fotos o videos.</p>
-        <?php else: ?>
-            <div class="card-list">
-                <?php foreach ($media as $index => $item): ?>
-                    <article class="content-card content-card--stacked">
-                        <div>
-                            <h3><?= $item['type'] === 'photo' ? 'Foto' : 'Video' ?></h3>
-                            <p class="muted"><?= $item['is_cover'] ? 'Portada · ' : '' ?>Orden <?= (int) $item['sort_order'] ?></p>
-                        </div>
-                        <div class="button-row">
-                            <?php if ($item['type'] === 'photo'): ?>
-                                <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/units/<?= (int) $unit['id'] ?>/media/<?= (int) $item['id'] ?>">Ver foto</a>
-                            <?php elseif ($item['external_url'] !== null): ?>
-                                <a class="button button--quiet" href="<?= $escape($item['external_url']) ?>" target="_blank" rel="noopener noreferrer">Abrir video</a>
-                            <?php endif; ?>
-
-                            <?php if ($canManage && $item['type'] === 'photo' && !$item['is_cover']): ?>
-                                <form method="post" action="<?= $escape($basePath) ?>/admin/units/<?= (int) $unit['id'] ?>/media/<?= (int) $item['id'] ?>/cover">
-                                    <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
-                                    <button class="button button--quiet" type="submit">Usar de portada</button>
-                                </form>
-                            <?php endif; ?>
-
-                            <?php if ($canManage && $index > 0): ?>
-                                <?php $up = $mediaIds; [$up[$index - 1], $up[$index]] = [$up[$index], $up[$index - 1]]; ?>
-                                <form method="post" action="<?= $escape($basePath) ?>/admin/units/<?= (int) $unit['id'] ?>/media/order">
-                                    <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
-                                    <?php foreach ($up as $orderedId): ?><input type="hidden" name="media_ids[]" value="<?= (int) $orderedId ?>"><?php endforeach; ?>
-                                    <button class="button button--quiet" type="submit" aria-label="Mover arriba">↑</button>
-                                </form>
-                            <?php endif; ?>
-
-                            <?php if ($canManage && $index < count($media) - 1): ?>
-                                <?php $down = $mediaIds; [$down[$index], $down[$index + 1]] = [$down[$index + 1], $down[$index]]; ?>
-                                <form method="post" action="<?= $escape($basePath) ?>/admin/units/<?= (int) $unit['id'] ?>/media/order">
-                                    <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
-                                    <?php foreach ($down as $orderedId): ?><input type="hidden" name="media_ids[]" value="<?= (int) $orderedId ?>"><?php endforeach; ?>
-                                    <button class="button button--quiet" type="submit" aria-label="Mover abajo">↓</button>
-                                </form>
-                            <?php endif; ?>
-
-                            <?php if ($canManage): ?>
-                                <form method="post" action="<?= $escape($basePath) ?>/admin/units/<?= (int) $unit['id'] ?>/media/<?= (int) $item['id'] ?>/delete">
-                                    <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
-                                    <button class="button button--quiet" type="submit">Eliminar</button>
-                                </form>
-                            <?php endif; ?>
-                        </div>
-                    </article>
-                <?php endforeach; ?>
+    <?php if ($canManageApplicationRequirements): ?>
+        <section aria-labelledby="requirements-title">
+            <div class="section-heading">
+                <h2 id="requirements-title">Requisitos documentales</h2>
+                <span><?= count($applicationRequirements) ?></span>
             </div>
-        <?php endif; ?>
-    </section>
+
+            <article class="content-card content-card--stacked">
+                <h3>Agregar requisito</h3>
+                <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/admin/units/<?= (int) $unit['id'] ?>/application-requirements">
+                    <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                    <label>Código<input name="code" required maxlength="80" pattern="[A-Za-z0-9_-]+"></label>
+                    <label>Nombre<input name="label" required maxlength="190"></label>
+                    <label>Descripción<textarea name="description" rows="2"></textarea></label>
+                    <input type="hidden" name="is_required" value="0">
+                    <label class="check-row"><input type="checkbox" name="is_required" value="1" checked> Obligatorio</label>
+                    <input type="hidden" name="is_active" value="0">
+                    <label class="check-row"><input type="checkbox" name="is_active" value="1" checked> Activo</label>
+                    <button class="button" type="submit">Agregar requisito</button>
+                </form>
+            </article>
+
+            <?php if ($applicationRequirements === []): ?>
+                <p class="empty-state">Esta unidad aún no tiene requisitos documentales configurados.</p>
+            <?php else: ?>
+                <div class="card-list">
+                    <?php foreach ($applicationRequirements as $index => $requirement): ?>
+                        <article class="content-card content-card--stacked">
+                            <div>
+                                <h3><?= $escape($requirement['label']) ?></h3>
+                                <p class="muted">Código: <?= $escape($requirement['code']) ?> · <?= $requirement['is_required'] ? 'Obligatorio' : 'Opcional' ?> · <?= $requirement['is_active'] ? 'Activo' : 'Inactivo' ?></p>
+                                <?php if ($requirement['description'] !== null): ?><p><?= nl2br($escape($requirement['description'])) ?></p><?php endif; ?>
+                            </div>
+
+                            <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/admin/units/<?= (int) $unit['id'] ?>/application-requirements/<?= (int) $requirement['id'] ?>">
+                                <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                                <label>Nombre<input name="label" required maxlength="190" value="<?= $escape($requirement['label']) ?>"></label>
+                                <label>Descripción<textarea name="description" rows="2"><?= $escape($requirement['description'] ?? '') ?></textarea></label>
+                                <input type="hidden" name="is_required" value="0">
+                                <label class="check-row"><input type="checkbox" name="is_required" value="1"<?= $requirement['is_required'] ? ' checked' : '' ?>> Obligatorio</label>
+                                <input type="hidden" name="is_active" value="0">
+                                <label class="check-row"><input type="checkbox" name="is_active" value="1"<?= $requirement['is_active'] ? ' checked' : '' ?>> Activo</label>
+                                <button class="button button--quiet" type="submit">Guardar requisito</button>
+                            </form>
+
+                            <div class="button-row">
+                                <?php if ($index > 0): ?>
+                                    <?php $up = $requirementIds; [$up[$index - 1], $up[$index]] = [$up[$index], $up[$index - 1]]; ?>
+                                    <form method="post" action="<?= $escape($basePath) ?>/admin/units/<?= (int) $unit['id'] ?>/application-requirements/order">
+                                        <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                                        <?php foreach ($up as $orderedId): ?><input type="hidden" name="requirement_ids[]" value="<?= (int) $orderedId ?>"><?php endforeach; ?>
+                                        <button class="button button--quiet" type="submit" aria-label="Mover requisito arriba">↑</button>
+                                    </form>
+                                <?php endif; ?>
+                                <?php if ($index < count($applicationRequirements) - 1): ?>
+                                    <?php $down = $requirementIds; [$down[$index], $down[$index + 1]] = [$down[$index + 1], $down[$index]]; ?>
+                                    <form method="post" action="<?= $escape($basePath) ?>/admin/units/<?= (int) $unit['id'] ?>/application-requirements/order">
+                                        <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                                        <?php foreach ($down as $orderedId): ?><input type="hidden" name="requirement_ids[]" value="<?= (int) $orderedId ?>"><?php endforeach; ?>
+                                        <button class="button button--quiet" type="submit" aria-label="Mover requisito abajo">↓</button>
+                                    </form>
+                                <?php endif; ?>
+                            </div>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </section>
+    <?php endif; ?>
+
+    <?php if ($canViewPropertyDetails): ?>
+        <section aria-labelledby="media-title">
+            <div class="section-heading">
+                <h2 id="media-title">Multimedia</h2>
+                <span><?= count($media) ?></span>
+            </div>
+
+            <?php if ($media === []): ?>
+                <p class="empty-state">Esta unidad aún no tiene fotos o videos.</p>
+            <?php else: ?>
+                <div class="card-list">
+                    <?php foreach ($media as $index => $item): ?>
+                        <article class="content-card content-card--stacked">
+                            <div>
+                                <h3><?= $item['type'] === 'photo' ? 'Foto' : 'Video' ?></h3>
+                                <p class="muted"><?= $item['is_cover'] ? 'Portada · ' : '' ?>Orden <?= (int) $item['sort_order'] ?></p>
+                            </div>
+                            <div class="button-row">
+                                <?php if ($item['type'] === 'photo'): ?>
+                                    <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/units/<?= (int) $unit['id'] ?>/media/<?= (int) $item['id'] ?>">Ver foto</a>
+                                <?php elseif ($item['external_url'] !== null): ?>
+                                    <a class="button button--quiet" href="<?= $escape($item['external_url']) ?>" target="_blank" rel="noopener noreferrer">Abrir video</a>
+                                <?php endif; ?>
+
+                                <?php if ($canManage && $item['type'] === 'photo' && !$item['is_cover']): ?>
+                                    <form method="post" action="<?= $escape($basePath) ?>/admin/units/<?= (int) $unit['id'] ?>/media/<?= (int) $item['id'] ?>/cover">
+                                        <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                                        <button class="button button--quiet" type="submit">Usar de portada</button>
+                                    </form>
+                                <?php endif; ?>
+
+                                <?php if ($canManage && $index > 0): ?>
+                                    <?php $up = $mediaIds; [$up[$index - 1], $up[$index]] = [$up[$index], $up[$index - 1]]; ?>
+                                    <form method="post" action="<?= $escape($basePath) ?>/admin/units/<?= (int) $unit['id'] ?>/media/order">
+                                        <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                                        <?php foreach ($up as $orderedId): ?><input type="hidden" name="media_ids[]" value="<?= (int) $orderedId ?>"><?php endforeach; ?>
+                                        <button class="button button--quiet" type="submit" aria-label="Mover arriba">↑</button>
+                                    </form>
+                                <?php endif; ?>
+
+                                <?php if ($canManage && $index < count($media) - 1): ?>
+                                    <?php $down = $mediaIds; [$down[$index], $down[$index + 1]] = [$down[$index + 1], $down[$index]]; ?>
+                                    <form method="post" action="<?= $escape($basePath) ?>/admin/units/<?= (int) $unit['id'] ?>/media/order">
+                                        <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                                        <?php foreach ($down as $orderedId): ?><input type="hidden" name="media_ids[]" value="<?= (int) $orderedId ?>"><?php endforeach; ?>
+                                        <button class="button button--quiet" type="submit" aria-label="Mover abajo">↓</button>
+                                    </form>
+                                <?php endif; ?>
+
+                                <?php if ($canManage): ?>
+                                    <form method="post" action="<?= $escape($basePath) ?>/admin/units/<?= (int) $unit['id'] ?>/media/<?= (int) $item['id'] ?>/delete">
+                                        <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                                        <button class="button button--quiet" type="submit">Eliminar</button>
+                                    </form>
+                                <?php endif; ?>
+                            </div>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </section>
+    <?php endif; ?>
 </section>

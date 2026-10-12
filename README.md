@@ -5,9 +5,10 @@ Aplicación web mobile-first y autoinstalable para administrar arrendamientos de
 **Dominio objetivo:** `https://alquilapro.sierraglobalcompany.com`  
 **Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + CSS/JS mínimo  
 **Destino:** Hostinger; subdominio o subcarpeta HTTPS.  
-**Estado actual:** F0–F4 CLOSED / VERIFIED / MERGED.  
+**Estado actual:** F0–F4 CLOSED / VERIFIED / MERGED; F5 CLOSED / VERIFIED / NOT MERGED.  
 **F4 merge SHA:** `3226feeea0b1740659df46fae6499842dfbc894a`.  
-**F5:** NOT STARTED; siguiente fase autorizada para diseño/implementación.
+**F5 final product HEAD:** `e47bae4e4873f9c07b5353a2134ea6b95f20b4c6`.  
+**F5 final product CI:** `38292062089` — PHP 8.3/8.4/8.5 PASS; PHP 8.3 `207 tests / 1465 assertions`.
 
 ---
 
@@ -18,15 +19,15 @@ Antes de tocar código:
 1. `README.md`;
 2. `docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.2_AUDITADO.md`;
 3. `docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.2_AUDITADO.md`;
-4. `docs/checkpoints/F4_MERGED_2026-10-12.md`;
-5. `docs/checkpoints/F4_CLOSED_2026-10-12.md` para detalle de F4;
-6. `docs/specs/F4_PROPERTIES_UNITS_PUBLIC_CATALOG_SPEC.md` y `docs/plans/F4_PROPERTIES_UNITS_PUBLIC_CATALOG_IMPLEMENTATION_PLAN.md` solo cuando F4 sea relevante;
+4. `docs/checkpoints/F5_CLOSED_2026-10-12.md` para el estado F5 actual;
+5. `docs/specs/F5_APPLICATIONS_CANDIDATES_REFERENCES_SPEC.md` y `docs/plans/F5_APPLICATIONS_CANDIDATES_REFERENCES_IMPLEMENTATION_PLAN.md` cuando F5/F6 sea relevante;
+6. `docs/checkpoints/F4_MERGED_2026-10-12.md` y `docs/checkpoints/F4_CLOSED_2026-10-12.md` solo para historia F4;
 7. tests y CI reales;
 8. código real del repositorio.
 
 Regla de autoridad:
 
-`SPEC maestra → PLAN maestro → decisiones canónicas README → SPEC/PLAN específica de fase → decisiones específicas posteriores documentadas → checkpoint → tests/CI → código`.
+`SPEC maestra → PLAN maestro → decisiones canónicas README → SPEC/PLAN específica de fase → checkpoint final → tests/CI → código`.
 
 V1.1 queda histórica.
 
@@ -90,25 +91,33 @@ F4_FINAL_HEAD: 5e1faa5d18b4397fcaac1b834d33c1d4fbd8bdea
 F4_PR: #7 CLOSED / MERGED
 F4_MERGE_SHA: 3226feeea0b1740659df46fae6499842dfbc894a
 F4_FINAL_CI: 38213578871 — PHP 8.3 / 8.4 / 8.5 PASS — 151 tests / 873 assertions
-F4_VISUAL_QA: PASS
+
+F5: CLOSED / VERIFIED / NOT MERGED
+F5_FINAL_PRODUCT_HEAD: e47bae4e4873f9c07b5353a2134ea6b95f20b4c6
+F5_PR: #8 OPEN
+F5_FINAL_PRODUCT_CI: 38292062089 — PHP 8.3 / 8.4 / 8.5 PASS — 207 tests / 1465 assertions
+F5_SECURITY_QA: PASS
+F5_VISUAL_QA: PASS
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
 
-CURRENT_GATE: F5 — NOT STARTED
-NEXT: F5 SCOPE / PRE-KISS / SPEC / PLAN
+CURRENT_GATE: F5 FINAL PR REVIEW / STOP BEFORE MERGE
+NEXT: F6 only after F5 merge authorization + merge
 ```
 
-No reimplementar F1–F4. No reabrir F4 sin evidencia de regresión o una nueva SPEC aprobada.
+No reimplementar F1–F5. No reabrir una fase certificada sin evidencia de regresión o una nueva SPEC aprobada.
 
 ---
 
-# 5. DECISIONES CANÓNICAS HEREDADAS DE F4
+# 5. DECISIONES CANÓNICAS HEREDADAS Y EXTENDIDAS
 
 ## 5.1 Auth único
 
 Propietario, administrador, gestor e inquilino usan el mismo login, sesión, CSRF, recuperación, cambio de contraseña y logout. F8 debe evolucionar el auth existente, no duplicarlo.
 
-No crear `tenant-login`, `admin-login`, segundo `AuthService` ni segunda tabla de sesiones.
+F5 tampoco creó login de candidato: la continuación pública usa un capability token criptográfico hash-only en DB.
+
+No crear `tenant-login`, `admin-login`, candidate login, segundo `AuthService` ni segunda tabla de sesiones.
 
 ## 5.2 Inventario único
 
@@ -118,7 +127,7 @@ F4 usa exactamente:
 - `units` para `apartment|parking`;
 - `unit_media`.
 
-No existen tablas paralelas de catálogo, apartamentos o parqueaderos.
+F5 reutiliza `units.id` como unidad actual del candidato y no crea inventario paralelo.
 
 ## 5.3 Precio y disponibilidad
 
@@ -127,7 +136,7 @@ No existen tablas paralelas de catálogo, apartamentos o parqueaderos.
 - intención de publicación: `units.is_public`;
 - publicabilidad real: propiedad activa + `available` + `is_public=1` + precio + descripción + requisitos + al menos una foto válida.
 
-No crear `catalog_price`, booleano paralelo de disponibilidad ni caché independiente de publicabilidad.
+F5 no cambia `units.status` automáticamente al iniciar o enviar una candidatura.
 
 ## 5.4 Identificador y media pública
 
@@ -151,53 +160,58 @@ Video V1: enlace HTTPS externo; sin upload, transcoding ni iframe arbitrario.
 - usuario autenticado en `/` → shell privado F3;
 - `/catalog` → listado público;
 - `/catalog/{publicKey}` → detalle;
-- F4 no muestra CTA **Aplicar**.
+- F5 añade CTA **Aplicar** en detalle publicable;
+- `GET|POST /apply/{publicKey}` inicia candidatura;
+- `GET|POST /apply/continue/{token}` continúa el mismo candidato;
+- rutas públicas F5 nunca usan candidate/document IDs internos.
 
-F5 podrá añadir **Aplicar** únicamente cuando exista el flujo real de candidato.
+## 5.6 Permisos
 
-## 5.6 Permisos F4
-
-Exactamente:
+F4:
 
 - `properties.view`;
 - `properties.manage`.
+
+F5 añade exactamente:
+
+- `candidates.view`;
+- `candidates.manage`.
 
 Owner conserva bypass.
 
 ---
 
-# 6. RESULTADO F4
+# 6. RESULTADO F5
 
-F4 quedó implementada, verificada y mergeada con:
+F5 quedó implementada y verificada, pendiente únicamente de merge autorizado, con:
 
-- CRUD/inactivación de propiedades;
-- unidades apartamento/parqueadero en una sola entidad;
-- relación parking → apartment del mismo property;
-- `unit.type` inmutable después de creación;
-- estados canónicos;
-- precio, descripción, requisitos y notas privadas;
-- publicabilidad viva;
-- fotos JPEG/PNG/WebP por MIME real, máximo 10 MiB y fuera de webroot;
-- video HTTPS externo;
-- portada y orden;
-- administración privada;
-- launcher Propiedades;
-- CSRF/permisos/subfolder/IDOR;
-- landing pública;
-- catálogo y filtros mínimos;
-- detalle por `public_key`;
-- media pública sin IDs internos;
-- privacidad mediante allowlist pública;
-- QA visual responsive y reflow equivalente a 200%;
-- +3 tablas exactas;
+- candidato único candidate-centric; no `lead` ni `application` paralelo;
+- +4 tablas exactas: `candidates`, `candidate_references`, `unit_application_requirements`, `candidate_documents`;
 - +2 permisos exactos;
+- +2 servicios exactos: `CandidateService`, `CandidateDocumentService`;
+- una sola `unit_id` activa por candidato;
+- identidad única normalizada por `(document_type, document_number)`;
+- duplicate identity genérico, sin token ni datos privados;
+- token raw 256-bit, SHA-256 persistido, TTL 7 días, rotación invalidante;
+- raw continuation token redactado de error logs;
+- perfil, referencias y cambio controlado de unidad;
+- requisitos estructurados por unidad sin delete físico;
+- documentos PDF/JPEG/PNG <=10 MiB, MIME real y storage privado;
+- submit con validación física de documentos obligatorios;
+- administración privada de candidatos y documentos anti-IDOR;
+- CTA Aplicar por `public_key`;
+- lifecycle que conserva candidatos existentes si la unidad deja de ser publicable;
+- CSRF global, forced-password, basePath y auth existentes reutilizados;
+- throttle V1 session-local sin mutación al 429;
+- visual QA con wrap de valores largos y primitives F3/F4 reutilizados;
 - +0 dependencias runtime;
 - +0 npm;
-- un solo archivo de rutas F4;
-- un solo auth;
-- una sola fuente de precio y disponibilidad.
+- +0 auth paralelo;
+- +0 notification engine;
+- LEY 1 KISS PASS;
+- LEY 2 CERO RUIDO PASS.
 
-F4 NO incluye candidato, Aplicar, contratos, leases, documentos privados, video upload/transcoding, SEO avanzado ni CMS paralelo.
+Checkpoint canónico: `docs/checkpoints/F5_CLOSED_2026-10-12.md`.
 
 ---
 
@@ -208,8 +222,8 @@ F4 NO incluye candidato, Aplicar, contratos, leases, documentos privados, video 
 - F2 — Auth + usuarios + permisos ✅
 - F3 — Shell móvil + sistema visual ✅
 - F4 — Propiedades + unidades + landing + catálogo público ✅ CLOSED / VERIFIED / MERGED
-- **F5 — Aplicaciones + candidatos + referencias — NEXT / NOT STARTED**
-- F6 — Aseguradora/SURA
+- F5 — Aplicaciones + candidatos + referencias ✅ **CLOSED / VERIFIED / NOT MERGED**
+- **F6 — Aseguradora/SURA — BLOCKED hasta merge autorizado de F5**
 - F7 — Contratos
 - F8 — Inquilino + lease + portal usando auth único
 - F9 — Cargos + cartera
@@ -237,23 +251,23 @@ F4 NO incluye candidato, Aplicar, contratos, leases, documentos privados, video 
 
 Al retomar trabajo:
 
-1. verificar `main` y HEAD reales;
-2. leer `docs/checkpoints/F4_MERGED_2026-10-12.md`;
-3. contrastar SPEC/PLAN maestra con el alcance exacto de F5;
-4. ejecutar PRE-KISS antes de diseñar F5;
-5. crear SPEC/PLAN específica de F5 si hace falta para eliminar ambigüedad;
-6. implementar F5 por microfases cerrables con TDD;
-7. crear checkpoint entre microfases largas;
-8. no reabrir contratos F4 certificados sin evidencia.
+1. verificar `main`, HEAD y PR reales;
+2. leer `docs/checkpoints/F5_CLOSED_2026-10-12.md`;
+3. confirmar que PR #8 no fue mergeado o, si fue autorizado y mergeado, registrar el merge SHA antes de abrir F6;
+4. no reabrir contratos F5 certificados sin evidencia;
+5. F6 debe extender el mismo candidato desde `pending_screening`, no copiarlo a una entidad paralela;
+6. mantener KISS + Cero Ruido + TDD por microfases.
 
 ---
 
 # 9. GATE ACTUAL
 
 ```text
-LAST_PHASE: F4 CLOSED / VERIFIED / MERGED
-MERGE_SHA: 3226feeea0b1740659df46fae6499842dfbc894a
-NEXT_PHASE: F5 — APLICACIONES + CANDIDATOS + REFERENCIAS
-F5_STATUS: NOT STARTED
-NEXT_ACTION: SCOPE → PRE-KISS → SPEC/DESIGN → PLAN
+LAST_PHASE: F5 CLOSED / VERIFIED / NOT MERGED
+F5_FINAL_PRODUCT_HEAD: e47bae4e4873f9c07b5353a2134ea6b95f20b4c6
+F5_FINAL_PRODUCT_CI: 38292062089
+PR: #8 OPEN
+MERGE_ALLOWED: NO
+NEXT_PHASE: F6 — BLOCKED
+NEXT_ACTION: FINAL PR REVIEW -> READY FOR REVIEW IF CLEAN -> STOP BEFORE MERGE
 ```

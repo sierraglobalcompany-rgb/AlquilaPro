@@ -54,7 +54,7 @@ final class PublicCatalogDetailTest extends TestCase
         @rmdir($this->directory);
     }
 
-    public function testPublicDetailShowsSafeFieldsAndHttpsVideoWithoutPrivateDataOrApply(): void
+    public function testPublicDetailShowsSafeFieldsAndHttpsVideoWithoutPrivateData(): void
     {
         $propertyId = $this->insertProperty(
             '<script>Edificio Seguro</script>',
@@ -94,7 +94,6 @@ final class PublicCatalogDetailTest extends TestCase
             'NO PUBLICAR UNIDAD',
             'MATRICULA-SECRETA',
             'INT-A1',
-            'Aplicar',
         ] as $privateValue) {
             self::assertStringNotContainsString($privateValue, $html);
         }

@@ -74,6 +74,7 @@ $isApartment = ($unit['type'] ?? null) === 'apartment';
         </section>
     <?php endif; ?>
 
+    <p><a href="<?= $escape($basePath) ?>/apply/<?= $escape($unit['public_key'] ?? '') ?>">Aplicar</a></p>
     <p><a href="<?= $escape($basePath) ?>/catalog">Volver al catálogo</a></p>
     <p><a href="<?= $escape($basePath) ?>/">Volver al inicio</a></p>
 </article>

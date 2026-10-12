@@ -4,6 +4,9 @@
          bootstrap="vendor/autoload.php"
          colors="true"
          cacheDirectory=".phpunit.cache">
+  <extensions>
+    <bootstrap class="AlquilaPro\Tests\Support\DatabaseIsolationExtension"/>
+  </extensions>
   <testsuites>
     <testsuite name="Alquila Pro">
       <directory>tests</directory>

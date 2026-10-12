@@ -6,6 +6,8 @@ use AlquilaPro\Auth\AuthService;
 use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Auth\UserService;
+use AlquilaPro\Candidates\CandidateDocumentService;
+use AlquilaPro\Candidates\CandidateService;
 use AlquilaPro\Foundation\DatabaseConfig;
 use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
@@ -31,6 +33,9 @@ return static function (array $settings): App {
     $viewsPath = dirname(__DIR__) . '/resources/views';
     $logoDirectory = (string) ($settings['logo_directory'] ?? dirname(__DIR__) . '/storage/branding');
     $unitMediaDirectory = (string) ($settings['unit_media_directory'] ?? dirname(__DIR__) . '/storage/unit-media');
+    $candidateDocumentDirectory = (string) (
+        $settings['candidate_document_directory'] ?? dirname(__DIR__) . '/storage/candidate-documents'
+    );
 
     $lock = new InstallationLock($lockPath);
     $installer = new Installer($lock, $migrationDirectory, $databaseConfigPath);
@@ -139,6 +144,8 @@ return static function (array $settings): App {
             $view = new View($viewsPath, $branding, $basePath);
             $properties = new PropertyService($pdo);
             $unitMedia = new UnitMediaService($pdo, $unitMediaDirectory);
+            $candidateDocuments = new CandidateDocumentService($pdo, $candidateDocumentDirectory);
+            $candidates = new CandidateService($pdo, candidateDocumentService: $candidateDocuments);
 
             $currentUser = static function () use ($session, $auth): ?array {
                 $userId = $session->userId(time());
@@ -176,6 +183,14 @@ return static function (array $settings): App {
             $propertyRoutes($app, $shared + [
                 'properties' => $properties,
                 'unit_media' => $unitMedia,
+                'candidate_documents' => $candidateDocuments,
+            ]);
+
+            $candidateRoutes = require dirname(__DIR__) . '/app/Candidates/routes.php';
+            $candidateRoutes($app, $shared + [
+                'candidates' => $candidates,
+                'candidate_documents' => $candidateDocuments,
+                'properties' => $properties,
             ]);
         }
     }
@@ -205,11 +220,18 @@ return static function (array $settings): App {
             bool $logErrors,
             bool $logErrorDetails,
         ) use ($responseFactory): ResponseInterface {
+            $requestPath = $request->getUri()->getPath();
+            $safePath = preg_replace(
+                '#(/apply/continue/)[a-f0-9]{64}(?=/|$)#i',
+                '$1[redacted]',
+                $requestPath,
+            ) ?? $requestPath;
+
             error_log(sprintf(
                 'AlquilaPro unhandled %s on %s %s',
                 $exception::class,
                 $request->getMethod(),
-                $request->getUri()->getPath(),
+                $safePath,
             ));
 
             $response = $responseFactory->createResponse(500);
