@@ -11,7 +11,21 @@ final class SessionGuardTest extends TestCase
 {
     protected function setUp(): void
     {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
         $_SESSION = [];
+    }
+
+    protected function tearDown(): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
+        $_SESSION = [];
+        session_id('');
     }
 
     public function testLoginStoresUserAndSessionExpiresAfterThirtyMinutesOfInactivity(): void
@@ -47,6 +61,21 @@ final class SessionGuardTest extends TestCase
 
         self::assertNull($guard->userId(1_001));
         self::assertFalse($guard->mustChangePassword());
+    }
+
+    public function testLoginRegeneratesActivePhpSessionId(): void
+    {
+        session_id('alquilapro' . bin2hex(random_bytes(8)));
+        self::assertTrue(session_start());
+        $before = session_id();
+
+        $this->guard()->login([
+            'id' => 10,
+            'role' => 'admin',
+            'must_change_password' => false,
+        ], 1_000);
+
+        self::assertNotSame($before, session_id());
     }
 
     private function guard(): SessionGuard
