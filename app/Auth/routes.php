@@ -23,6 +23,8 @@ return static function (App $app, array $deps): void {
     $csrf = $deps['csrf'];
     /** @var View $view */
     $view = $deps['view'];
+    /** @var Closure(): ?array $currentUser */
+    $currentUser = $deps['current_user'];
     $basePath = (string) ($deps['base_path'] ?? '');
     $baseUrl = rtrim((string) ($deps['base_url'] ?? ''), '/');
     $views = (string) $deps['views'];
@@ -34,21 +36,6 @@ return static function (App $app, array $deps): void {
         ob_start();
         require $views . '/' . $name . '.php';
         return (string) ob_get_clean();
-    };
-
-    $currentUser = static function () use ($session, $auth): ?array {
-        $userId = $session->userId(time());
-        if ($userId === null) {
-            return null;
-        }
-
-        $user = $auth->findUser($userId);
-        if ($user === null || !$user['is_active']) {
-            $session->logout();
-            return null;
-        }
-
-        return $user;
     };
 
     $guard = static function (ResponseInterface $response, ?string $permission = null) use ($currentUser, $session, $path): array|ResponseInterface {
