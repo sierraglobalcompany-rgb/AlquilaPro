@@ -93,7 +93,7 @@ final class UnitMediaService
         $url = trim($url);
         $parts = parse_url($url);
         if ($url === ''
-            || strlen($url) > 2048
+            || strlen($url) > 1000
             || filter_var($url, FILTER_VALIDATE_URL) === false
             || !is_array($parts)
             || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
@@ -104,7 +104,7 @@ final class UnitMediaService
 
         $statement = $this->pdo->prepare(
             "INSERT INTO unit_media (unit_id, type, stored_name, mime_type, external_url, sort_order, is_cover) "
-            . "VALUES (:unit_id, 'video', NULL, NULL, :external_url, :sort_order, 0)",
+            . "VALUES (:unit_id, 'video_link', NULL, NULL, :external_url, :sort_order, 0)",
         );
         $statement->execute([
             'unit_id' => $unitId,
@@ -160,17 +160,11 @@ final class UnitMediaService
                 "UPDATE unit_media SET is_cover = 1 WHERE id = :id AND unit_id = :unit_id AND type = 'photo'",
             );
             $set->execute(['id' => $mediaId, 'unit_id' => $unitId]);
-            if ($set->rowCount() !== 1) {
-                throw new RuntimeException('No fue posible definir la portada.');
-            }
 
             $this->pdo->commit();
         } catch (Throwable $exception) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
-            }
-            if ($exception instanceof RuntimeException) {
-                throw $exception;
             }
             throw new RuntimeException('No fue posible definir la portada.', 0, $exception);
         }
@@ -220,17 +214,11 @@ final class UnitMediaService
                     'id' => $mediaId,
                     'unit_id' => $unitId,
                 ]);
-                if ($update->rowCount() !== 1) {
-                    throw new RuntimeException('No fue posible actualizar el orden de multimedia.');
-                }
             }
             $this->pdo->commit();
         } catch (Throwable $exception) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
-            }
-            if ($exception instanceof RuntimeException) {
-                throw $exception;
             }
             throw new RuntimeException('No fue posible actualizar el orden de multimedia.', 0, $exception);
         }
