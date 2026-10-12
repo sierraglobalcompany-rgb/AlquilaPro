@@ -3,9 +3,9 @@
 Sistema privado, mobile-first y autoinstalable para administrar arrendamientos de vivienda y parqueaderos.
 
 **Dominio previsto:** `https://alquilapro.sierraglobalcompany.com`  
-**Estado actual:** F2 — Autenticación, usuarios y permisos **CLOSED / VERIFIED / MERGED**.  
-**Siguiente fase:** F3 — Shell móvil + sistema visual, actualmente en gate de SPEC específica.  
-**Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + Alpine.js solo cuando aporte valor real.  
+**Estado actual:** F3 — Shell móvil + sistema visual **CLOSED / VERIFIED / PENDIENTE DE MERGE**.  
+**Integración:** PR #4 abierto contra `main`; no fusionar sin aprobación explícita.  
+**Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + JS mínimo. Alpine.js solo cuando aporte valor real.  
 **Destino:** Hostinger, instalación portable en subdominio o subcarpeta HTTPS.
 
 ---
@@ -114,27 +114,63 @@ F1: CLOSED / VERIFIED / MERGED
 F1_MERGE_SHA: a5225151358aaeca4698adf8cb85d815752a5ac4
 
 F2: CLOSED / VERIFIED / MERGED
-F2_IMPLEMENTATION_SHA: f4ac9e8b386aab0e0b83226f5012a5e7e86d102b
-F2_DOCUMENTATION_HEAD: 94489483879da7ffa433538b4cb4dbd702990e39
 F2_MERGE_SHA: 96a4fa59ca82604d821061c6aed7d9edb3849ae1
 F2_QA: PHP 8.3 / 8.4 / 8.5 — 60 tests / 254 assertions
-LEY_1_KISS_F2: PASS
-LEY_2_CERO_RUIDO_F2: PASS
-LATEST_MERGED_CHECKPOINT: docs/checkpoints/F2_MERGED_2026-10-11.md
 
-F3: DESIGN/SPEC GATE
-NEXT: aprobar SPEC específica F3 antes de plan/implementación
+F3: CLOSED / VERIFIED / NOT MERGED
+F3_BRANCH: impl/f3-mobile-shell-visual-20261011
+F3_PR: #4 OPEN
+F3_VERIFIED_IMPLEMENTATION_HEAD: 76574f2c4e37bc9386bc00e81aabc9a75c3205a0
+F3_QA: PHP 8.3 / 8.4 / 8.5 — 94 tests / 458 assertions / 0 warnings
+F3_VISUAL_QA: PASS — 360x800 / 390x844 / 412x915 / 768x1024 / 1440x1000 + 200% equivalent
+LEY_1_KISS_F3: PASS
+LEY_2_CERO_RUIDO_F3: PASS
+LATEST_CHECKPOINT: docs/checkpoints/F3_CLOSED_2026-10-11.md
+
+NEXT_GATE: verify final documentation HEAD, mark PR #4 ready, then merge only with explicit approval
+NEXT_PHASE_AFTER_MERGE: F4 — Propiedades + unidades
 ```
 
 ---
 
-# 5. ROADMAP
+# 5. F3 — QUÉ QUEDÓ ENTREGADO
+
+F3 cerró el sistema visual real sin abrir módulos futuros:
+
+- shell autenticado mobile-first;
+- topbar y bottom navigation `Inicio · Apps · Cuenta`;
+- launcher Apps mediante `<dialog>` nativo;
+- Inicio y Cuenta reales;
+- administración de usuarios F2 convergida al mismo shell;
+- branding configurable con nombre, un color primario y logo opcional;
+- logo almacenado fuera del webroot y servido por ruta controlada;
+- auth e installer convergidos sobre una única hoja CSS;
+- `resources/` protegido contra acceso HTTP directo;
+- safe-area, foco visible, touch targets y reduced-motion;
+- soporte de subcarpeta;
+- cero rutas/botones de Cartera, Solicitudes o Propiedades antes de sus fases.
+
+Deltas arquitectónicos F3:
+
+```text
+COMPOSER_DEPENDENCIES_DELTA: +0
+DB_MIGRATIONS_DELTA: +0
+DB_TABLES_DELTA: +0
+NODE_NPM_BUILD_DELTA: +0
+NEW_REAL_ROUTES: /account, /admin/appearance, /brand/logo
+INSTALLED_ROOT: plain text -> authenticated app shell
+FUTURE_MODULE_ROUTES: +0
+```
+
+---
+
+# 6. ROADMAP
 
 - F0 — Spec + plan ✅
 - F1 — Foundation + installer ✅
 - F2 — Auth + usuarios + permisos ✅
-- **F3 — Shell móvil + sistema visual ← ACTUAL**
-- F4 — Propiedades + unidades
+- F3 — Shell móvil + sistema visual ✅ *(pendiente de merge del PR #4)*
+- **F4 — Propiedades + unidades ← SIGUIENTE DESPUÉS DEL MERGE**
 - F5 — Candidatos + referencias
 - F6 — Aseguradora/SURA
 - F7 — Contratos
@@ -164,7 +200,7 @@ Ciclo por fase:
 
 ---
 
-# 6. GUARDRAILS CLAVE
+# 7. GUARDRAILS CLAVE
 
 - no introducir funcionalidades futuras como botones muertos;
 - no crear PSE, WhatsApp API o módulos incompletos por anticipación;
@@ -172,11 +208,12 @@ Ciclo por fase:
 - no exponer documentos privados;
 - no automatizar decisiones jurídicas;
 - no duplicar fuentes de verdad;
-- no agregar dependencia si CSS/PHP/HTML/JS mínimo resuelven mejor.
+- no agregar dependencia si CSS/PHP/HTML/JS mínimo resuelven mejor;
+- no abrir F4 mientras PR #4 siga sin integrar.
 
 ---
 
-# 7. PROTOCOLO DE RECUPERACIÓN
+# 8. PROTOCOLO DE RECUPERACIÓN
 
 Una nueva sesión debe:
 
@@ -198,6 +235,6 @@ Prompt mínimo:
 
 ---
 
-# 8. SIGUIENTE PASO
+# 9. SIGUIENTE PASO
 
-Completar y revisar la **SPEC específica de F3 — Shell móvil + sistema visual**. Solo después de su aprobación se puede crear el mini-plan de implementación y comenzar TDD.
+Verificar el HEAD documental final de F3 en CI, dejar PR #4 **Ready for review** y detenerse antes del merge. El merge a `main` requiere aprobación explícita del usuario. Solo después se abre F4.
