@@ -261,6 +261,7 @@ return static function (App $app, array $deps): void {
             'media' => $media->listForUnit($unitId),
             'applicationRequirements' => $candidateDocuments->listRequirementsForUnit($unitId),
             'canManage' => Permissions::allows($user, 'properties.manage'),
+            'canViewPropertyDetails' => Permissions::allows($user, 'properties.view'),
             'canManageApplicationRequirements' => Permissions::allows($user, 'candidates.manage'),
             'error' => $error,
         ]));
