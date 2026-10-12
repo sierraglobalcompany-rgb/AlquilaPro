@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** PLAN F4 PARA REVISIÓN HUMANA — NO IMPLEMENTAR HASTA APROBACIÓN EXPLÍCITA.
+
 **Goal:** Implement the single-source property/unit inventory, safe media, public landing/catalog, and private F4 administration without duplicating auth, prices, availability, catalog records, or candidate/application flows.
 
 **Architecture:** Add one focused domain under `app/Properties`: `PropertyService` owns property/unit persistence, validation, publication rules and catalog queries; `UnitMediaService` owns photo/video-link lifecycle and filesystem rollback. HTTP is one `app/Properties/routes.php` file using the existing Slim app, `View`, CSRF, session/current-user resolver and Permissions. Public pages reuse the existing visual tokens through one new lightweight public layout; private pages reuse the F3 app shell. No repository layer, DTO layer, DI container, ORM, frontend framework, media library, or second auth system.
