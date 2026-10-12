@@ -93,8 +93,14 @@ final class CandidateService
     public function findByToken(string $rawToken, int $now): ?array
     {
         $row = $this->candidateRowByToken($rawToken, $now);
+        if ($row === null) {
+            return null;
+        }
 
-        return $row === null ? null : $this->normalizeCandidate($row);
+        $candidate = $this->normalizeCandidate($row);
+        $candidate['references'] = $this->referencesForCandidate((int) $row['id']);
+
+        return $candidate;
     }
 
     public function updateByToken(string $rawToken, array $input, int $now): array
@@ -103,9 +109,7 @@ final class CandidateService
         if ($row === null) {
             throw new RuntimeException('El enlace de continuación no es válido.');
         }
-        if (!in_array((string) $row['status'], self::EDITABLE_STATUSES, true)) {
-            throw new RuntimeException('La solicitud ya no admite cambios.');
-        }
+        $this->assertPublicEditable($row);
 
         if (array_key_exists('document_type', $input)
             && $this->normalizeDocumentType((string) $input['document_type']) !== $row['document_type']) {
@@ -141,9 +145,25 @@ final class CandidateService
             'occupation' => array_key_exists('occupation', $input)
                 ? $this->optionalText($input['occupation'], 190)
                 : $row['occupation'],
+            'monthly_income' => array_key_exists('monthly_income', $input)
+                ? $this->optionalDecimal($input['monthly_income'])
+                : $row['monthly_income'],
             'employment_notes' => array_key_exists('employment_notes', $input)
                 ? $this->optionalText($input['employment_notes'])
                 : $row['employment_notes'],
+            'occupants_count' => array_key_exists('occupants_count', $input)
+                ? $this->optionalInteger($input['occupants_count'])
+                : $row['occupants_count'],
+            'occupants_notes' => array_key_exists('occupants_notes', $input)
+                ? $this->optionalText($input['occupants_notes'])
+                : $row['occupants_notes'],
+            'pets_declared' => array_key_exists('pets_declared', $input)
+                ? $this->strictBoolean($input['pets_declared'])
+                : (bool) $row['pets_declared'],
+            'pets_notes' => array_key_exists('pets_notes', $input)
+                ? $this->optionalText($input['pets_notes'])
+                : $row['pets_notes'],
+            'status' => $this->partialStatus((string) $row['status']),
             'updated_at' => $this->dateTime($now),
             'id' => (int) $row['id'],
         ];
@@ -152,14 +172,139 @@ final class CandidateService
             'UPDATE candidates SET '
             . 'full_name = :full_name, birth_date = :birth_date, phone = :phone, email = :email, '
             . 'current_address = :current_address, employment_status = :employment_status, '
-            . 'employer_name = :employer_name, occupation = :occupation, employment_notes = :employment_notes, '
-            . 'updated_at = :updated_at WHERE id = :id',
+            . 'employer_name = :employer_name, occupation = :occupation, monthly_income = :monthly_income, '
+            . 'employment_notes = :employment_notes, occupants_count = :occupants_count, occupants_notes = :occupants_notes, '
+            . 'pets_declared = :pets_declared, pets_notes = :pets_notes, status = :status, updated_at = :updated_at '
+            . 'WHERE id = :id',
         );
-        $statement->execute($data);
+        $statement->execute([
+            ...$data,
+            'pets_declared' => $data['pets_declared'] ? 1 : 0,
+        ]);
 
         $candidate = $this->findCandidate((int) $row['id']);
         if ($candidate === null) {
             throw new RuntimeException('No fue posible actualizar la solicitud.');
+        }
+
+        return $candidate;
+    }
+
+    public function replaceReferencesByToken(string $rawToken, array $references, int $now): array
+    {
+        $row = $this->candidateRowByToken($rawToken, $now);
+        if ($row === null) {
+            throw new RuntimeException('El enlace de continuación no es válido.');
+        }
+        $this->assertPublicEditable($row);
+
+        $normalized = [];
+        foreach ($references as $reference) {
+            if (!is_array($reference)) {
+                throw new RuntimeException('Las referencias no son válidas.');
+            }
+
+            $isBlank = true;
+            foreach (['reference_type', 'name', 'relationship', 'phone', 'email'] as $field) {
+                if (trim((string) ($reference[$field] ?? '')) !== '') {
+                    $isBlank = false;
+                    break;
+                }
+            }
+            if ($isBlank) {
+                continue;
+            }
+
+            $normalized[] = [
+                'reference_type' => $this->optionalText($reference['reference_type'] ?? null, 40),
+                'name' => $this->requiredText($reference['name'] ?? null, 190, 'El nombre de la referencia es obligatorio.'),
+                'relationship' => $this->optionalText($reference['relationship'] ?? null, 120),
+                'phone' => $this->requiredText($reference['phone'] ?? null, 50, 'El teléfono de la referencia es obligatorio.'),
+                'email' => $this->optionalEmail($reference['email'] ?? null),
+            ];
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $delete = $this->pdo->prepare('DELETE FROM candidate_references WHERE candidate_id = :candidate_id');
+            $delete->execute(['candidate_id' => (int) $row['id']]);
+
+            $insert = $this->pdo->prepare(
+                'INSERT INTO candidate_references '
+                . '(candidate_id, reference_type, name, relationship, phone, email, updated_at) '
+                . 'VALUES (:candidate_id, :reference_type, :name, :relationship, :phone, :email, :updated_at)',
+            );
+            foreach ($normalized as $reference) {
+                $insert->execute([
+                    'candidate_id' => (int) $row['id'],
+                    ...$reference,
+                    'updated_at' => $this->dateTime($now),
+                ]);
+            }
+
+            $this->markPartialProgress((int) $row['id'], (string) $row['status'], $now);
+            $this->pdo->commit();
+        } catch (Throwable $exception) {
+            $this->rollbackIfNeeded();
+            throw $exception;
+        }
+
+        $candidate = $this->findByToken($rawToken, $now);
+        if ($candidate === null) {
+            throw new RuntimeException('No fue posible guardar las referencias.');
+        }
+
+        return $candidate;
+    }
+
+    public function changeUnitByToken(string $rawToken, string $publicKey, int $now): array
+    {
+        $row = $this->candidateRowByToken($rawToken, $now);
+        if ($row === null) {
+            throw new RuntimeException('El enlace de continuación no es válido.');
+        }
+        $this->assertPublicEditable($row);
+        if ($row['submitted_at'] !== null) {
+            throw new RuntimeException('La unidad ya no se puede cambiar.');
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $documents = $this->pdo->prepare(
+                'SELECT COUNT(*) FROM candidate_documents WHERE candidate_id = :candidate_id',
+            );
+            $documents->execute(['candidate_id' => (int) $row['id']]);
+            if ((int) $documents->fetchColumn() > 0) {
+                throw new RuntimeException('La unidad ya no se puede cambiar.');
+            }
+
+            if ($this->propertyService->findPublicUnit($publicKey) === null) {
+                throw new RuntimeException('La nueva unidad no está disponible.');
+            }
+            $unitId = $this->unitIdByPublicKey($publicKey);
+            if ($unitId === null) {
+                throw new RuntimeException('La nueva unidad no está disponible.');
+            }
+
+            $statement = $this->pdo->prepare(
+                'UPDATE candidates SET unit_id = :unit_id, status = :status, updated_at = :updated_at WHERE id = :id',
+            );
+            $statement->execute([
+                'unit_id' => $unitId,
+                'status' => $this->partialStatus((string) $row['status']),
+                'updated_at' => $this->dateTime($now),
+                'id' => (int) $row['id'],
+            ]);
+
+            $this->pdo->commit();
+        } catch (Throwable $exception) {
+            $this->rollbackIfNeeded();
+            throw $exception;
+        }
+
+        $candidate = $this->findCandidate((int) $row['id']);
+        if ($candidate === null) {
+            throw new RuntimeException('No fue posible cambiar la unidad.');
         }
 
         return $candidate;
@@ -171,9 +316,7 @@ final class CandidateService
         if ($row === null) {
             throw new RuntimeException('El enlace de continuación no es válido.');
         }
-        if (!in_array((string) $row['status'], self::EDITABLE_STATUSES, true)) {
-            throw new RuntimeException('La solicitud ya no admite cambios.');
-        }
+        $this->assertPublicEditable($row);
 
         $this->assertBasicCompleteness($row);
         $this->assertLaborCompleteness($row);
@@ -364,6 +507,56 @@ final class CandidateService
         return $text;
     }
 
+    private function optionalEmail(mixed $value): ?string
+    {
+        $email = mb_strtolower(trim((string) $value));
+        if ($email === '') {
+            return null;
+        }
+        if (mb_strlen($email) > 190 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            throw new RuntimeException('El correo de la referencia no es válido.');
+        }
+
+        return $email;
+    }
+
+    private function optionalDecimal(mixed $value): ?string
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return null;
+        }
+        $text = trim((string) $value);
+        if (!is_numeric($text) || !is_finite((float) $text) || (float) $text < 0 || (float) $text > 9999999999.99) {
+            throw new RuntimeException('El ingreso mensual no es válido.');
+        }
+
+        return $text;
+    }
+
+    private function optionalInteger(mixed $value): ?int
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return null;
+        }
+        if (filter_var($value, FILTER_VALIDATE_INT) === false || (int) $value < 0 || (int) $value > 65535) {
+            throw new RuntimeException('La cantidad de ocupantes no es válida.');
+        }
+
+        return (int) $value;
+    }
+
+    private function strictBoolean(mixed $value): bool
+    {
+        if ($value === true || $value === 1 || $value === '1') {
+            return true;
+        }
+        if ($value === false || $value === 0 || $value === '0') {
+            return false;
+        }
+
+        throw new RuntimeException('La declaración de mascotas no es válida.');
+    }
+
     private function optionalDate(mixed $value): ?string
     {
         $date = trim((string) $value);
@@ -386,6 +579,42 @@ final class CandidateService
         }
 
         return $email;
+    }
+
+    private function assertPublicEditable(array $row): void
+    {
+        if (!in_array((string) $row['status'], self::EDITABLE_STATUSES, true)) {
+            throw new RuntimeException('La solicitud ya no admite cambios.');
+        }
+    }
+
+    private function partialStatus(string $status): string
+    {
+        return $status === 'new' ? 'incomplete' : $status;
+    }
+
+    private function markPartialProgress(int $candidateId, string $status, int $now): void
+    {
+        $statement = $this->pdo->prepare(
+            'UPDATE candidates SET status = :status, updated_at = :updated_at WHERE id = :id',
+        );
+        $statement->execute([
+            'status' => $this->partialStatus($status),
+            'updated_at' => $this->dateTime($now),
+            'id' => $candidateId,
+        ]);
+    }
+
+    /** @return list<array{reference_type:?string,name:string,relationship:?string,phone:string,email:?string}> */
+    private function referencesForCandidate(int $candidateId): array
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT reference_type, name, relationship, phone, email '
+            . 'FROM candidate_references WHERE candidate_id = :candidate_id ORDER BY id ASC',
+        );
+        $statement->execute(['candidate_id' => $candidateId]);
+
+        return $statement->fetchAll(PDO::FETCH_ASSOC);
     }
 
     private function assertBasicCompleteness(array $row): void
