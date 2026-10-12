@@ -143,6 +143,39 @@ final class AuthRoutesTest extends TestCase
         self::assertSame(0, (int) $this->pdo->query("SELECT COUNT(*) FROM users WHERE email = 'blocked@example.com'")->fetchColumn());
     }
 
+    public function testManagePermissionCannotEscalatePermissionsDuringUserCreation(): void
+    {
+        $this->insertUser(
+            'manager@example.com',
+            'ManagerPassword123',
+            'admin',
+            ['users.view', 'users.manage'],
+        );
+        $this->login('manager@example.com', 'ManagerPassword123');
+
+        $allowed = $this->request('POST', '/admin/users', [
+            'full_name' => 'Basic Gestor',
+            'email' => 'basic@example.com',
+            'role' => 'gestor',
+            'temporary_password' => 'TemporaryPass123',
+        ]);
+        self::assertSame(303, $allowed->getStatusCode());
+
+        $blocked = $this->request('POST', '/admin/users', [
+            'full_name' => 'Escalated Gestor',
+            'email' => 'escalated@example.com',
+            'role' => 'gestor',
+            'temporary_password' => 'TemporaryPass123',
+            'permissions' => ['users.permissions'],
+        ]);
+
+        self::assertSame(403, $blocked->getStatusCode());
+        self::assertSame(
+            0,
+            (int) $this->pdo->query("SELECT COUNT(*) FROM users WHERE email = 'escalated@example.com'")->fetchColumn(),
+        );
+    }
+
     public function testMustChangePasswordForcesAccountPasswordUntilChanged(): void
     {
         $this->insertUser(
