@@ -35,7 +35,7 @@ return static function (App $app, array $deps): void {
         if ($user === null) {
             $response->getBody()->write($view->renderPublic('public_landing', [
                 'pageTitle' => 'Inicio',
-                'availabilityCount' => count($properties->listPublicUnits()),
+                'availabilityCount' => count($properties->listPublicUnits(null, null, null)),
             ]));
 
             return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
