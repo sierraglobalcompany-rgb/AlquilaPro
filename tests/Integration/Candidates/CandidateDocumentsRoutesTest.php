@@ -139,14 +139,57 @@ final class CandidateDocumentsRoutesTest extends TestCase
         )->fetchAll(PDO::FETCH_COLUMN);
         self::assertSame([$incomeId, $identityId], array_map('intval', $order));
 
-        self::assertSame(
-            404,
-            $this->request(
-                $app,
-                'POST',
-                '/sub/admin/units/' . $unit['id'] . '/application-requirements/' . $identityId . '/delete',
-            )->getStatusCode(),
-        );
+        $rendered = (string) $this->request($app, 'GET', '/sub/admin/units/' . $unit['id'])->getBody();
+        self::assertStringNotContainsString('/delete', $rendered);
+        self::assertFalse(method_exists(CandidateDocumentService::class, 'deleteRequirement'));
+    }
+
+    public function testUnitContextSeparatesPropertyVisibilityFromCandidateRequirementManagement(): void
+    {
+        $propertyId = $this->insertProperty('Edificio Privacidad');
+        $unit = $this->insertUnit($propertyId, 'A-504');
+        $this->pdo->prepare(
+            'UPDATE units SET description = :description, private_notes = :private_notes WHERE id = :id',
+        )->execute([
+            'description' => 'DESCRIPCION F4 VISIBLE',
+            'private_notes' => 'SECRETO F4 PRIVADO',
+            'id' => $unit['id'],
+        ]);
+        $this->pdo->prepare(
+            "INSERT INTO unit_media (unit_id, type, external_url, sort_order, is_cover) "
+            . "VALUES (:unit_id, 'video_link', 'https://video.example.com/private-tour', 0, 0)",
+        )->execute(['unit_id' => $unit['id']]);
+        $this->documents()->createRequirement($unit['id'], [
+            'code' => 'identity',
+            'label' => 'Documento identidad',
+            'is_required' => 1,
+            'is_active' => 1,
+        ]);
+
+        $this->insertUser('candidate-only@example.com', 'CandidatePassword123', 'admin', ['candidates.manage']);
+        $candidateApp = $this->app();
+        $this->login($candidateApp, 'candidate-only@example.com', 'CandidatePassword123');
+        $candidateResponse = $this->request($candidateApp, 'GET', '/admin/units/' . $unit['id']);
+        self::assertSame(200, $candidateResponse->getStatusCode());
+        $candidateHtml = (string) $candidateResponse->getBody();
+        self::assertStringContainsString('Requisitos documentales', $candidateHtml);
+        self::assertStringContainsString('Documento identidad', $candidateHtml);
+        self::assertStringNotContainsString('DESCRIPCION F4 VISIBLE', $candidateHtml);
+        self::assertStringNotContainsString('SECRETO F4 PRIVADO', $candidateHtml);
+        self::assertStringNotContainsString('Multimedia', $candidateHtml);
+        self::assertStringNotContainsString('video.example.com/private-tour', $candidateHtml);
+
+        $_SESSION = [];
+        $this->insertUser('property-viewer@example.com', 'PropertyPassword123', 'admin', ['properties.view']);
+        $propertyApp = $this->app();
+        $this->login($propertyApp, 'property-viewer@example.com', 'PropertyPassword123');
+        $propertyResponse = $this->request($propertyApp, 'GET', '/admin/units/' . $unit['id']);
+        self::assertSame(200, $propertyResponse->getStatusCode());
+        $propertyHtml = (string) $propertyResponse->getBody();
+        self::assertStringContainsString('DESCRIPCION F4 VISIBLE', $propertyHtml);
+        self::assertStringContainsString('SECRETO F4 PRIVADO', $propertyHtml);
+        self::assertStringContainsString('Multimedia', $propertyHtml);
+        self::assertStringContainsString('video.example.com/private-tour', $propertyHtml);
     }
 
     public function testRequirementMutationsRequireCandidatesManageCsrfAndHonorPasswordGate(): void
