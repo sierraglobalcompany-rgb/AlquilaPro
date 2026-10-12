@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AlquilaPro\Tests\Integration\Auth;
 
 use AlquilaPro\Auth\AuthService;
+use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Foundation\DatabaseConfig;
 use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
@@ -217,6 +218,10 @@ final class AuthRoutesTest extends TestCase
             $method,
             'https://alquilapro.sierraglobalcompany.com' . $path,
         );
+
+        if (strtoupper($method) === 'POST') {
+            $body['csrf_token'] = (new Csrf())->token();
+        }
 
         if ($body !== []) {
             $request = $request->withParsedBody($body);
