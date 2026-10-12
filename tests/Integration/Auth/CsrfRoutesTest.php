@@ -110,6 +110,26 @@ final class CsrfRoutesTest extends TestCase
         self::assertSame(0, (int) $this->pdo->query("SELECT COUNT(*) FROM users WHERE email = 'blocked@example.com'")->fetchColumn());
     }
 
+    public function testAppearanceMutationWithoutCsrfIsForbidden(): void
+    {
+        $this->markInstalled();
+        $ownerId = $this->insertOwner();
+        (new SessionGuard())->login([
+            'id' => $ownerId,
+            'role' => 'owner',
+            'must_change_password' => false,
+        ], time());
+        $app = $this->app(true);
+
+        $response = $this->request($app, 'POST', '/admin/appearance', [
+            'app_name' => 'Blocked Brand',
+            'primary_color' => '#112233',
+        ]);
+
+        self::assertSame(403, $response->getStatusCode());
+        self::assertSame(0, (int) $this->pdo->query("SELECT COUNT(*) FROM settings WHERE setting_key IN ('app.name', 'brand.primary_color')")->fetchColumn());
+    }
+
     public function testHealthRemainsPublicWithoutCsrf(): void
     {
         $app = $this->app(false);
