@@ -1,0 +1,115 @@
+:root {
+    color-scheme: light;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --color-background: #F6F7F4;
+    --color-surface: #FFFFFF;
+    --color-text: #17211F;
+    --color-muted: #66706D;
+    --color-border: #E3E8E5;
+    --color-primary: #1E6A5A;
+    --color-success: #2F7D5A;
+    --color-warning: #A66A16;
+    --color-danger: #B84C4C;
+    --brand-primary: var(--color-primary);
+    --radius-card: 20px;
+    --radius-control: 12px;
+    --shadow-soft: 0 14px 40px rgba(23, 33, 31, 0.08);
+}
+
+* { box-sizing: border-box; }
+html { background: var(--color-background); color: var(--color-text); }
+body { margin: 0; background: var(--color-background); color: var(--color-text); }
+a { color: var(--brand-primary); }
+button, input, select, textarea { font: inherit; }
+button, input, select, textarea, a { -webkit-tap-highlight-color: transparent; }
+button, input, select, textarea { min-height: 44px; }
+
+:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--brand-primary) 65%, white);
+    outline-offset: 2px;
+}
+
+.auth-page { min-height: 100dvh; }
+.auth-shell {
+    width: min(100% - 32px, 520px);
+    min-height: 100dvh;
+    margin: 0 auto;
+    display: grid;
+    align-content: center;
+    padding: 32px 0;
+}
+.auth-shell--installer { width: min(100% - 32px, 680px); align-content: start; }
+.auth-card,
+.surface {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-soft);
+    padding: 24px;
+}
+.auth-shell--installer > .surface,
+.auth-shell--installer > form > .surface { margin-bottom: 16px; }
+.auth-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+    font-weight: 750;
+}
+.auth-brand__mark {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    background: var(--brand-primary);
+    color: #fff;
+}
+h1, h2 { margin-top: 0; line-height: 1.15; }
+h1 { font-size: clamp(1.65rem, 6vw, 2.1rem); }
+h2 { font-size: 1.15rem; }
+label { display: block; margin: 16px 0 6px; font-weight: 650; }
+input, select, textarea {
+    width: 100%;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    padding: 10px 12px;
+    background: #fff;
+    color: var(--color-text);
+}
+button,
+.button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    border: 0;
+    border-radius: var(--radius-control);
+    padding: 10px 16px;
+    background: var(--brand-primary);
+    color: #fff;
+    font-weight: 750;
+    text-decoration: none;
+    cursor: pointer;
+}
+form > button { width: 100%; margin-top: 20px; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.error,
+[role="alert"] {
+    border: 1px solid color-mix(in srgb, var(--color-danger) 45%, white);
+    border-radius: var(--radius-control);
+    padding: 12px;
+    color: #7f2929;
+    background: #fff7f7;
+}
+.hint { color: var(--color-muted); }
+ul { padding-left: 22px; }
+
+@media (max-width: 420px) {
+    .auth-shell { width: min(100% - 24px, 520px); padding: 20px 0; }
+    .auth-card, .surface { padding: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
