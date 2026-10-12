@@ -6,6 +6,7 @@ use AlquilaPro\Auth\AuthService;
 use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Auth\UserService;
+use AlquilaPro\Candidates\CandidateService;
 use AlquilaPro\Foundation\DatabaseConfig;
 use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
@@ -139,6 +140,7 @@ return static function (array $settings): App {
             $view = new View($viewsPath, $branding, $basePath);
             $properties = new PropertyService($pdo);
             $unitMedia = new UnitMediaService($pdo, $unitMediaDirectory);
+            $candidates = new CandidateService($pdo);
 
             $currentUser = static function () use ($session, $auth): ?array {
                 $userId = $session->userId(time());
@@ -176,6 +178,12 @@ return static function (array $settings): App {
             $propertyRoutes($app, $shared + [
                 'properties' => $properties,
                 'unit_media' => $unitMedia,
+            ]);
+
+            $candidateRoutes = require dirname(__DIR__) . '/app/Candidates/routes.php';
+            $candidateRoutes($app, $shared + [
+                'candidates' => $candidates,
+                'properties' => $properties,
             ]);
         }
     }
