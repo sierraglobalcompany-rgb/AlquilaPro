@@ -320,6 +320,83 @@ final class CandidateDocumentsTest extends TestCase
         self::assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM candidates')->fetchColumn());
     }
 
+    public function testSubmitRejectsRequiredDocumentWhosePhysicalFileWasDeleted(): void
+    {
+        $unit = $this->seedUnit(str_repeat('3', 24), 'DOC-I');
+        $candidateService = new CandidateService($this->pdo);
+        $candidate = $candidateService->startCandidate(
+            $unit['public_key'],
+            $this->candidateInput('DOC-6001'),
+            self::NOW,
+        );
+        $documents = $this->documents();
+        $documents->createRequirement($unit['id'], [
+            'code' => 'identity',
+            'label' => 'Identidad',
+            'is_required' => 1,
+            'is_active' => 1,
+        ]);
+        $document = $documents->addOrReplaceDocument(
+            $candidate['candidate_id'],
+            'identity',
+            $this->upload($this->pdfBytes(), 'identity.pdf', 'application/pdf'),
+        );
+        $path = $this->documentDirectory . '/' . $document['stored_name'];
+        self::assertFileExists($path);
+        self::assertTrue(unlink($path));
+        self::assertFileDoesNotExist($path);
+
+        try {
+            $candidateService->submitByToken($candidate['continuation_token'], self::NOW + 1);
+            self::fail('Submit must reject a required document whose physical file is missing.');
+        } catch (RuntimeException $exception) {
+            self::assertStringContainsString('document', mb_strtolower($exception->getMessage()));
+        }
+
+        $stored = $candidateService->findCandidate($candidate['candidate_id']);
+        self::assertNotNull($stored);
+        self::assertSame('new', $stored['status']);
+        self::assertNull($stored['submitted_at']);
+    }
+
+    public function testSubmitRejectsRequiredDocumentWhosePhysicalFileWasTampered(): void
+    {
+        $unit = $this->seedUnit(str_repeat('4', 24), 'DOC-J');
+        $candidateService = new CandidateService($this->pdo);
+        $candidate = $candidateService->startCandidate(
+            $unit['public_key'],
+            $this->candidateInput('DOC-7001'),
+            self::NOW,
+        );
+        $documents = $this->documents();
+        $documents->createRequirement($unit['id'], [
+            'code' => 'identity',
+            'label' => 'Identidad',
+            'is_required' => 1,
+            'is_active' => 1,
+        ]);
+        $document = $documents->addOrReplaceDocument(
+            $candidate['candidate_id'],
+            'identity',
+            $this->upload($this->pdfBytes(), 'identity.pdf', 'application/pdf'),
+        );
+        $path = $this->documentDirectory . '/' . $document['stored_name'];
+        self::assertFileExists($path);
+        self::assertNotFalse(file_put_contents($path, '<?php echo "tampered"; ?>'));
+
+        try {
+            $candidateService->submitByToken($candidate['continuation_token'], self::NOW + 1);
+            self::fail('Submit must reject a required document whose physical file was tampered.');
+        } catch (RuntimeException $exception) {
+            self::assertStringContainsString('document', mb_strtolower($exception->getMessage()));
+        }
+
+        $stored = $candidateService->findCandidate($candidate['candidate_id']);
+        self::assertNotNull($stored);
+        self::assertSame('new', $stored['status']);
+        self::assertNull($stored['submitted_at']);
+    }
+
     private function documents(): CandidateDocumentService
     {
         self::assertTrue(
@@ -419,7 +496,7 @@ final class CandidateDocumentsTest extends TestCase
     private function jpegBytes(): string
     {
         $bytes = base64_decode(
-            '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABD/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/EH//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/EH//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/EH//2Q==',
+            '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABD/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/EH//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/EH//xAAUEAEAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxB//9k=',
             true,
         );
         self::assertIsString($bytes);
