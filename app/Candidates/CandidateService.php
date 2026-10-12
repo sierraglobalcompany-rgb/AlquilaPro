@@ -343,7 +343,13 @@ final class CandidateService
 
     public function listCandidates(): array
     {
-        $rows = $this->pdo->query('SELECT * FROM candidates ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $this->pdo->query(
+            'SELECT c.*, u.code AS unit_code, p.name AS property_name '
+            . 'FROM candidates c '
+            . 'INNER JOIN units u ON u.id = c.unit_id '
+            . 'INNER JOIN properties p ON p.id = u.property_id '
+            . 'ORDER BY c.id ASC',
+        )->fetchAll(PDO::FETCH_ASSOC);
 
         return array_map($this->normalizeCandidate(...), $rows);
     }
@@ -354,11 +360,23 @@ final class CandidateService
             return null;
         }
 
-        $statement = $this->pdo->prepare('SELECT * FROM candidates WHERE id = :id LIMIT 1');
+        $statement = $this->pdo->prepare(
+            'SELECT c.*, u.code AS unit_code, p.name AS property_name '
+            . 'FROM candidates c '
+            . 'INNER JOIN units u ON u.id = c.unit_id '
+            . 'INNER JOIN properties p ON p.id = u.property_id '
+            . 'WHERE c.id = :id LIMIT 1',
+        );
         $statement->execute(['id' => $candidateId]);
         $row = $statement->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
 
-        return is_array($row) ? $this->normalizeCandidate($row) : null;
+        $candidate = $this->normalizeCandidate($row);
+        $candidate['references'] = $this->referencesForCandidate($candidateId);
+
+        return $candidate;
     }
 
     public function transitionStatus(int $candidateId, string $status): array
