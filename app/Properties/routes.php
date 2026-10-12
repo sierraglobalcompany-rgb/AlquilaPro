@@ -5,6 +5,7 @@ declare(strict_types=1);
 use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
+use AlquilaPro\Candidates\CandidateDocumentService;
 use AlquilaPro\Properties\PropertyService;
 use AlquilaPro\Properties\UnitMediaService;
 use AlquilaPro\UI\View;
@@ -18,6 +19,8 @@ return static function (App $app, array $deps): void {
     $properties = $deps['properties'];
     /** @var UnitMediaService $media */
     $media = $deps['unit_media'];
+    /** @var CandidateDocumentService $candidateDocuments */
+    $candidateDocuments = $deps['candidate_documents'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -167,6 +170,21 @@ return static function (App $app, array $deps): void {
         return $user;
     };
 
+    $unitViewGuard = static function (ResponseInterface $response) use ($currentUser, $session, $path): array|ResponseInterface {
+        $user = $currentUser();
+        if ($user === null) {
+            return $response->withHeader('Location', $path('/login'))->withStatus(302);
+        }
+        if ($session->mustChangePassword()) {
+            return $response->withHeader('Location', $path('/account/password'))->withStatus(302);
+        }
+        if (!Permissions::allows($user, 'properties.view') && !Permissions::allows($user, 'candidates.manage')) {
+            return $response->withStatus(403);
+        }
+
+        return $user;
+    };
+
     $renderProperties = static function (
         ResponseInterface $response,
         array $user,
@@ -222,7 +240,7 @@ return static function (App $app, array $deps): void {
         int $unitId,
         ?string $error = null,
         int $status = 200,
-    ) use ($view, $properties, $media, $csrf): ResponseInterface {
+    ) use ($view, $properties, $media, $candidateDocuments, $csrf): ResponseInterface {
         $unit = $properties->findUnit($unitId);
         if ($unit === null) {
             return $response->withStatus(404);
@@ -241,7 +259,9 @@ return static function (App $app, array $deps): void {
             'unit' => $unit,
             'propertyUnits' => $properties->listUnitsForProperty($unit['property_id']),
             'media' => $media->listForUnit($unitId),
+            'applicationRequirements' => $candidateDocuments->listRequirementsForUnit($unitId),
             'canManage' => Permissions::allows($user, 'properties.manage'),
+            'canManageApplicationRequirements' => Permissions::allows($user, 'candidates.manage'),
             'error' => $error,
         ]));
 
@@ -371,8 +391,8 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($guard, $renderUnit): ResponseInterface {
-        $user = $guard($response, 'properties.view');
+    ) use ($unitViewGuard, $renderUnit): ResponseInterface {
+        $user = $unitViewGuard($response);
         if ($user instanceof ResponseInterface) {
             return $user;
         }
