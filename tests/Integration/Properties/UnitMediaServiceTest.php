@@ -97,7 +97,7 @@ final class UnitMediaServiceTest extends TestCase
         ]);
 
         $service = $this->service();
-        $media = $service->addPhoto(
+        $service->addPhoto(
             $unit['id'],
             $this->upload($this->pngBytes(), 'public.png', 'image/png'),
         );
@@ -111,7 +111,8 @@ final class UnitMediaServiceTest extends TestCase
             'requirements' => 'Ingresos demostrables',
             'is_public' => 1,
         ]);
-        self::assertNotNull($service->publicPhoto($media['id']));
+        self::assertSame([1], $service->publicPhotoPositions($unit['public_key']));
+        self::assertNotNull($service->publicPhoto($unit['public_key'], 1));
 
         $properties->updateUnit($unit['id'], [
             'type' => 'apartment',
@@ -123,7 +124,8 @@ final class UnitMediaServiceTest extends TestCase
         ]);
 
         self::assertFalse($properties->isUnitPublicable($unit['id']));
-        self::assertNull($service->publicPhoto($media['id']));
+        self::assertSame([], $service->publicPhotoPositions($unit['public_key']));
+        self::assertNull($service->publicPhoto($unit['public_key'], 1));
     }
 
     public function testPhotoRejectsNoFileSvgPhpBytesAndOversizedPayloadWithoutRowsOrFiles(): void
