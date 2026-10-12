@@ -34,7 +34,7 @@ $canViewUsers = \AlquilaPro\Auth\Permissions::allows($user, 'users.view');
 
     <nav class="bottom-nav" aria-label="Navegación principal">
         <a class="bottom-nav__item" href="<?= $escape($basePath) ?>/"<?= $activeNav === 'home' ? ' aria-current="page"' : '' ?>>Inicio</a>
-        <button class="bottom-nav__apps" type="button" data-apps-open aria-controls="apps-dialog" aria-haspopup="dialog">Apps</button>
+        <button class="bottom-nav__apps" type="button" data-apps-open aria-controls="apps-dialog" aria-haspopup="dialog"<?= $activeNav === 'apps' ? ' aria-current="page"' : '' ?>>Apps</button>
         <a class="bottom-nav__item" href="<?= $escape($basePath) ?>/account"<?= $activeNav === 'account' ? ' aria-current="page"' : '' ?>>Cuenta</a>
     </nav>
 
