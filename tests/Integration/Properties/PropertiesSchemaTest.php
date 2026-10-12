@@ -87,7 +87,7 @@ final class PropertiesSchemaTest extends TestCase
     private function uniqueIndexColumns(string $table): array
     {
         $statement = $this->pdo->prepare(
-            'SELECT GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR \",\") AS columns_list '
+            'SELECT GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR \',\') AS columns_list '
             . 'FROM information_schema.statistics '
             . 'WHERE table_schema = DATABASE() AND table_name = :table AND non_unique = 0 '
             . 'GROUP BY index_name ORDER BY index_name',
