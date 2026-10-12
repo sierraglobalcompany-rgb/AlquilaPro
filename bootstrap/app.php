@@ -156,7 +156,6 @@ return static function (array $settings): App {
                 'csrf' => $csrf,
                 'base_path' => $basePath,
                 'base_url' => $baseUrl,
-                'views' => $viewsPath,
                 'view' => $view,
                 'current_user' => $currentUser,
             ];
