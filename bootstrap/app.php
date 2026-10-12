@@ -11,6 +11,8 @@ use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
 use AlquilaPro\Foundation\Installer;
 use AlquilaPro\Foundation\RuntimeRequirements;
+use AlquilaPro\UI\Branding;
+use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
@@ -24,6 +26,8 @@ return static function (array $settings): App {
     $baseUrl = rtrim((string) ($settings['base_url'] ?? ''), '/');
     $basePath = '/' . trim((string) ($settings['base_path'] ?? ''), '/');
     $basePath = $basePath === '/' ? '' : $basePath;
+    $viewsPath = dirname(__DIR__) . '/resources/views';
+    $logoDirectory = (string) ($settings['logo_directory'] ?? dirname(__DIR__) . '/storage/branding');
 
     $lock = new InstallationLock($lockPath);
     $installer = new Installer($lock, $migrationDirectory, $databaseConfigPath);
@@ -47,13 +51,14 @@ return static function (array $settings): App {
     $runtime = RuntimeRequirements::evaluate(PHP_VERSION, get_loaded_extensions(), $storageWritable);
     $installPath = $basePath . '/install';
     $homePath = $basePath . '/';
-    $view = dirname(__DIR__) . '/resources/views/install.php';
+    $installerView = $viewsPath . '/install.php';
 
-    $renderInstaller = static function (?string $error = null) use ($runtime, $installPath, $view, $csrf): string {
+    $renderInstaller = static function (?string $error = null) use ($runtime, $installPath, $installerView, $csrf, $basePath): string {
         $action = $installPath;
         $csrfToken = $csrf->token();
+        $assetHref = $basePath . '/assets/app.css';
         ob_start();
-        require $view;
+        require $installerView;
         return (string) ob_get_clean();
     };
 
@@ -128,6 +133,8 @@ return static function (array $settings): App {
         }
 
         if ($pdo instanceof \PDO) {
+            $branding = new Branding($pdo, $logoDirectory);
+            $view = new View($viewsPath, $branding, $basePath);
             $routes = require dirname(__DIR__) . '/app/Auth/routes.php';
             $routes($app, [
                 'auth' => new AuthService($pdo),
@@ -136,7 +143,8 @@ return static function (array $settings): App {
                 'csrf' => $csrf,
                 'base_path' => $basePath,
                 'base_url' => $baseUrl,
-                'views' => dirname(__DIR__) . '/resources/views',
+                'views' => $viewsPath,
+                'view' => $view,
             ]);
         }
     }
