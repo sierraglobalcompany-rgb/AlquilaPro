@@ -89,11 +89,15 @@ return static function (App $app, array $deps): void {
         string $token,
         ?string $error = null,
         int $status = 200,
-    ) use ($view, $csrf, $path): ResponseInterface {
+    ) use ($view, $csrf, $path, $properties): ResponseInterface {
+        $continuePath = '/apply/continue/' . $token;
         $response->getBody()->write($view->renderPublic('public_candidate_continue', [
             'pageTitle' => 'Continuar solicitud',
             'candidate' => $candidate,
-            'action' => $path('/apply/continue/' . $token),
+            'action' => $path($continuePath),
+            'referencesAction' => $path($continuePath . '/references'),
+            'unitAction' => $path($continuePath . '/unit'),
+            'availableUnits' => $properties->listPublicUnits(null, null, null),
             'csrfToken' => $csrf->token(),
             'error' => $error,
         ]));
@@ -185,6 +189,65 @@ return static function (App $app, array $deps): void {
 
         try {
             $candidates->updateByToken($token, $input, time());
+        } catch (RuntimeException $exception) {
+            return $renderContinue($response, $candidate, $token, $exception->getMessage(), 422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/apply/continue/' . $token))
+            ->withStatus(303);
+    });
+
+    $app->post('/apply/continue/{token}/references', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($candidates, $allowAttempt, $tooMany, $renderContinue, $path): ResponseInterface {
+        $token = (string) ($args['token'] ?? '');
+        $candidate = $candidates->findByToken($token, time());
+        if ($candidate === null) {
+            return $response->withStatus(404);
+        }
+
+        if (!$allowAttempt('continue', 10, time())) {
+            return $tooMany($response);
+        }
+
+        $body = (array) ($request->getParsedBody() ?? []);
+        $references = $body['references'] ?? [];
+        if (!is_array($references)) {
+            return $renderContinue($response, $candidate, $token, 'Las referencias no son válidas.', 422);
+        }
+
+        try {
+            $candidates->replaceReferencesByToken($token, $references, time());
+        } catch (RuntimeException $exception) {
+            return $renderContinue($response, $candidate, $token, $exception->getMessage(), 422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/apply/continue/' . $token))
+            ->withStatus(303);
+    });
+
+    $app->post('/apply/continue/{token}/unit', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($candidates, $allowAttempt, $tooMany, $renderContinue, $path): ResponseInterface {
+        $token = (string) ($args['token'] ?? '');
+        $candidate = $candidates->findByToken($token, time());
+        if ($candidate === null) {
+            return $response->withStatus(404);
+        }
+
+        if (!$allowAttempt('continue', 10, time())) {
+            return $tooMany($response);
+        }
+
+        $body = (array) ($request->getParsedBody() ?? []);
+        try {
+            $candidates->changeUnitByToken($token, (string) ($body['public_key'] ?? ''), time());
         } catch (RuntimeException $exception) {
             return $renderContinue($response, $candidate, $token, $exception->getMessage(), 422);
         }
