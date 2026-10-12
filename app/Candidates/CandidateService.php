@@ -320,6 +320,7 @@ final class CandidateService
 
         $this->assertBasicCompleteness($row);
         $this->assertLaborCompleteness($row);
+        $this->assertDocumentCompleteness($row);
 
         $statement = $this->pdo->prepare(
             "UPDATE candidates SET status = 'verification', submitted_at = :submitted_at, updated_at = :updated_at WHERE id = :id",
@@ -639,6 +640,24 @@ final class CandidateService
 
         if ($started && trim((string) ($row['employment_status'] ?? '')) === '') {
             throw new RuntimeException('Debes completar el estado laboral antes de enviar.');
+        }
+    }
+
+    private function assertDocumentCompleteness(array $row): void
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM unit_application_requirements r '
+            . 'LEFT JOIN candidate_documents d '
+            . 'ON d.requirement_id = r.id AND d.candidate_id = :candidate_id '
+            . 'WHERE r.unit_id = :unit_id AND r.is_required = 1 AND r.is_active = 1 AND d.id IS NULL',
+        );
+        $statement->execute([
+            'candidate_id' => (int) $row['id'],
+            'unit_id' => (int) $row['unit_id'],
+        ]);
+
+        if ((int) $statement->fetchColumn() > 0) {
+            throw new RuntimeException('Debes adjuntar los documentos obligatorios antes de enviar.');
         }
     }
 
