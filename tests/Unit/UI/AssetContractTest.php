@@ -53,6 +53,14 @@ final class AssetContractTest extends TestCase
         );
     }
 
+    public function testLongPublicLinksCanWrapWithinCards(): void
+    {
+        self::assertMatchesRegularExpression(
+            '/a\s*\{[^}]*overflow-wrap\s*:\s*anywhere\s*;/s',
+            $this->css,
+        );
+    }
+
     public function testF4PrivateLayoutPrimitivesAreDefined(): void
     {
         foreach (['.content-card', '.page-stack', '.card-list', '.button-row', '.check-row'] as $selector) {
