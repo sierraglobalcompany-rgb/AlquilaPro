@@ -26,7 +26,7 @@ final class AuthServiceTest extends TestCase
             'password' => getenv('TEST_DB_PASSWORD') ?: 'root',
         ]));
 
-        foreach (['settings', 'users', 'schema_migrations'] as $table) {
+        foreach (['unit_media', 'units', 'properties', 'settings', 'users', 'schema_migrations'] as $table) {
             $this->pdo->exec(sprintf('DROP TABLE IF EXISTS `%s`', $table));
         }
 
