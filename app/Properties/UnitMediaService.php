@@ -234,6 +234,42 @@ final class UnitMediaService
         return array_map($this->normalizeMedia(...), $statement->fetchAll(PDO::FETCH_ASSOC));
     }
 
+    public function publicVideoLinks(string $publicKey): array
+    {
+        $publicKey = trim($publicKey);
+        if ((new PropertyService($this->pdo))->findPublicUnit($publicKey) === null) {
+            return [];
+        }
+
+        $statement = $this->pdo->prepare(
+            "SELECT m.external_url FROM unit_media m "
+            . 'INNER JOIN units u ON u.id = m.unit_id '
+            . "WHERE u.public_key = :public_key AND m.type = 'video_link' "
+            . 'ORDER BY m.sort_order ASC, m.id ASC',
+        );
+        $statement->execute(['public_key' => $publicKey]);
+
+        $links = [];
+        foreach ($statement->fetchAll(PDO::FETCH_COLUMN) as $url) {
+            if (!is_string($url)) {
+                continue;
+            }
+            $url = trim($url);
+            $parts = parse_url($url);
+            if ($url !== ''
+                && strlen($url) <= 1000
+                && filter_var($url, FILTER_VALIDATE_URL) !== false
+                && is_array($parts)
+                && strtolower((string) ($parts['scheme'] ?? '')) === 'https'
+                && trim((string) ($parts['host'] ?? '')) !== ''
+            ) {
+                $links[] = $url;
+            }
+        }
+
+        return $links;
+    }
+
     public function privatePhoto(int $unitId, int $mediaId): ?array
     {
         $media = $this->findMedia($unitId, $mediaId);
