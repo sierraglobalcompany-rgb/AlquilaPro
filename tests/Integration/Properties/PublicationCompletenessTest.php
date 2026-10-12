@@ -137,6 +137,44 @@ final class PublicationCompletenessTest extends TestCase
         self::assertNull($this->service->findPublicUnit($unit['public_key']));
     }
 
+    public function testPublishedUnitBecomesInvisibleWhenPriceIsRemoved(): void
+    {
+        $property = $this->property('Catálogo vivo');
+        $unit = $this->service->createUnit($property['id'], [
+            'type' => 'apartment',
+            'code' => 'A-601',
+            'status' => 'available',
+            'monthly_price' => 1900000,
+            'description' => 'Apartamento listo para publicar',
+            'requirements' => 'Ingresos demostrables',
+        ]);
+        $this->insertPhoto($unit['id']);
+
+        $this->service->updateUnit($unit['id'], [
+            'type' => 'apartment',
+            'code' => 'A-601',
+            'status' => 'available',
+            'monthly_price' => 1900000,
+            'description' => 'Apartamento listo para publicar',
+            'requirements' => 'Ingresos demostrables',
+            'is_public' => 1,
+        ]);
+
+        $updated = $this->service->updateUnit($unit['id'], [
+            'type' => 'apartment',
+            'code' => 'A-601',
+            'status' => 'available',
+            'monthly_price' => null,
+            'description' => 'Apartamento listo para publicar',
+            'requirements' => 'Ingresos demostrables',
+        ]);
+
+        self::assertTrue($updated['is_public'], 'is_public keeps publication intent; visibility is derived.');
+        self::assertFalse($this->service->isUnitPublicable($unit['id']));
+        self::assertCount(0, $this->service->listPublicUnits(null, null, null));
+        self::assertNull($this->service->findPublicUnit($unit['public_key']));
+    }
+
     private function property(string $name): array
     {
         return $this->service->createProperty([
