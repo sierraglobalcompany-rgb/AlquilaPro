@@ -61,12 +61,7 @@ final class UnitMediaService
             $upload->moveTo($path);
             @chmod($path, 0600);
 
-            $orderStatement = $this->pdo->prepare(
-                'SELECT COALESCE(MAX(sort_order), 0) + 1 FROM unit_media WHERE unit_id = :unit_id',
-            );
-            $orderStatement->execute(['unit_id' => $unitId]);
-            $sortOrder = (int) $orderStatement->fetchColumn();
-
+            $sortOrder = $this->nextSortOrder($unitId);
             $statement = $this->pdo->prepare(
                 "INSERT INTO unit_media (unit_id, type, stored_name, mime_type, external_url, sort_order, is_cover) "
                 . "VALUES (:unit_id, 'photo', :stored_name, :mime_type, NULL, :sort_order, 0)",
@@ -86,6 +81,40 @@ final class UnitMediaService
         if ($media === null) {
             @unlink($path);
             throw new RuntimeException('No fue posible confirmar la foto guardada.');
+        }
+
+        return $media;
+    }
+
+    public function addVideoLink(int $unitId, string $url): array
+    {
+        $this->requireUnit($unitId);
+
+        $url = trim($url);
+        $parts = parse_url($url);
+        if ($url === ''
+            || strlen($url) > 2048
+            || filter_var($url, FILTER_VALIDATE_URL) === false
+            || !is_array($parts)
+            || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
+            || trim((string) ($parts['host'] ?? '')) === ''
+        ) {
+            throw new RuntimeException('El enlace de video debe ser una URL HTTPS válida.');
+        }
+
+        $statement = $this->pdo->prepare(
+            "INSERT INTO unit_media (unit_id, type, stored_name, mime_type, external_url, sort_order, is_cover) "
+            . "VALUES (:unit_id, 'video', NULL, NULL, :external_url, :sort_order, 0)",
+        );
+        $statement->execute([
+            'unit_id' => $unitId,
+            'external_url' => $url,
+            'sort_order' => $this->nextSortOrder($unitId),
+        ]);
+
+        $media = $this->findMedia($unitId, (int) $this->pdo->lastInsertId());
+        if ($media === null) {
+            throw new RuntimeException('No fue posible confirmar el enlace de video guardado.');
         }
 
         return $media;
@@ -111,6 +140,99 @@ final class UnitMediaService
 
         if ($path !== null && is_file($path) && !@unlink($path)) {
             throw new RuntimeException('No fue posible eliminar el archivo de la foto.');
+        }
+    }
+
+    public function setCover(int $unitId, int $mediaId): void
+    {
+        $media = $this->findMedia($unitId, $mediaId);
+        if ($media === null || $media['type'] !== 'photo') {
+            throw new RuntimeException('La portada debe ser una foto de esta unidad.');
+        }
+
+        try {
+            $this->pdo->beginTransaction();
+
+            $clear = $this->pdo->prepare('UPDATE unit_media SET is_cover = 0 WHERE unit_id = :unit_id');
+            $clear->execute(['unit_id' => $unitId]);
+
+            $set = $this->pdo->prepare(
+                "UPDATE unit_media SET is_cover = 1 WHERE id = :id AND unit_id = :unit_id AND type = 'photo'",
+            );
+            $set->execute(['id' => $mediaId, 'unit_id' => $unitId]);
+            if ($set->rowCount() !== 1) {
+                throw new RuntimeException('No fue posible definir la portada.');
+            }
+
+            $this->pdo->commit();
+        } catch (Throwable $exception) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            if ($exception instanceof RuntimeException) {
+                throw $exception;
+            }
+            throw new RuntimeException('No fue posible definir la portada.', 0, $exception);
+        }
+    }
+
+    public function reorder(int $unitId, array $orderedMediaIds): void
+    {
+        $this->requireUnit($unitId);
+
+        $normalized = [];
+        foreach ($orderedMediaIds as $mediaId) {
+            if (is_int($mediaId)) {
+                $id = $mediaId;
+            } elseif (is_string($mediaId) && ctype_digit($mediaId)) {
+                $id = (int) $mediaId;
+            } else {
+                throw new RuntimeException('El orden de multimedia no es válido.');
+            }
+
+            if ($id <= 0 || isset($normalized[$id])) {
+                throw new RuntimeException('El orden de multimedia contiene IDs inválidos o duplicados.');
+            }
+            $normalized[$id] = true;
+        }
+        $orderedIds = array_keys($normalized);
+
+        $statement = $this->pdo->prepare('SELECT id FROM unit_media WHERE unit_id = :unit_id ORDER BY id ASC');
+        $statement->execute(['unit_id' => $unitId]);
+        $ownedIds = array_map('intval', $statement->fetchAll(PDO::FETCH_COLUMN));
+
+        $expected = $ownedIds;
+        $provided = $orderedIds;
+        sort($expected, SORT_NUMERIC);
+        sort($provided, SORT_NUMERIC);
+        if ($provided !== $expected) {
+            throw new RuntimeException('El orden debe incluir exactamente la multimedia de esta unidad.');
+        }
+
+        try {
+            $this->pdo->beginTransaction();
+            $update = $this->pdo->prepare(
+                'UPDATE unit_media SET sort_order = :sort_order WHERE id = :id AND unit_id = :unit_id',
+            );
+            foreach ($orderedIds as $index => $mediaId) {
+                $update->execute([
+                    'sort_order' => $index + 1,
+                    'id' => $mediaId,
+                    'unit_id' => $unitId,
+                ]);
+                if ($update->rowCount() !== 1) {
+                    throw new RuntimeException('No fue posible actualizar el orden de multimedia.');
+                }
+            }
+            $this->pdo->commit();
+        } catch (Throwable $exception) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            if ($exception instanceof RuntimeException) {
+                throw $exception;
+            }
+            throw new RuntimeException('No fue posible actualizar el orden de multimedia.', 0, $exception);
         }
     }
 
@@ -168,6 +290,16 @@ final class UnitMediaService
         }
 
         return $this->privatePhoto((int) $unitId, $mediaId);
+    }
+
+    private function nextSortOrder(int $unitId): int
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT COALESCE(MAX(sort_order), 0) + 1 FROM unit_media WHERE unit_id = :unit_id',
+        );
+        $statement->execute(['unit_id' => $unitId]);
+
+        return (int) $statement->fetchColumn();
     }
 
     private function requireUnit(int $unitId): void
