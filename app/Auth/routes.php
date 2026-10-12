@@ -27,16 +27,8 @@ return static function (App $app, array $deps): void {
     $currentUser = $deps['current_user'];
     $basePath = (string) ($deps['base_path'] ?? '');
     $baseUrl = rtrim((string) ($deps['base_url'] ?? ''), '/');
-    $views = (string) $deps['views'];
 
     $path = static fn (string $value): string => $basePath . $value;
-
-    $renderLegacy = static function (string $name, array $data = []) use ($views): string {
-        extract($data, EXTR_SKIP);
-        ob_start();
-        require $views . '/' . $name . '.php';
-        return (string) ob_get_clean();
-    };
 
     $guard = static function (ResponseInterface $response, ?string $permission = null) use ($currentUser, $session, $path): array|ResponseInterface {
         $user = $currentUser();
@@ -177,16 +169,19 @@ return static function (App $app, array $deps): void {
         return $response->withHeader('Location', $path('/login'))->withStatus(303);
     });
 
-    $app->get('/admin/users', static function (ServerRequestInterface $request, ResponseInterface $response) use ($guard, $users, $renderLegacy, $csrf, $path): ResponseInterface {
+    $app->get('/admin/users', static function (ServerRequestInterface $request, ResponseInterface $response) use ($guard, $users, $view, $csrf): ResponseInterface {
         $authorized = $guard($response, 'users.view');
         if ($authorized instanceof ResponseInterface) {
             return $authorized;
         }
 
-        $response->getBody()->write($renderLegacy('admin_users', [
-            'users' => $users->listUsers(),
-            'basePath' => $path(''),
+        $response->getBody()->write($view->renderApp('admin_users', [
+            'pageTitle' => 'Usuarios',
+            'user' => $authorized,
+            'activeNav' => 'apps',
             'csrfToken' => $csrf->token(),
+            'users' => $users->listUsers(),
+            'canManageUsers' => Permissions::allows($authorized, 'users.manage'),
         ]));
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
     });
