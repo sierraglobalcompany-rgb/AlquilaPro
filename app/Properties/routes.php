@@ -10,6 +10,7 @@ use AlquilaPro\Properties\UnitMediaService;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\UploadedFileInterface;
 use Slim\App;
 
 return static function (App $app, array $deps): void {
@@ -49,15 +50,12 @@ return static function (App $app, array $deps): void {
         return $user;
     };
 
-    $app->get('/admin/properties', static function (
-        ServerRequestInterface $request,
+    $renderProperties = static function (
         ResponseInterface $response,
-    ) use ($guard, $view, $properties, $csrf): ResponseInterface {
-        $user = $guard($response, 'properties.view');
-        if ($user instanceof ResponseInterface) {
-            return $user;
-        }
-
+        array $user,
+        ?string $error = null,
+        int $status = 200,
+    ) use ($view, $properties, $csrf): ResponseInterface {
         $response->getBody()->write($view->renderApp('properties', [
             'pageTitle' => 'Propiedades',
             'user' => $user,
@@ -65,22 +63,22 @@ return static function (App $app, array $deps): void {
             'csrfToken' => $csrf->token(),
             'properties' => $properties->listProperties(),
             'canManage' => Permissions::allows($user, 'properties.manage'),
+            'error' => $error,
         ]));
 
-        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
-    });
+        return $response
+            ->withHeader('Content-Type', 'text/html; charset=utf-8')
+            ->withStatus($status);
+    };
 
-    $app->get('/admin/properties/{id:[0-9]+}', static function (
-        ServerRequestInterface $request,
+    $renderProperty = static function (
         ResponseInterface $response,
-        array $args,
-    ) use ($guard, $view, $properties, $csrf): ResponseInterface {
-        $user = $guard($response, 'properties.view');
-        if ($user instanceof ResponseInterface) {
-            return $user;
-        }
-
-        $property = $properties->findProperty((int) $args['id']);
+        array $user,
+        int $propertyId,
+        ?string $error = null,
+        int $status = 200,
+    ) use ($view, $properties, $csrf): ResponseInterface {
+        $property = $properties->findProperty($propertyId);
         if ($property === null) {
             return $response->withStatus(404);
         }
@@ -91,24 +89,24 @@ return static function (App $app, array $deps): void {
             'activeNav' => 'apps',
             'csrfToken' => $csrf->token(),
             'property' => $property,
-            'units' => $properties->listUnitsForProperty($property['id']),
+            'units' => $properties->listUnitsForProperty($propertyId),
             'canManage' => Permissions::allows($user, 'properties.manage'),
+            'error' => $error,
         ]));
 
-        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
-    });
+        return $response
+            ->withHeader('Content-Type', 'text/html; charset=utf-8')
+            ->withStatus($status);
+    };
 
-    $app->get('/admin/units/{id:[0-9]+}', static function (
-        ServerRequestInterface $request,
+    $renderUnit = static function (
         ResponseInterface $response,
-        array $args,
-    ) use ($guard, $view, $properties, $media, $csrf): ResponseInterface {
-        $user = $guard($response, 'properties.view');
-        if ($user instanceof ResponseInterface) {
-            return $user;
-        }
-
-        $unit = $properties->findUnit((int) $args['id']);
+        array $user,
+        int $unitId,
+        ?string $error = null,
+        int $status = 200,
+    ) use ($view, $properties, $media, $csrf): ResponseInterface {
+        $unit = $properties->findUnit($unitId);
         if ($unit === null) {
             return $response->withStatus(404);
         }
@@ -124,11 +122,284 @@ return static function (App $app, array $deps): void {
             'csrfToken' => $csrf->token(),
             'property' => $property,
             'unit' => $unit,
-            'media' => $media->listForUnit($unit['id']),
+            'media' => $media->listForUnit($unitId),
             'canManage' => Permissions::allows($user, 'properties.manage'),
+            'error' => $error,
         ]));
 
-        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+        return $response
+            ->withHeader('Content-Type', 'text/html; charset=utf-8')
+            ->withStatus($status);
+    };
+
+    $app->get('/admin/properties', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ) use ($guard, $renderProperties): ResponseInterface {
+        $user = $guard($response, 'properties.view');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        return $renderProperties($response, $user);
+    });
+
+    $app->post('/admin/properties', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ) use ($guard, $properties, $renderProperties, $path): ResponseInterface {
+        $user = $guard($response, 'properties.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        try {
+            $property = $properties->createProperty((array) ($request->getParsedBody() ?? []));
+        } catch (RuntimeException $exception) {
+            return $renderProperties($response, $user, $exception->getMessage(), 422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/admin/properties/' . $property['id']))
+            ->withStatus(303);
+    });
+
+    $app->get('/admin/properties/{id:[0-9]+}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($guard, $renderProperty): ResponseInterface {
+        $user = $guard($response, 'properties.view');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        return $renderProperty($response, $user, (int) $args['id']);
+    });
+
+    $app->post('/admin/properties/{id:[0-9]+}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($guard, $properties, $renderProperty, $path): ResponseInterface {
+        $user = $guard($response, 'properties.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $propertyId = (int) $args['id'];
+        try {
+            $properties->updateProperty($propertyId, (array) ($request->getParsedBody() ?? []));
+        } catch (RuntimeException $exception) {
+            return $renderProperty($response, $user, $propertyId, $exception->getMessage(), 422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/admin/properties/' . $propertyId))
+            ->withStatus(303);
+    });
+
+    $app->post('/admin/properties/{id:[0-9]+}/status', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($guard, $properties, $renderProperty, $path): ResponseInterface {
+        $user = $guard($response, 'properties.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $propertyId = (int) $args['id'];
+        $form = (array) ($request->getParsedBody() ?? []);
+        $active = $form['active'] ?? null;
+        if (!in_array($active, [0, 1, '0', '1', false, true], true)) {
+            return $renderProperty($response, $user, $propertyId, 'El estado de la propiedad no es válido.', 422);
+        }
+
+        try {
+            $properties->setPropertyActive($propertyId, in_array($active, [1, '1', true], true));
+        } catch (RuntimeException $exception) {
+            return $renderProperty($response, $user, $propertyId, $exception->getMessage(), 422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/admin/properties/' . $propertyId))
+            ->withStatus(303);
+    });
+
+    $app->post('/admin/properties/{id:[0-9]+}/units', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($guard, $properties, $renderProperty, $path): ResponseInterface {
+        $user = $guard($response, 'properties.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $propertyId = (int) $args['id'];
+        try {
+            $unit = $properties->createUnit($propertyId, (array) ($request->getParsedBody() ?? []));
+        } catch (RuntimeException $exception) {
+            return $renderProperty($response, $user, $propertyId, $exception->getMessage(), 422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/admin/units/' . $unit['id']))
+            ->withStatus(303);
+    });
+
+    $app->get('/admin/units/{id:[0-9]+}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($guard, $renderUnit): ResponseInterface {
+        $user = $guard($response, 'properties.view');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        return $renderUnit($response, $user, (int) $args['id']);
+    });
+
+    $app->post('/admin/units/{id:[0-9]+}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($guard, $properties, $renderUnit, $path): ResponseInterface {
+        $user = $guard($response, 'properties.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $unitId = (int) $args['id'];
+        try {
+            $properties->updateUnit($unitId, (array) ($request->getParsedBody() ?? []));
+        } catch (RuntimeException $exception) {
+            return $renderUnit($response, $user, $unitId, $exception->getMessage(), 422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/admin/units/' . $unitId))
+            ->withStatus(303);
+    });
+
+    $app->post('/admin/units/{id:[0-9]+}/media/photo', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($guard, $media, $renderUnit, $path): ResponseInterface {
+        $user = $guard($response, 'properties.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $unitId = (int) $args['id'];
+        $upload = $request->getUploadedFiles()['photo'] ?? null;
+        if (!$upload instanceof UploadedFileInterface || $upload->getError() === UPLOAD_ERR_NO_FILE) {
+            return $renderUnit($response, $user, $unitId, 'Selecciona una foto.', 422);
+        }
+
+        try {
+            $media->addPhoto($unitId, $upload);
+        } catch (RuntimeException $exception) {
+            return $renderUnit($response, $user, $unitId, $exception->getMessage(), 422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/admin/units/' . $unitId))
+            ->withStatus(303);
+    });
+
+    $app->post('/admin/units/{id:[0-9]+}/media/video', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($guard, $media, $renderUnit, $path): ResponseInterface {
+        $user = $guard($response, 'properties.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $unitId = (int) $args['id'];
+        $form = (array) ($request->getParsedBody() ?? []);
+        try {
+            $media->addVideoLink($unitId, (string) ($form['url'] ?? ''));
+        } catch (RuntimeException $exception) {
+            return $renderUnit($response, $user, $unitId, $exception->getMessage(), 422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/admin/units/' . $unitId))
+            ->withStatus(303);
+    });
+
+    $app->post('/admin/units/{id:[0-9]+}/media/{mediaId:[0-9]+}/delete', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($guard, $media, $renderUnit, $path): ResponseInterface {
+        $user = $guard($response, 'properties.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $unitId = (int) $args['id'];
+        try {
+            $media->remove($unitId, (int) $args['mediaId']);
+        } catch (RuntimeException $exception) {
+            return $renderUnit($response, $user, $unitId, $exception->getMessage(), 422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/admin/units/' . $unitId))
+            ->withStatus(303);
+    });
+
+    $app->post('/admin/units/{id:[0-9]+}/media/{mediaId:[0-9]+}/cover', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($guard, $media, $renderUnit, $path): ResponseInterface {
+        $user = $guard($response, 'properties.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $unitId = (int) $args['id'];
+        try {
+            $media->setCover($unitId, (int) $args['mediaId']);
+        } catch (RuntimeException $exception) {
+            return $renderUnit($response, $user, $unitId, $exception->getMessage(), 422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/admin/units/' . $unitId))
+            ->withStatus(303);
+    });
+
+    $app->post('/admin/units/{id:[0-9]+}/media/order', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($guard, $media, $renderUnit, $path): ResponseInterface {
+        $user = $guard($response, 'properties.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $unitId = (int) $args['id'];
+        $form = (array) ($request->getParsedBody() ?? []);
+        $mediaIds = $form['media_ids'] ?? [];
+        try {
+            $media->reorder($unitId, is_array($mediaIds) ? $mediaIds : []);
+        } catch (RuntimeException $exception) {
+            return $renderUnit($response, $user, $unitId, $exception->getMessage(), 422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/admin/units/' . $unitId))
+            ->withStatus(303);
     });
 
     $app->get('/admin/units/{id:[0-9]+}/media/{mediaId:[0-9]+}', static function (
@@ -161,17 +432,5 @@ return static function (App $app, array $deps): void {
             ->withHeader('Content-Type', $photo['mime'])
             ->withHeader('X-Content-Type-Options', 'nosniff')
             ->withHeader('Cache-Control', 'private, no-store');
-    });
-
-    $app->post('/admin/properties', static function (
-        ServerRequestInterface $request,
-        ResponseInterface $response,
-    ) use ($guard): ResponseInterface {
-        $user = $guard($response, 'properties.manage');
-        if ($user instanceof ResponseInterface) {
-            return $user;
-        }
-
-        return $response->withStatus(501);
     });
 };
