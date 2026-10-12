@@ -552,13 +552,25 @@ final class PropertyService
 
     private function normalizePublicUnit(array $row): array
     {
-        $unit = $this->normalizeUnit($row);
-        $unit['property_name'] = (string) $row['property_name'];
-        $unit['city'] = (string) $row['property_city'];
-        $unit['sector'] = $row['property_sector'] !== null ? (string) $row['property_sector'] : null;
-
-        unset($unit['private_notes'], $unit['registry_number'], $unit['unit_number']);
-
-        return $unit;
+        return [
+            'public_key' => (string) $row['public_key'],
+            'type' => (string) $row['type'],
+            'location_label' => $row['location_label'] !== null ? (string) $row['location_label'] : null,
+            'monthly_price' => $row['monthly_price'] !== null ? (string) $row['monthly_price'] : null,
+            'description' => $row['description'] !== null ? (string) $row['description'] : null,
+            'requirements' => $row['requirements'] !== null ? (string) $row['requirements'] : null,
+            'tower' => $row['tower'] !== null ? (string) $row['tower'] : null,
+            'floor' => $row['floor'] !== null ? (string) $row['floor'] : null,
+            'area_m2' => $row['area_m2'] !== null ? (string) $row['area_m2'] : null,
+            'bedrooms' => $row['bedrooms'] !== null ? (int) $row['bedrooms'] : null,
+            'bathrooms' => $row['bathrooms'] !== null ? (string) $row['bathrooms'] : null,
+            'administration_fee' => $row['administration_fee'] !== null ? (string) $row['administration_fee'] : null,
+            'parking_level' => $row['parking_level'] !== null ? (string) $row['parking_level'] : null,
+            'dimensions' => $row['dimensions'] !== null ? (string) $row['dimensions'] : null,
+            'vehicle_type' => $row['vehicle_type'] !== null ? (string) $row['vehicle_type'] : null,
+            'property_name' => (string) $row['property_name'],
+            'city' => (string) $row['property_city'],
+            'sector' => $row['property_sector'] !== null ? (string) $row['property_sector'] : null,
+        ];
     }
 }
