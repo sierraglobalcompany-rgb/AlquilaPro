@@ -216,6 +216,52 @@ final class ShellRoutesTest extends TestCase
         self::assertStringNotContainsString('Propiedades', $body);
     }
 
+    public function testUserAdministrationUsesAppShellCardsAndManagePermissionShowsCreateForm(): void
+    {
+        $this->insertUser(
+            'manager@example.com',
+            'ManagerPassword123',
+            'admin',
+            ['users.view', 'users.manage'],
+            false,
+            'Manager Admin',
+        );
+        $this->insertUser('listed@example.com', 'ListedPassword123', 'gestor', [], false, 'Usuario Listado');
+        $app = $this->app();
+        $this->login($app, 'manager@example.com', 'ManagerPassword123');
+
+        $response = $this->request($app, 'GET', '/admin/users');
+        $body = (string) $response->getBody();
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringContainsString('data-f3-app-shell', $body);
+        self::assertStringContainsString('aria-current="page"', $body);
+        self::assertStringContainsString('class="user-card"', $body);
+        self::assertStringContainsString('Usuario Listado', $body);
+        self::assertStringContainsString('Agregar usuario', $body);
+        self::assertStringContainsString('name="temporary_password"', $body);
+        self::assertStringNotContainsString('<table', $body);
+    }
+
+    public function testViewOnlyUserCanSeeCardsButNotCreateForm(): void
+    {
+        $this->insertUser('viewer@example.com', 'ViewerPassword123', 'admin', ['users.view'], false, 'Viewer Admin');
+        $this->insertUser('listed@example.com', 'ListedPassword123', 'gestor', [], false, 'Usuario Listado');
+        $app = $this->app();
+        $this->login($app, 'viewer@example.com', 'ViewerPassword123');
+
+        $response = $this->request($app, 'GET', '/admin/users');
+        $body = (string) $response->getBody();
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringContainsString('data-f3-app-shell', $body);
+        self::assertStringContainsString('class="user-card"', $body);
+        self::assertStringContainsString('Usuario Listado', $body);
+        self::assertStringNotContainsString('Agregar usuario', $body);
+        self::assertStringNotContainsString('name="temporary_password"', $body);
+        self::assertStringNotContainsString('<table', $body);
+    }
+
     private function app(string $basePath = ''): App
     {
         $brandingDirectory = $this->directory . '/branding';
