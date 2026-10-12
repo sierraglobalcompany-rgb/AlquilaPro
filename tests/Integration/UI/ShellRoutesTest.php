@@ -89,7 +89,7 @@ final class ShellRoutesTest extends TestCase
         self::assertStringContainsString('aria-current="page"', $body);
         self::assertStringNotContainsString('Cartera', $body);
         self::assertStringNotContainsString('Solicitudes', $body);
-        self::assertStringNotContainsString('Propiedades', $body);
+        self::assertStringContainsString('Propiedades', $body);
     }
 
     public function testAccountRequiresLoginAndRendersCurrentUser(): void
