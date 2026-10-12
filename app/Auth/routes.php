@@ -92,6 +92,7 @@ return static function (App $app, array $deps): void {
         }
 
         $session->login($user, time());
+        $csrf->rotate();
         $destination = $user['must_change_password'] ? $path('/account/password') : $path('/');
         return $response->withHeader('Location', $destination)->withStatus(303);
     });
