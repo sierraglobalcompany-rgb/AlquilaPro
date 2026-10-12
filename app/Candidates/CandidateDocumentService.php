@@ -48,7 +48,7 @@ final class CandidateDocumentService
     {
         $this->requireUnit($unitId);
 
-        $code = $this->requiredText($input['code'] ?? null, 80, 'El código del requisito es obligatorio.');
+        $code = $this->requirementCode($input['code'] ?? null);
         $label = $this->requiredText($input['label'] ?? null, 190, 'El nombre del requisito es obligatorio.');
         $description = $this->optionalText($input['description'] ?? null);
         $isRequired = array_key_exists('is_required', $input)
@@ -96,7 +96,7 @@ final class CandidateDocumentService
         }
 
         if (array_key_exists('code', $input)) {
-            $requestedCode = $this->requiredText($input['code'], 80, 'El código del requisito es obligatorio.');
+            $requestedCode = $this->requirementCode($input['code']);
             if ($requestedCode !== $current['code']) {
                 throw new RuntimeException('El código del requisito no se puede cambiar.');
             }
@@ -228,10 +228,7 @@ final class CandidateDocumentService
             throw new RuntimeException('La solicitud ya no admite documentos.');
         }
 
-        $requirementCode = trim($requirementCode);
-        if ($requirementCode === '') {
-            throw new RuntimeException('El requisito documental no es válido.');
-        }
+        $requirementCode = $this->requirementCode($requirementCode);
 
         $requirementStatement = $this->pdo->prepare(
             'SELECT * FROM unit_application_requirements '
@@ -507,6 +504,16 @@ final class CandidateDocumentService
             'mime_type' => (string) $row['mime_type'],
             'size_bytes' => (int) $row['size_bytes'],
         ];
+    }
+
+    private function requirementCode(mixed $value): string
+    {
+        $code = trim((string) $value);
+        if ($code === '' || mb_strlen($code) > 80 || preg_match('/^[A-Za-z0-9_-]+$/D', $code) !== 1) {
+            throw new RuntimeException('El código del requisito no es válido.');
+        }
+
+        return $code;
     }
 
     private function requiredText(mixed $value, int $maxLength, string $message): string
