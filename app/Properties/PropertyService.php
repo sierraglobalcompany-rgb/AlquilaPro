@@ -99,8 +99,12 @@ final class PropertyService
 
     public function createUnit(int $propertyId, array $input): array
     {
-        if ($this->findProperty($propertyId) === null) {
+        $property = $this->findProperty($propertyId);
+        if ($property === null) {
             throw new RuntimeException('La propiedad no existe.');
+        }
+        if (!$property['is_active']) {
+            throw new RuntimeException('No se pueden crear unidades en una propiedad inactiva.');
         }
 
         if (trim((string) ($input['public_key'] ?? '')) !== '') {
