@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AlquilaPro\Tests\Integration\Foundation;
 
+use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Foundation\DatabaseConfig;
 use AlquilaPro\Foundation\DatabaseConnector;
 use PDO;
@@ -21,6 +22,8 @@ final class AppBootstrapTest extends TestCase
 
     protected function setUp(): void
     {
+        $_SESSION = [];
+
         $this->pdo = DatabaseConnector::connect(DatabaseConfig::fromArray([
             'host' => getenv('TEST_DB_HOST') ?: '127.0.0.1',
             'port' => getenv('TEST_DB_PORT') ?: '3306',
@@ -42,6 +45,7 @@ final class AppBootstrapTest extends TestCase
 
     protected function tearDown(): void
     {
+        $_SESSION = [];
         @unlink($this->lockPath);
         @unlink($this->lockPath . '.tmp');
         @unlink($this->configPath);
@@ -73,6 +77,7 @@ final class AppBootstrapTest extends TestCase
         self::assertStringContainsString('Diagnóstico del servidor', $body);
         self::assertStringContainsString('Base de datos', $body);
         self::assertStringContainsString('Propietario inicial', $body);
+        self::assertStringContainsString('name="csrf_token"', $body);
     }
 
     public function testCleanInstallCanUseStoragePathThatDoesNotExistYet(): void
@@ -171,6 +176,7 @@ final class AppBootstrapTest extends TestCase
     private function form(array $override = []): array
     {
         return array_merge([
+            'csrf_token' => (new Csrf())->token(),
             'db_host' => getenv('TEST_DB_HOST') ?: '127.0.0.1',
             'db_port' => getenv('TEST_DB_PORT') ?: '3306',
             'db_name' => getenv('TEST_DB_NAME') ?: 'alquila_test',
