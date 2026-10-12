@@ -7,6 +7,7 @@ use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Auth\UserService;
+use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\App;
@@ -20,33 +21,14 @@ return static function (App $app, array $deps): void {
     $session = $deps['session'];
     /** @var Csrf $csrf */
     $csrf = $deps['csrf'];
+    /** @var View $view */
+    $view = $deps['view'];
+    /** @var Closure(): ?array $currentUser */
+    $currentUser = $deps['current_user'];
     $basePath = (string) ($deps['base_path'] ?? '');
     $baseUrl = rtrim((string) ($deps['base_url'] ?? ''), '/');
-    $views = (string) $deps['views'];
 
     $path = static fn (string $value): string => $basePath . $value;
-
-    $render = static function (string $view, array $data = []) use ($views): string {
-        extract($data, EXTR_SKIP);
-        ob_start();
-        require $views . '/' . $view . '.php';
-        return (string) ob_get_clean();
-    };
-
-    $currentUser = static function () use ($session, $auth): ?array {
-        $userId = $session->userId(time());
-        if ($userId === null) {
-            return null;
-        }
-
-        $user = $auth->findUser($userId);
-        if ($user === null || !$user['is_active']) {
-            $session->logout();
-            return null;
-        }
-
-        return $user;
-    };
 
     $guard = static function (ResponseInterface $response, ?string $permission = null) use ($currentUser, $session, $path): array|ResponseInterface {
         $user = $currentUser();
@@ -65,8 +47,9 @@ return static function (App $app, array $deps): void {
         return $user;
     };
 
-    $app->get('/login', static function (ServerRequestInterface $request, ResponseInterface $response) use ($render, $csrf, $path): ResponseInterface {
-        $response->getBody()->write($render('login', [
+    $app->get('/login', static function (ServerRequestInterface $request, ResponseInterface $response) use ($view, $csrf, $path): ResponseInterface {
+        $response->getBody()->write($view->renderAuth('login', [
+            'pageTitle' => 'Iniciar sesión',
             'action' => $path('/login'),
             'csrfToken' => $csrf->token(),
             'error' => null,
@@ -74,7 +57,7 @@ return static function (App $app, array $deps): void {
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
     });
 
-    $app->post('/login', static function (ServerRequestInterface $request, ResponseInterface $response) use ($auth, $session, $render, $csrf, $path): ResponseInterface {
+    $app->post('/login', static function (ServerRequestInterface $request, ResponseInterface $response) use ($auth, $session, $view, $csrf, $path): ResponseInterface {
         $form = (array) ($request->getParsedBody() ?? []);
         $user = $auth->authenticate(
             (string) ($form['email'] ?? ''),
@@ -83,7 +66,8 @@ return static function (App $app, array $deps): void {
         );
 
         if ($user === null) {
-            $response->getBody()->write($render('login', [
+            $response->getBody()->write($view->renderAuth('login', [
+                'pageTitle' => 'Iniciar sesión',
                 'action' => $path('/login'),
                 'csrfToken' => $csrf->token(),
                 'error' => 'No fue posible iniciar sesión con esas credenciales.',
@@ -103,12 +87,13 @@ return static function (App $app, array $deps): void {
         return $response->withHeader('Location', $path('/login'))->withStatus(303);
     });
 
-    $app->get('/account/password', static function (ServerRequestInterface $request, ResponseInterface $response) use ($currentUser, $render, $csrf, $path): ResponseInterface {
+    $app->get('/account/password', static function (ServerRequestInterface $request, ResponseInterface $response) use ($currentUser, $view, $csrf, $path): ResponseInterface {
         if ($currentUser() === null) {
             return $response->withHeader('Location', $path('/login'))->withStatus(302);
         }
 
-        $response->getBody()->write($render('change_password', [
+        $response->getBody()->write($view->renderAuth('change_password', [
+            'pageTitle' => 'Cambiar contraseña',
             'action' => $path('/account/password'),
             'csrfToken' => $csrf->token(),
             'error' => null,
@@ -116,7 +101,7 @@ return static function (App $app, array $deps): void {
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
     });
 
-    $app->post('/account/password', static function (ServerRequestInterface $request, ResponseInterface $response) use ($currentUser, $auth, $session, $render, $csrf, $path): ResponseInterface {
+    $app->post('/account/password', static function (ServerRequestInterface $request, ResponseInterface $response) use ($currentUser, $auth, $session, $view, $csrf, $path): ResponseInterface {
         $user = $currentUser();
         if ($user === null) {
             return $response->withHeader('Location', $path('/login'))->withStatus(302);
@@ -130,7 +115,8 @@ return static function (App $app, array $deps): void {
         );
 
         if (!$changed) {
-            $response->getBody()->write($render('change_password', [
+            $response->getBody()->write($view->renderAuth('change_password', [
+                'pageTitle' => 'Cambiar contraseña',
                 'action' => $path('/account/password'),
                 'csrfToken' => $csrf->token(),
                 'error' => 'No fue posible cambiar la contraseña.',
@@ -147,9 +133,10 @@ return static function (App $app, array $deps): void {
         return $response->withHeader('Location', $path('/'))->withStatus(303);
     });
 
-    $app->get('/reset-password', static function (ServerRequestInterface $request, ResponseInterface $response) use ($render, $csrf, $path): ResponseInterface {
+    $app->get('/reset-password', static function (ServerRequestInterface $request, ResponseInterface $response) use ($view, $csrf, $path): ResponseInterface {
         $token = (string) ($request->getQueryParams()['token'] ?? '');
-        $response->getBody()->write($render('reset_password', [
+        $response->getBody()->write($view->renderAuth('reset_password', [
+            'pageTitle' => 'Restablecer contraseña',
             'action' => $path('/reset-password'),
             'csrfToken' => $csrf->token(),
             'token' => $token,
@@ -158,7 +145,7 @@ return static function (App $app, array $deps): void {
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
     });
 
-    $app->post('/reset-password', static function (ServerRequestInterface $request, ResponseInterface $response) use ($auth, $render, $csrf, $path): ResponseInterface {
+    $app->post('/reset-password', static function (ServerRequestInterface $request, ResponseInterface $response) use ($auth, $view, $csrf, $path): ResponseInterface {
         $form = (array) ($request->getParsedBody() ?? []);
         $token = (string) ($form['token'] ?? '');
         $changed = $auth->resetPassword(
@@ -168,7 +155,8 @@ return static function (App $app, array $deps): void {
         );
 
         if (!$changed) {
-            $response->getBody()->write($render('reset_password', [
+            $response->getBody()->write($view->renderAuth('reset_password', [
+                'pageTitle' => 'Restablecer contraseña',
                 'action' => $path('/reset-password'),
                 'csrfToken' => $csrf->token(),
                 'token' => $token,
@@ -181,16 +169,19 @@ return static function (App $app, array $deps): void {
         return $response->withHeader('Location', $path('/login'))->withStatus(303);
     });
 
-    $app->get('/admin/users', static function (ServerRequestInterface $request, ResponseInterface $response) use ($guard, $users, $render, $csrf, $path): ResponseInterface {
+    $app->get('/admin/users', static function (ServerRequestInterface $request, ResponseInterface $response) use ($guard, $users, $view, $csrf): ResponseInterface {
         $authorized = $guard($response, 'users.view');
         if ($authorized instanceof ResponseInterface) {
             return $authorized;
         }
 
-        $response->getBody()->write($render('admin_users', [
-            'users' => $users->listUsers(),
-            'basePath' => $path(''),
+        $response->getBody()->write($view->renderApp('admin_users', [
+            'pageTitle' => 'Usuarios',
+            'user' => $authorized,
+            'activeNav' => 'apps',
             'csrfToken' => $csrf->token(),
+            'users' => $users->listUsers(),
+            'canManageUsers' => Permissions::allows($authorized, 'users.manage'),
         ]));
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
     });

@@ -6,6 +6,7 @@ declare(strict_types=1);
 /** @var string|null $error */
 /** @var string $action */
 /** @var string $csrfToken */
+/** @var string $assetHref */
 
 $label = static fn (bool $ok): string => $ok ? 'OK' : 'FALTA';
 ?>
@@ -14,30 +15,18 @@ $label = static fn (bool $ok): string => $ok ? 'OK' : 'FALTA';
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
     <title>Instalar Alquila Pro</title>
-    <style>
-        :root { color-scheme: light; font-family: system-ui, sans-serif; background: #f5f5f3; color: #20211f; }
-        body { margin: 0; }
-        main { width: min(680px, calc(100% - 32px)); margin: 32px auto; }
-        section { background: #fff; border: 1px solid #e3e4df; border-radius: 18px; padding: 20px; margin-bottom: 16px; }
-        h1, h2 { margin-top: 0; }
-        label { display: block; font-weight: 650; margin: 14px 0 6px; }
-        input { box-sizing: border-box; width: 100%; min-height: 46px; border: 1px solid #c9cbc4; border-radius: 12px; padding: 10px 12px; font: inherit; }
-        button { width: 100%; min-height: 48px; margin-top: 18px; border: 0; border-radius: 12px; font: inherit; font-weight: 700; cursor: pointer; }
-        ul { padding-left: 20px; }
-        .error { border-color: #bd4242; }
-        .error strong { color: #8a2222; }
-        .hint { color: #62645f; font-size: .94rem; }
-    </style>
+    <link rel="stylesheet" href="<?= htmlspecialchars($assetHref, ENT_QUOTES, 'UTF-8') ?>">
 </head>
 <body>
-<main>
-    <section>
+<main class="auth-shell auth-shell--installer">
+    <section class="surface">
         <h1>Instalar Alquila Pro</h1>
         <p class="hint">Configuración inicial del sistema.</p>
     </section>
 
-    <section>
+    <section class="surface">
         <h2>Diagnóstico del servidor</h2>
         <ul>
             <?php foreach ($runtime['checks'] as $name => $check): ?>
@@ -47,12 +36,12 @@ $label = static fn (bool $ok): string => $ok ? 'OK' : 'FALTA';
     </section>
 
     <?php if ($error !== null): ?>
-        <section class="error"><strong><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></strong></section>
+        <section class="surface error"><strong><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></strong></section>
     <?php endif; ?>
 
     <form method="post" action="<?= htmlspecialchars($action, ENT_QUOTES, 'UTF-8') ?>" autocomplete="off">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
-        <section>
+        <section class="surface">
             <h2>Base de datos</h2>
             <label for="db_host">Servidor</label>
             <input id="db_host" name="db_host" value="localhost" required>
@@ -70,7 +59,7 @@ $label = static fn (bool $ok): string => $ok ? 'OK' : 'FALTA';
             <input id="db_password" name="db_password" type="password">
         </section>
 
-        <section>
+        <section class="surface">
             <h2>Propietario inicial</h2>
             <label for="app_name">Nombre del sistema</label>
             <input id="app_name" name="app_name" value="Alquila Pro" required>

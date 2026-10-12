@@ -35,10 +35,11 @@ final class SecurityBoundaryTest extends TestCase
         $rules = file_get_contents(dirname(__DIR__, 3) . '/.htaccess');
         self::assertIsString($rules);
 
-        foreach (['app', 'bootstrap', 'config', 'database', 'docs', 'storage', 'tests', 'vendor'] as $directory) {
+        foreach (['app', 'bootstrap', 'config', 'database', 'docs', 'resources', 'storage', 'tests', 'vendor'] as $directory) {
             self::assertMatchesRegularExpression('/\\b' . preg_quote($directory, '/') . '\\b/i', $rules, $directory . ' must be blocked from direct HTTP access.');
         }
 
+        self::assertDoesNotMatchRegularExpression('/\\bassets\\b/i', $rules, 'The real public assets directory must remain web-accessible.');
         self::assertMatchesRegularExpression('/\\[F(?:,|\\])/', $rules, 'Sensitive path rule must fail the request instead of rewriting it.');
     }
 
