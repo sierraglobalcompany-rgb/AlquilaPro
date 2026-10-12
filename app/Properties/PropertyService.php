@@ -79,9 +79,36 @@ final class PropertyService
 
     public function listProperties(): array
     {
-        $rows = $this->pdo->query('SELECT * FROM properties ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $this->pdo->query(
+            'SELECT p.*, '
+            . 'COALESCE(c.available_count, 0) AS available_count, '
+            . 'COALESCE(c.in_process_count, 0) AS in_process_count, '
+            . 'COALESCE(c.occupied_count, 0) AS occupied_count, '
+            . 'COALESCE(c.inactive_count, 0) AS inactive_count, '
+            . 'COALESCE(c.maintenance_count, 0) AS maintenance_count '
+            . 'FROM properties p LEFT JOIN ('
+            . 'SELECT property_id, '
+            . "SUM(status = 'available') AS available_count, "
+            . "SUM(status = 'in_process') AS in_process_count, "
+            . "SUM(status = 'occupied') AS occupied_count, "
+            . "SUM(status = 'inactive') AS inactive_count, "
+            . "SUM(status = 'maintenance') AS maintenance_count "
+            . 'FROM units GROUP BY property_id'
+            . ') c ON c.property_id = p.id ORDER BY p.id ASC',
+        )->fetchAll(PDO::FETCH_ASSOC);
 
-        return array_map($this->normalizeProperty(...), $rows);
+        return array_map(function (array $row): array {
+            $property = $this->normalizeProperty($row);
+            $property['unit_counts'] = [
+                'available' => (int) $row['available_count'],
+                'in_process' => (int) $row['in_process_count'],
+                'occupied' => (int) $row['occupied_count'],
+                'inactive' => (int) $row['inactive_count'],
+                'maintenance' => (int) $row['maintenance_count'],
+            ];
+
+            return $property;
+        }, $rows);
     }
 
     public function findProperty(int $propertyId): ?array

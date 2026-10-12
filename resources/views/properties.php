@@ -44,6 +44,7 @@ $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, 
                         <h2><?= $escape($property['name']) ?></h2>
                         <p><?= $escape($property['city']) ?><?= $property['sector'] !== null ? ' · ' . $escape($property['sector']) : '' ?></p>
                         <p class="muted"><?= $property['is_active'] ? 'Activa' : 'Inactiva' ?></p>
+                        <p class="muted">Disponibles: <?= (int) $property['unit_counts']['available'] ?> · En proceso: <?= (int) $property['unit_counts']['in_process'] ?> · Ocupadas: <?= (int) $property['unit_counts']['occupied'] ?> · Inactivas: <?= (int) $property['unit_counts']['inactive'] ?> · Mantenimiento: <?= (int) $property['unit_counts']['maintenance'] ?></p>
                     </div>
                     <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/properties/<?= (int) $property['id'] ?>">Ver</a>
                 </article>
