@@ -122,6 +122,7 @@ return static function (App $app, array $deps): void {
             'csrfToken' => $csrf->token(),
             'property' => $property,
             'unit' => $unit,
+            'propertyUnits' => $properties->listUnitsForProperty($unit['property_id']),
             'media' => $media->listForUnit($unitId),
             'canManage' => Permissions::allows($user, 'properties.manage'),
             'error' => $error,
