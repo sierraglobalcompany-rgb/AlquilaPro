@@ -61,12 +61,16 @@ final class ShellRoutesTest extends TestCase
         @rmdir($this->directory);
     }
 
-    public function testInstalledRootWithoutSessionRedirectsToLogin(): void
+    public function testInstalledRootWithoutSessionRendersPublicLanding(): void
     {
         $response = $this->request($this->app(), 'GET', '/');
+        $body = (string) $response->getBody();
 
-        self::assertSame(302, $response->getStatusCode());
-        self::assertSame('/login', $response->getHeaderLine('Location'));
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringContainsString('data-public-shell', $body);
+        self::assertStringContainsString('href="/catalog"', $body);
+        self::assertStringContainsString('href="/login"', $body);
+        self::assertStringNotContainsString('data-f3-app-shell', $body);
     }
 
     public function testAuthenticatedRootRendersSemanticMobileShell(): void
