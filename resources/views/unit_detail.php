@@ -34,12 +34,8 @@ $mediaIds = array_map(static fn (array $item): int => (int) $item['id'], $media)
             <h2>Editar unidad</h2>
             <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/admin/units/<?= (int) $unit['id'] ?>">
                 <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
-                <label>Tipo
-                    <select name="type" required>
-                        <option value="apartment"<?= $unit['type'] === 'apartment' ? ' selected' : '' ?>>Apartamento</option>
-                        <option value="parking"<?= $unit['type'] === 'parking' ? ' selected' : '' ?>>Parqueadero</option>
-                    </select>
-                </label>
+                <p><strong>Tipo:</strong> <?= $unit['type'] === 'apartment' ? 'Apartamento' : 'Parqueadero' ?></p>
+                <input type="hidden" name="type" value="<?= $escape($unit['type']) ?>">
                 <label>Código<input name="code" required maxlength="80" value="<?= $escape($unit['code']) ?>"></label>
                 <label>Ubicación interna<input name="location_label" maxlength="190" value="<?= $escape($unit['location_label'] ?? '') ?>"></label>
                 <label>Estado
@@ -54,28 +50,30 @@ $mediaIds = array_map(static fn (array $item): int => (int) $item['id'], $media)
                 <label>Requisitos<textarea name="requirements" rows="3"><?= $escape($unit['requirements'] ?? '') ?></textarea></label>
                 <label>Notas privadas<textarea name="private_notes" rows="3"><?= $escape($unit['private_notes'] ?? '') ?></textarea></label>
 
-                <label>Número apartamento<input name="unit_number" maxlength="50" value="<?= $escape($unit['unit_number'] ?? '') ?>"></label>
-                <label>Torre<input name="tower" maxlength="80" value="<?= $escape($unit['tower'] ?? '') ?>"></label>
-                <label>Piso<input name="floor" maxlength="50" value="<?= $escape($unit['floor'] ?? '') ?>"></label>
-                <label>Área m²<input type="number" name="area_m2" min="0" step="0.01" value="<?= $escape($unit['area_m2'] ?? '') ?>"></label>
-                <label>Habitaciones<input type="number" name="bedrooms" min="0" step="1" value="<?= $escape($unit['bedrooms'] ?? '') ?>"></label>
-                <label>Baños<input type="number" name="bathrooms" min="0" step="0.5" value="<?= $escape($unit['bathrooms'] ?? '') ?>"></label>
-                <label>Administración mensual<input type="number" name="administration_fee" min="0" step="0.01" value="<?= $escape($unit['administration_fee'] ?? '') ?>"></label>
-                <label>Matrícula<input name="registry_number" maxlength="120" value="<?= $escape($unit['registry_number'] ?? '') ?>"></label>
-
-                <label>Nivel parqueadero<input name="parking_level" maxlength="80" value="<?= $escape($unit['parking_level'] ?? '') ?>"></label>
-                <label>Dimensiones parqueadero<input name="dimensions" maxlength="120" value="<?= $escape($unit['dimensions'] ?? '') ?>"></label>
-                <label>Tipo de vehículo<input name="vehicle_type" maxlength="80" value="<?= $escape($unit['vehicle_type'] ?? '') ?>"></label>
-                <label>Apartamento relacionado
-                    <select name="linked_apartment_id">
-                        <option value="">Sin relación</option>
-                        <?php foreach ($propertyUnits as $candidate): ?>
-                            <?php if ($candidate['type'] === 'apartment' && $candidate['id'] !== $unit['id']): ?>
-                                <option value="<?= (int) $candidate['id'] ?>"<?= $unit['linked_apartment_id'] === $candidate['id'] ? ' selected' : '' ?>><?= $escape($candidate['code']) ?></option>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </select>
-                </label>
+                <?php if ($unit['type'] === 'apartment'): ?>
+                    <label>Número apartamento<input name="unit_number" maxlength="50" value="<?= $escape($unit['unit_number'] ?? '') ?>"></label>
+                    <label>Torre<input name="tower" maxlength="80" value="<?= $escape($unit['tower'] ?? '') ?>"></label>
+                    <label>Piso<input name="floor" maxlength="50" value="<?= $escape($unit['floor'] ?? '') ?>"></label>
+                    <label>Área m²<input type="number" name="area_m2" min="0" step="0.01" value="<?= $escape($unit['area_m2'] ?? '') ?>"></label>
+                    <label>Habitaciones<input type="number" name="bedrooms" min="0" step="1" value="<?= $escape($unit['bedrooms'] ?? '') ?>"></label>
+                    <label>Baños<input type="number" name="bathrooms" min="0" step="0.5" value="<?= $escape($unit['bathrooms'] ?? '') ?>"></label>
+                    <label>Administración mensual<input type="number" name="administration_fee" min="0" step="0.01" value="<?= $escape($unit['administration_fee'] ?? '') ?>"></label>
+                    <label>Matrícula<input name="registry_number" maxlength="120" value="<?= $escape($unit['registry_number'] ?? '') ?>"></label>
+                <?php else: ?>
+                    <label>Nivel parqueadero<input name="parking_level" maxlength="80" value="<?= $escape($unit['parking_level'] ?? '') ?>"></label>
+                    <label>Dimensiones parqueadero<input name="dimensions" maxlength="120" value="<?= $escape($unit['dimensions'] ?? '') ?>"></label>
+                    <label>Tipo de vehículo<input name="vehicle_type" maxlength="80" value="<?= $escape($unit['vehicle_type'] ?? '') ?>"></label>
+                    <label>Apartamento relacionado
+                        <select name="linked_apartment_id">
+                            <option value="">Sin relación</option>
+                            <?php foreach ($propertyUnits as $candidate): ?>
+                                <?php if ($candidate['type'] === 'apartment' && $candidate['id'] !== $unit['id']): ?>
+                                    <option value="<?= (int) $candidate['id'] ?>"<?= $unit['linked_apartment_id'] === $candidate['id'] ? ' selected' : '' ?>><?= $escape($candidate['code']) ?></option>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+                <?php endif; ?>
 
                 <input type="hidden" name="is_public" value="0">
                 <label class="check-row"><input type="checkbox" name="is_public" value="1"<?= $unit['is_public'] ? ' checked' : '' ?>> Publicar en catálogo</label>

@@ -58,7 +58,7 @@ $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, 
             <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/admin/properties/<?= (int) $property['id'] ?>/units">
                 <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
                 <label>Tipo
-                    <select name="type" required>
+                    <select name="type" required data-unit-type-select>
                         <option value="apartment">Apartamento</option>
                         <option value="parking">Parqueadero</option>
                     </select>
@@ -78,18 +78,18 @@ $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, 
                 <label>Descripción<textarea name="description" rows="3"></textarea></label>
                 <label>Requisitos<textarea name="requirements" rows="3"></textarea></label>
                 <label>Notas privadas<textarea name="private_notes" rows="3"></textarea></label>
-                <label>Número apartamento<input name="unit_number" maxlength="50"></label>
-                <label>Torre<input name="tower" maxlength="80"></label>
-                <label>Piso<input name="floor" maxlength="50"></label>
-                <label>Área m²<input type="number" name="area_m2" min="0" step="0.01"></label>
-                <label>Habitaciones<input type="number" name="bedrooms" min="0" step="1"></label>
-                <label>Baños<input type="number" name="bathrooms" min="0" step="0.5"></label>
-                <label>Administración mensual<input type="number" name="administration_fee" min="0" step="0.01"></label>
-                <label>Matrícula<input name="registry_number" maxlength="120"></label>
-                <label>Nivel parqueadero<input name="parking_level" maxlength="80"></label>
-                <label>Dimensiones parqueadero<input name="dimensions" maxlength="120"></label>
-                <label>Tipo de vehículo<input name="vehicle_type" maxlength="80"></label>
-                <label>Apartamento relacionado
+                <label data-unit-type-field="apartment">Número apartamento<input name="unit_number" maxlength="50"></label>
+                <label data-unit-type-field="apartment">Torre<input name="tower" maxlength="80"></label>
+                <label data-unit-type-field="apartment">Piso<input name="floor" maxlength="50"></label>
+                <label data-unit-type-field="apartment">Área m²<input type="number" name="area_m2" min="0" step="0.01"></label>
+                <label data-unit-type-field="apartment">Habitaciones<input type="number" name="bedrooms" min="0" step="1"></label>
+                <label data-unit-type-field="apartment">Baños<input type="number" name="bathrooms" min="0" step="0.5"></label>
+                <label data-unit-type-field="apartment">Administración mensual<input type="number" name="administration_fee" min="0" step="0.01"></label>
+                <label data-unit-type-field="apartment">Matrícula<input name="registry_number" maxlength="120"></label>
+                <label data-unit-type-field="parking">Nivel parqueadero<input name="parking_level" maxlength="80"></label>
+                <label data-unit-type-field="parking">Dimensiones parqueadero<input name="dimensions" maxlength="120"></label>
+                <label data-unit-type-field="parking">Tipo de vehículo<input name="vehicle_type" maxlength="80"></label>
+                <label data-unit-type-field="parking">Apartamento relacionado
                     <select name="linked_apartment_id">
                         <option value="">Sin relación</option>
                         <?php foreach ($units as $candidate): ?>
