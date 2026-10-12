@@ -24,6 +24,8 @@ button, input, select, textarea { font: inherit; }
 button, input, select, textarea, a { -webkit-tap-highlight-color: transparent; }
 button, input, select, textarea { min-height: 44px; }
 img { display: block; max-width: 100%; height: auto; }
+dl dd,
+.user-card > div { overflow-wrap: anywhere; }
 
 :focus-visible {
     outline: 3px solid color-mix(in srgb, var(--brand-primary) 65%, white);
