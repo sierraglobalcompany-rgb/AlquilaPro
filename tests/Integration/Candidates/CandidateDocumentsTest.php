@@ -273,13 +273,13 @@ final class CandidateDocumentsTest extends TestCase
     public function testSubmitRequiresOnlyCurrentActiveRequiredDocumentsAndSurvivesUnitUnpublish(): void
     {
         $unit = $this->seedUnit(str_repeat('2', 24), 'DOC-H');
-        $candidateService = new CandidateService($this->pdo);
+        $documents = $this->documents();
+        $candidateService = new CandidateService($this->pdo, candidateDocumentService: $documents);
         $candidate = $candidateService->startCandidate(
             $unit['public_key'],
             $this->candidateInput('DOC-5001'),
             self::NOW,
         );
-        $documents = $this->documents();
 
         $documents->createRequirement($unit['id'], [
             'code' => 'required',
@@ -323,13 +323,13 @@ final class CandidateDocumentsTest extends TestCase
     public function testSubmitRejectsRequiredDocumentWhosePhysicalFileWasDeleted(): void
     {
         $unit = $this->seedUnit(str_repeat('3', 24), 'DOC-I');
-        $candidateService = new CandidateService($this->pdo);
+        $documents = $this->documents();
+        $candidateService = new CandidateService($this->pdo, candidateDocumentService: $documents);
         $candidate = $candidateService->startCandidate(
             $unit['public_key'],
             $this->candidateInput('DOC-6001'),
             self::NOW,
         );
-        $documents = $this->documents();
         $documents->createRequirement($unit['id'], [
             'code' => 'identity',
             'label' => 'Identidad',
@@ -362,13 +362,13 @@ final class CandidateDocumentsTest extends TestCase
     public function testSubmitRejectsRequiredDocumentWhosePhysicalFileWasTampered(): void
     {
         $unit = $this->seedUnit(str_repeat('4', 24), 'DOC-J');
-        $candidateService = new CandidateService($this->pdo);
+        $documents = $this->documents();
+        $candidateService = new CandidateService($this->pdo, candidateDocumentService: $documents);
         $candidate = $candidateService->startCandidate(
             $unit['public_key'],
             $this->candidateInput('DOC-7001'),
             self::NOW,
         );
-        $documents = $this->documents();
         $documents->createRequirement($unit['id'], [
             'code' => 'identity',
             'label' => 'Identidad',
