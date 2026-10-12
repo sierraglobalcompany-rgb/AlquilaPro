@@ -13,6 +13,27 @@ $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, 
         </div>
     </header>
 
+    <?php if (!empty($error)): ?>
+        <div class="form-error" role="alert"><?= $escape($error) ?></div>
+    <?php endif; ?>
+
+    <?php if ($canManage): ?>
+        <article class="content-card content-card--stacked">
+            <h2>Nueva propiedad</h2>
+            <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/admin/properties">
+                <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                <label>Nombre<input name="name" required maxlength="150"></label>
+                <label>Dirección<input name="address" required maxlength="255"></label>
+                <label>Ciudad<input name="city" required maxlength="120"></label>
+                <label>Sector<input name="sector" maxlength="120"></label>
+                <label>Administración<input name="administration_name" maxlength="150"></label>
+                <label>Contacto de administración<input name="administration_contact" maxlength="190"></label>
+                <label>Notas<textarea name="notes" rows="3"></textarea></label>
+                <button class="button" type="submit">Crear propiedad</button>
+            </form>
+        </article>
+    <?php endif; ?>
+
     <?php if ($properties === []): ?>
         <p class="empty-state">Aún no hay propiedades registradas.</p>
     <?php else: ?>
