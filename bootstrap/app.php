@@ -173,7 +173,10 @@ return static function (array $settings): App {
             $uiRoutes($app, $shared);
 
             $publicPropertyRoutes = require dirname(__DIR__) . '/app/Properties/public_routes.php';
-            $publicPropertyRoutes($app, $shared + ['properties' => $properties]);
+            $publicPropertyRoutes($app, $shared + [
+                'properties' => $properties,
+                'unit_media' => $unitMedia,
+            ]);
 
             $propertyRoutes = require dirname(__DIR__) . '/app/Properties/routes.php';
             $propertyRoutes($app, $shared + [
