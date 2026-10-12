@@ -240,6 +240,39 @@ final class PublicCandidateApplyTest extends TestCase
         self::assertSame($before['phone'], $service->findByToken($started['continuation_token'], time())['phone']);
     }
 
+    public function testExistingCandidateSurvivesUnitUnpublishAndSubmitNeverChangesUnitStatus(): void
+    {
+        $unit = $this->seedUnit(bin2hex(random_bytes(12)), true);
+        $app = $this->app();
+
+        $created = $this->request($app, 'POST', '/apply/' . $unit['public_key'], $this->candidateInput('cc', 'F57-LIFECYCLE-1') + [
+            'csrf_token' => $this->csrfToken(),
+        ]);
+        self::assertSame(303, $created->getStatusCode());
+        $continuePath = $created->getHeaderLine('Location');
+        self::assertMatchesRegularExpression('#^/apply/continue/[a-f0-9]{64}$#', $continuePath);
+        self::assertSame('available', $this->unitStatus($unit['id']));
+
+        $this->pdo->prepare('UPDATE units SET status = :status, is_public = 0 WHERE id = :id')->execute([
+            'status' => 'occupied',
+            'id' => $unit['id'],
+        ]);
+
+        self::assertSame(404, $this->request($app, 'GET', '/apply/' . $unit['public_key'])->getStatusCode());
+        self::assertSame(404, $this->request($app, 'POST', '/apply/' . $unit['public_key'], $this->candidateInput('cc', 'F57-LIFECYCLE-2') + [
+            'csrf_token' => $this->csrfToken(),
+        ])->getStatusCode());
+        self::assertSame(200, $this->request($app, 'GET', $continuePath)->getStatusCode());
+
+        $submitted = $this->request($app, 'POST', $continuePath . '/submit', [
+            'csrf_token' => $this->csrfToken(),
+        ]);
+        self::assertSame(303, $submitted->getStatusCode());
+        self::assertSame($continuePath, $submitted->getHeaderLine('Location'));
+        self::assertSame('verification', $this->candidateRowByDocument('F57-LIFECYCLE-1')['status']);
+        self::assertSame('occupied', $this->unitStatus($unit['id']));
+    }
+
     public function testApplyAndContinuePreserveSubfolderInFormsAndRedirects(): void
     {
         $unit = $this->seedUnit(str_repeat('3', 24), true);
@@ -358,6 +391,11 @@ final class PublicCandidateApplyTest extends TestCase
     private function candidateCount(): int
     {
         return (int) $this->pdo->query('SELECT COUNT(*) FROM candidates')->fetchColumn();
+    }
+
+    private function unitStatus(int $unitId): string
+    {
+        return (string) $this->pdo->query('SELECT status FROM units WHERE id = ' . $unitId)->fetchColumn();
     }
 
     /** @return array<string,mixed> */
