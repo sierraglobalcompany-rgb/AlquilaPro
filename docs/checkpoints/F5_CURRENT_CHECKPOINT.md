@@ -1,4 +1,4 @@
-# F5 CURRENT CHECKPOINT — F5.3 CLOSED / VERIFIED
+# F5 CURRENT CHECKPOINT — F5.4 CLOSED / VERIFIED
 
 **Fecha:** 2026-10-12 (America/Bogota)  
 **Proyecto:** Alquila Pro  
@@ -7,11 +7,9 @@
 **Base:** `main` @ `648401a4927bfeb7525421a4edd2b5f2c60f06c4`  
 **PR:** `#8` OPEN / DRAFT / NOT MERGED
 
-> Regla documental: este checkpoint no auto-incrusta el SHA de su propio commit final. El HEAD exacto se consulta en GitHub/PR #8. Sí conserva SHAs de producto y runs de CI ya cerrados.
+> El SHA del commit que contiene este archivo no se auto-incrusta para evitar ciclos documentales. Consultar el HEAD del branch/PR y su CI exacto.
 
----
-
-## 1. ESTADO
+## 1. Estado
 
 ```text
 F0-F4: CLOSED / VERIFIED / MERGED
@@ -20,301 +18,221 @@ F5_PLAN: APPROVED
 F5.1_SCHEMA_PERMISSIONS: CLOSED / VERIFIED
 F5.2_CANDIDATE_CORE_TOKEN: CLOSED / VERIFIED
 F5.3_PUBLIC_START_CONTINUE: CLOSED / VERIFIED
-F5.4_PROFILE_REFERENCES_UNIT_CHANGE: NOT STARTED
-F5.5-F5.8: NOT STARTED
+F5.4_PROFILE_REFERENCES_UNIT_CHANGE: CLOSED / VERIFIED
+F5.5_STRUCTURED_REQUIREMENTS_PRIVATE_DOCUMENTS: NOT STARTED
+F5.6-F5.8: NOT STARTED
 PR_READY: NO
 MERGE_ALLOWED: NO
 ```
 
-No abrir F5.4 sin retomar desde este checkpoint y reconfirmar HEAD / PR #8 / CI.
+No abrir F5.5 sin reconfirmar este checkpoint, HEAD, PR #8 y CI.
 
----
+## 2. Autoridad y leyes
 
-## 2. AUTORIDAD F5
+Autoridad: README → SPEC maestro V1.2 → PLAN maestro V1.2 → SPEC F5 → decisión F5 de identidad/privacidad/estados → PLAN F5 → checkpoint → tests/CI → código real.
 
-1. `README.md`
-2. `docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.2_AUDITADO.md`
-3. `docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.2_AUDITADO.md`
-4. `docs/specs/F5_APPLICATIONS_CANDIDATES_REFERENCES_SPEC.md`
-5. `docs/decisions/F5_DUPLICATE_IDENTITY_PRIVACY_AND_STATE_TRANSITIONS_2026-10-12.md`
-6. `docs/plans/F5_APPLICATIONS_CANDIDATES_REFERENCES_IMPLEMENTATION_PLAN.md`
-7. este checkpoint
-8. tests / CI
-9. código real
+Leyes:
+- LEY 1 KISS.
+- LEY 2 CERO RUIDO / CONVERGENCIA.
+- RED antes de GREEN.
+- No merge sin aprobación humana explícita.
 
-Leyes obligatorias:
+## 3. F5.1–F5.3 ya cerradas
 
-- LEY 1 KISS;
-- LEY 2 CERO RUIDO / CONVERGENCIA;
-- RED antes de GREEN;
-- no merge sin aprobación humana explícita.
-
----
-
-## 3. F5.1 — FUNDACIÓN CERRADA
-
-F5.1 quedó CLOSED / VERIFIED con:
-
+### F5.1
 - exactamente +4 tablas: `candidates`, `candidate_references`, `unit_application_requirements`, `candidate_documents`;
 - exactamente +2 permisos: `candidates.view`, `candidates.manage`;
-- +0 dependencias runtime;
-- +0 npm;
-- sin `lead`, `applications`, `rental_applications`, login candidato ni segunda sesión.
+- sin lead/application paralelo, segundo auth/session, npm o dependencias nuevas;
+- GREEN `a9449e8f87c345e6baafeda9bd26a5aa8f86b882`;
+- CI `38263081173` PASS PHP 8.3/8.4/8.5;
+- PHP 8.3: 157 tests / 905 assertions.
 
-GREEN final F5.1:
+### F5.2
+- un solo `CandidateService`;
+- token raw 64 hex, solo SHA-256 persistido, TTL 7 días, expiración fail-closed;
+- identidad normalizada/inmutable, duplicado genérico;
+- candidato nuevo solo sobre unidad publicable; candidato existente puede continuar tras despublicación;
+- estados exactos `new|incomplete|verification|pending_screening|withdrawn`;
+- submit público es el camino a `verification`; `withdrawn` terminal;
+- GREEN `511dc595b8265794f19dd3b5a04fef1ceaa62d36`;
+- CI `38264989604` PASS PHP 8.3/8.4/8.5;
+- PHP 8.3: 164 tests / 968 assertions.
 
-- producto/test isolation: `a9449e8f87c345e6baafeda9bd26a5aa8f86b882`;
-- CI `38263081173`;
-- PHP 8.3 / 8.4 / 8.5 PASS;
-- PHP 8.3: **157 tests / 905 assertions / 0 failures / 0 errors**.
+### F5.3
+Rutas públicas:
+```text
+GET  /apply/{publicKey}
+POST /apply/{publicKey}
+GET  /apply/continue/{token}
+POST /apply/continue/{token}
+```
+Contratos: publicabilidad F4 reutilizada, CSRF global, basePath, token raw sin candidate ID/hash, duplicado genérico, aislamiento por token y throttle V1 por sesión (start 5/10min; continue 10/10min; 429 sin mutación).
 
----
+RED `c1fab238ecc4cc5c172ab9f36f1941ecd3758734` / CI `38270416673`: 172 tests / 980 assertions / 8 failures esperados.  
+GREEN producto `544d6c6f15a926a4b28d004bd32b5075aa9f2fcd` / CI `38271564490`: PASS 8.3/8.4/8.5, 172 tests / 1050 assertions en PHP 8.3.  
+Checkpoint F5.3 `4b29a9a639b1ab3af9ecfc977abaa948b0270afb` / CI `38271890830`: PASS 8.3/8.4/8.5.
 
-## 4. F5.2 — CANDIDATE CORE + SECURE CONTINUATION TOKEN
+## 4. F5.4 — alcance cerrado
 
-Producto principal:
-
+Solo cambiaron los archivos previstos por el PLAN:
 - `app/Candidates/CandidateService.php`;
+- `app/Candidates/routes.php`;
+- `resources/views/public_candidate_continue.php`;
+- `tests/Integration/Candidates/CandidateReferencesTest.php`;
 - `tests/Integration/Candidates/CandidateServiceTest.php`.
 
-Contrato cerrado:
+No cambió schema, bootstrap, CSS/JS, Composer/npm, permisos, F4 ni almacenamiento documental. No se creó `CandidateReferenceService`, segunda entidad de aplicación, CRUD público por reference ID ni historial de cambios de unidad.
 
-- token raw = 32 bytes aleatorios / 64 hex lowercase;
-- solo SHA-256 del token persiste;
-- TTL 7 días;
-- expiración fail-closed;
-- regeneración invalida token anterior;
-- identidad `document_type + document_number` normalizada e inmutable;
-- duplicado no crea segunda fila ni revela contexto privado;
-- candidato nuevo solo sobre unidad publicable F4;
-- candidato ya creado puede continuar aunque la unidad luego deje de publicarse;
-- estados exactos: `new`, `incomplete`, `verification`, `pending_screening`, `withdrawn`;
-- `submitByToken()` es el camino público F5.2 a `verification`;
-- `withdrawn` es terminal.
+## 5. Perfil ampliado
 
-`CandidateService` implementa:
+`updateByToken()` ahora valida/persiste:
+- `monthly_income`: opcional, numérico, >= 0 y dentro de `DECIMAL(12,2)`;
+- `occupants_count`: opcional, entero >= 0 y compatible con `SMALLINT UNSIGNED`;
+- `occupants_notes`;
+- `pets_declared`: boolean estricto;
+- `pets_notes`;
+- campos base/laborales previos.
 
-- `startCandidate()`;
-- `findByToken()`;
-- `updateByToken()`;
-- `submitByToken()`;
-- `listCandidates()`;
-- `findCandidate()`;
-- `transitionStatus()`;
-- `regenerateToken()`.
+Guardado público válido: `new -> incomplete`; `incomplete` permanece `incomplete`. Estados no editables continúan bloqueados. La regla laboral F5.2 sigue activa en submit.
 
-`changeUnitByToken()` y `replaceReferencesByToken()` siguen deliberadamente ausentes hasta F5.4; no hay stubs muertos.
+## 6. Referencias 0..N
 
-GREEN F5.2:
-
-- commit `511dc595b8265794f19dd3b5a04fef1ceaa62d36`;
-- CI `38264989604`;
-- PHP 8.3 / 8.4 / 8.5 PASS;
-- PHP 8.3: **164 tests / 968 assertions / 0 failures / 0 errors**.
-
----
-
-## 5. F5.3 — PUBLIC START + CONTINUE SURFACE
-
-### Scope implementado
-
-F5.3 agregó exactamente:
-
-- `app/Candidates/routes.php` — único route file F5;
-- `resources/views/public_apply_start.php`;
-- `resources/views/public_candidate_continue.php`;
-- wiring mínimo en `bootstrap/app.php`;
-- `tests/Integration/Candidates/PublicCandidateApplyTest.php`.
-
-No modificó:
-
-- `CandidateService`;
-- schema / migraciones;
-- CSS;
-- catálogo F4 ni CTA `Aplicar`;
-- Composer / npm;
-- autenticación/sesión existente;
-- tablas o workers;
-- requisitos/documentos/referencias/cambio de unidad.
-
-### Rutas públicas cerradas
-
-Exactamente:
-
-- `GET /apply/{publicKey}`;
-- `POST /apply/{publicKey}`;
-- `GET /apply/continue/{token}`;
-- `POST /apply/continue/{token}`.
-
-Todas respetan `basePath` en forms y redirects.
-
-### Start
-
-- GET exige unidad actualmente publicable reutilizando `PropertyService::findPublicUnit()`;
-- unidad no publicable o key inválida -> 404;
-- formulario contiene únicamente identidad + nombre + teléfono + email + consentimiento;
-- POST vuelve a validar publicabilidad;
-- global CSRF existente protege el POST;
-- identidad nueva -> crea exactamente un candidato y redirige 303 a `/apply/continue/{rawToken}`;
-- URL pública usa solo token raw de 64 hex, nunca candidate ID ni hash;
-- identidad duplicada -> 422 genérico sin token, nombre/email previo, unidad, estado ni contexto privado.
-
-### Continue
-
-- token inválido o expirado -> 404;
-- token válido resuelve únicamente su candidato;
-- HTML no expone `continuation_token_hash`, candidate ID, storage paths ni datos de otro candidato;
-- POST usa CSRF global;
-- guarda únicamente campos permitidos por `CandidateService::updateByToken()`;
-- éxito -> 303 a la misma URL de continuación;
-- F5.3 no implementa todavía referencias, cambio de unidad, documentos ni submit final.
-
-### Throttle V1 KISS
-
-Throttle local por sesión, sin Redis / tabla / worker / dependencia:
-
-- bucket start: máximo 5 POST por ventana de 10 minutos;
-- bucket continue: máximo 10 POST por ventana de 10 minutos;
-- excedido -> 429 con mensaje genérico;
-- petición bloqueada no muta BD.
-
----
-
-## 6. TDD / EVIDENCIA F5.3
-
-### RED
-
-Commit: `c1fab238ecc4cc5c172ab9f36f1941ecd3758734`  
-CI: `38270416673`
-
-PHP 8.3 observado:
-
-- **172 tests / 980 assertions / 8 failures**;
-- los 8 fallos correspondieron exactamente a los 8 contratos nuevos F5.3 por ausencia de rutas/vistas;
-- F1-F4 + F5.1/F5.2 permanecieron verdes.
-
-Casos RED:
-
-1. GET apply exige unidad publicable + formulario seguro;
-2. POST apply CSRF + redirect raw token sin candidate ID;
-3. duplicado genérico sin fuga;
-4. token inválido/expirado + aislamiento entre candidatos;
-5. continue POST actualiza solo candidato del token + CSRF;
-6. throttle start 5 -> 429 en sexto sin mutación;
-7. throttle continue 10 -> 429 en onceavo sin mutación;
-8. compatibilidad subfolder/basePath.
-
-### GREEN inicial y diagnóstico
-
-HEAD de implementación inicial: `7e97c8bf65a6fe7464133fefe66d48eb6d70aaa3`  
-CI: `38271152808`
-
-Resultado PHP 8.3:
-
-- **172 tests / 1049 assertions / 1 failure**;
-- 7/8 pruebas F5.3 pasaron;
-- toda la regresión restante pasó;
-- el único fallo era una aserción defectuosa del test que exigía que la URL no contuviera el texto del ID `1`; un token hexadecimal aleatorio puede contener legítimamente el dígito `1`.
-
-No se cambió producción para satisfacer ese falso fallo.
-
-### Corrección mínima del test
-
-Commit: `544d6c6f15a926a4b28d004bd32b5075aa9f2fcd`
-
-Cambio único:
-
-- eliminar la aserción aleatoria/imposible sobre el carácter textual del candidate ID;
-- conservar la prueba fuerte del contrato mediante regex exacta `/apply/continue/[a-f0-9]{64}` + correspondencia SHA-256 del token + ausencia del hash público.
-
-CI final producto F5.3: `38271564490`
-
-- PHP 8.3: PASS;
-- PHP 8.4: PASS;
-- PHP 8.5: PASS;
-- Composer validate --strict: PASS;
-- PHP 8.3: **172 tests / 1050 assertions / 0 failures / 0 errors**;
-- los 8 tests `PublicCandidateApply` pasan;
-- regresión F1-F4 + F5.1/F5.2 completa verde.
-
----
-
-## 7. F5.3 TWO LAWS / CERO RUIDO GATE
-
-Diff funcional entre checkpoint F5.2 y GREEN F5.3:
-
-```text
-+ app/Candidates/routes.php                              196 líneas
-+ resources/views/public_apply_start.php                 63 líneas
-+ resources/views/public_candidate_continue.php          69 líneas
-~ bootstrap/app.php                                       +8 líneas
-+ tests/Integration/Candidates/PublicCandidateApplyTest.php
+Método añadido en el mismo servicio:
+```php
+replaceReferencesByToken(string $rawToken, array $references, int $now)
 ```
 
-GitHub compare confirmó exactamente 5 archivos cambiados en el delta funcional.
+Contrato:
+- cero, una o múltiples referencias;
+- fila completamente vacía se ignora;
+- referencia real exige `name + phone`;
+- `reference_type`, `relationship`, `email` opcionales;
+- email opcional validado/normalizado;
+- conjunto completo validado antes de mutar;
+- reemplazo transaccional;
+- error conserva el conjunto previo;
+- superficie pública sin reference IDs;
+- `findByToken()` devuelve referencias solo con `reference_type`, `name`, `relationship`, `phone`, `email`.
+
+Ruta añadida:
+```text
+POST /apply/continue/{token}/references
+```
+Reutiliza CSRF global, basePath y bucket de throttle `continue`.
+
+## 7. Cambio controlado de unidad
+
+Método añadido:
+```php
+changeUnitByToken(string $rawToken, string $publicKey, int $now)
+```
+
+Permitido solo si simultáneamente:
+```text
+status = new|incomplete
+submitted_at IS NULL
+candidate_documents = 0
+target publicKey actualmente publicable
+```
+
+La publicabilidad reutiliza `PropertyService::findPublicUnit()`. El servidor resuelve el ID interno; se actualiza únicamente la misma fila `candidate.unit_id`; no se crea segundo candidato ni historial paralelo.
+
+Ruta añadida:
+```text
+POST /apply/continue/{token}/unit
+```
+La vista usa `public_key`, nunca unit ID interno.
+
+## 8. SSR / privacidad
+
+La misma `public_candidate_continue.php` ahora contiene perfil ampliado, referencias y selector de unidad. Todos los valores dinámicos se escapan. No expone candidate ID, reference ID, continuation hash ni storage path. No se agregó CSS ni JS.
+
+## 9. TDD F5.4
+
+### RED
+Commit: `01159acb731705ab18b850be3253da23bf05f635`  
+CI: `38273121352`
+
+PHP 8.3:
+- 176 tests / 1051 assertions;
+- 1 failure + 3 errors;
+- exactamente por F5.4 ausente: promoción `new -> incomplete`, referencias, cambio de unidad y superficie SSR/rutas dependiente de referencias;
+- F1-F5.3 permanecieron verdes.
+
+### GREEN inicial
+HEAD `a368460feb628207e8d186019221d9337a51ba3f`  
+CI `38273634863`
+- PHP 8.3/8.4/8.5 PASS;
+- Composer validate --strict PASS;
+- PHP 8.3: 176 tests / 1114 assertions / 0 failures / 0 errors.
+
+### GREEN final de conformidad PLAN
+El PLAN exige también extender `CandidateServiceTest.php`. Se añadió una caracterización mínima que comprueba que `findByToken()` entrega referencias sin `id` ni `candidate_id`.
+
+Producto/test final F5.4: `471c92d47a568a720dd3606e9455a39ec51a75ed`  
+CI: `38273953538`
+- PHP 8.3 PASS;
+- PHP 8.4 PASS;
+- PHP 8.5 PASS;
+- Composer validate --strict PASS;
+- PHP 8.3: **177 tests / 1121 assertions / 0 failures / 0 errors**.
+
+## 10. Two Laws / Cero Ruido
+
+Compare `4b29a9a639b1ab3af9ecfc977abaa948b0270afb...471c92d47a568a720dd3606e9455a39ec51a75ed` confirmó exactamente 5 archivos efectivos, todos previstos por F5.4.
 
 ```text
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
-F5_ROUTE_FILES_TOTAL: 1
-F5_NEW_VIEWS: 2
-CANDIDATE_SERVICE_CHANGED_IN_F5.3: NO
-NEW_TABLES_F5.3: 0
+NEW_TABLES_F5.4: 0
+NEW_SERVICES_F5.4: 0
+NEW_ROUTE_FILES_F5.4: 0
+NEW_VIEWS_F5.4: 0
+BOOTSTRAP_DELTA_F5.4: 0
+CSS_JS_DELTA_F5.4: 0
 DEPENDENCIES_DELTA: 0
 NPM_DELTA: 0
 SECOND_AUTH_OR_SESSION: NO
-REDIS: NO
-WORKER: NO
-CATALOG_CTA_EARLY: NO
-REFERENCES_EARLY: NO
-DOCUMENTS_EARLY: NO
-UNIT_CHANGE_EARLY: NO
+REFERENCE_PUBLIC_IDS: NO
+PARALLEL_APPLICATION_ENTITY: NO
+UNIT_CHANGE_HISTORY_TABLE: NO
+DOCUMENT_RUNTIME_EARLY: NO
+PUBLICABILITY_DUPLICATION: NO
 ```
 
-Durante el wiring el conector GitHub generó commits intermedios/no-op por operaciones de Contents API. No añadieron contenido funcional adicional. La auditoría se hizo sobre el diff efectivo F5.2 -> F5.3, que queda limitado a los 5 archivos anteriores.
+Hasta F5.4 solo existe `CandidateService`. El único segundo servicio permitido, `CandidateDocumentService`, sigue reservado para F5.5.
 
----
+## 11. PR / gobernanza
 
-## 8. PR / GOBERNANZA
+PR #8 debe permanecer OPEN / DRAFT / NOT MERGED. No marcar Ready: F5.5-F5.8 siguen abiertas. Merge no autorizado.
 
-PR #8 debe permanecer:
+## 12. Próximo gate — F5.5 NOT STARTED
 
-- state: OPEN;
-- draft: YES;
-- merged: NO;
-- merge no autorizado.
+**F5.5 — Structured Requirements + Private Candidate Documents**.
 
-No marcar Ready: F5.4-F5.8 continúan abiertas.
+Orden al retomar:
+1. reconfirmar HEAD / PR #8 / CI del checkpoint;
+2. releer PLAN/SPEC F5.5;
+3. RED en `CandidateDocumentsTest.php` + extensión focal de `CandidateServiceTest.php`;
+4. verificar RED antes de producción;
+5. crear el único segundo servicio permitido: `CandidateDocumentService`;
+6. reutilizar tablas F5 existentes; no crear tablas nuevas;
+7. requisitos estructurados por unidad;
+8. documentos privados ligados a candidate + requirement;
+9. validar MIME real, tamaño y nombre almacenado generado por servidor;
+10. no servir `storage/` directamente;
+11. descarga privada debe validar par candidate/document;
+12. ampliar el mismo `app/Candidates/routes.php` y wiring mínimo;
+13. ampliar `unit_detail.php` y `public_candidate_continue.php` solo lo necesario;
+14. CI PHP 8.3/8.4/8.5 + Cero Ruido + checkpoint;
+15. no abrir F5.6 hasta F5.5 CLOSED / VERIFIED.
 
----
-
-## 9. SIGUIENTE MICROFASE — NO INICIADA
-
-F5.4 — Profile Completion + References + Controlled Unit Change.
-
-Orden exacto al retomar:
-
-1. reconfirmar branch HEAD / PR #8 / CI de este checkpoint;
-2. releer PLAN F5.4 y SPEC de perfil, referencias y cambio de unidad;
-3. escribir RED de `CandidateServiceTest` + `CandidateReferencesTest` antes de producción;
-4. verificar RED exacto;
-5. ampliar el mismo `CandidateService`, sin segundo servicio para referencias;
-6. ampliar el mismo `app/Candidates/routes.php` y la misma vista de continuación;
-7. implementar guardado parcial `new -> incomplete`;
-8. validar `monthly_income >= 0` si existe, `occupants_count >= 0` y boolean estricto de mascotas;
-9. implementar referencias 0..N con reemplazo transaccional y sin IDs públicos;
-10. implementar cambio controlado de unidad solo si `new|incomplete`, `submitted_at IS NULL`, cero `candidate_documents` y destino actualmente publicable;
-11. cambio de unidad modifica el mismo `candidate.unit_id`; no crea segundo candidato ni historial paralelo;
-12. ejecutar focal + full CI PHP 8.3/8.4/8.5;
-13. aplicar Cero Ruido + actualizar este mismo checkpoint;
-14. no abrir F5.5 hasta F5.4 CLOSED / VERIFIED.
-
-Guardrails F5.4:
-
-- no `CandidateReferenceService`;
-- no segunda tabla de aplicaciones;
-- no IDs de referencia públicos;
-- no historial de cambios de unidad salvo evidencia funcional futura;
-- no documentos runtime todavía;
+Guardrails F5.5:
+- máximo dos servicios F5 totales;
+- no repositories/DTO/factories/interfaces;
+- no almacenamiento público directo;
+- no IDs internos en URLs públicas de candidato;
+- no tercera tabla documental;
+- no queue/cloud-storage abstraction sin necesidad probada;
 - PR #8 sigue Draft;
 - **NO MERGEAR sin aprobación humana explícita**.
