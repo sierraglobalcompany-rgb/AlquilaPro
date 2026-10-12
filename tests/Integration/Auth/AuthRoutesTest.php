@@ -96,6 +96,21 @@ final class AuthRoutesTest extends TestCase
         self::assertSame(302, $this->request('GET', '/admin/users')->getStatusCode());
     }
 
+    public function testSuccessfulLoginRotatesCsrfToken(): void
+    {
+        $this->insertUser('owner@example.com', 'OwnerPassword123', 'owner');
+        $csrf = new Csrf();
+        $before = $csrf->token();
+
+        $login = $this->request('POST', '/login', [
+            'email' => 'owner@example.com',
+            'password' => 'OwnerPassword123',
+        ]);
+
+        self::assertSame(303, $login->getStatusCode());
+        self::assertNotSame($before, $csrf->token());
+    }
+
     public function testOwnerCanCreateUpdatePermissionsAndDeactivateManagedUser(): void
     {
         $this->insertUser('owner@example.com', 'OwnerPassword123', 'owner');
