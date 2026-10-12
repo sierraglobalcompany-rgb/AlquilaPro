@@ -19,6 +19,7 @@ final class CandidateService
     public function __construct(
         private readonly PDO $pdo,
         private readonly int $tokenTtlSeconds = 604800,
+        private readonly ?CandidateDocumentService $candidateDocumentService = null,
     ) {
         $this->propertyService = new PropertyService($pdo);
     }
@@ -646,18 +647,27 @@ final class CandidateService
     private function assertDocumentCompleteness(array $row): void
     {
         $statement = $this->pdo->prepare(
-            'SELECT COUNT(*) FROM unit_application_requirements r '
+            'SELECT d.id AS document_id FROM unit_application_requirements r '
             . 'LEFT JOIN candidate_documents d '
             . 'ON d.requirement_id = r.id AND d.candidate_id = :candidate_id '
-            . 'WHERE r.unit_id = :unit_id AND r.is_required = 1 AND r.is_active = 1 AND d.id IS NULL',
+            . 'WHERE r.unit_id = :unit_id AND r.is_required = 1 AND r.is_active = 1 '
+            . 'ORDER BY r.id ASC',
         );
         $statement->execute([
             'candidate_id' => (int) $row['id'],
             'unit_id' => (int) $row['unit_id'],
         ]);
 
-        if ((int) $statement->fetchColumn() > 0) {
-            throw new RuntimeException('Debes adjuntar los documentos obligatorios antes de enviar.');
+        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $requiredDocument) {
+            $documentId = $requiredDocument['document_id'] === null
+                ? null
+                : (int) $requiredDocument['document_id'];
+
+            if ($documentId === null
+                || $this->candidateDocumentService === null
+                || $this->candidateDocumentService->privateDocument((int) $row['id'], $documentId) === null) {
+                throw new RuntimeException('Debes adjuntar los documentos obligatorios antes de enviar.');
+            }
         }
     }
 
