@@ -61,6 +61,18 @@ final class AssetContractTest extends TestCase
         );
     }
 
+    public function testCandidateDetailLongValuesCanWrapOnNarrowScreens(): void
+    {
+        self::assertMatchesRegularExpression(
+            '/dl\s+dd[^\{]*\{[^}]*overflow-wrap\s*:\s*anywhere\s*;/s',
+            $this->css,
+        );
+        self::assertMatchesRegularExpression(
+            '/\.user-card\s*>\s*div[^\{]*\{[^}]*overflow-wrap\s*:\s*anywhere\s*;/s',
+            $this->css,
+        );
+    }
+
     public function testF4PrivateLayoutPrimitivesAreDefined(): void
     {
         foreach (['.content-card', '.page-stack', '.card-list', '.button-row', '.check-row'] as $selector) {
