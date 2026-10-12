@@ -12,6 +12,7 @@ foreach (array_slice($nameParts, 0, 2) as $part) {
 }
 $initials = $initials !== '' ? $initials : 'AP';
 $canViewUsers = \AlquilaPro\Auth\Permissions::allows($user, 'users.view');
+$isOwner = ($user['role'] ?? null) === 'owner';
 ?>
 <!doctype html>
 <html lang="es">
@@ -24,7 +25,13 @@ $canViewUsers = \AlquilaPro\Auth\Permissions::allows($user, 'users.view');
 <body class="app-page" style="--brand-primary: <?= $escape($branding['primary_color']) ?>;">
 <div class="app-shell" data-f3-app-shell>
     <header class="topbar">
-        <a class="topbar__brand" href="<?= $escape($basePath) ?>/"><?= $escape($branding['app_name']) ?></a>
+        <a class="topbar__brand" href="<?= $escape($basePath) ?>/">
+            <?php if ($branding['logo_path'] !== null): ?>
+                <img class="topbar__logo" src="<?= $escape($basePath) ?>/brand/logo" alt="<?= $escape($branding['app_name']) ?>">
+            <?php else: ?>
+                <?= $escape($branding['app_name']) ?>
+            <?php endif; ?>
+        </a>
         <a class="topbar__account" href="<?= $escape($basePath) ?>/account" aria-label="Abrir cuenta"><?= $escape($initials) ?></a>
     </header>
 
@@ -49,7 +56,14 @@ $canViewUsers = \AlquilaPro\Auth\Permissions::allows($user, 'users.view');
                     <strong>Usuarios</strong>
                     <span>Administración de accesos</span>
                 </a>
-            <?php else: ?>
+            <?php endif; ?>
+            <?php if ($isOwner): ?>
+                <a class="app-card" href="<?= $escape($basePath) ?>/admin/appearance">
+                    <strong>Apariencia</strong>
+                    <span>Nombre, color y logo</span>
+                </a>
+            <?php endif; ?>
+            <?php if (!$canViewUsers && !$isOwner): ?>
                 <p class="empty-state">No tienes aplicaciones disponibles.</p>
             <?php endif; ?>
         </div>
