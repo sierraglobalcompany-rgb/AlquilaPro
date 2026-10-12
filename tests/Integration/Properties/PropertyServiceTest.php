@@ -115,12 +115,248 @@ final class PropertyServiceTest extends TestCase
         ]);
     }
 
+    public function testApartmentAndParkingUseOneUnitModelWithServerGeneratedTwentyFourHexKey(): void
+    {
+        $service = $this->service();
+        $property = $this->property($service, 'Torre Uno', 'Medellín', 'Laureles');
+
+        $apartment = $service->createUnit($property['id'], [
+            'type' => 'apartment',
+            'code' => ' A-101 ',
+            'status' => 'available',
+            'location_label' => ' Torre 1 ',
+            'monthly_price' => '1500000',
+            'description' => ' Apartamento iluminado ',
+            'requirements' => ' Ingresos demostrables ',
+            'private_notes' => ' Nota privada ',
+            'unit_number' => ' 101 ',
+            'tower' => ' 1 ',
+            'floor' => ' 10 ',
+            'area_m2' => '72.50',
+            'bedrooms' => '3',
+            'bathrooms' => '2.5',
+            'administration_fee' => '250000',
+            'registry_number' => ' 001-123 ',
+            'parking_level' => 'S1',
+            'vehicle_type' => 'car',
+        ]);
+
+        self::assertSame('apartment', $apartment['type']);
+        self::assertSame('A-101', $apartment['code']);
+        self::assertMatchesRegularExpression('/^[a-f0-9]{24}$/', $apartment['public_key']);
+        self::assertSame('available', $apartment['status']);
+        self::assertFalse($apartment['is_public']);
+        self::assertSame('1500000.00', $apartment['monthly_price']);
+        self::assertSame(3, $apartment['bedrooms']);
+        self::assertSame('72.50', $apartment['area_m2']);
+        self::assertSame('2.5', $apartment['bathrooms']);
+        self::assertNull($apartment['parking_level']);
+        self::assertNull($apartment['vehicle_type']);
+        self::assertNull($apartment['linked_apartment_id']);
+
+        $parking = $service->createUnit($property['id'], [
+            'type' => 'parking',
+            'code' => ' P-01 ',
+            'status' => 'available',
+            'monthly_price' => 180000,
+            'parking_level' => ' S1 ',
+            'dimensions' => ' 2.5 x 5 ',
+            'vehicle_type' => ' carro ',
+            'linked_apartment_id' => $apartment['id'],
+            'bedrooms' => 9,
+            'bathrooms' => 8,
+            'registry_number' => 'SHOULD-BE-NULL',
+        ]);
+
+        self::assertSame('parking', $parking['type']);
+        self::assertSame('P-01', $parking['code']);
+        self::assertSame('S1', $parking['parking_level']);
+        self::assertSame('2.5 x 5', $parking['dimensions']);
+        self::assertSame('carro', $parking['vehicle_type']);
+        self::assertSame($apartment['id'], $parking['linked_apartment_id']);
+        self::assertNull($parking['bedrooms']);
+        self::assertNull($parking['bathrooms']);
+        self::assertNull($parking['registry_number']);
+        self::assertCount(2, $service->listUnitsForProperty($property['id']));
+    }
+
+    public function testUnitValidationRejectsUnsupportedValuesNegativeNumbersClientPublicKeyAndDuplicateCode(): void
+    {
+        $service = $this->service();
+        $property = $this->property($service);
+
+        $valid = [
+            'type' => 'apartment',
+            'code' => 'A-101',
+            'status' => 'available',
+        ];
+
+        foreach ([
+            array_merge($valid, ['type' => 'house']),
+            array_merge($valid, ['status' => 'reserved']),
+            array_merge($valid, ['monthly_price' => -1]),
+            array_merge($valid, ['area_m2' => -1]),
+            array_merge($valid, ['bedrooms' => -1]),
+            array_merge($valid, ['bathrooms' => -1]),
+            array_merge($valid, ['administration_fee' => -1]),
+            array_merge($valid, ['public_key' => '0123456789abcdef01234567']),
+        ] as $invalid) {
+            try {
+                $service->createUnit($property['id'], $invalid);
+                self::fail('Invalid unit data must be rejected.');
+            } catch (RuntimeException $exception) {
+                self::assertNotSame('', $exception->getMessage());
+            }
+        }
+
+        $first = $service->createUnit($property['id'], $valid);
+        self::assertGreaterThan(0, $first['id']);
+
+        try {
+            $service->createUnit($property['id'], $valid);
+            self::fail('Duplicate property code must be rejected.');
+        } catch (RuntimeException $exception) {
+            self::assertNotSame('', $exception->getMessage());
+        }
+
+        $this->expectException(RuntimeException::class);
+        $service->createUnit(999999, $valid);
+    }
+
+    public function testParkingLinkRequiresApartmentInSamePropertyAndAllowsManyParkingUnitsPerApartment(): void
+    {
+        $service = $this->service();
+        $propertyA = $this->property($service, 'A');
+        $propertyB = $this->property($service, 'B');
+        $apartmentA = $service->createUnit($propertyA['id'], [
+            'type' => 'apartment', 'code' => 'A-1', 'status' => 'available',
+        ]);
+        $apartmentB = $service->createUnit($propertyB['id'], [
+            'type' => 'apartment', 'code' => 'B-1', 'status' => 'available',
+        ]);
+        $parkingA1 = $service->createUnit($propertyA['id'], [
+            'type' => 'parking', 'code' => 'P-1', 'status' => 'available',
+            'linked_apartment_id' => $apartmentA['id'],
+        ]);
+        $parkingA2 = $service->createUnit($propertyA['id'], [
+            'type' => 'parking', 'code' => 'P-2', 'status' => 'available',
+            'linked_apartment_id' => $apartmentA['id'],
+        ]);
+
+        self::assertSame($apartmentA['id'], $parkingA1['linked_apartment_id']);
+        self::assertSame($apartmentA['id'], $parkingA2['linked_apartment_id']);
+
+        foreach ([
+            ['code' => 'P-X', 'linked_apartment_id' => $apartmentB['id']],
+            ['code' => 'P-Y', 'linked_apartment_id' => $parkingA1['id']],
+        ] as $invalid) {
+            try {
+                $service->createUnit($propertyA['id'], [
+                    'type' => 'parking',
+                    'code' => $invalid['code'],
+                    'status' => 'available',
+                    'linked_apartment_id' => $invalid['linked_apartment_id'],
+                ]);
+                self::fail('Invalid parking link must be rejected.');
+            } catch (RuntimeException $exception) {
+                self::assertNotSame('', $exception->getMessage());
+            }
+        }
+
+        $this->expectException(RuntimeException::class);
+        $service->updateUnit($parkingA1['id'], [
+            'type' => 'parking',
+            'code' => 'P-1',
+            'status' => 'available',
+            'linked_apartment_id' => $parkingA1['id'],
+        ]);
+    }
+
+    public function testUnitReadsUpdatesAndPublicQuerySkeletonUseOnlyActiveAvailablePublishedInventory(): void
+    {
+        $service = $this->service();
+        $property = $this->property($service, 'Catálogo', 'Medellín', 'Calasanz');
+        $otherProperty = $this->property($service, 'Otra', 'Bello', 'Cabañas');
+
+        $apartment = $service->createUnit($property['id'], [
+            'type' => 'apartment', 'code' => 'A-201', 'status' => 'available',
+            'location_label' => 'Torre Norte',
+        ]);
+        $parking = $service->createUnit($property['id'], [
+            'type' => 'parking', 'code' => 'P-201', 'status' => 'available',
+        ]);
+        $occupied = $service->createUnit($property['id'], [
+            'type' => 'apartment', 'code' => 'A-202', 'status' => 'occupied',
+        ]);
+        $bello = $service->createUnit($otherProperty['id'], [
+            'type' => 'apartment', 'code' => 'B-101', 'status' => 'available',
+        ]);
+
+        $this->pdo->exec(
+            'UPDATE units SET is_public = 1 WHERE id IN ('
+            . implode(',', [$apartment['id'], $parking['id'], $occupied['id'], $bello['id']]) . ')',
+        );
+
+        self::assertSame($apartment['id'], $service->findUnit($apartment['id'])['id']);
+        self::assertNull($service->findUnit(999999));
+
+        $updated = $service->updateUnit($apartment['id'], [
+            'type' => 'apartment',
+            'code' => 'A-201-R',
+            'status' => 'maintenance',
+            'location_label' => 'Torre Sur',
+        ]);
+        self::assertSame('A-201-R', $updated['code']);
+        self::assertSame('maintenance', $updated['status']);
+        self::assertSame('Torre Sur', $updated['location_label']);
+
+        $this->pdo->prepare("UPDATE units SET status = 'available' WHERE id = :id")
+            ->execute(['id' => $apartment['id']]);
+
+        self::assertCount(2, $service->listPublicUnits(null, 'Medellín', 'Calasanz'));
+        self::assertCount(1, $service->listPublicUnits('apartment', 'Medellín', 'Calasanz'));
+        self::assertCount(1, $service->listPublicUnits('parking', 'Medellín', 'Calasanz'));
+        self::assertCount(1, $service->listPublicUnits(null, 'Bello', null));
+        self::assertSame($apartment['public_key'], $service->findPublicUnit($apartment['public_key'])['public_key']);
+        self::assertNull($service->findPublicUnit($occupied['public_key']));
+
+        $service->setPropertyActive($property['id'], false);
+        self::assertCount(0, $service->listPublicUnits(null, 'Medellín', null));
+        self::assertNull($service->findPublicUnit($apartment['public_key']));
+
+        try {
+            $service->listPublicUnits('house', null, null);
+            self::fail('Unsupported public type filter must be rejected.');
+        } catch (RuntimeException $exception) {
+            self::assertNotSame('', $exception->getMessage());
+        }
+
+        $this->expectException(RuntimeException::class);
+        $service->updateUnit(999999, [
+            'type' => 'apartment', 'code' => 'MISSING', 'status' => 'available',
+        ]);
+    }
+
     private function service(): PropertyService
     {
         if (!class_exists(PropertyService::class)) {
-            self::fail('PropertyService must exist before Task 2 property GREEN can pass.');
+            self::fail('PropertyService must exist before Task 2 GREEN can pass.');
         }
 
         return new PropertyService($this->pdo);
+    }
+
+    private function property(
+        PropertyService $service,
+        string $name = 'Propiedad Test',
+        string $city = 'Medellín',
+        ?string $sector = null,
+    ): array {
+        return $service->createProperty([
+            'name' => $name,
+            'address' => 'Calle 1 # 2-3',
+            'city' => $city,
+            'sector' => $sector,
+        ]);
     }
 }
