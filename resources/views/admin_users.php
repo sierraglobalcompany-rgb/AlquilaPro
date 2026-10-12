@@ -1,32 +1,45 @@
 <?php
 
 declare(strict_types=1);
-?>
-<!doctype html>
-<html lang="es">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administradores · Alquila Pro</title></head>
-<body>
-<main>
-    <h1>Administradores</h1>
-    <section>
-        <?php foreach ($users as $user): ?>
-            <article>
-                <strong><?= htmlspecialchars((string) $user['full_name'], ENT_QUOTES, 'UTF-8') ?></strong>
-                <div><?= htmlspecialchars((string) $user['email'], ENT_QUOTES, 'UTF-8') ?></div>
-                <div><?= htmlspecialchars((string) $user['role'], ENT_QUOTES, 'UTF-8') ?> · <?= $user['is_active'] ? 'Activo' : 'Inactivo' ?></div>
-            </article>
-        <?php endforeach; ?>
-    </section>
 
-    <h2>Agregar usuario</h2>
-    <form method="post" action="<?= htmlspecialchars($basePath . '/admin/users', ENT_QUOTES, 'UTF-8') ?>">
-        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string) $csrfToken, ENT_QUOTES, 'UTF-8') ?>">
-        <label>Nombre <input name="full_name" required></label>
-        <label>Correo <input type="email" name="email" required></label>
-        <label>Rol <select name="role"><option value="admin">Administrador</option><option value="gestor">Gestor</option></select></label>
-        <label>Contraseña temporal <input type="password" name="temporary_password" minlength="12" required></label>
-        <button type="submit">Crear usuario</button>
-    </form>
-</main>
-</body>
-</html>
+$escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+?>
+<section class="surface">
+    <p class="eyebrow">Apps</p>
+    <h1>Usuarios</h1>
+    <p class="hint">Administra accesos y consulta el estado de las cuentas existentes.</p>
+</section>
+
+<section class="users-grid" aria-label="Usuarios registrados">
+    <?php foreach ($users as $listedUser): ?>
+        <article class="user-card">
+            <div class="user-card__head">
+                <strong><?= $escape($listedUser['full_name']) ?></strong>
+                <span class="status-pill<?= $listedUser['is_active'] ? ' status-pill--active' : '' ?>">
+                    <?= $listedUser['is_active'] ? 'Activo' : 'Inactivo' ?>
+                </span>
+            </div>
+            <div class="user-card__email"><?= $escape($listedUser['email']) ?></div>
+            <div class="user-card__role"><?= $escape($listedUser['role']) ?></div>
+        </article>
+    <?php endforeach; ?>
+</section>
+
+<?php if ($canManageUsers): ?>
+    <section class="surface user-create">
+        <h2>Agregar usuario</h2>
+        <form method="post" action="<?= $escape($basePath) ?>/admin/users">
+            <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+            <label>Nombre <input name="full_name" autocomplete="name" required></label>
+            <label>Correo <input type="email" name="email" autocomplete="email" required></label>
+            <label>Rol
+                <select name="role">
+                    <option value="admin">Administrador</option>
+                    <option value="gestor">Gestor</option>
+                </select>
+            </label>
+            <label>Contraseña temporal <input type="password" name="temporary_password" minlength="12" autocomplete="new-password" required></label>
+            <button type="submit">Crear usuario</button>
+        </form>
+    </section>
+<?php endif; ?>
