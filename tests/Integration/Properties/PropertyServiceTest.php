@@ -359,7 +359,23 @@ final class PropertyServiceTest extends TestCase
         $this->pdo->prepare("UPDATE units SET status = 'available' WHERE id = :id")
             ->execute(['id' => $apartment['id']]);
 
-        self::assertCount(2, $service->listPublicUnits(null, 'Medellín', 'Calasanz'));
+        $publicUnits = $service->listPublicUnits(null, 'Medellín', 'Calasanz');
+        self::assertCount(2, $publicUnits);
+        foreach ($publicUnits as $publicUnit) {
+            foreach ([
+                'id',
+                'property_id',
+                'linked_apartment_id',
+                'is_public',
+                'private_notes',
+                'unit_number',
+                'registry_number',
+                'created_at',
+                'updated_at',
+            ] as $privateKey) {
+                self::assertArrayNotHasKey($privateKey, $publicUnit);
+            }
+        }
         self::assertCount(1, $service->listPublicUnits('apartment', 'Medellín', 'Calasanz'));
         self::assertCount(1, $service->listPublicUnits('parking', 'Medellín', 'Calasanz'));
         self::assertCount(1, $service->listPublicUnits(null, 'Bello', null));
