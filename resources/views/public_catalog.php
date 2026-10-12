@@ -43,6 +43,11 @@ $sector = (string) ($filters['sector'] ?? '');
         <div class="stack">
             <?php foreach ($units as $unit): ?>
                 <article class="surface">
+                    <img
+                        src="<?= $escape($basePath) ?>/catalog/<?= $escape($unit['public_key']) ?>/photo/1"
+                        alt="Foto de <?= $escape($unit['property_name']) ?>"
+                        loading="lazy"
+                    >
                     <p class="eyebrow"><?= $unit['type'] === 'apartment' ? 'Apartamento' : 'Parqueadero' ?></p>
                     <h2><?= $escape($unit['property_name']) ?></h2>
                     <p><?= $escape($unit['city']) ?><?= $unit['sector'] !== null ? ' · ' . $escape($unit['sector']) : '' ?></p>
