@@ -186,7 +186,8 @@ final class ShellRoutesTest extends TestCase
         $ownerBody = (string) $this->request($app, 'GET', '/')->getBody();
         self::assertStringContainsString('/admin/users', $ownerBody);
         self::assertStringContainsString('Usuarios', $ownerBody);
-        self::assertStringNotContainsString('/admin/appearance', $ownerBody, 'Apariencia entra cuando exista su ruta real en Task 5.');
+        self::assertStringContainsString('/admin/appearance', $ownerBody);
+        self::assertStringContainsString('Apariencia', $ownerBody);
 
         $_SESSION = [];
         $this->insertUser('viewer@example.com', 'ViewerPassword123', 'admin', ['users.view'], false, 'Viewer');
@@ -196,6 +197,7 @@ final class ShellRoutesTest extends TestCase
 
         self::assertStringContainsString('/admin/users', $viewerBody);
         self::assertStringContainsString('Usuarios', $viewerBody);
+        self::assertStringNotContainsString('/admin/appearance', $viewerBody);
         self::assertStringNotContainsString('Apariencia', $viewerBody);
     }
 
