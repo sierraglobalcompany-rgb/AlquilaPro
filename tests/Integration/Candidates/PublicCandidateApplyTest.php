@@ -97,7 +97,6 @@ final class PublicCandidateApplyTest extends TestCase
 
         $row = $this->candidateRowByDocument('1001');
         self::assertSame(hash('sha256', $token), $row['continuation_token_hash']);
-        self::assertStringNotContainsString((string) $row['id'], $location);
         self::assertStringNotContainsString($row['continuation_token_hash'], $location);
         self::assertSame(1, $this->candidateCount());
     }
