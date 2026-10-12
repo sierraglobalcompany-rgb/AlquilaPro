@@ -175,6 +175,26 @@ final class PublicationCompletenessTest extends TestCase
         self::assertNull($this->service->findPublicUnit($unit['public_key']));
     }
 
+    public function testInactivePropertyCannotReceiveNewUnit(): void
+    {
+        $property = $this->property('Propiedad inactiva');
+        $this->service->setPropertyActive($property['id'], false);
+        $before = (int) $this->pdo->query('SELECT COUNT(*) FROM units')->fetchColumn();
+
+        try {
+            $this->service->createUnit($property['id'], [
+                'type' => 'apartment',
+                'code' => 'A-INACTIVE',
+                'status' => 'available',
+            ]);
+            self::fail('Inactive property must reject new units.');
+        } catch (RuntimeException $exception) {
+            self::assertNotSame('', $exception->getMessage());
+        }
+
+        self::assertSame($before, (int) $this->pdo->query('SELECT COUNT(*) FROM units')->fetchColumn());
+    }
+
     private function property(string $name): array
     {
         return $this->service->createProperty([
