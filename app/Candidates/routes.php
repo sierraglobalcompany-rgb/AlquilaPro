@@ -3,22 +3,32 @@
 declare(strict_types=1);
 
 use AlquilaPro\Auth\Csrf;
+use AlquilaPro\Auth\Permissions;
+use AlquilaPro\Auth\SessionGuard;
+use AlquilaPro\Candidates\CandidateDocumentService;
 use AlquilaPro\Candidates\CandidateService;
 use AlquilaPro\Properties\PropertyService;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\UploadedFileInterface;
 use Slim\App;
 
 return static function (App $app, array $deps): void {
     /** @var CandidateService $candidates */
     $candidates = $deps['candidates'];
+    /** @var CandidateDocumentService $candidateDocuments */
+    $candidateDocuments = $deps['candidate_documents'];
     /** @var PropertyService $properties */
     $properties = $deps['properties'];
     /** @var View $view */
     $view = $deps['view'];
+    /** @var SessionGuard $session */
+    $session = $deps['session'];
     /** @var Csrf $csrf */
     $csrf = $deps['csrf'];
+    /** @var Closure(): ?array $currentUser */
+    $currentUser = $deps['current_user'];
     $basePath = (string) ($deps['base_path'] ?? '');
 
     $path = static fn (string $value): string => $basePath . $value;
@@ -64,6 +74,24 @@ return static function (App $app, array $deps): void {
             ->withStatus(429);
     };
 
+    $adminGuard = static function (
+        ResponseInterface $response,
+        string $permission,
+    ) use ($currentUser, $session, $path): array|ResponseInterface {
+        $user = $currentUser();
+        if ($user === null) {
+            return $response->withHeader('Location', $path('/login'))->withStatus(302);
+        }
+        if ($session->mustChangePassword()) {
+            return $response->withHeader('Location', $path('/account/password'))->withStatus(302);
+        }
+        if (!Permissions::allows($user, $permission)) {
+            return $response->withStatus(403);
+        }
+
+        return $user;
+    };
+
     $renderStart = static function (
         ResponseInterface $response,
         array $unit,
@@ -89,14 +117,25 @@ return static function (App $app, array $deps): void {
         string $token,
         ?string $error = null,
         int $status = 200,
-    ) use ($view, $csrf, $path, $properties): ResponseInterface {
+    ) use ($view, $csrf, $path, $properties, $candidateDocuments): ResponseInterface {
         $continuePath = '/apply/continue/' . $token;
+        $documentsByRequirement = [];
+        foreach ($candidateDocuments->listDocumentsForCandidate((int) $candidate['id']) as $document) {
+            if (is_string($document['requirement_code'] ?? null)) {
+                $documentsByRequirement[$document['requirement_code']] = true;
+            }
+        }
+
         $response->getBody()->write($view->renderPublic('public_candidate_continue', [
             'pageTitle' => 'Continuar solicitud',
             'candidate' => $candidate,
             'action' => $path($continuePath),
             'referencesAction' => $path($continuePath . '/references'),
             'unitAction' => $path($continuePath . '/unit'),
+            'submitAction' => $path($continuePath . '/submit'),
+            'documentActionBase' => $path($continuePath . '/documents'),
+            'applicationRequirements' => $candidateDocuments->listRequirementsForUnit((int) $candidate['unit_id'], true),
+            'documentsByRequirement' => $documentsByRequirement,
             'availableUnits' => $properties->listPublicUnits(null, null, null),
             'csrfToken' => $csrf->token(),
             'error' => $error,
@@ -106,6 +145,75 @@ return static function (App $app, array $deps): void {
             ->withHeader('Content-Type', 'text/html; charset=utf-8')
             ->withStatus($status);
     };
+
+    $app->post('/admin/units/{id:[0-9]+}/application-requirements', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminGuard, $candidateDocuments, $path): ResponseInterface {
+        $user = $adminGuard($response, 'candidates.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $unitId = (int) $args['id'];
+        try {
+            $candidateDocuments->createRequirement($unitId, (array) ($request->getParsedBody() ?? []));
+        } catch (RuntimeException $exception) {
+            $response->getBody()->write($exception->getMessage());
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+
+        return $response->withHeader('Location', $path('/admin/units/' . $unitId))->withStatus(303);
+    });
+
+    $app->post('/admin/units/{id:[0-9]+}/application-requirements/{requirementId:[0-9]+}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminGuard, $candidateDocuments, $path): ResponseInterface {
+        $user = $adminGuard($response, 'candidates.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $unitId = (int) $args['id'];
+        try {
+            $candidateDocuments->updateRequirement(
+                $unitId,
+                (int) $args['requirementId'],
+                (array) ($request->getParsedBody() ?? []),
+            );
+        } catch (RuntimeException $exception) {
+            $response->getBody()->write($exception->getMessage());
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+
+        return $response->withHeader('Location', $path('/admin/units/' . $unitId))->withStatus(303);
+    });
+
+    $app->post('/admin/units/{id:[0-9]+}/application-requirements/order', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminGuard, $candidateDocuments, $path): ResponseInterface {
+        $user = $adminGuard($response, 'candidates.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $unitId = (int) $args['id'];
+        $body = (array) ($request->getParsedBody() ?? []);
+        $requirementIds = $body['requirement_ids'] ?? [];
+        try {
+            $candidateDocuments->reorderRequirements($unitId, is_array($requirementIds) ? $requirementIds : []);
+        } catch (RuntimeException $exception) {
+            $response->getBody()->write($exception->getMessage());
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+
+        return $response->withHeader('Location', $path('/admin/units/' . $unitId))->withStatus(303);
+    });
 
     $app->get('/apply/{publicKey}', static function (
         ServerRequestInterface $request,
@@ -248,6 +356,67 @@ return static function (App $app, array $deps): void {
         $body = (array) ($request->getParsedBody() ?? []);
         try {
             $candidates->changeUnitByToken($token, (string) ($body['public_key'] ?? ''), time());
+        } catch (RuntimeException $exception) {
+            return $renderContinue($response, $candidate, $token, $exception->getMessage(), 422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/apply/continue/' . $token))
+            ->withStatus(303);
+    });
+
+    $app->post('/apply/continue/{token}/documents/{requirementCode}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($candidates, $candidateDocuments, $allowAttempt, $tooMany, $renderContinue, $path): ResponseInterface {
+        $token = (string) ($args['token'] ?? '');
+        $candidate = $candidates->findByToken($token, time());
+        if ($candidate === null) {
+            return $response->withStatus(404);
+        }
+
+        if (!$allowAttempt('continue', 10, time())) {
+            return $tooMany($response);
+        }
+
+        $upload = $request->getUploadedFiles()['document'] ?? null;
+        if (!$upload instanceof UploadedFileInterface || $upload->getError() === UPLOAD_ERR_NO_FILE) {
+            return $renderContinue($response, $candidate, $token, 'Selecciona un documento.', 422);
+        }
+
+        try {
+            $candidateDocuments->addOrReplaceDocument(
+                (int) $candidate['id'],
+                (string) ($args['requirementCode'] ?? ''),
+                $upload,
+            );
+        } catch (RuntimeException $exception) {
+            return $renderContinue($response, $candidate, $token, $exception->getMessage(), 422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/apply/continue/' . $token))
+            ->withStatus(303);
+    });
+
+    $app->post('/apply/continue/{token}/submit', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($candidates, $allowAttempt, $tooMany, $renderContinue, $path): ResponseInterface {
+        $token = (string) ($args['token'] ?? '');
+        $candidate = $candidates->findByToken($token, time());
+        if ($candidate === null) {
+            return $response->withStatus(404);
+        }
+
+        if (!$allowAttempt('continue', 10, time())) {
+            return $tooMany($response);
+        }
+
+        try {
+            $candidates->submitByToken($token, time());
         } catch (RuntimeException $exception) {
             return $renderContinue($response, $candidate, $token, $exception->getMessage(), 422);
         }
