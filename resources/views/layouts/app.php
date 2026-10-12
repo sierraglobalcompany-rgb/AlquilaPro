@@ -68,7 +68,7 @@ $isOwner = ($user['role'] ?? null) === 'owner';
             <?php if ($canViewCandidates): ?>
                 <a class="app-card" href="<?= $escape($basePath) ?>/admin/candidates">
                     <strong>Candidatos</strong>
-                    <span>Solicitudes y documentación</span>
+                    <span>Candidaturas y documentación</span>
                 </a>
             <?php endif; ?>
             <?php if ($isOwner): ?>
