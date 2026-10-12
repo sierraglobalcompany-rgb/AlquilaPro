@@ -12,6 +12,7 @@ foreach (array_slice($nameParts, 0, 2) as $part) {
 }
 $initials = $initials !== '' ? $initials : 'AP';
 $canViewUsers = \AlquilaPro\Auth\Permissions::allows($user, 'users.view');
+$canViewProperties = \AlquilaPro\Auth\Permissions::allows($user, 'properties.view');
 $isOwner = ($user['role'] ?? null) === 'owner';
 ?>
 <!doctype html>
@@ -57,13 +58,19 @@ $isOwner = ($user['role'] ?? null) === 'owner';
                     <span>Administración de accesos</span>
                 </a>
             <?php endif; ?>
+            <?php if ($canViewProperties): ?>
+                <a class="app-card" href="<?= $escape($basePath) ?>/admin/properties">
+                    <strong>Propiedades</strong>
+                    <span>Inventario y publicación</span>
+                </a>
+            <?php endif; ?>
             <?php if ($isOwner): ?>
                 <a class="app-card" href="<?= $escape($basePath) ?>/admin/appearance">
                     <strong>Apariencia</strong>
                     <span>Nombre, color y logo</span>
                 </a>
             <?php endif; ?>
-            <?php if (!$canViewUsers && !$isOwner): ?>
+            <?php if (!$canViewUsers && !$canViewProperties && !$isOwner): ?>
                 <p class="empty-state">No tienes aplicaciones disponibles.</p>
             <?php endif; ?>
         </div>
