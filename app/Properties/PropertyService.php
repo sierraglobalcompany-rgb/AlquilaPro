@@ -152,6 +152,11 @@ final class PropertyService
             throw new RuntimeException('El identificador público es generado por el sistema.');
         }
 
+        $requestedType = trim((string) ($input['type'] ?? ''));
+        if (in_array($requestedType, self::UNIT_TYPES, true) && $requestedType !== $existing['type']) {
+            throw new RuntimeException('El tipo de la unidad no se puede cambiar.');
+        }
+
         $data = $this->validateUnit($existing['property_id'], $input, $unitId);
         $data['is_public'] = $this->normalizePublicFlag($input, $existing['is_public']);
         if (!$existing['is_public'] && $data['is_public']) {
