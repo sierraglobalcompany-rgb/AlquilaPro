@@ -6,6 +6,7 @@ use AlquilaPro\Auth\AuthService;
 use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Auth\UserService;
+use AlquilaPro\Candidates\CandidateDocumentService;
 use AlquilaPro\Candidates\CandidateService;
 use AlquilaPro\Foundation\DatabaseConfig;
 use AlquilaPro\Foundation\DatabaseConnector;
@@ -32,6 +33,9 @@ return static function (array $settings): App {
     $viewsPath = dirname(__DIR__) . '/resources/views';
     $logoDirectory = (string) ($settings['logo_directory'] ?? dirname(__DIR__) . '/storage/branding');
     $unitMediaDirectory = (string) ($settings['unit_media_directory'] ?? dirname(__DIR__) . '/storage/unit-media');
+    $candidateDocumentDirectory = (string) (
+        $settings['candidate_document_directory'] ?? dirname(__DIR__) . '/storage/candidate-documents'
+    );
 
     $lock = new InstallationLock($lockPath);
     $installer = new Installer($lock, $migrationDirectory, $databaseConfigPath);
@@ -140,7 +144,8 @@ return static function (array $settings): App {
             $view = new View($viewsPath, $branding, $basePath);
             $properties = new PropertyService($pdo);
             $unitMedia = new UnitMediaService($pdo, $unitMediaDirectory);
-            $candidates = new CandidateService($pdo);
+            $candidateDocuments = new CandidateDocumentService($pdo, $candidateDocumentDirectory);
+            $candidates = new CandidateService($pdo, candidateDocumentService: $candidateDocuments);
 
             $currentUser = static function () use ($session, $auth): ?array {
                 $userId = $session->userId(time());
@@ -178,11 +183,13 @@ return static function (array $settings): App {
             $propertyRoutes($app, $shared + [
                 'properties' => $properties,
                 'unit_media' => $unitMedia,
+                'candidate_documents' => $candidateDocuments,
             ]);
 
             $candidateRoutes = require dirname(__DIR__) . '/app/Candidates/routes.php';
             $candidateRoutes($app, $shared + [
                 'candidates' => $candidates,
+                'candidate_documents' => $candidateDocuments,
                 'properties' => $properties,
             ]);
         }
