@@ -1,0 +1,438 @@
+<?php
+
+declare(strict_types=1);
+
+namespace AlquilaPro\Tests\Integration\Candidates;
+
+use AlquilaPro\Auth\Csrf;
+use AlquilaPro\Candidates\CandidateDocumentService;
+use AlquilaPro\Foundation\DatabaseConfig;
+use AlquilaPro\Foundation\DatabaseConnector;
+use AlquilaPro\Foundation\InstallationLock;
+use AlquilaPro\Foundation\MigrationRunner;
+use PDO;
+use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\ResponseInterface;
+use Slim\App;
+use Slim\Psr7\Factory\ServerRequestFactory;
+use Slim\Psr7\UploadedFile;
+
+final class CandidatesAdminRoutesTest extends TestCase
+{
+    private PDO $pdo;
+    private string $directory;
+    private string $lockPath;
+    private string $documentDirectory;
+    private array $temporaryFiles = [];
+
+    protected function setUp(): void
+    {
+        $_SESSION = [];
+        $this->pdo = DatabaseConnector::connect(DatabaseConfig::fromArray([
+            'host' => getenv('TEST_DB_HOST') ?: '127.0.0.1',
+            'port' => getenv('TEST_DB_PORT') ?: '3306',
+            'database' => getenv('TEST_DB_NAME') ?: 'alquila_test',
+            'username' => getenv('TEST_DB_USER') ?: 'root',
+            'password' => getenv('TEST_DB_PASSWORD') ?: 'root',
+        ]));
+        MigrationRunner::migrate($this->pdo, dirname(__DIR__, 3) . '/database/migrations');
+
+        $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+        foreach (['candidate_documents', 'candidate_references', 'unit_application_requirements', 'candidates', 'unit_media', 'units', 'properties', 'users'] as $table) {
+            $this->pdo->exec('DELETE FROM `' . $table . '`');
+        }
+        $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+
+        $this->directory = sys_get_temp_dir() . '/alquila_candidates_admin_' . bin2hex(random_bytes(6));
+        mkdir($this->directory, 0700, true);
+        $this->documentDirectory = $this->directory . '/candidate-documents';
+        $this->lockPath = $this->directory . '/installed.lock';
+        (new InstallationLock($this->lockPath))->write([
+            'schema_version' => '1',
+            'installed_at' => '2026-10-12T00:00:00-05:00',
+        ]);
+    }
+
+    protected function tearDown(): void
+    {
+        $_SESSION = [];
+        foreach ($this->temporaryFiles as $file) {
+            @unlink($file);
+        }
+        foreach (glob($this->documentDirectory . '/*') ?: [] as $file) {
+            @unlink($file);
+        }
+        @rmdir($this->documentDirectory);
+        @unlink($this->lockPath);
+        @unlink($this->lockPath . '.tmp');
+        @rmdir($this->directory . '/branding');
+        @rmdir($this->directory . '/unit-media');
+        @rmdir($this->directory);
+    }
+
+    public function testAdminCandidatesRequiresAuthViewPermissionPasswordGateAndOwnerBypass(): void
+    {
+        $candidateId = $this->insertCandidate('VIEW-1', 'Candidato Visible');
+        $app = $this->app('/sub');
+
+        $guest = $this->request($app, 'GET', '/sub/admin/candidates');
+        self::assertSame(302, $guest->getStatusCode());
+        self::assertSame('/sub/login', $guest->getHeaderLine('Location'));
+
+        $this->insertUser('restricted@example.com', 'RestrictedPassword123', 'admin', ['properties.view']);
+        $this->login($app, 'restricted@example.com', 'RestrictedPassword123', '/sub');
+        self::assertSame(403, $this->request($app, 'GET', '/sub/admin/candidates')->getStatusCode());
+
+        $_SESSION = [];
+        $this->insertUser('viewer@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
+        $viewerApp = $this->app('/sub');
+        $this->login($viewerApp, 'viewer@example.com', 'ViewerPassword123', '/sub');
+        self::assertSame(200, $this->request($viewerApp, 'GET', '/sub/admin/candidates')->getStatusCode());
+        self::assertSame(200, $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId)->getStatusCode());
+
+        $_SESSION = [];
+        $this->insertUser('forced@example.com', 'ForcedPassword123', 'admin', ['candidates.view'], true);
+        $forcedApp = $this->app('/sub');
+        $forcedLogin = $this->request($forcedApp, 'POST', '/sub/login', [
+            'email' => 'forced@example.com',
+            'password' => 'ForcedPassword123',
+        ]);
+        self::assertSame('/sub/account/password', $forcedLogin->getHeaderLine('Location'));
+        $blocked = $this->request($forcedApp, 'GET', '/sub/admin/candidates');
+        self::assertSame(302, $blocked->getStatusCode());
+        self::assertSame('/sub/account/password', $blocked->getHeaderLine('Location'));
+
+        $_SESSION = [];
+        $this->insertUser('owner@example.com', 'OwnerPassword123', 'owner');
+        $ownerApp = $this->app('/sub');
+        $this->login($ownerApp, 'owner@example.com', 'OwnerPassword123', '/sub');
+        self::assertSame(200, $this->request($ownerApp, 'GET', '/sub/admin/candidates')->getStatusCode());
+        self::assertSame(200, $this->request($ownerApp, 'GET', '/sub/admin/candidates/' . $candidateId)->getStatusCode());
+    }
+
+    public function testCandidatesLauncherIsVisibleOnlyToCandidateViewerAndUsesBasePath(): void
+    {
+        $this->insertUser('viewer@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
+        $viewerApp = $this->app('/sub');
+        $this->login($viewerApp, 'viewer@example.com', 'ViewerPassword123', '/sub');
+        $viewerHome = (string) $this->request($viewerApp, 'GET', '/sub/')->getBody();
+        self::assertStringContainsString('href="/sub/admin/candidates"', $viewerHome);
+        self::assertStringContainsString('Candidatos', $viewerHome);
+
+        $_SESSION = [];
+        $this->insertUser('restricted@example.com', 'RestrictedPassword123', 'admin', ['properties.view']);
+        $restrictedApp = $this->app('/sub');
+        $this->login($restrictedApp, 'restricted@example.com', 'RestrictedPassword123', '/sub');
+        $restrictedHome = (string) $this->request($restrictedApp, 'GET', '/sub/')->getBody();
+        self::assertStringNotContainsString('/sub/admin/candidates', $restrictedHome);
+        self::assertStringNotContainsString('Candidatos', $restrictedHome);
+    }
+
+    public function testListAndDetailEscapeCandidateReferenceAndOriginalFilename(): void
+    {
+        $candidateId = $this->insertCandidate('ESC-1', '<script>alert(1)</script>');
+        $this->pdo->prepare(
+            'INSERT INTO candidate_references (candidate_id, reference_type, name, relationship, phone, email) '
+            . 'VALUES (:candidate_id, :type, :name, :relationship, :phone, :email)',
+        )->execute([
+            'candidate_id' => $candidateId,
+            'type' => 'personal',
+            'name' => '<b>Referencia</b>',
+            'relationship' => 'Amigo',
+            'phone' => '3001112233',
+            'email' => 'ref@example.com',
+        ]);
+
+        $unitId = (int) $this->pdo->query('SELECT unit_id FROM candidates WHERE id = ' . $candidateId)->fetchColumn();
+        $documents = new CandidateDocumentService($this->pdo, $this->documentDirectory);
+        $documents->createRequirement($unitId, [
+            'code' => 'identity',
+            'label' => 'Identidad',
+            'is_required' => 1,
+            'is_active' => 1,
+        ]);
+        $document = $documents->addOrReplaceDocument(
+            $candidateId,
+            'identity',
+            $this->upload($this->pdfBytes(), '<img src=x onerror=alert(1)>.pdf', 'application/pdf'),
+        );
+
+        $this->insertUser('viewer@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
+        $app = $this->app();
+        $this->login($app, 'viewer@example.com', 'ViewerPassword123');
+
+        $list = $this->request($app, 'GET', '/admin/candidates');
+        self::assertSame(200, $list->getStatusCode());
+        $listHtml = (string) $list->getBody();
+        self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $listHtml);
+        self::assertStringNotContainsString('<script>alert(1)</script>', $listHtml);
+
+        $detail = $this->request($app, 'GET', '/admin/candidates/' . $candidateId);
+        self::assertSame(200, $detail->getStatusCode());
+        $html = (string) $detail->getBody();
+        self::assertStringContainsString('&lt;b&gt;Referencia&lt;/b&gt;', $html);
+        self::assertStringContainsString('&lt;img src=x onerror=alert(1)&gt;.pdf', $html);
+        self::assertStringNotContainsString('<b>Referencia</b>', $html);
+        self::assertStringNotContainsString('<img src=x onerror=alert(1)>', $html);
+        self::assertStringContainsString('/admin/candidates/' . $candidateId . '/documents/' . $document['id'], $html);
+        self::assertStringNotContainsString('stored_name', $html);
+        self::assertStringNotContainsString($this->documentDirectory, $html);
+    }
+
+    public function testStatusMutationRequiresManageAndCannotSimulatePublicSubmit(): void
+    {
+        $candidateId = $this->insertCandidate('STATUS-1', 'Estado Candidato');
+
+        $this->insertUser('viewer@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
+        $viewerApp = $this->app();
+        $this->login($viewerApp, 'viewer@example.com', 'ViewerPassword123');
+        self::assertSame(403, $this->request($viewerApp, 'POST', '/admin/candidates/' . $candidateId . '/status', [
+            'status' => 'withdrawn',
+        ])->getStatusCode());
+        self::assertSame('new', $this->candidateStatus($candidateId));
+
+        $_SESSION = [];
+        $this->insertUser('manager@example.com', 'ManagerPassword123', 'admin', ['candidates.view', 'candidates.manage']);
+        $managerApp = $this->app();
+        $this->login($managerApp, 'manager@example.com', 'ManagerPassword123');
+
+        $forbiddenTransition = $this->request($managerApp, 'POST', '/admin/candidates/' . $candidateId . '/status', [
+            'status' => 'verification',
+        ]);
+        self::assertSame(422, $forbiddenTransition->getStatusCode());
+        self::assertSame('new', $this->candidateStatus($candidateId));
+
+        $withdraw = $this->request($managerApp, 'POST', '/admin/candidates/' . $candidateId . '/status', [
+            'status' => 'withdrawn',
+        ]);
+        self::assertSame(303, $withdraw->getStatusCode());
+        self::assertSame('/admin/candidates/' . $candidateId, $withdraw->getHeaderLine('Location'));
+        self::assertSame('withdrawn', $this->candidateStatus($candidateId));
+    }
+
+    public function testPrivateDocumentReadRequiresViewAndRejectsCrossCandidateIdor(): void
+    {
+        $candidateA = $this->insertCandidate('DOC-A', 'Candidato A');
+        $candidateB = $this->insertCandidate('DOC-B', 'Candidato B');
+        $unitId = (int) $this->pdo->query('SELECT unit_id FROM candidates WHERE id = ' . $candidateA)->fetchColumn();
+        $documents = new CandidateDocumentService($this->pdo, $this->documentDirectory);
+        $documents->createRequirement($unitId, [
+            'code' => 'identity',
+            'label' => 'Identidad',
+            'is_required' => 0,
+            'is_active' => 1,
+        ]);
+        $documentA = $documents->addOrReplaceDocument(
+            $candidateA,
+            'identity',
+            $this->upload($this->pdfBytes(), 'a.pdf', 'application/pdf'),
+        );
+        $documentB = $documents->addOrReplaceDocument(
+            $candidateB,
+            'identity',
+            $this->upload($this->pdfBytes(), 'b.pdf', 'application/pdf'),
+        );
+
+        $this->insertUser('viewer@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
+        $app = $this->app();
+        $this->login($app, 'viewer@example.com', 'ViewerPassword123');
+
+        $owned = $this->request($app, 'GET', '/admin/candidates/' . $candidateA . '/documents/' . $documentA['id']);
+        self::assertSame(200, $owned->getStatusCode());
+        self::assertSame('application/pdf', $owned->getHeaderLine('Content-Type'));
+        self::assertSame('nosniff', $owned->getHeaderLine('X-Content-Type-Options'));
+        self::assertSame('private, no-store', $owned->getHeaderLine('Cache-Control'));
+        self::assertSame($this->pdfBytes(), (string) $owned->getBody());
+
+        $idor = $this->request($app, 'GET', '/admin/candidates/' . $candidateA . '/documents/' . $documentB['id']);
+        self::assertSame(404, $idor->getStatusCode());
+
+        $_SESSION = [];
+        $this->insertUser('restricted@example.com', 'RestrictedPassword123', 'admin', ['properties.view']);
+        $restrictedApp = $this->app();
+        $this->login($restrictedApp, 'restricted@example.com', 'RestrictedPassword123');
+        self::assertSame(403, $this->request(
+            $restrictedApp,
+            'GET',
+            '/admin/candidates/' . $candidateA . '/documents/' . $documentA['id'],
+        )->getStatusCode());
+    }
+
+    public function testTokenRegenerationShowsNewRawUrlOnceStoresOnlyHashAndInvalidatesOldToken(): void
+    {
+        $oldToken = str_repeat('a', 64);
+        $candidateId = $this->insertCandidate('TOKEN-1', 'Token Candidato', 'new', $oldToken);
+        $this->insertUser('manager@example.com', 'ManagerPassword123', 'admin', ['candidates.view', 'candidates.manage']);
+        $app = $this->app('/sub', 'https://tenant.example.test/sub');
+        $this->login($app, 'manager@example.com', 'ManagerPassword123', '/sub');
+
+        $response = $this->request(
+            $app,
+            'POST',
+            '/sub/admin/candidates/' . $candidateId . '/token/regenerate',
+        );
+        self::assertSame(200, $response->getStatusCode());
+        $html = (string) $response->getBody();
+        self::assertMatchesRegularExpression(
+            '#https://tenant\.example\.test/sub/apply/continue/([a-f0-9]{64})#',
+            $html,
+        );
+        preg_match('#/apply/continue/([a-f0-9]{64})#', $html, $matches);
+        $newToken = (string) ($matches[1] ?? '');
+        self::assertNotSame('', $newToken);
+        self::assertNotSame($oldToken, $newToken);
+        self::assertStringNotContainsString($oldToken, $html);
+
+        $row = $this->pdo->query(
+            'SELECT continuation_token_hash FROM candidates WHERE id = ' . $candidateId,
+        )->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($row);
+        self::assertSame(hash('sha256', $newToken), $row['continuation_token_hash']);
+        self::assertNotSame($newToken, $row['continuation_token_hash']);
+
+        self::assertSame(404, $this->request($app, 'GET', '/sub/apply/continue/' . $oldToken)->getStatusCode());
+        self::assertSame(200, $this->request($app, 'GET', '/sub/apply/continue/' . $newToken)->getStatusCode());
+
+        $detail = (string) $this->request($app, 'GET', '/sub/admin/candidates/' . $candidateId)->getBody();
+        self::assertStringNotContainsString($newToken, $detail);
+    }
+
+    private function app(string $basePath = '', ?string $baseUrl = null): App
+    {
+        $factory = require dirname(__DIR__, 3) . '/bootstrap/app.php';
+
+        return $factory([
+            'lock_path' => $this->lockPath,
+            'database_config_path' => $this->directory . '/database.php',
+            'migration_directory' => dirname(__DIR__, 3) . '/database/migrations',
+            'base_url' => $baseUrl ?? ('https://alquilapro.sierraglobalcompany.com' . $basePath),
+            'base_path' => $basePath,
+            'logo_directory' => $this->directory . '/branding',
+            'unit_media_directory' => $this->directory . '/unit-media',
+            'candidate_document_directory' => $this->documentDirectory,
+            'pdo' => $this->pdo,
+        ]);
+    }
+
+    private function request(
+        App $app,
+        string $method,
+        string $path,
+        array $body = [],
+        bool $withCsrf = true,
+    ): ResponseInterface {
+        $request = (new ServerRequestFactory())->createServerRequest(
+            $method,
+            'https://alquilapro.sierraglobalcompany.com' . $path,
+        );
+        if (strtoupper($method) === 'POST' && $withCsrf) {
+            $body['csrf_token'] = (new Csrf())->token();
+        }
+        if ($body !== []) {
+            $request = $request->withParsedBody($body);
+        }
+
+        return $app->handle($request);
+    }
+
+    private function login(App $app, string $email, string $password, string $basePath = ''): void
+    {
+        $response = $this->request($app, 'POST', $basePath . '/login', [
+            'email' => $email,
+            'password' => $password,
+        ]);
+        self::assertSame(303, $response->getStatusCode());
+    }
+
+    private function insertUser(
+        string $email,
+        string $password,
+        string $role,
+        array $permissions = [],
+        bool $mustChangePassword = false,
+    ): int {
+        $statement = $this->pdo->prepare(
+            'INSERT INTO users '
+            . '(role, full_name, email, password_hash, is_active, permissions_json, must_change_password) '
+            . 'VALUES (:role, :full_name, :email, :password_hash, 1, :permissions_json, :must_change_password)',
+        );
+        $statement->execute([
+            'role' => $role,
+            'full_name' => ucfirst($role) . ' Test',
+            'email' => strtolower($email),
+            'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+            'permissions_json' => $permissions === [] ? null : json_encode($permissions, JSON_THROW_ON_ERROR),
+            'must_change_password' => $mustChangePassword ? 1 : 0,
+        ]);
+
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    private function insertCandidate(
+        string $documentNumber,
+        string $fullName,
+        string $status = 'new',
+        ?string $rawToken = null,
+    ): int {
+        $property = $this->pdo->prepare(
+            "INSERT INTO properties (name, address, city, sector, is_active) VALUES (:name, 'Calle 1', 'Medellín', 'Calasanz', 1)",
+        );
+        $property->execute(['name' => 'Propiedad ' . $documentNumber]);
+        $propertyId = (int) $this->pdo->lastInsertId();
+
+        $unit = $this->pdo->prepare(
+            "INSERT INTO units (property_id, public_key, type, code, status, is_public) "
+            . "VALUES (:property_id, :public_key, 'apartment', :code, 'available', 0)",
+        );
+        $unit->execute([
+            'property_id' => $propertyId,
+            'public_key' => bin2hex(random_bytes(12)),
+            'code' => 'A-' . substr(hash('sha256', $documentNumber), 0, 8),
+        ]);
+        $unitId = (int) $this->pdo->lastInsertId();
+
+        $token = $rawToken ?? bin2hex(random_bytes(32));
+        $candidate = $this->pdo->prepare(
+            'INSERT INTO candidates '
+            . '(unit_id, document_type, document_number, full_name, phone, email, status, continuation_token_hash, continuation_token_expires_at, consent_at) '
+            . 'VALUES (:unit_id, :document_type, :document_number, :full_name, :phone, :email, :status, :token_hash, :expires_at, :consent_at)',
+        );
+        $candidate->execute([
+            'unit_id' => $unitId,
+            'document_type' => 'cc',
+            'document_number' => $documentNumber,
+            'full_name' => $fullName,
+            'phone' => '3001234567',
+            'email' => strtolower(preg_replace('/[^A-Za-z0-9]+/', '-', $documentNumber) ?? 'candidate') . '@example.com',
+            'status' => $status,
+            'token_hash' => hash('sha256', $token),
+            'expires_at' => '2099-01-01 00:00:00',
+            'consent_at' => '2026-10-12 12:00:00',
+        ]);
+
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    private function upload(string $bytes, string $clientName, string $clientType): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'alquila_candidate_admin_upload_');
+        if ($path === false || file_put_contents($path, $bytes) === false) {
+            self::fail('Unable to create candidate admin upload fixture.');
+        }
+        $this->temporaryFiles[] = $path;
+
+        return new UploadedFile($path, $clientName, $clientType, strlen($bytes), UPLOAD_ERR_OK, false);
+    }
+
+    private function pdfBytes(): string
+    {
+        return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<<>>\n%%EOF\n";
+    }
+
+    private function candidateStatus(int $candidateId): string
+    {
+        return (string) $this->pdo->query(
+            'SELECT status FROM candidates WHERE id = ' . $candidateId,
+        )->fetchColumn();
+    }
+}
