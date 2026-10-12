@@ -23,8 +23,12 @@ $title = $pageTitle !== '' ? $pageTitle . ' · ' . $branding['app_name'] : $bran
 <main class="auth-shell" data-f3-auth-shell>
     <section class="auth-card">
         <div class="auth-brand" aria-label="<?= $escape($branding['app_name']) ?>">
-            <span class="auth-brand__mark" aria-hidden="true">A</span>
-            <span><?= $escape($branding['app_name']) ?></span>
+            <?php if ($branding['logo_path'] !== null): ?>
+                <img class="auth-brand__logo" src="<?= $escape($basePath . '/brand/logo') ?>" alt="<?= $escape($branding['app_name']) ?>">
+            <?php else: ?>
+                <span class="auth-brand__mark" aria-hidden="true">A</span>
+                <span><?= $escape($branding['app_name']) ?></span>
+            <?php endif; ?>
         </div>
         <?= $content ?>
     </section>
