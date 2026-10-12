@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use AlquilaPro\Properties\PropertyService;
+use AlquilaPro\Properties\UnitMediaService;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -11,6 +12,8 @@ use Slim\App;
 return static function (App $app, array $deps): void {
     /** @var PropertyService $properties */
     $properties = $deps['properties'];
+    /** @var UnitMediaService $media */
+    $media = $deps['unit_media'];
     /** @var View $view */
     $view = $deps['view'];
 
@@ -52,5 +55,25 @@ return static function (App $app, array $deps): void {
         return $response
             ->withHeader('Content-Type', 'text/html; charset=utf-8')
             ->withStatus($status);
+    });
+
+    $app->get('/catalog/{publicKey}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($properties, $media, $view): ResponseInterface {
+        $publicKey = (string) ($args['publicKey'] ?? '');
+        $unit = $properties->findPublicUnit($publicKey);
+        if ($unit === null) {
+            return $response->withStatus(404);
+        }
+
+        $response->getBody()->write($view->renderPublic('public_catalog_detail', [
+            'pageTitle' => $unit['property_name'],
+            'unit' => $unit,
+            'videoLinks' => $media->publicVideoLinks($publicKey),
+        ]));
+
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
     });
 };
