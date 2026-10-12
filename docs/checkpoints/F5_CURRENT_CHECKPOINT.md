@@ -220,7 +220,7 @@ Resultado:
 - los 7 tests `CandidateService` pasan;
 - regresión F1-F4 + F5.1 completa verde.
 
-### CHECKPOINT EXACTO
+### CHECKPOINT CERTIFICADO PREVIO
 
 Commit: `b4904bb0f3f5b4c52c8669850b178ee9f08dc86f`  
 CI: `38265367655`
@@ -230,8 +230,20 @@ Resultado:
 - PHP 8.3: PASS;
 - PHP 8.4: PASS;
 - PHP 8.5: PASS;
+- Composer validate --strict: PASS en la matriz.
+
+### HEAD FINAL DE CIERRE
+
+Commit: `89901bc4253d391901dff621a2d74dc667638b86`  
+CI: `38265599227`
+
+Resultado:
+
+- PHP 8.3: PASS;
+- PHP 8.4: PASS;
+- PHP 8.5: PASS;
 - Composer validate --strict: PASS en la matriz;
-- checkpoint documental certificado sobre el mismo producto GREEN.
+- no hubo cambios de producto después de `511dc595b8265794f19dd3b5a04fef1ceaa62d36`.
 
 ---
 
