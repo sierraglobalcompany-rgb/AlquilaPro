@@ -95,6 +95,34 @@ return static function (App $app, array $deps): void {
             ->withStatus($status);
     });
 
+    $app->get('/catalog/{publicKey}/photo/{position}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($media): ResponseInterface {
+        $publicKey = (string) ($args['publicKey'] ?? '');
+        $rawPosition = (string) ($args['position'] ?? '');
+        if (!ctype_digit($rawPosition) || (int) $rawPosition < 1) {
+            return $response->withStatus(404);
+        }
+
+        $photo = $media->publicPhoto($publicKey, (int) $rawPosition);
+        if ($photo === null) {
+            return $response->withStatus(404);
+        }
+
+        $bytes = file_get_contents($photo['path']);
+        if ($bytes === false) {
+            return $response->withStatus(404);
+        }
+        $response->getBody()->write($bytes);
+
+        return $response
+            ->withHeader('Content-Type', $photo['mime'])
+            ->withHeader('X-Content-Type-Options', 'nosniff')
+            ->withHeader('Cache-Control', 'no-store, max-age=0');
+    });
+
     $app->get('/catalog/{publicKey}', static function (
         ServerRequestInterface $request,
         ResponseInterface $response,
@@ -109,6 +137,7 @@ return static function (App $app, array $deps): void {
         $response->getBody()->write($view->renderPublic('public_catalog_detail', [
             'pageTitle' => $unit['property_name'],
             'unit' => $unit,
+            'photoPositions' => $media->publicPhotoPositions($publicKey),
             'videoLinks' => $media->publicVideoLinks($publicKey),
         ]));
 
