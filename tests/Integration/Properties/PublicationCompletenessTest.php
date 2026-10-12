@@ -61,6 +61,7 @@ final class PublicationCompletenessTest extends TestCase
                 $this->insertPhoto($unit['id']);
             }
 
+            $rejected = false;
             try {
                 $this->service->updateUnit($unit['id'], [
                     'type' => 'apartment',
@@ -71,11 +72,12 @@ final class PublicationCompletenessTest extends TestCase
                     'requirements' => $case['requirements'],
                     'is_public' => 1,
                 ]);
-                self::fail('Incomplete unit must not be publishable: ' . $name);
             } catch (RuntimeException $exception) {
+                $rejected = true;
                 self::assertNotSame('', $exception->getMessage());
             }
 
+            self::assertTrue($rejected, 'Incomplete unit must not be publishable: ' . $name);
             self::assertFalse($this->service->findUnit($unit['id'])['is_public']);
         }
     }
