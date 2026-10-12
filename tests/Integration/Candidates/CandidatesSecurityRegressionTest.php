@@ -40,7 +40,6 @@ final class CandidatesSecurityRegressionTest extends TestCase
             'password' => getenv('TEST_DB_PASSWORD') ?: 'root',
         ]));
         MigrationRunner::migrate($this->pdo, dirname(__DIR__, 3) . '/database/migrations');
-
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
         foreach (['candidate_documents', 'candidate_references', 'unit_application_requirements', 'candidates', 'unit_media', 'units', 'properties', 'users'] as $table) {
             $this->pdo->exec('DELETE FROM `' . $table . '`');
@@ -86,23 +85,14 @@ final class CandidatesSecurityRegressionTest extends TestCase
 
         self::assertSame(404, $this->request($app, 'GET', '/sub/apply/continue/short')->getStatusCode());
         self::assertSame(404, $this->request($app, 'GET', '/sub/apply/continue/' . str_repeat('z', 64))->getStatusCode());
-
         $this->pdo->prepare('UPDATE candidates SET continuation_token_expires_at = :expired WHERE id = :id')->execute([
             'expired' => '2000-01-01 00:00:00',
             'id' => $expired['candidate_id'],
         ]);
-        self::assertSame(404, $this->request(
-            $app,
-            'GET',
-            '/sub/apply/continue/' . $expired['continuation_token'],
-        )->getStatusCode());
+        self::assertSame(404, $this->request($app, 'GET', '/sub/apply/continue/' . $expired['continuation_token'])->getStatusCode());
 
         $newToken = $service->regenerateToken((int) $started['candidate_id'], $now + 1);
-        self::assertSame(404, $this->request(
-            $app,
-            'GET',
-            '/sub/apply/continue/' . $started['continuation_token'],
-        )->getStatusCode());
+        self::assertSame(404, $this->request($app, 'GET', '/sub/apply/continue/' . $started['continuation_token'])->getStatusCode());
         self::assertSame(200, $this->request($app, 'GET', '/sub/apply/continue/' . $newToken)->getStatusCode());
 
         $app->get('/apply/continue/{token}/explode', static function (
@@ -118,8 +108,7 @@ final class CandidatesSecurityRegressionTest extends TestCase
         ini_set('log_errors', '1');
         ini_set('error_log', $logPath);
         try {
-            $response = $this->request($app, 'GET', '/sub/apply/continue/' . $newToken . '/explode');
-            self::assertSame(500, $response->getStatusCode());
+            self::assertSame(500, $this->request($app, 'GET', '/sub/apply/continue/' . $newToken . '/explode')->getStatusCode());
         } finally {
             ini_set('error_log', is_string($oldErrorLog) ? $oldErrorLog : '');
             ini_set('log_errors', is_string($oldLogErrors) ? $oldLogErrors : '1');
@@ -136,10 +125,7 @@ final class CandidatesSecurityRegressionTest extends TestCase
         $unit = $this->seedUnit('SEC-DUP');
         $app = $this->app();
         $csrf = (new Csrf())->token();
-
-        $first = $this->request($app, 'POST', '/apply/' . $unit['public_key'], $this->candidateInput('SEC-DUP-1') + [
-            'csrf_token' => $csrf,
-        ]);
+        $first = $this->request($app, 'POST', '/apply/' . $unit['public_key'], $this->candidateInput('SEC-DUP-1') + ['csrf_token' => $csrf]);
         self::assertSame(303, $first->getStatusCode());
         $rawToken = basename($first->getHeaderLine('Location'));
         self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $rawToken);
@@ -184,12 +170,11 @@ final class CandidatesSecurityRegressionTest extends TestCase
 
         $this->insertUser('manager@example.com', 'ManagerPassword123', ['candidates.view', 'candidates.manage']);
         $app = $this->app('/sub');
-        $login = $this->request($app, 'POST', '/sub/login', [
+        self::assertSame(303, $this->request($app, 'POST', '/sub/login', [
             'csrf_token' => (new Csrf())->token(),
             'email' => 'manager@example.com',
             'password' => 'ManagerPassword123',
-        ]);
-        self::assertSame(303, $login->getStatusCode());
+        ])->getStatusCode());
 
         $beforeCandidate = $this->candidateByDocument('SEC-CSRF-1');
         $beforeRequirementCount = (int) $this->pdo->query('SELECT COUNT(*) FROM unit_application_requirements')->fetchColumn();
@@ -202,11 +187,10 @@ final class CandidatesSecurityRegressionTest extends TestCase
             ['/sub/apply/continue/' . $started['continuation_token'] . '/submit', []],
             ['/sub/admin/units/' . $unit['id'] . '/application-requirements', ['code' => 'new-code', 'label' => 'Nuevo']],
             ['/sub/admin/units/' . $unit['id'] . '/application-requirements/' . $requirement['id'], ['label' => 'Mutado']],
-            ['/sub/admin/units/' . $unit['id'] . '/application-requirements/order', ['requirement_ids' => [$requirement['id']]],
+            ['/sub/admin/units/' . $unit['id'] . '/application-requirements/order', ['requirement_ids' => [$requirement['id']]]],
             ['/sub/admin/candidates/' . $candidateId . '/status', ['status' => 'withdrawn']],
             ['/sub/admin/candidates/' . $candidateId . '/token/regenerate', []],
         ];
-
         foreach ($postCases as [$path, $body]) {
             self::assertSame(403, $this->request($app, 'POST', $path, $body)->getStatusCode(), $path);
         }
@@ -234,14 +218,10 @@ final class CandidatesSecurityRegressionTest extends TestCase
     {
         $unit = $this->seedUnit('SEC-DOC');
         $documents = new CandidateDocumentService($this->pdo, $this->documentDirectory);
-        $documents->createRequirement($unit['id'], [
-            'code' => 'identity',
-            'label' => 'Identidad',
-            'is_required' => 0,
-        ]);
-        $candidateService = new CandidateService($this->pdo, candidateDocumentService: $documents);
-        $first = $candidateService->startCandidate($unit['public_key'], $this->candidateInput('SEC-DOC-1'), time());
-        $second = $candidateService->startCandidate($unit['public_key'], $this->candidateInput('SEC-DOC-2'), time());
+        $documents->createRequirement($unit['id'], ['code' => 'identity', 'label' => 'Identidad', 'is_required' => 0]);
+        $service = new CandidateService($this->pdo, candidateDocumentService: $documents);
+        $first = $service->startCandidate($unit['public_key'], $this->candidateInput('SEC-DOC-1'), time());
+        $second = $service->startCandidate($unit['public_key'], $this->candidateInput('SEC-DOC-2'), time());
         $document = $documents->addOrReplaceDocument(
             (int) $first['candidate_id'],
             'identity',
@@ -250,13 +230,11 @@ final class CandidatesSecurityRegressionTest extends TestCase
 
         self::assertNotNull($documents->privateDocument((int) $first['candidate_id'], (int) $document['id']));
         self::assertNull($documents->privateDocument((int) $second['candidate_id'], (int) $document['id']));
-
         $this->pdo->prepare('UPDATE candidate_documents SET stored_name = :stored_name WHERE id = :id')->execute([
             'stored_name' => '../escape.pdf',
             'id' => $document['id'],
         ]);
         self::assertNull($documents->privateDocument((int) $first['candidate_id'], (int) $document['id']));
-
         $this->pdo->prepare('UPDATE candidate_documents SET stored_name = :stored_name, mime_type = :mime WHERE id = :id')->execute([
             'stored_name' => $document['stored_name'],
             'mime' => 'image/png',
@@ -292,10 +270,7 @@ final class CandidatesSecurityRegressionTest extends TestCase
 
     private function request(App $app, string $method, string $path, array $body = []): ResponseInterface
     {
-        $request = (new ServerRequestFactory())->createServerRequest(
-            $method,
-            'https://alquilapro.sierraglobalcompany.com' . $path,
-        );
+        $request = (new ServerRequestFactory())->createServerRequest($method, 'https://alquilapro.sierraglobalcompany.com' . $path);
         if ($body !== []) {
             $request = $request->withParsedBody($body);
         }
@@ -311,7 +286,6 @@ final class CandidatesSecurityRegressionTest extends TestCase
         $property->execute(['name' => 'Propiedad ' . $suffix]);
         $propertyId = (int) $this->pdo->lastInsertId();
         $publicKey = bin2hex(random_bytes(12));
-
         $unit = $this->pdo->prepare(
             'INSERT INTO units '
             . '(property_id, public_key, type, code, location_label, status, is_public, monthly_price, description, requirements) '
@@ -324,13 +298,8 @@ final class CandidatesSecurityRegressionTest extends TestCase
         ]);
         $unitId = (int) $this->pdo->lastInsertId();
         $this->pdo->prepare(
-            "INSERT INTO unit_media (unit_id, type, stored_name, mime_type, sort_order, is_cover) "
-            . "VALUES (:unit_id, 'photo', :stored_name, 'image/jpeg', 1, 1)",
-        )->execute([
-            'unit_id' => $unitId,
-            'stored_name' => 'cover-' . $unitId . '.jpg',
-        ]);
-
+            "INSERT INTO unit_media (unit_id, type, stored_name, mime_type, sort_order, is_cover) VALUES (:unit_id, 'photo', :stored_name, 'image/jpeg', 1, 1)",
+        )->execute(['unit_id' => $unitId, 'stored_name' => 'cover-' . $unitId . '.jpg']);
         return ['id' => $unitId, 'public_key' => $publicKey];
     }
 
