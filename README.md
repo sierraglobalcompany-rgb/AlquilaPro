@@ -3,8 +3,8 @@
 Sistema privado, mobile-first y autoinstalable para administrar arrendamientos de vivienda y parqueaderos.
 
 **Dominio previsto:** `https://alquilapro.sierraglobalcompany.com`  
-**Estado actual:** F3 — Shell móvil + sistema visual **CLOSED / VERIFIED / PENDIENTE DE MERGE**.  
-**Integración:** PR #4 abierto contra `main`; no fusionar sin aprobación explícita.  
+**Estado actual:** F3 — Shell móvil + sistema visual **CLOSED / VERIFIED / MERGED**.  
+**Siguiente fase:** F4 — Propiedades + unidades.  
 **Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + JS mínimo. Alpine.js solo cuando aporte valor real.  
 **Destino:** Hostinger, instalación portable en subdominio o subcarpeta HTTPS.
 
@@ -24,7 +24,7 @@ Toda persona, ChatGPT, Codex, Antigravity u otra IA que retome este proyecto deb
 
 Orden de autoridad:
 
-`SPEC MAESTRA → PLAN MAESTRO → SPEC DE FASE → PLAN DE FASE → CHECKPOINT → TESTS/CI → CÓDIGO REAL`
+`SPEC MAESTRA → PLAN MAESTRO → DECISIONES/ACLARACIONES CANÓNICAS DEL README → SPEC DE FASE → PLAN DE FASE → CHECKPOINT → TESTS/CI → CÓDIGO REAL`
 
 Si hay contradicción, no se adivina: se audita y se corrige la fuente correspondiente.
 
@@ -100,7 +100,25 @@ Principios:
 
 ---
 
-# 4. ESTADO REAL DEL REPOSITORIO
+# 4. DECISIÓN CANÓNICA — AUTENTICACIÓN ÚNICA
+
+Alquila Pro usa **un solo módulo de autenticación** para todos los usuarios humanos de la aplicación.
+
+Esto significa:
+
+- propietario, administrador, gestor e inquilino usan el mismo endpoint/pantalla de login;
+- no se crea un `tenant login`, `admin login` ni segundo sistema de sesiones;
+- no se duplica recuperación de contraseña, CSRF, rate limiting ni cierre de sesión;
+- la diferencia ocurre **después de autenticar**, según rol, permisos, estado y contexto del usuario;
+- F8 puede crear/activar credenciales del inquilino y su portal, pero debe reutilizar el `AuthService`, `SessionGuard`, CSRF, recuperación y vistas/base auth existentes;
+- las credenciales iniciales del inquilino siguen la SPEC: documento como usuario/identificador y contraseña inicial igual al documento, con cambio obligatorio en primer acceso, salvo revisión posterior explícita de producto/seguridad;
+- cualquier propuesta futura que requiera un segundo módulo de login debe tratarse como conflicto con Ley 1 KISS y Ley 2 Cero Ruido hasta demostrar necesidad real.
+
+Esta decisión **aclara y hace explícito** el presupuesto ya definido en SPEC/PLAN: `1 auth`.
+
+---
+
+# 5. ESTADO REAL DEL REPOSITORIO
 
 ```text
 PROJECT: Alquila Pro
@@ -117,23 +135,23 @@ F2: CLOSED / VERIFIED / MERGED
 F2_MERGE_SHA: 96a4fa59ca82604d821061c6aed7d9edb3849ae1
 F2_QA: PHP 8.3 / 8.4 / 8.5 — 60 tests / 254 assertions
 
-F3: CLOSED / VERIFIED / NOT MERGED
-F3_BRANCH: impl/f3-mobile-shell-visual-20261011
-F3_PR: #4 OPEN
+F3: CLOSED / VERIFIED / MERGED
+F3_MERGE_SHA: b35c32b9f8c99646879e22b1af92e6a54690ceca
 F3_VERIFIED_IMPLEMENTATION_HEAD: 76574f2c4e37bc9386bc00e81aabc9a75c3205a0
+F3_DOCUMENTATION_HEAD: cfc07f9e750f80771b7b14fdb237ea38e57fbee6
 F3_QA: PHP 8.3 / 8.4 / 8.5 — 94 tests / 458 assertions / 0 warnings
 F3_VISUAL_QA: PASS — 360x800 / 390x844 / 412x915 / 768x1024 / 1440x1000 + 200% equivalent
 LEY_1_KISS_F3: PASS
 LEY_2_CERO_RUIDO_F3: PASS
-LATEST_CHECKPOINT: docs/checkpoints/F3_CLOSED_2026-10-11.md
+LATEST_CLOSED_CHECKPOINT: docs/checkpoints/F3_CLOSED_2026-10-11.md
 
-NEXT_GATE: verify final documentation HEAD, mark PR #4 ready, then merge only with explicit approval
-NEXT_PHASE_AFTER_MERGE: F4 — Propiedades + unidades
+CURRENT_PHASE: F4 — Propiedades + unidades
+NEXT_GATE: recuperar alcance F4 → PRE-KISS → SPEC/mini-plan de fase → TDD
 ```
 
 ---
 
-# 5. F3 — QUÉ QUEDÓ ENTREGADO
+# 6. F3 — QUÉ QUEDÓ ENTREGADO
 
 F3 cerró el sistema visual real sin abrir módulos futuros:
 
@@ -164,13 +182,13 @@ FUTURE_MODULE_ROUTES: +0
 
 ---
 
-# 6. ROADMAP
+# 7. ROADMAP
 
 - F0 — Spec + plan ✅
 - F1 — Foundation + installer ✅
 - F2 — Auth + usuarios + permisos ✅
-- F3 — Shell móvil + sistema visual ✅ *(pendiente de merge del PR #4)*
-- **F4 — Propiedades + unidades ← SIGUIENTE DESPUÉS DEL MERGE**
+- F3 — Shell móvil + sistema visual ✅
+- **F4 — Propiedades + unidades ← ACTUAL**
 - F5 — Candidatos + referencias
 - F6 — Aseguradora/SURA
 - F7 — Contratos
@@ -200,7 +218,7 @@ Ciclo por fase:
 
 ---
 
-# 7. GUARDRAILS CLAVE
+# 8. GUARDRAILS CLAVE
 
 - no introducir funcionalidades futuras como botones muertos;
 - no crear PSE, WhatsApp API o módulos incompletos por anticipación;
@@ -209,11 +227,12 @@ Ciclo por fase:
 - no automatizar decisiones jurídicas;
 - no duplicar fuentes de verdad;
 - no agregar dependencia si CSS/PHP/HTML/JS mínimo resuelven mejor;
-- no abrir F4 mientras PR #4 siga sin integrar.
+- no crear un login separado para inquilinos, candidatos o administradores mientras el auth único pueda resolverlo;
+- no abrir F5 mientras F4 permanezca abierta.
 
 ---
 
-# 8. PROTOCOLO DE RECUPERACIÓN
+# 9. PROTOCOLO DE RECUPERACIÓN
 
 Una nueva sesión debe:
 
@@ -235,6 +254,6 @@ Prompt mínimo:
 
 ---
 
-# 9. SIGUIENTE PASO
+# 10. SIGUIENTE PASO
 
-Verificar el HEAD documental final de F3 en CI, dejar PR #4 **Ready for review** y detenerse antes del merge. El merge a `main` requiere aprobación explícita del usuario. Solo después se abre F4.
+Recuperar y congelar el alcance exacto de **F4 — Propiedades + unidades**, aplicar PRE-KISS y crear la SPEC/mini-plan de fase antes del primer RED.
