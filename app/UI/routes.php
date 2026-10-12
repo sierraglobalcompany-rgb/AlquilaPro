@@ -9,7 +9,6 @@ use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\UploadedFileInterface;
-use RuntimeException;
 use Slim\App;
 
 return static function (App $app, array $deps): void {
