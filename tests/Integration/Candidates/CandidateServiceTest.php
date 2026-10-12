@@ -211,6 +211,35 @@ final class CandidateServiceTest extends TestCase
         $service->transitionStatus((int) $third['candidate_id'], 'approved');
     }
 
+    public function testFindByTokenIncludesOnlyPublicReferenceFieldsWithoutInternalIds(): void
+    {
+        $unit = $this->seedUnit('222222222222222222222222', true);
+        $service = $this->service();
+        $started = $service->startCandidate($unit['public_key'], $this->candidateInput('cc', '6001'), self::NOW);
+
+        $service->replaceReferencesByToken($started['continuation_token'], [[
+            'reference_type' => 'personal',
+            'name' => 'Referencia Visible',
+            'relationship' => 'Amiga',
+            'phone' => '3005556677',
+            'email' => 'ref@example.com',
+        ]], self::NOW + 1);
+
+        $resolved = $service->findByToken($started['continuation_token'], self::NOW + 2);
+        self::assertNotNull($resolved);
+        self::assertSame('incomplete', $resolved['status']);
+        self::assertCount(1, $resolved['references']);
+        self::assertSame([
+            'reference_type' => 'personal',
+            'name' => 'Referencia Visible',
+            'relationship' => 'Amiga',
+            'phone' => '3005556677',
+            'email' => 'ref@example.com',
+        ], $resolved['references'][0]);
+        self::assertArrayNotHasKey('id', $resolved['references'][0]);
+        self::assertArrayNotHasKey('candidate_id', $resolved['references'][0]);
+    }
+
     private function service(): CandidateService
     {
         self::assertTrue(class_exists(CandidateService::class), 'CandidateService must exist for F5.2.');
