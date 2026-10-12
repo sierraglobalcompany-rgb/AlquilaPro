@@ -150,7 +150,7 @@ final class PropertyService
 
         $data = $this->validateUnit($existing['property_id'], $input, $unitId);
         $data['is_public'] = $this->normalizePublicFlag($input, $existing['is_public']);
-        if ($data['is_public']) {
+        if (!$existing['is_public'] && $data['is_public']) {
             $this->assertPublicationComplete($unitId, $data);
         }
         $data['id'] = $unitId;
@@ -208,15 +208,7 @@ final class PropertyService
             throw new RuntimeException('El tipo de unidad no es válido.');
         }
 
-        $where = [
-            'p.is_active = 1',
-            "u.status = 'available'",
-            'u.is_public = 1',
-            'u.monthly_price > 0',
-            "TRIM(COALESCE(u.description, '')) <> ''",
-            "TRIM(COALESCE(u.requirements, '')) <> ''",
-            "EXISTS (SELECT 1 FROM unit_media m WHERE m.unit_id = u.id AND m.type = 'photo')",
-        ];
+        $where = ['p.is_active = 1', "u.status = 'available'", 'u.is_public = 1'];
         $params = [];
 
         if ($type !== null) {
@@ -257,9 +249,6 @@ final class PropertyService
             'SELECT u.*, p.name AS property_name, p.city AS property_city, p.sector AS property_sector '
             . 'FROM units u INNER JOIN properties p ON p.id = u.property_id '
             . "WHERE u.public_key = :public_key AND p.is_active = 1 AND u.status = 'available' AND u.is_public = 1 "
-            . "AND u.monthly_price > 0 AND TRIM(COALESCE(u.description, '')) <> '' "
-            . "AND TRIM(COALESCE(u.requirements, '')) <> '' "
-            . "AND EXISTS (SELECT 1 FROM unit_media m WHERE m.unit_id = u.id AND m.type = 'photo') "
             . 'LIMIT 1',
         );
         $statement->execute(['public_key' => $publicKey]);
@@ -277,9 +266,7 @@ final class PropertyService
 
         $property = $this->findProperty($unit['property_id']);
 
-        return $property !== null
-            && $property['is_active']
-            && $this->publicationDataComplete($unitId, $unit);
+        return $property !== null && $property['is_active'];
     }
 
     private function validateProperty(array $input): array
