@@ -21,6 +21,7 @@ final class RuntimeRequirements
             'pdo' => ['ok' => in_array('pdo', $extensions, true)],
             'pdo_mysql' => ['ok' => in_array('pdo_mysql', $extensions, true)],
             'mbstring' => ['ok' => in_array('mbstring', $extensions, true)],
+            'fileinfo' => ['ok' => in_array('fileinfo', $extensions, true)],
             'storage' => ['ok' => $storageWritable],
         ];
 
