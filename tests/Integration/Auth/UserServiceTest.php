@@ -43,11 +43,21 @@ final class UserServiceTest extends TestCase
         self::assertTrue($permissions::allows(['role' => 'admin', 'permissions' => ['users.view']], 'users.view'));
         self::assertFalse($permissions::allows(['role' => 'admin', 'permissions' => ['users.view']], 'users.manage'));
         self::assertTrue($permissions::allows(['role' => 'gestor', 'permissions' => ['users.permissions']], 'users.permissions'));
+        self::assertTrue($permissions::allows(['role' => 'gestor', 'permissions' => ['properties.view']], 'properties.view'));
         self::assertFalse($permissions::allows(['role' => 'gestor', 'permissions' => []], 'users.view'));
 
         self::assertSame(
-            ['users.view', 'users.permissions'],
-            $permissions::sanitize(['users.view', 'unknown.permission', 'users.view', 123, 'users.permissions']),
+            ['users.view', 'users.manage', 'users.permissions', 'properties.view', 'properties.manage'],
+            $permissions::sanitize([
+                'users.view',
+                'users.manage',
+                'users.permissions',
+                'properties.view',
+                'properties.manage',
+                'unknown.permission',
+                'properties.view',
+                123,
+            ]),
         );
     }
 
