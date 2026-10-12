@@ -2,9 +2,16 @@
 
 declare(strict_types=1);
 
+use AlquilaPro\Auth\AuthService;
+use AlquilaPro\Auth\Csrf;
+use AlquilaPro\Auth\SessionGuard;
+use AlquilaPro\Auth\UserService;
+use AlquilaPro\Foundation\DatabaseConfig;
+use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
 use AlquilaPro\Foundation\Installer;
 use AlquilaPro\Foundation\RuntimeRequirements;
+use PDO;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\App;
@@ -108,6 +115,29 @@ return static function (array $settings): App {
         $response->getBody()->write($payload);
         return $response->withHeader('Content-Type', 'application/json; charset=utf-8');
     });
+
+    if ($lock->isInstalled()) {
+        $pdo = $settings['pdo'] ?? null;
+        if (!$pdo instanceof PDO && is_file($databaseConfigPath)) {
+            $database = require $databaseConfigPath;
+            if (is_array($database)) {
+                $pdo = DatabaseConnector::connect(DatabaseConfig::fromArray($database));
+            }
+        }
+
+        if ($pdo instanceof PDO) {
+            $routes = require dirname(__DIR__) . '/app/Auth/routes.php';
+            $routes($app, [
+                'auth' => new AuthService($pdo),
+                'users' => new UserService($pdo),
+                'session' => new SessionGuard(),
+                'csrf' => new Csrf(),
+                'base_path' => $basePath,
+                'base_url' => $baseUrl,
+                'views' => dirname(__DIR__) . '/resources/views',
+            ]);
+        }
+    }
 
     $responseFactory = $app->getResponseFactory();
     $errorMiddleware = $app->addErrorMiddleware(false, false, false);
