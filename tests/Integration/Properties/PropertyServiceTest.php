@@ -272,6 +272,35 @@ final class PropertyServiceTest extends TestCase
         ]);
     }
 
+    public function testUnitTypeCannotChangeAfterCreation(): void
+    {
+        $service = $this->service();
+        $property = $this->property($service, 'Tipos');
+        $apartment = $service->createUnit($property['id'], [
+            'type' => 'apartment', 'code' => 'A-TYPE', 'status' => 'available',
+        ]);
+        $parking = $service->createUnit($property['id'], [
+            'type' => 'parking', 'code' => 'P-TYPE', 'status' => 'available',
+        ]);
+
+        foreach ([
+            [$apartment['id'], 'parking', 'apartment', 'A-TYPE'],
+            [$parking['id'], 'apartment', 'parking', 'P-TYPE'],
+        ] as [$unitId, $requestedType, $expectedType, $code]) {
+            try {
+                $service->updateUnit($unitId, [
+                    'type' => $requestedType,
+                    'code' => $code,
+                    'status' => 'available',
+                ]);
+                self::fail('Existing unit type must be immutable.');
+            } catch (RuntimeException $exception) {
+                self::assertNotSame('', $exception->getMessage());
+                self::assertSame($expectedType, $service->findUnit($unitId)['type']);
+            }
+        }
+    }
+
     public function testUnitReadsUpdatesAndPublicQueriesUseCompleteActiveAvailablePublishedInventory(): void
     {
         $service = $this->service();
