@@ -29,9 +29,11 @@ final class BrandingTest extends TestCase
             'password' => getenv('TEST_DB_PASSWORD') ?: 'root',
         ]));
 
-        foreach (['settings', 'users', 'schema_migrations'] as $table) {
+        $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+        foreach (['unit_media', 'units', 'properties', 'settings', 'users', 'schema_migrations'] as $table) {
             $this->pdo->exec(sprintf('DROP TABLE IF EXISTS `%s`', $table));
         }
+        $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
         MigrationRunner::migrate($this->pdo, dirname(__DIR__, 3) . '/database/migrations');
 
         $this->logoDirectory = sys_get_temp_dir() . '/alquila_branding_' . bin2hex(random_bytes(6));
