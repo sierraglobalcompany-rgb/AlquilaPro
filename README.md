@@ -5,10 +5,11 @@ Aplicación web mobile-first y autoinstalable para administrar arrendamientos de
 **Dominio objetivo:** `https://alquilapro.sierraglobalcompany.com`  
 **Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + CSS/JS mínimo  
 **Destino:** Hostinger; subdominio o subcarpeta HTTPS.  
-**Estado actual:** F0–F4 CLOSED / VERIFIED / MERGED; F5 CLOSED / VERIFIED / NOT MERGED.  
+**Estado actual:** F0–F5 CLOSED / VERIFIED / MERGED.  
 **F4 merge SHA:** `3226feeea0b1740659df46fae6499842dfbc894a`.  
-**F5 final product HEAD:** `e47bae4e4873f9c07b5353a2134ea6b95f20b4c6`.  
-**F5 final product CI:** `38292062089` — PHP 8.3/8.4/8.5 PASS; PHP 8.3 `207 tests / 1465 assertions`.
+**F5 merge SHA:** `8511f8f8eb0c086e84c1170940353ff5460da66b`.  
+**F5 final branch HEAD:** `2010920d7bb1f0c854a32ddb22224abba531f408`.  
+**F5 final CI:** `38292601759` — PHP 8.3/8.4/8.5 PASS; PHP 8.3 `207 tests / 1465 assertions`.
 
 ---
 
@@ -19,15 +20,15 @@ Antes de tocar código:
 1. `README.md`;
 2. `docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.2_AUDITADO.md`;
 3. `docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.2_AUDITADO.md`;
-4. `docs/checkpoints/F5_CLOSED_2026-10-12.md` para el estado F5 actual;
-5. `docs/specs/F5_APPLICATIONS_CANDIDATES_REFERENCES_SPEC.md` y `docs/plans/F5_APPLICATIONS_CANDIDATES_REFERENCES_IMPLEMENTATION_PLAN.md` cuando F5/F6 sea relevante;
-6. `docs/checkpoints/F4_MERGED_2026-10-12.md` y `docs/checkpoints/F4_CLOSED_2026-10-12.md` solo para historia F4;
+4. `docs/checkpoints/F5_MERGED_2026-10-12.md` como autoridad de integración F5;
+5. `docs/checkpoints/F5_CLOSED_2026-10-12.md` para evidencia técnica pre-merge;
+6. `docs/specs/F5_APPLICATIONS_CANDIDATES_REFERENCES_SPEC.md` y `docs/plans/F5_APPLICATIONS_CANDIDATES_REFERENCES_IMPLEMENTATION_PLAN.md` cuando F5/F6 sea relevante;
 7. tests y CI reales;
 8. código real del repositorio.
 
 Regla de autoridad:
 
-`SPEC maestra → PLAN maestro → decisiones canónicas README → SPEC/PLAN específica de fase → checkpoint final → tests/CI → código`.
+`SPEC maestra → PLAN maestro → decisiones canónicas README → SPEC/PLAN específica de fase → checkpoint de integración → tests/CI → código`.
 
 V1.1 queda histórica.
 
@@ -65,7 +66,7 @@ Ciclo:
 
 `SCOPE → PRE-KISS → SPEC/DESIGN → PLAN → RED → VERIFY RED → MINIMAL GREEN → VERIFY GREEN → CONVERGE → QA → TWO LAWS GATE → CHECKPOINT → REVIEW → MERGE`.
 
-No merge sin aprobación explícita del usuario.
+No merge sin aprobación explícita del usuario. Regla operativa actual: cuando el usuario diga **“continua”**, autoriza ejecutar el siguiente gate previsto; si la fase ya está CLOSED / VERIFIED / READY, esa continuidad incluye el merge correspondiente.
 
 ---
 
@@ -92,17 +93,19 @@ F4_PR: #7 CLOSED / MERGED
 F4_MERGE_SHA: 3226feeea0b1740659df46fae6499842dfbc894a
 F4_FINAL_CI: 38213578871 — PHP 8.3 / 8.4 / 8.5 PASS — 151 tests / 873 assertions
 
-F5: CLOSED / VERIFIED / NOT MERGED
+F5: CLOSED / VERIFIED / MERGED
 F5_FINAL_PRODUCT_HEAD: e47bae4e4873f9c07b5353a2134ea6b95f20b4c6
-F5_PR: #8 OPEN
-F5_FINAL_PRODUCT_CI: 38292062089 — PHP 8.3 / 8.4 / 8.5 PASS — 207 tests / 1465 assertions
+F5_FINAL_BRANCH_HEAD: 2010920d7bb1f0c854a32ddb22224abba531f408
+F5_PR: #8 CLOSED / MERGED
+F5_MERGE_SHA: 8511f8f8eb0c086e84c1170940353ff5460da66b
+F5_FINAL_CI: 38292601759 — PHP 8.3 / 8.4 / 8.5 PASS — 207 tests / 1465 assertions
 F5_SECURITY_QA: PASS
 F5_VISUAL_QA: PASS
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
 
-CURRENT_GATE: F5 FINAL PR REVIEW / STOP BEFORE MERGE
-NEXT: F6 only after F5 merge authorization + merge
+CURRENT_GATE: F6 — NOT STARTED
+NEXT: F6 SCOPE / PRE-KISS / SPEC / PLAN
 ```
 
 No reimplementar F1–F5. No reabrir una fase certificada sin evidencia de regresión o una nueva SPEC aprobada.
@@ -183,7 +186,7 @@ Owner conserva bypass.
 
 # 6. RESULTADO F5
 
-F5 quedó implementada y verificada, pendiente únicamente de merge autorizado, con:
+F5 quedó implementada, verificada y mergeada con:
 
 - candidato único candidate-centric; no `lead` ni `application` paralelo;
 - +4 tablas exactas: `candidates`, `candidate_references`, `unit_application_requirements`, `candidate_documents`;
@@ -211,7 +214,8 @@ F5 quedó implementada y verificada, pendiente únicamente de merge autorizado, 
 - LEY 1 KISS PASS;
 - LEY 2 CERO RUIDO PASS.
 
-Checkpoint canónico: `docs/checkpoints/F5_CLOSED_2026-10-12.md`.
+Checkpoint técnico: `docs/checkpoints/F5_CLOSED_2026-10-12.md`.  
+Checkpoint de integración: `docs/checkpoints/F5_MERGED_2026-10-12.md`.
 
 ---
 
@@ -222,8 +226,8 @@ Checkpoint canónico: `docs/checkpoints/F5_CLOSED_2026-10-12.md`.
 - F2 — Auth + usuarios + permisos ✅
 - F3 — Shell móvil + sistema visual ✅
 - F4 — Propiedades + unidades + landing + catálogo público ✅ CLOSED / VERIFIED / MERGED
-- F5 — Aplicaciones + candidatos + referencias ✅ **CLOSED / VERIFIED / NOT MERGED**
-- **F6 — Aseguradora/SURA — BLOCKED hasta merge autorizado de F5**
+- F5 — Aplicaciones + candidatos + referencias ✅ **CLOSED / VERIFIED / MERGED**
+- **F6 — Aseguradora/SURA — NEXT / NOT STARTED**
 - F7 — Contratos
 - F8 — Inquilino + lease + portal usando auth único
 - F9 — Cargos + cartera
@@ -251,23 +255,25 @@ Checkpoint canónico: `docs/checkpoints/F5_CLOSED_2026-10-12.md`.
 
 Al retomar trabajo:
 
-1. verificar `main`, HEAD y PR reales;
-2. leer `docs/checkpoints/F5_CLOSED_2026-10-12.md`;
-3. confirmar que PR #8 no fue mergeado o, si fue autorizado y mergeado, registrar el merge SHA antes de abrir F6;
-4. no reabrir contratos F5 certificados sin evidencia;
-5. F6 debe extender el mismo candidato desde `pending_screening`, no copiarlo a una entidad paralela;
-6. mantener KISS + Cero Ruido + TDD por microfases.
+1. verificar `main` y HEAD reales;
+2. leer `docs/checkpoints/F5_MERGED_2026-10-12.md`;
+3. leer SPEC/PLAN maestra V1.2 para el alcance exacto de F6;
+4. ejecutar PRE-KISS antes de diseñar F6;
+5. extender el mismo candidato desde `pending_screening`, sin copiarlo a una entidad paralela;
+6. crear SPEC/PLAN específica de F6 solo si elimina ambigüedad real;
+7. mantener KISS + Cero Ruido + TDD por microfases;
+8. no reabrir F5 sin evidencia.
 
 ---
 
 # 9. GATE ACTUAL
 
 ```text
-LAST_PHASE: F5 CLOSED / VERIFIED / NOT MERGED
-F5_FINAL_PRODUCT_HEAD: e47bae4e4873f9c07b5353a2134ea6b95f20b4c6
-F5_FINAL_PRODUCT_CI: 38292062089
-PR: #8 OPEN
-MERGE_ALLOWED: NO
-NEXT_PHASE: F6 — BLOCKED
-NEXT_ACTION: FINAL PR REVIEW -> READY FOR REVIEW IF CLEAN -> STOP BEFORE MERGE
+LAST_PHASE: F5 CLOSED / VERIFIED / MERGED
+F5_MERGE_SHA: 8511f8f8eb0c086e84c1170940353ff5460da66b
+F5_FINAL_CI: 38292601759
+PR: #8 CLOSED / MERGED
+NEXT_PHASE: F6 — ASEGURADORA / SURA
+F6_STATUS: NOT STARTED
+NEXT_ACTION: SCOPE → PRE-KISS → SPEC/DESIGN → PLAN
 ```
