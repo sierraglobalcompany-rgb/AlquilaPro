@@ -7,6 +7,8 @@
 **Base:** `main` @ `648401a4927bfeb7525421a4edd2b5f2c60f06c4`  
 **PR:** `#8` OPEN / DRAFT / NOT MERGED
 
+> Regla documental: este checkpoint no auto-incrusta el SHA de su propio commit final, porque hacerlo crea un nuevo commit y vuelve obsoleto el SHA escrito. El HEAD exacto y su CI se consultan en GitHub/PR #8. El checkpoint sí conserva los SHAs y runs de producto/evidencia ya cerrados.
+
 ---
 
 ## 1. ESTADO
@@ -220,30 +222,12 @@ Resultado:
 - los 7 tests `CandidateService` pasan;
 - regresión F1-F4 + F5.1 completa verde.
 
-### CHECKPOINT CERTIFICADO PREVIO
+### Evidencia documental previa
 
-Commit: `b4904bb0f3f5b4c52c8669850b178ee9f08dc86f`  
-CI: `38265367655`
+- checkpoint `b4904bb0f3f5b4c52c8669850b178ee9f08dc86f` — CI `38265367655` — PHP 8.3/8.4/8.5 PASS;
+- checkpoint `89901bc4253d391901dff621a2d74dc667638b86` — CI `38265599227` — PHP 8.3/8.4/8.5 PASS.
 
-Resultado:
-
-- PHP 8.3: PASS;
-- PHP 8.4: PASS;
-- PHP 8.5: PASS;
-- Composer validate --strict: PASS en la matriz.
-
-### HEAD FINAL DE CIERRE
-
-Commit: `89901bc4253d391901dff621a2d74dc667638b86`  
-CI: `38265599227`
-
-Resultado:
-
-- PHP 8.3: PASS;
-- PHP 8.4: PASS;
-- PHP 8.5: PASS;
-- Composer validate --strict: PASS en la matriz;
-- no hubo cambios de producto después de `511dc595b8265794f19dd3b5a04fef1ceaa62d36`.
+El HEAD exacto actual no se auto-registra en este archivo; debe tomarse del branch/PR y su workflow asociado para evitar el ciclo documental descrito al inicio.
 
 ---
 
