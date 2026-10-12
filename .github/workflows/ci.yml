@@ -54,4 +54,4 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress
 
       - name: Run tests
-        run: vendor/bin/phpunit --testdox --display-warnings
+        run: vendor/bin/phpunit --testdox
