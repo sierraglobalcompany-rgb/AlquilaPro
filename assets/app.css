@@ -19,7 +19,7 @@
 * { box-sizing: border-box; }
 html { background: var(--color-background); color: var(--color-text); }
 body { margin: 0; background: var(--color-background); color: var(--color-text); }
-a { color: var(--brand-primary); }
+a { color: var(--brand-primary); overflow-wrap: anywhere; }
 button, input, select, textarea { font: inherit; }
 button, input, select, textarea, a { -webkit-tap-highlight-color: transparent; }
 button, input, select, textarea { min-height: 44px; }
