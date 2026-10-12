@@ -61,6 +61,28 @@ final class CandidatesSchemaTest extends TestCase
         }
     }
 
+    public function testF5CandidateTablesHaveExactColumns(): void
+    {
+        self::assertSame([
+            'id', 'unit_id', 'document_type', 'document_number', 'full_name', 'birth_date', 'phone', 'email',
+            'current_address', 'employment_status', 'employer_name', 'occupation', 'monthly_income', 'employment_notes',
+            'occupants_count', 'occupants_notes', 'pets_declared', 'pets_notes', 'status', 'continuation_token_hash',
+            'continuation_token_expires_at', 'consent_at', 'submitted_at', 'created_at', 'updated_at',
+        ], $this->columns('candidates'));
+
+        self::assertSame([
+            'id', 'candidate_id', 'reference_type', 'name', 'relationship', 'phone', 'email', 'created_at', 'updated_at',
+        ], $this->columns('candidate_references'));
+
+        self::assertSame([
+            'id', 'unit_id', 'code', 'label', 'description', 'is_required', 'is_active', 'sort_order', 'created_at', 'updated_at',
+        ], $this->columns('unit_application_requirements'));
+
+        self::assertSame([
+            'id', 'candidate_id', 'requirement_id', 'stored_name', 'original_name', 'mime_type', 'size_bytes', 'created_at', 'updated_at',
+        ], $this->columns('candidate_documents'));
+    }
+
     public function testCandidateIdentityAndTokenHashAreUnique(): void
     {
         $uniqueIndexes = $this->uniqueIndexColumns('candidates');
@@ -118,6 +140,18 @@ final class CandidatesSchemaTest extends TestCase
         $statement->execute(['table' => $table]);
 
         return (int) $statement->fetchColumn();
+    }
+
+    /** @return list<string> */
+    private function columns(string $table): array
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT column_name FROM information_schema.columns '
+            . 'WHERE table_schema = DATABASE() AND table_name = :table ORDER BY ordinal_position',
+        );
+        $statement->execute(['table' => $table]);
+
+        return array_values(array_map('strval', $statement->fetchAll(PDO::FETCH_COLUMN)));
     }
 
     /** @return list<string> */
