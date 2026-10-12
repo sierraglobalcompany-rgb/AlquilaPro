@@ -1,4 +1,4 @@
-# F5 CURRENT CHECKPOINT — F5.4 CLOSED / VERIFIED
+# F5 CURRENT CHECKPOINT — F5.5 CLOSED / VERIFIED
 
 **Fecha:** 2026-10-12 (America/Bogota)  
 **Proyecto:** Alquila Pro  
@@ -7,9 +7,9 @@
 **Base:** `main` @ `648401a4927bfeb7525421a4edd2b5f2c60f06c4`  
 **PR:** `#8` OPEN / DRAFT / NOT MERGED
 
-> El SHA del commit que contiene este archivo no se auto-incrusta para evitar ciclos documentales. Consultar el HEAD del branch/PR y su CI exacto.
+> El SHA del commit documental que contiene este archivo no se auto-incrusta. El producto F5.5 certificado termina en `4907bf6e16d3c51190fd582cd3c5d136461ff3bc`; su CI exacto es `38287467062`.
 
-## 1. Estado
+## 1. Estado canónico
 
 ```text
 F0-F4: CLOSED / VERIFIED / MERGED
@@ -19,220 +19,230 @@ F5.1_SCHEMA_PERMISSIONS: CLOSED / VERIFIED
 F5.2_CANDIDATE_CORE_TOKEN: CLOSED / VERIFIED
 F5.3_PUBLIC_START_CONTINUE: CLOSED / VERIFIED
 F5.4_PROFILE_REFERENCES_UNIT_CHANGE: CLOSED / VERIFIED
-F5.5_STRUCTURED_REQUIREMENTS_PRIVATE_DOCUMENTS: NOT STARTED
-F5.6-F5.8: NOT STARTED
+F5.5_STRUCTURED_REQUIREMENTS_PRIVATE_DOCUMENTS: CLOSED / VERIFIED
+F5.6_ADMIN_CANDIDATES: NOT STARTED
+F5.7_CATALOG_CTA_LIFECYCLE: NOT STARTED
+F5.8_HARDENING_CLOSURE: NOT STARTED
 PR_READY: NO
 MERGE_ALLOWED: NO
 ```
 
-No abrir F5.5 sin reconfirmar este checkpoint, HEAD, PR #8 y CI.
+No abrir F5.7 antes de cerrar F5.6. Mantener PR Draft. **NO MERGEAR sin aprobación humana explícita.**
 
-## 2. Autoridad y leyes
+## 2. Leyes y método
 
-Autoridad: README → SPEC maestro V1.2 → PLAN maestro V1.2 → SPEC F5 → decisión F5 de identidad/privacidad/estados → PLAN F5 → checkpoint → tests/CI → código real.
+Autoridad: README → SPEC maestro → PLAN maestro → SPEC F5 → PLAN F5 → checkpoint → tests/CI → código real.
 
-Leyes:
-- LEY 1 KISS.
-- LEY 2 CERO RUIDO / CONVERGENCIA.
-- RED antes de GREEN.
-- No merge sin aprobación humana explícita.
+- **LEY 1 — KISS:** simple, directo, eficiente, sin arquitectura anticipatoria.
+- **LEY 2 — CERO RUIDO / CONVERGENCIA:** eliminar ruido probado; luego unir/simplificar/mejorar antes de añadir.
+- TDD obligatorio: RED → RED verificado → GREEN mínimo → GREEN completo → Cero Ruido → checkpoint.
+- No repositories/DTO/factories/interfaces sin necesidad probada.
+- No merge sin autorización humana explícita.
 
-## 3. F5.1–F5.3 ya cerradas
+## 3. F5.1–F5.4
 
-### F5.1
-- exactamente +4 tablas: `candidates`, `candidate_references`, `unit_application_requirements`, `candidate_documents`;
-- exactamente +2 permisos: `candidates.view`, `candidates.manage`;
-- sin lead/application paralelo, segundo auth/session, npm o dependencias nuevas;
-- GREEN `a9449e8f87c345e6baafeda9bd26a5aa8f86b882`;
-- CI `38263081173` PASS PHP 8.3/8.4/8.5;
-- PHP 8.3: 157 tests / 905 assertions.
+Permanecen CLOSED / VERIFIED. F5.5 no cambió sus contratos canónicos: una sola entidad `candidates`, mismas cuatro tablas F5, exactamente dos permisos (`candidates.view`, `candidates.manage`), mismo auth/session, misma publicabilidad F4, mismo `CandidateService`.
 
-### F5.2
-- un solo `CandidateService`;
-- token raw 64 hex, solo SHA-256 persistido, TTL 7 días, expiración fail-closed;
-- identidad normalizada/inmutable, duplicado genérico;
-- candidato nuevo solo sobre unidad publicable; candidato existente puede continuar tras despublicación;
-- estados exactos `new|incomplete|verification|pending_screening|withdrawn`;
-- submit público es el camino a `verification`; `withdrawn` terminal;
-- GREEN `511dc595b8265794f19dd3b5a04fef1ceaa62d36`;
-- CI `38264989604` PASS PHP 8.3/8.4/8.5;
-- PHP 8.3: 164 tests / 968 assertions.
+## 4. F5.5 — alcance cerrado
 
-### F5.3
-Rutas públicas:
-```text
-GET  /apply/{publicKey}
-POST /apply/{publicKey}
-GET  /apply/continue/{token}
-POST /apply/continue/{token}
-```
-Contratos: publicabilidad F4 reutilizada, CSRF global, basePath, token raw sin candidate ID/hash, duplicado genérico, aislamiento por token y throttle V1 por sesión (start 5/10min; continue 10/10min; 429 sin mutación).
+Segundo y último servicio F5 permitido:
 
-RED `c1fab238ecc4cc5c172ab9f36f1941ecd3758734` / CI `38270416673`: 172 tests / 980 assertions / 8 failures esperados.  
-GREEN producto `544d6c6f15a926a4b28d004bd32b5075aa9f2fcd` / CI `38271564490`: PASS 8.3/8.4/8.5, 172 tests / 1050 assertions en PHP 8.3.  
-Checkpoint F5.3 `4b29a9a639b1ab3af9ecfc977abaa948b0270afb` / CI `38271890830`: PASS 8.3/8.4/8.5.
-
-## 4. F5.4 — alcance cerrado
-
-Solo cambiaron los archivos previstos por el PLAN:
-- `app/Candidates/CandidateService.php`;
-- `app/Candidates/routes.php`;
-- `resources/views/public_candidate_continue.php`;
-- `tests/Integration/Candidates/CandidateReferencesTest.php`;
-- `tests/Integration/Candidates/CandidateServiceTest.php`.
-
-No cambió schema, bootstrap, CSS/JS, Composer/npm, permisos, F4 ni almacenamiento documental. No se creó `CandidateReferenceService`, segunda entidad de aplicación, CRUD público por reference ID ni historial de cambios de unidad.
-
-## 5. Perfil ampliado
-
-`updateByToken()` ahora valida/persiste:
-- `monthly_income`: opcional, numérico, >= 0 y dentro de `DECIMAL(12,2)`;
-- `occupants_count`: opcional, entero >= 0 y compatible con `SMALLINT UNSIGNED`;
-- `occupants_notes`;
-- `pets_declared`: boolean estricto;
-- `pets_notes`;
-- campos base/laborales previos.
-
-Guardado público válido: `new -> incomplete`; `incomplete` permanece `incomplete`. Estados no editables continúan bloqueados. La regla laboral F5.2 sigue activa en submit.
-
-## 6. Referencias 0..N
-
-Método añadido en el mismo servicio:
 ```php
-replaceReferencesByToken(string $rawToken, array $references, int $now)
+CandidateDocumentService
 ```
 
-Contrato:
-- cero, una o múltiples referencias;
-- fila completamente vacía se ignora;
-- referencia real exige `name + phone`;
-- `reference_type`, `relationship`, `email` opcionales;
-- email opcional validado/normalizado;
-- conjunto completo validado antes de mutar;
-- reemplazo transaccional;
-- error conserva el conjunto previo;
-- superficie pública sin reference IDs;
-- `findByToken()` devuelve referencias solo con `reference_type`, `name`, `relationship`, `phone`, `email`.
+Responsabilidades cerradas:
+- requisitos estructurados por unidad;
+- código único por unidad, inmutable y route-safe (`A-Z`, `a-z`, `0-9`, `_`, `-`, máximo 80); no se fuerza minúscula;
+- label/description/required/active/order editables;
+- reorder exige conjunto exacto perteneciente a la unidad;
+- requisitos no se eliminan físicamente en F5: se inactivan;
+- documentos PDF/JPEG/PNG, máximo 10 MiB;
+- MIME real con `finfo`;
+- nombre físico generado por servidor;
+- almacenamiento privado fuera de webroot;
+- una fila por candidate+requirement, con reemplazo seguro;
+- requisito de upload debe estar activo y pertenecer a la unidad actual del candidato;
+- `privateDocument()` valida ownership, existencia física, MIME y tamaño persistidos;
+- submit final exige todos los requisitos actuales `required + active` con archivos físicamente válidos;
+- requisito opcional/inactivo no bloquea;
+- despublicar la unidad no bloquea al candidato ya creado.
 
-Ruta añadida:
+## 5. B01 — validez física en submit — CLOSED / VERIFIED
+
+Hueco demostrado: una fila documental en DB podía satisfacer submit aunque el archivo físico hubiera sido borrado o manipulado.
+
+RED añadió casos de archivo borrado y archivo manipulado. GREEN reutilizó `CandidateDocumentService::privateDocument()` desde `CandidateService::assertDocumentCompleteness()`; no se duplicó lógica de filesystem/MIME.
+
+Se corrigió el fixture para que guardado y validación compartieran **la misma instancia real** de `CandidateDocumentService`, evitando un falso GREEN por storage distinto.
+
+CI final B01: `38284137434` — PASS PHP 8.3/8.4/8.5.  
+PHP 8.3: **185 tests / 1206 assertions**.
+
+## 6. B02 — requirementCode route-safe — CLOSED / VERIFIED
+
+La SPEC no imponía slug lowercase. Se evitó inventar esa política.
+
+Contrato mínimo derivado de la URL pública:
+
 ```text
-POST /apply/continue/{token}/references
+[A-Za-z0-9_-]+
+longitud <= 80
 ```
-Reutiliza CSRF global, basePath y bucket de throttle `continue`.
 
-## 7. Cambio controlado de unidad
+El mismo validador privado se reutiliza en creación, comprobación de inmutabilidad y upload. Sin nueva clase/capa.
 
-Método añadido:
+CI final B02: `38284901149` — PASS PHP 8.3/8.4/8.5.  
+PHP 8.3: **186 tests / 1213 assertions**.
+
+## 7. B03 — bootstrap, rutas y UI — CLOSED / VERIFIED
+
+Se mantuvieron las piezas existentes; no se creó un segundo route file ni pantalla paralela.
+
+Bootstrap:
+- `candidate_document_directory` con default `storage/candidate-documents`;
+- una única instancia `CandidateDocumentService($pdo, $candidateDocumentDirectory)`;
+- esa misma instancia se inyecta en `CandidateService` y rutas.
+
+Rutas F5.5 añadidas al mismo `app/Candidates/routes.php`:
+
+```text
+POST /admin/units/{id}/application-requirements
+POST /admin/units/{id}/application-requirements/{requirementId}
+POST /admin/units/{id}/application-requirements/order
+POST /apply/continue/{token}/documents/{requirementCode}
+POST /apply/continue/{token}/submit
+```
+
+Contratos verificados:
+- mutaciones de requisitos requieren `candidates.manage`;
+- CSRF y forced-password gate existentes se reutilizan;
+- requisitos viven dentro del `unit_detail.php` existente;
+- no existe acción/método de delete físico para requisitos;
+- continuación pública muestra solo requisitos activos y estado documental, sin IDs internos;
+- upload usa `requirementCode`, no requirement ID;
+- upload reutiliza bucket throttle `continue`;
+- basePath/subfolder preservado;
+- submit reutiliza `CandidateService::submitByToken()`;
+- candidate-only (`candidates.manage`) puede administrar requisitos sin heredar información/media F4;
+- `properties.view` conserva su visibilidad F4 histórica.
+
+La separación de permisos quedó cerrada con una corrección GREEN de **una sola línea** en `app/Properties/routes.php`:
+
 ```php
-changeUnitByToken(string $rawToken, string $publicKey, int $now)
+'canViewPropertyDetails' => Permissions::allows($user, 'properties.view'),
 ```
 
-Permitido solo si simultáneamente:
+Producto certificado F5.5: `4907bf6e16d3c51190fd582cd3c5d136461ff3bc`.
+
+## 8. TDD B03 / superficie de rutas
+
+RED inicial de rutas/UI: `e89bdc1e59a202c9e7c5d9c3de69fbbdfbc4fb3e`.  
+CI `38285422700`: PHP 8.3 **191 tests / 1231 assertions / 5 failures**, exactamente por la superficie F5.5 ausente; regresión previa verde.
+
+El test de integración de rutas/UI se dejó en archivo único:
+
 ```text
-status = new|incomplete
-submitted_at IS NULL
-candidate_documents = 0
-target publicKey actualmente publicable
+tests/Integration/Candidates/CandidateDocumentsRoutesTest.php
 ```
 
-La publicabilidad reutiliza `PropertyService::findPublicUnit()`. El servidor resuelve el ID interno; se actualiza únicamente la misma fila `candidate.unit_id`; no se crea segundo candidato ni historial paralelo.
+**Ruling KISS:** el PLAN nombraba `CandidateDocumentsTest.php`/`CandidateServiceTest.php`, pero mezclar autorización/SSR/rutas en el test de dominio o en pruebas F4 aumentaba acoplamiento. Se creó un único test de integración F5.5 para la superficie HTTP; no produjo arquitectura de producto adicional.
 
-Ruta añadida:
+Un assertion antiguo esperaba `404` para una ruta delete inexistente. Eso era un contrato de test incorrecto porque el error handler global convierte rutas no encontradas en 500. No se añadió ruta delete ni se cambió error handling: el contrato correcto verifica ausencia de `/delete` en UI y ausencia de `deleteRequirement()` en el servicio.
+
+RED final de privacidad/permisos: `fd2c9676f056671480a03bb11b6b620d94f8c364`.  
+PHP 8.3: **192 tests / 1295 assertions / 1 failure**, únicamente porque `properties.view` había perdido la visibilidad F4 al no recibir la bandera explícita.
+
+GREEN final: `4907bf6e16d3c51190fd582cd3c5d136461ff3bc`.
+
+## 9. Certificación final F5.5
+
+CI producto: `38287467062`
+
 ```text
-POST /apply/continue/{token}/unit
+PHP 8.3: PASS — 192 tests / 1298 assertions
+PHP 8.4: PASS
+PHP 8.5: PASS
+Composer validate --strict: PASS
+SecurityBoundary: PASS
+Failures: 0
+Errors: 0
 ```
-La vista usa `public_key`, nunca unit ID interno.
 
-## 8. SSR / privacidad
-
-La misma `public_candidate_continue.php` ahora contiene perfil ampliado, referencias y selector de unidad. Todos los valores dinámicos se escapan. No expone candidate ID, reference ID, continuation hash ni storage path. No se agregó CSS ni JS.
-
-## 9. TDD F5.4
-
-### RED
-Commit: `01159acb731705ab18b850be3253da23bf05f635`  
-CI: `38273121352`
-
-PHP 8.3:
-- 176 tests / 1051 assertions;
-- 1 failure + 3 errors;
-- exactamente por F5.4 ausente: promoción `new -> incomplete`, referencias, cambio de unidad y superficie SSR/rutas dependiente de referencias;
-- F1-F5.3 permanecieron verdes.
-
-### GREEN inicial
-HEAD `a368460feb628207e8d186019221d9337a51ba3f`  
-CI `38273634863`
-- PHP 8.3/8.4/8.5 PASS;
-- Composer validate --strict PASS;
-- PHP 8.3: 176 tests / 1114 assertions / 0 failures / 0 errors.
-
-### GREEN final de conformidad PLAN
-El PLAN exige también extender `CandidateServiceTest.php`. Se añadió una caracterización mínima que comprueba que `findByToken()` entrega referencias sin `id` ni `candidate_id`.
-
-Producto/test final F5.4: `471c92d47a568a720dd3606e9455a39ec51a75ed`  
-CI: `38273953538`
-- PHP 8.3 PASS;
-- PHP 8.4 PASS;
-- PHP 8.5 PASS;
-- Composer validate --strict PASS;
-- PHP 8.3: **177 tests / 1121 assertions / 0 failures / 0 errors**.
+Warnings de MariaDB `io_uring` y deprecación de Node 20 en `actions/checkout@v4` son ruido de runner y no fallos de producto.
 
 ## 10. Two Laws / Cero Ruido
 
-Compare `4b29a9a639b1ab3af9ecfc977abaa948b0270afb...471c92d47a568a720dd3606e9455a39ec51a75ed` confirmó exactamente 5 archivos efectivos, todos previstos por F5.4.
+Delta efectivo F5.5 desde el checkpoint de dominio `23ef4428eabac458297445c21efd7116f06b08c2` hasta producto `4907bf6e...`:
+
+```text
+NEW_TABLES_F5.5: 0
+NEW_SERVICES_F5.5: 0 adicionales fuera del CandidateDocumentService ya previsto
+TOTAL_F5_SERVICES: 2
+NEW_ROUTE_FILES_F5.5: 0
+NEW_PRODUCT_VIEWS_F5.5: 0
+DEPENDENCIES_DELTA: 0
+NPM_DELTA: 0
+CSS_JS_DELTA: 0
+SECOND_AUTH_OR_SESSION: NO
+REPOSITORY_DTO_FACTORY_INTERFACE_DELTA: 0
+PUBLIC_STORAGE_DIRECT_SERVING: NO
+PARALLEL_APPLICATION_ENTITY: NO
+PHYSICAL_REQUIREMENT_DELETE: NO
+INTERNAL_IDS_IN_PUBLIC_DOCUMENT_ROUTES: NO
+```
+
+Archivos de producto tocados para cerrar wiring/guardrails F5.5:
+- `app/Candidates/CandidateDocumentService.php`
+- `app/Candidates/CandidateService.php`
+- `app/Candidates/routes.php`
+- `app/Properties/routes.php`
+- `bootstrap/app.php`
+- `resources/views/unit_detail.php`
+- `resources/views/public_candidate_continue.php`
+
+Conclusión:
 
 ```text
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
-NEW_TABLES_F5.4: 0
-NEW_SERVICES_F5.4: 0
-NEW_ROUTE_FILES_F5.4: 0
-NEW_VIEWS_F5.4: 0
-BOOTSTRAP_DELTA_F5.4: 0
-CSS_JS_DELTA_F5.4: 0
-DEPENDENCIES_DELTA: 0
-NPM_DELTA: 0
-SECOND_AUTH_OR_SESSION: NO
-REFERENCE_PUBLIC_IDS: NO
-PARALLEL_APPLICATION_ENTITY: NO
-UNIT_CHANGE_HISTORY_TABLE: NO
-DOCUMENT_RUNTIME_EARLY: NO
-PUBLICABILITY_DUPLICATION: NO
+F5.5: CLOSED / VERIFIED
 ```
 
-Hasta F5.4 solo existe `CandidateService`. El único segundo servicio permitido, `CandidateDocumentService`, sigue reservado para F5.5.
+## 11. Deuda explícita reservada para F5.8
 
-## 11. PR / gobernanza
+No mezclar con F5.5 sin RED:
 
-PR #8 debe permanecer OPEN / DRAFT / NOT MERGED. No marcar Ready: F5.5-F5.8 siguen abiertas. Merge no autorizado.
+`bootstrap/app.php` registra la ruta completa en errores no manejados. Las rutas `/apply/continue/{token}` contienen el token raw de capacidad; una excepción no manejada podría incluirlo en logs.
 
-## 12. Próximo gate — F5.5 NOT STARTED
+La SPEC exige no revelar token/hash. Este hallazgo queda como gate de hardening F5.8. No fue necesario debilitar ni ampliar F5.5 para cerrarlo.
 
-**F5.5 — Structured Requirements + Private Candidate Documents**.
+## 12. Próximo gate — F5.6
 
-Orden al retomar:
-1. reconfirmar HEAD / PR #8 / CI del checkpoint;
-2. releer PLAN/SPEC F5.5;
-3. RED en `CandidateDocumentsTest.php` + extensión focal de `CandidateServiceTest.php`;
-4. verificar RED antes de producción;
-5. crear el único segundo servicio permitido: `CandidateDocumentService`;
-6. reutilizar tablas F5 existentes; no crear tablas nuevas;
-7. requisitos estructurados por unidad;
-8. documentos privados ligados a candidate + requirement;
-9. validar MIME real, tamaño y nombre almacenado generado por servidor;
-10. no servir `storage/` directamente;
-11. descarga privada debe validar par candidate/document;
-12. ampliar el mismo `app/Candidates/routes.php` y wiring mínimo;
-13. ampliar `unit_detail.php` y `public_candidate_continue.php` solo lo necesario;
-14. CI PHP 8.3/8.4/8.5 + Cero Ruido + checkpoint;
-15. no abrir F5.6 hasta F5.5 CLOSED / VERIFIED.
+**F5.6 — Administrative Candidates Module**.
 
-Guardrails F5.5:
-- máximo dos servicios F5 totales;
-- no repositories/DTO/factories/interfaces;
-- no almacenamiento público directo;
-- no IDs internos en URLs públicas de candidato;
-- no tercera tabla documental;
-- no queue/cloud-storage abstraction sin necesidad probada;
-- PR #8 sigue Draft;
-- **NO MERGEAR sin aprobación humana explícita**.
+Rutas planificadas:
+
+```text
+GET  /admin/candidates
+GET  /admin/candidates/{id}
+POST /admin/candidates/{id}/status
+POST /admin/candidates/{id}/token/regenerate
+GET  /admin/candidates/{id}/documents/{documentId}
+```
+
+Orden obligatorio:
+1. RED de autorización y SSR;
+2. RED IDOR de documento privado;
+3. RED regeneración de token;
+4. verificar RED;
+5. GREEN mínimo sobre `CandidateService`, `CandidateDocumentService`, mismo `app/Candidates/routes.php` y dos vistas admin previstas;
+6. `candidates.view` para list/detail/document read;
+7. `candidates.manage` para status/token regenerate;
+8. owner bypass, CSRF, forced-password y basePath existentes;
+9. admin NO puede simular submit/completitud para forzar `verification`;
+10. focal + auth/shell regression + CI 8.3/8.4/8.5;
+11. Cero Ruido + checkpoint;
+12. no abrir F5.7 antes de cerrar F5.6.
+
+PR #8 permanece **OPEN / DRAFT / NOT MERGED**. **NO MERGEAR sin aprobación humana explícita.**
