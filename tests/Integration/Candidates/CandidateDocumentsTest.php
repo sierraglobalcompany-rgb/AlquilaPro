@@ -111,6 +111,30 @@ final class CandidateDocumentsTest extends TestCase
         self::assertSame([1, 2], array_column($ordered, 'sort_order'));
     }
 
+    public function testRequirementCodeMustBeRouteSafeMachineKey(): void
+    {
+        $unit = $this->seedUnit(str_repeat('5', 24), 'DOC-K');
+        $service = $this->documents();
+
+        foreach (['identity proof', 'identity/proof', 'identity?proof', 'identity#proof', '../identity'] as $invalidCode) {
+            try {
+                $service->createRequirement($unit['id'], [
+                    'code' => $invalidCode,
+                    'label' => 'Inválido',
+                ]);
+                self::fail('Requirement code must be safe for one public route segment.');
+            } catch (RuntimeException $exception) {
+                self::assertStringContainsString('código', mb_strtolower($exception->getMessage()));
+            }
+        }
+
+        $valid = $service->createRequirement($unit['id'], [
+            'code' => 'INCOME_proof-2026',
+            'label' => 'Válido',
+        ]);
+        self::assertSame('INCOME_proof-2026', $valid['code']);
+    }
+
     public function testPdfJpegAndPngUploadsUseRealMimeGeneratedNamesAndSafeReplacement(): void
     {
         $unit = $this->seedUnit(str_repeat('c', 24), 'DOC-C');
@@ -496,7 +520,7 @@ final class CandidateDocumentsTest extends TestCase
     private function jpegBytes(): string
     {
         $bytes = base64_decode(
-            '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABD/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/EH//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/EH//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/EH//2Q==',
+            '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABD/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/EH//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/EH//xAAUEAEAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABD/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/EH//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/EH//xAAUEAEAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxB//9k=',
             true,
         );
         self::assertIsString($bytes);
