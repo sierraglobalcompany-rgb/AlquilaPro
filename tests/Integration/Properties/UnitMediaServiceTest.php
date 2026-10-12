@@ -79,6 +79,53 @@ final class UnitMediaServiceTest extends TestCase
         self::assertSame($this->mediaDirectory . '/' . $media['stored_name'], $private['path']);
     }
 
+    public function testPublicPhotoDisappearsWhenPublishedUnitLosesCompleteness(): void
+    {
+        $properties = new PropertyService($this->pdo);
+        $property = $properties->createProperty([
+            'name' => 'Propiedad pública',
+            'address' => 'Calle 1 # 2-3',
+            'city' => 'Medellín',
+        ]);
+        $unit = $properties->createUnit($property['id'], [
+            'type' => 'apartment',
+            'code' => 'A-PUBLIC',
+            'status' => 'available',
+            'monthly_price' => 1800000,
+            'description' => 'Apartamento listo para publicar',
+            'requirements' => 'Ingresos demostrables',
+        ]);
+
+        $service = $this->service();
+        $media = $service->addPhoto(
+            $unit['id'],
+            $this->upload($this->pngBytes(), 'public.png', 'image/png'),
+        );
+
+        $properties->updateUnit($unit['id'], [
+            'type' => 'apartment',
+            'code' => 'A-PUBLIC',
+            'status' => 'available',
+            'monthly_price' => 1800000,
+            'description' => 'Apartamento listo para publicar',
+            'requirements' => 'Ingresos demostrables',
+            'is_public' => 1,
+        ]);
+        self::assertNotNull($service->publicPhoto($media['id']));
+
+        $properties->updateUnit($unit['id'], [
+            'type' => 'apartment',
+            'code' => 'A-PUBLIC',
+            'status' => 'available',
+            'monthly_price' => null,
+            'description' => 'Apartamento listo para publicar',
+            'requirements' => 'Ingresos demostrables',
+        ]);
+
+        self::assertFalse($properties->isUnitPublicable($unit['id']));
+        self::assertNull($service->publicPhoto($media['id']));
+    }
+
     public function testPhotoRejectsNoFileSvgPhpBytesAndOversizedPayloadWithoutRowsOrFiles(): void
     {
         $unitId = $this->unitId();
