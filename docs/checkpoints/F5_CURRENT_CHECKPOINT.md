@@ -220,6 +220,19 @@ Resultado:
 - los 7 tests `CandidateService` pasan;
 - regresión F1-F4 + F5.1 completa verde.
 
+### CHECKPOINT EXACTO
+
+Commit: `b4904bb0f3f5b4c52c8669850b178ee9f08dc86f`  
+CI: `38265367655`
+
+Resultado:
+
+- PHP 8.3: PASS;
+- PHP 8.4: PASS;
+- PHP 8.5: PASS;
+- Composer validate --strict: PASS en la matriz;
+- checkpoint documental certificado sobre el mismo producto GREEN.
+
 ---
 
 ## 9. F5.2 TWO LAWS GATE
