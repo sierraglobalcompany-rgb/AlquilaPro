@@ -31,7 +31,7 @@
 
 ## Review Focus
 
-1. **Publication race/incomplete content:** toggling `is_public` on an available unit without price, description, requirements or photo must be rejected and must not leak into `/catalog`.
+1. **Publication race/incomplete content:** setting `is_public=1` on an available unit without price, description, requirements or photo must be rejected without persisting the public flag and must not leak into `/catalog`.
 2. **Cross-property parking link:** a parking unit must never link to an apartment from another property or to a non-apartment unit.
 3. **Media authorization drift:** a previously public photo must become 404 immediately when property/unit publication conditions cease to hold; no stale direct media access.
 4. **Multipart edge cases:** `UPLOAD_ERR_NO_FILE`, misleading filename/MIME, SVG/PHP bytes, oversized file and DB failure after moving a file must not leave orphan files/rows.
@@ -46,7 +46,7 @@
 - `database/migrations/004_create_properties_units_media.sql` — only F4 schema.
 - `app/Properties/PropertyService.php` — property/unit validation, persistence, publication predicate, private/public reads.
 - `app/Properties/UnitMediaService.php` — photo/video-link lifecycle and filesystem safety.
-- `app/Properties/routes.php` — all F4 public/private routes.
+- `app/Properties/routes.php` — all F4 public/private routes and the sole installed `GET /` route.
 - `resources/views/layouts/public.php` — lightweight public shell reusing F3 assets/tokens.
 - `resources/views/public_home.php` — public landing.
 - `resources/views/catalog.php` — public browse/filter cards.
@@ -65,9 +65,8 @@
 - `app/Auth/Permissions.php` — add only `properties.view`, `properties.manage`.
 - `app/UI/View.php` — add `renderPublic(string $view, array $data = []): string` using existing branding/base path.
 - `resources/views/layouts/app.php` — add Propiedades to Apps only when current user is authorized and real route exists.
-- `resources/views/layouts/auth.php` — no behavior split; only reuse if public header needs existing branding conventions.
 - `bootstrap/app.php` — instantiate F4 services, media directory setting and register F4 routes; keep existing single auth/current-user resolver.
-- `app/UI/routes.php` — remove the unauthenticated `/` redirect ownership so F4 can own the installed root while preserving authenticated home rendering through a shared callable or route decision; do not duplicate a second private home.
+- `app/UI/routes.php` — delete its installed `GET /` registration. `app/Properties/routes.php` becomes the only installed root owner; its authenticated branch renders the same `home` view through existing `View::renderApp` with `pageTitle=Inicio`, `activeNav=home` and existing CSRF token.
 - `assets/app.css` — extend existing stylesheet only; no second design system.
 - `tests/Integration/UI/ShellRoutesTest.php` — update the intentionally changed visitor-root contract and assert authenticated root still renders F3 shell.
 - `tests/Integration/Auth/UserServiceTest.php` — only if sanitizer expectations enumerate the complete permission catalog.
@@ -128,10 +127,10 @@
 - [ ] **Step 2: Run RED.** `vendor/bin/phpunit tests/Integration/Properties/PropertyServiceTest.php --filter Property --testdox`; expected fail because service does not exist.
 - [ ] **Step 3: Implement property methods minimally with direct PDO.** No repository/interface/DTO.
 - [ ] **Step 4: Run property GREEN.** Same command; expected PASS.
-- [ ] **Step 5: Write unit RED.** Cover apartment/parking creation, exact statuses, nonnegative numeric values, server-generated 32-hex `public_key`, unique code per property, ignored/rejected user supplied `public_key`, and type-specific field normalization.
+- [ ] **Step 5: Write unit RED.** Cover apartment/parking creation, exact statuses, nonnegative numeric values, server-generated 32-hex `public_key`, unique code per property, explicit rejection when input contains a nonblank `public_key`, and type-specific field normalization.
 - [ ] **Step 6: Add Review Focus parking tests.** Assert parking→apartment same property succeeds; cross-property/non-apartment/self link rejects; multiple parking units may reference one apartment.
 - [ ] **Step 7: Run RED.** Expected failures only for missing unit methods/rules.
-- [ ] **Step 8: Implement unit methods and public query skeleton.** `listPublicUnits`/`findPublicUnit` must already enforce active property + available + `is_public`; Task 3 adds the photo-dependent completeness predicate.
+- [ ] **Step 8: Implement unit methods and public query skeleton.** `listPublicUnits`/`findPublicUnit` must already enforce active property + available + `is_public`; Task 3 adds the completeness predicate including photo.
 - [ ] **Step 9: Run GREEN.** Entire `PropertyServiceTest.php` PASS.
 - [ ] **Step 10: Commit.** `git commit -m "feat(f4): add property and unit domain service"`.
 
@@ -157,17 +156,17 @@
   - `listForUnit(int $unitId): array`
   - `publicPhoto(int $mediaId): ?array` shape `['path'=>string,'mime'=>string,'stored_name'=>string]`
   - `privatePhoto(int $unitId, int $mediaId): ?array` same shape, without publicability requirement.
-- `PropertyService::isUnitPublicable()` now includes price + description + requirements + at least one photo.
+- `PropertyService::isUnitPublicable()` includes price + description + requirements + at least one photo in addition to active-property/status/is_public.
 
 - [ ] **Step 1: Write photo RED.** Valid JPEG/PNG/WebP, real bytes MIME, random stored name, outside-webroot path, 10 MiB max, SVG/fake/PHP bytes rejection, `UPLOAD_ERR_NO_FILE` rejection at service level.
 - [ ] **Step 2: Add rollback/orphan RED.** Force persistence failure after move and assert moved file is removed; removing media deletes DB row + file; missing file is handled without path escape.
 - [ ] **Step 3: Run RED.** Expected fail because media service absent.
-- [ ] **Step 4: Implement photo lifecycle minimally.** Use `finfo(FILEINFO_MIME_TYPE)`, `random_bytes`, `realpath`/directory containment checks, and transaction/cleanup only where required.
+- [ ] **Step 4: Implement photo lifecycle minimally.** Use `finfo(FILEINFO_MIME_TYPE)`, `random_bytes`, directory containment checks, and transaction/cleanup only where required.
 - [ ] **Step 5: Run photo GREEN.** Photo subset PASS.
 - [ ] **Step 6: Write video/cover/order RED.** HTTPS only, no iframe/storage, one cover per unit, reorder accepts exactly media owned by that unit and rejects foreign/duplicate IDs.
 - [ ] **Step 7: Implement video/cover/order and run GREEN.** Full `UnitMediaServiceTest.php` PASS.
-- [ ] **Step 8: Add publication completeness RED.** Available + `is_public=1` without price/description/requirements/photo is not publicable; adding all required fields + photo makes it public; deactivating property or changing status removes it immediately.
-- [ ] **Step 9: Update `PropertyService` predicate/query and run GREEN.** Both service test files PASS.
+- [ ] **Step 8: Add publication completeness RED.** An available unit with requested `is_public=1` but missing price, description, requirements or photo makes `updateUnit()` throw and leaves `is_public=0`; after all requirements + photo exist, update to `is_public=1` succeeds; deactivating property or changing status makes public reads return no unit immediately.
+- [ ] **Step 9: Update `PropertyService` publication predicate/query and run GREEN.** Both service test files PASS.
 - [ ] **Step 10: Commit.** `git commit -m "feat(f4): add safe unit media and publication rules"`.
 
 ---
@@ -230,17 +229,18 @@
 
 **Interfaces:**
 - Produces `View::renderPublic(string $view, array $data = []): string`.
-- Produces exact public routes:
-  - `GET /` — installed visitor landing OR authenticated private shell behavior, with pre-install behavior still owned by bootstrap.
+- `app/Properties/routes.php` becomes the sole installed owner of `GET /`.
+- Exact public routes:
+  - `GET /` — if `current_user()` returns a user and `must_change_password` is false, render existing `home` via `View::renderApp('home', ['pageTitle'=>'Inicio','user'=>$user,'activeNav'=>'home','csrfToken'=>$csrf->token()])`; if no current user, render `public_home`; forced-password users redirect `/account/password`; pre-install root remains handled by bootstrap before F4 routes are registered.
   - `GET /catalog`
   - `GET /catalog/{publicKey}`
-- Catalog query params: `type` (`apartment|parking|''`), `city`, `sector`; invalid type returns 422 or is normalized to empty consistently, with test fixing the chosen behavior.
+- Catalog query params: `type` accepts `''|apartment|parking`; any other nonblank type returns HTTP 422; `city` and `sector` are trimmed strings.
 
-- [ ] **Step 1: Write `renderPublic` and landing RED.** Visitor installed `/` must return 200 with real `Ver catálogo` + `Iniciar sesión`; no private nav/user data; authenticated `/` remains F3 private shell; pre-install root remains installer redirect.
+- [ ] **Step 1: Write `renderPublic` and landing RED.** Visitor installed `/` must return 200 with real `Ver catálogo` + `Iniciar sesión`; no private nav/user data; authenticated `/` remains F3 private shell; forced-password user still redirects; pre-install root remains installer redirect.
 - [ ] **Step 2: Run RED.** Existing `ShellRoutesTest` should fail only on intentionally replaced unauthenticated-root expectation plus missing public renderer/routes.
-- [ ] **Step 3: Implement `renderPublic` and route ownership convergence.** Remove the duplicate unauthenticated-root redirect from `app/UI/routes.php`; F4 root decides visitor vs authenticated but reuses existing private rendering contract rather than creating a second home implementation.
+- [ ] **Step 3: Implement root ownership convergence exactly.** Delete `GET /` from `app/UI/routes.php`; register it only in `app/Properties/routes.php`; authenticated branch performs the existing F3 `renderApp('home', ...)` call, visitor branch uses new `renderPublic('public_home', ...)`. No helper/class is added solely for root dispatch.
 - [ ] **Step 4: Run landing GREEN.** New + updated shell tests PASS.
-- [ ] **Step 5: Write catalog browse/detail RED.** Only publicable units list; filters type/city/sector; nonpublic/missing detail 404; stable public key used; no `Aplicar` text/link.
+- [ ] **Step 5: Write catalog browse/detail RED.** Only publicable units list; filters type/city/sector; invalid type 422; nonpublic/missing detail 404; stable public key used; no `Aplicar` text/link.
 - [ ] **Step 6: Add privacy/XSS Review Focus assertions.** HTML escapes hostile title/description/requirements/video URL text; exact address, admin contact, notes, private notes, registry number and DB IDs absent; subfolder links/assets correct.
 - [ ] **Step 7: Implement browse/detail views/routes minimally.** Cards, no search engine/map/favorites/pagination framework; external video links validated HTTPS with `rel="noopener noreferrer"`.
 - [ ] **Step 8: Run full Task 5 GREEN.** PublicCatalogRoutes + ShellRoutes PASS.
