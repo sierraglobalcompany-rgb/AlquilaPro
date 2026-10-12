@@ -154,6 +154,7 @@ ul { padding-left: 22px; }
     text-decoration: none;
 }
 .app-main { padding: 18px 16px 28px; }
+.app-main > * + * { margin-top: 16px; }
 .hero-card h1,
 .account-card h1 { margin-bottom: 10px; }
 .eyebrow {
@@ -183,6 +184,46 @@ ul { padding-left: 22px; }
 .account-details dt { color: var(--color-muted); font-size: .82rem; font-weight: 700; }
 .account-details dd { margin: 0; overflow-wrap: anywhere; }
 .account-card > .button { width: 100%; }
+
+.users-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    gap: 12px;
+}
+.user-card {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    padding: 16px;
+    background: var(--color-surface);
+}
+.user-card__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+.user-card__email {
+    color: var(--color-muted);
+    overflow-wrap: anywhere;
+}
+.user-card__role { font-size: .88rem; font-weight: 700; }
+.status-pill {
+    flex: 0 0 auto;
+    border-radius: 999px;
+    padding: 5px 8px;
+    background: #f3f3f1;
+    color: var(--color-muted);
+    font-size: .75rem;
+    font-weight: 750;
+}
+.status-pill--active {
+    background: color-mix(in srgb, var(--color-success) 12%, white);
+    color: var(--color-success);
+}
+.user-create { margin-top: 16px; }
 
 .bottom-nav {
     position: fixed;
@@ -226,6 +267,9 @@ ul { padding-left: 22px; }
     background: var(--brand-primary);
     color: #fff;
     box-shadow: var(--shadow-soft);
+}
+.bottom-nav__apps[aria-current="page"] {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 25%, transparent), var(--shadow-soft);
 }
 
 .apps-dialog {
