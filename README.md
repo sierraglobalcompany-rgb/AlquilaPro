@@ -3,27 +3,30 @@
 Sistema privado, mobile-first y autoinstalable para administrar arrendamientos de vivienda y parqueaderos.
 
 **Dominio previsto:** `https://alquilapro.sierraglobalcompany.com`  
-**Estado actual:** F2 — Autenticación, usuarios y permisos **CLOSED / VERIFIED / NOT MERGED**.  
-**Siguiente gate permitido:** verificar HEAD documental → PR #2 Ready for review → aprobación de merge.  
-**Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + Alpine.js + PHPMailer.  
+**Estado actual:** F2 — Autenticación, usuarios y permisos **CLOSED / VERIFIED / MERGED**.  
+**Siguiente fase:** F3 — Shell móvil + sistema visual, actualmente en gate de SPEC específica.  
+**Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + Alpine.js solo cuando aporte valor real.  
 **Destino:** Hostinger, instalación portable en subdominio o subcarpeta HTTPS.
 
 ---
 
 # 1. PUNTO DE ENTRADA OBLIGATORIO
 
-Toda persona, ChatGPT, Codex, Antigravity u otra IA que retome este proyecto debe leer en este orden antes de tocar código:
+Toda persona, ChatGPT, Codex, Antigravity u otra IA que retome este proyecto debe leer, antes de tocar código:
 
 1. [`README.md`](README.md)
 2. [`docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.1_AUDITADO.md`](docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.1_AUDITADO.md)
 3. [`docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.1_AUDITADO.md`](docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.1_AUDITADO.md)
 4. checkpoint más reciente en [`docs/checkpoints/`](docs/checkpoints/)
-5. tests y CI reales
-6. código real del repositorio
+5. SPEC/plan específico de la fase abierta, si existe
+6. tests y CI reales
+7. código real del repositorio
 
-La SPEC y el PLAN son los documentos canónicos completos. Este README es el **hub de continuidad** y no debe duplicarlos íntegramente.
+Orden de autoridad:
 
-Si existe contradicción entre documentación y repositorio, no se adivina: se audita el estado real y se corrige la fuente correspondiente.
+`SPEC MAESTRA → PLAN MAESTRO → SPEC DE FASE → PLAN DE FASE → CHECKPOINT → TESTS/CI → CÓDIGO REAL`
+
+Si hay contradicción, no se adivina: se audita y se corrige la fuente correspondiente.
 
 ---
 
@@ -31,28 +34,18 @@ Si existe contradicción entre documentación y repositorio, no se adivina: se a
 
 ## LEY 1 — KISS / ARQUITECTURA SIMPLE
 
-Toda solución debe ser:
+Toda solución debe ser simple, sencilla, optimizada, eficiente, eficaz, rápida, fácil de auditar, actualizar, mejorar y desplegar.
 
-- simple;
-- sencilla;
-- optimizada;
-- eficiente;
-- eficaz;
-- rápida;
-- fácil de auditar;
-- fácil de actualizar;
-- fácil de mejorar;
-- fácil de desplegar.
-
-> Entre dos soluciones correctas gana la que use menos piezas, menos estados, menos dependencias, menos capas y menos conocimiento implícito, siempre que conserve seguridad, trazabilidad y requisitos funcionales.
+> Entre dos soluciones correctas gana la que use menos piezas, menos estados, menos dependencias y menos capas, siempre que mantenga seguridad, trazabilidad y requisitos.
 
 Arquitectura base:
 
 - 1 aplicación PHP;
-- 1 base de datos MariaDB/MySQL;
+- 1 base MariaDB/MySQL;
 - 1 repositorio;
-- HTML renderizado en servidor;
-- Alpine.js solo donde aporte valor;
+- HTML server-side;
+- JS mínimo;
+- Alpine.js solo por necesidad real;
 - sin microservicios;
 - sin Redis;
 - sin workers;
@@ -66,18 +59,7 @@ Orden obligatorio:
 
 > **ELIMINAR → UNIR / CONVERGER → SIMPLIFICAR → MEJORAR → AGREGAR**
 
-Se considera ruido, entre otros:
-
-- código muerto;
-- duplicación;
-- rutas repetidas;
-- tablas sin ciclo de vida propio;
-- estados equivalentes;
-- capas que solo delegan;
-- dependencias sin uso;
-- documentación obsoleta;
-- flags temporales permanentes;
-- módulos, botones o integraciones futuras que aún no funcionan.
+Ruido incluye código muerto, duplicación, rutas repetidas, tablas sin ciclo de vida propio, estados equivalentes, capas que solo delegan, dependencias sin uso, documentación obsoleta, flags permanentes y módulos/botones futuros sin función real.
 
 Cada fase debe cerrar con:
 
@@ -86,73 +68,21 @@ LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
 ```
 
-Y demostrar qué agregó, eliminó, unió/convergió, qué cambió en dependencias, esquema y rutas, y qué pruebas lo verifican.
+Y demostrar added/removed/merged, delta de dependencias/esquema/rutas y pruebas.
 
 ---
 
-# 3. QUÉ RESUELVE ALQUILA PRO
+# 3. VISIÓN Y UX
 
-Alquila Pro centraliza:
-
-- propiedades, apartamentos y parqueaderos;
-- candidatos y referencias;
-- estudio de aseguradora/SURA;
-- contratos y documentos;
-- inquilinos;
-- cartera, pagos y conciliación;
-- medios de pago, Bre-B y QR;
-- servicios públicos y cargos;
-- pólizas y reclamaciones;
-- solicitudes, mantenimiento y visitas;
-- recordatorios y comunicaciones;
-- convivencia y manuales;
-- inventarios;
-- membresías/servicios configurables;
-- bono potencial;
-- liquidación de terminación;
-- administradores, permisos y auditoría.
-
-La V1 no pretende ser un ERP contable, un SaaS multiempresa ni una plataforma masiva de inmobiliarias.
-
----
-
-# 4. FLUJO MAESTRO
-
-```text
-CANDIDATO
-  ↓
-Datos + referencias + documentos
-  ↓
-Estudio aseguradora
-  ↓
-Decisión propietario
-  ↓
-Contrato + firma + anexos
-  ↓
-Inventario inicial
-  ↓
-ARRENDAMIENTO ACTIVO
-  ↓
-Cartera + pagos + póliza + servicios + solicitudes + convivencia
-  ↓
-Renovación o terminación
-  ↓
-Inventario final + liquidación + bono si aplica
-  ↓
-CERRADO
-```
-
----
-
-# 5. UX
+Alquila Pro centraliza propiedades, candidatos, estudios de aseguradora, contratos, inquilinos, cartera, pagos, pólizas, servicios, solicitudes, visitas, convivencia, inventarios, documentos y cierre contractual.
 
 Dirección visual: **Residential OS / PropTech premium**.
 
-Administrador:
+Administrador objetivo:
 
 **Inicio · Cartera · [APPS] · Solicitudes · Cuenta**
 
-Inquilino:
+Inquilino objetivo:
 
 **Inicio · Pagos · [APPS] · Solicitudes · Cuenta**
 
@@ -160,33 +90,17 @@ Principios:
 
 - mobile-first;
 - navegación inferior;
-- botón central Apps;
+- Apps central;
 - tarjetas con jerarquía clara;
 - touch targets cómodos;
 - progressive disclosure;
 - cero gráficas decorativas;
-- cero tablas cuando una tarjeta resuelve mejor.
+- cero tablas cuando una tarjeta resuelve mejor;
+- no mostrar botones de módulos que todavía no existen.
 
 ---
 
-# 6. GUARDRAILS CLAVE
-
-- no disfrazar depósitos o garantías;
-- no ligar técnicamente membresía y bono;
-- no afirmar cobertura SURA sin revisar póliza;
-- no convertir daños automáticamente en deuda;
-- no automatizar terminación contractual;
-- no modificar contratos históricos;
-- no registrar WhatsApp como entregado sin API;
-- no fabricar QR bancario interoperable;
-- no crear módulo PSE vacío;
-- no exponer documentos privados por URL pública;
-- no almacenar credenciales bancarias;
-- contenido legal versionado y actualizable.
-
----
-
-# 7. ESTADO REAL DEL REPOSITORIO
+# 4. ESTADO REAL DEL REPOSITORIO
 
 ```text
 PROJECT: Alquila Pro
@@ -194,29 +108,32 @@ REPO: sierraglobalcompany-rgb/AlquilaPro
 TARGET: alquilapro.sierraglobalcompany.com
 SPEC: V1.1 AUDITADA
 PLAN: V1.1 AUDITADO
+
 F0: CLOSED
 F1: CLOSED / VERIFIED / MERGED
 F1_MERGE_SHA: a5225151358aaeca4698adf8cb85d815752a5ac4
-F2: CLOSED / VERIFIED / NOT MERGED
+
+F2: CLOSED / VERIFIED / MERGED
 F2_IMPLEMENTATION_SHA: f4ac9e8b386aab0e0b83226f5012a5e7e86d102b
+F2_DOCUMENTATION_HEAD: 94489483879da7ffa433538b4cb4dbd702990e39
+F2_MERGE_SHA: 96a4fa59ca82604d821061c6aed7d9edb3849ae1
 F2_QA: PHP 8.3 / 8.4 / 8.5 — 60 tests / 254 assertions
 LEY_1_KISS_F2: PASS
 LEY_2_CERO_RUIDO_F2: PASS
-LATEST_CHECKPOINT: docs/checkpoints/F2_CLOSED_2026-10-11.md
-OPEN_PR: #2 — F2 Auth + users + permissions
-NEXT_GATE: VERIFY DOCUMENTATION HEAD -> READY FOR REVIEW -> MERGE APPROVAL
-```
+LATEST_MERGED_CHECKPOINT: docs/checkpoints/F2_MERGED_2026-10-11.md
 
-F1 está integrada a `main`. F2 está cerrada y verificada en su rama, pero **todavía no está fusionada**.
+F3: DESIGN/SPEC GATE
+NEXT: aprobar SPEC específica F3 antes de plan/implementación
+```
 
 ---
 
-# 8. ROADMAP
+# 5. ROADMAP
 
 - F0 — Spec + plan ✅
 - F1 — Foundation + installer ✅
-- F2 — Auth + usuarios + permisos ✅ *(pendiente merge)*
-- F3 — Shell móvil + sistema visual
+- F2 — Auth + usuarios + permisos ✅
+- **F3 — Shell móvil + sistema visual ← ACTUAL**
 - F4 — Propiedades + unidades
 - F5 — Candidatos + referencias
 - F6 — Aseguradora/SURA
@@ -241,26 +158,38 @@ F1 está integrada a `main`. F2 está cerrada y verificada en su rama, pero **to
 - F25 — `SERVER_READY`
 - F26 — Hostinger + smoke test
 
-Cada fase sigue:
+Ciclo por fase:
 
-`SCOPE → PRE-KISS → RED → GREEN → CONVERGE/REFACTOR → QA → TWO LAWS GATE → CHECKPOINT`
+`SCOPE → PRE-KISS → SPEC/DISEÑO → PLAN → RED → GREEN → CONVERGE → QA → TWO LAWS GATE → CHECKPOINT`
 
 ---
 
-# 9. PROTOCOLO DE RECUPERACIÓN
+# 6. GUARDRAILS CLAVE
+
+- no introducir funcionalidades futuras como botones muertos;
+- no crear PSE, WhatsApp API o módulos incompletos por anticipación;
+- no modificar contratos históricos;
+- no exponer documentos privados;
+- no automatizar decisiones jurídicas;
+- no duplicar fuentes de verdad;
+- no agregar dependencia si CSS/PHP/HTML/JS mínimo resuelven mejor.
+
+---
+
+# 7. PROTOCOLO DE RECUPERACIÓN
 
 Una nueva sesión debe:
 
 1. leer README;
-2. leer SPEC;
-3. leer PLAN;
-4. leer checkpoint más reciente;
-5. revisar `main`, ramas y PR reales;
-6. revisar CI y tests;
+2. leer SPEC y PLAN maestros;
+3. leer checkpoint más reciente;
+4. revisar rama/PR de la fase actual;
+5. revisar SPEC/plan específico de fase;
+6. revisar CI/tests;
 7. identificar el primer gate abierto;
-8. confirmar ambas leyes del último checkpoint;
+8. confirmar ambas leyes;
 9. no repetir fases cerradas sin evidencia de regresión;
-10. no abrir una fase futura si la anterior está abierta;
+10. no abrir una fase futura mientras la actual esté abierta;
 11. no hacer merge sin gate y aprobación.
 
 Prompt mínimo:
@@ -269,9 +198,6 @@ Prompt mínimo:
 
 ---
 
-# 10. SIGUIENTE PASO
+# 8. SIGUIENTE PASO
 
-1. verificar CI del HEAD documental final de F2;
-2. marcar PR #2 **Ready for review**;
-3. no fusionar sin aprobación explícita;
-4. después del merge, abrir una rama nueva desde `main` para **F3 — Shell móvil + sistema visual**.
+Completar y revisar la **SPEC específica de F3 — Shell móvil + sistema visual**. Solo después de su aprobación se puede crear el mini-plan de implementación y comenzar TDD.
