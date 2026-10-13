@@ -11,6 +11,12 @@ $isDraft = $status === 'draft';
 $isGenerated = $status === 'generated';
 $isFinalized = $status === 'finalized';
 $hasPdf = in_array($status, ['generated', 'finalized'], true);
+$canViewFinance = (bool) ($canViewFinance ?? false);
+$canManageFinance = (bool) ($canManageFinance ?? false);
+$financeSummary = is_array($financeSummary ?? null) ? $financeSummary : null;
+$charges = is_array($charges ?? null) ? $charges : [];
+$today = (string) ($today ?? '');
+$currentPeriodMonth = (string) ($currentPeriodMonth ?? '');
 ?>
 <section class="surface">
     <p class="eyebrow">Contratos</p>
@@ -67,6 +73,100 @@ $hasPdf = in_array($status, ['generated', 'finalized'], true);
                 <?php endif; ?>
             <?php else: ?>
                 <p class="hint">Arrendamiento finalizado</p>
+            <?php endif; ?>
+
+            <?php if ($canViewFinance): ?>
+                <div class="user-card">
+                    <h3>Cargos del arrendamiento</h3>
+                    <?php if ($financeSummary !== null): ?>
+                        <div>Saldo pendiente: $<?= $escape($financeSummary['outstanding']) ?></div>
+                        <div>Saldo vencido: $<?= $escape($financeSummary['overdue']) ?></div>
+                        <div>Vencimiento pendiente más antiguo: <?= $escape($financeSummary['oldest_due_date'] ?? '—') ?></div>
+                    <?php endif; ?>
+
+                    <?php if ($charges === []): ?>
+                        <p class="empty-state">No hay cargos registrados para este arrendamiento.</p>
+                    <?php else: ?>
+                        <div class="users-grid">
+                            <?php foreach ($charges as $charge): ?>
+                                <article class="user-card">
+                                    <div class="user-card__head">
+                                        <strong><?= $escape($charge['type']) ?></strong>
+                                        <span class="status-pill"><?= $escape($charge['state']) ?></span>
+                                    </div>
+                                    <div>
+                                        <p>Período: <?= $escape($charge['period_month'] ?? 'No aplica') ?></p>
+                                        <p>Vencimiento: <?= $escape($charge['due_date']) ?></p>
+                                        <p>Monto: $<?= $escape($charge['amount']) ?></p>
+                                        <?php if ($charge['description'] !== null): ?>
+                                            <p><?= $escape($charge['description']) ?></p>
+                                        <?php endif; ?>
+                                        <p class="hint">Días vencidos: <?= $escape($charge['days_overdue']) ?></p>
+                                    </div>
+                                    <?php if ($canManageFinance && $charge['state'] !== 'voided'): ?>
+                                        <form method="post" action="<?= $escape($basePath) ?>/admin/charges/<?= $escape($charge['id']) ?>/void" class="settings-form">
+                                            <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                                            <label class="field">
+                                                <span>Motivo de anulación</span>
+                                                <input type="text" name="reason" maxlength="500" required>
+                                            </label>
+                                            <button class="button button--quiet" type="submit">Anular cargo</button>
+                                        </form>
+                                    <?php endif; ?>
+                                </article>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($canManageFinance): ?>
+                <div class="user-card">
+                    <h3>Generar cargos mensuales</h3>
+                    <form method="post" action="<?= $escape($basePath) ?>/admin/leases/<?= $escape($lease['id']) ?>/charges/monthly" class="settings-form">
+                        <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                        <label class="field">
+                            <span>Período</span>
+                            <input type="date" name="period_month" value="<?= $escape($currentPeriodMonth) ?>" required>
+                        </label>
+                        <label class="field">
+                            <span>Fecha de vencimiento</span>
+                            <input type="date" name="due_date" value="<?= $escape($today) ?>" required>
+                        </label>
+                        <button class="button" type="submit">Generar canon y administración</button>
+                    </form>
+
+                    <h3>Registrar cargo manual</h3>
+                    <form method="post" action="<?= $escape($basePath) ?>/admin/leases/<?= $escape($lease['id']) ?>/charges" class="settings-form">
+                        <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                        <label class="field">
+                            <span>Tipo</span>
+                            <select name="type" required>
+                                <option value="service">Servicio</option>
+                                <option value="fine">Multa</option>
+                                <option value="repair">Reparación</option>
+                                <option value="other">Otro</option>
+                            </select>
+                        </label>
+                        <label class="field">
+                            <span>Monto</span>
+                            <input type="text" inputmode="decimal" name="amount" required>
+                        </label>
+                        <label class="field">
+                            <span>Fecha de vencimiento</span>
+                            <input type="date" name="due_date" value="<?= $escape($today) ?>" required>
+                        </label>
+                        <label class="field">
+                            <span>Descripción</span>
+                            <input type="text" name="description" maxlength="500" required>
+                        </label>
+                        <label class="field">
+                            <span>Período (opcional)</span>
+                            <input type="date" name="period_month">
+                        </label>
+                        <button class="button" type="submit">Registrar cargo</button>
+                    </form>
+                </div>
             <?php endif; ?>
         <?php endif; ?>
     </section>

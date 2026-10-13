@@ -213,6 +213,62 @@ final class FinanceRoutesTest extends TestCase
         self::assertNull($voidedAt);
     }
 
+    public function testExistingContractDetailShowsFinanceReadAndManageControlsOnlyWithTheirPermissions(): void
+    {
+        $fixture = $this->createLease('Tenant Admin Context');
+        $chargeId = $this->insertCharge(
+            $fixture['lease_id'], 'service', null, '2026-10-12', '75.25', '<b>Caldera reparada</b>',
+        );
+        $viewerId = $this->insertUser(
+            'Finance Read Viewer', 'finance-read@example.com', 'gestor', ['contracts.view', 'finance.view'],
+        );
+        $managerId = $this->insertUser(
+            'Finance Context Manager', 'finance-context-manager@example.com', 'gestor', [
+                'contracts.view', 'finance.view', 'finance.manage',
+            ],
+        );
+        $contractViewerId = $this->insertUser(
+            'Contract Only Viewer', 'contract-only@example.com', 'gestor', ['contracts.view'],
+        );
+        $app = $this->app('/sub');
+        $detailPath = '/sub/admin/contracts/' . $fixture['contract_id'];
+
+        $this->login($viewerId);
+        $viewerResponse = $this->request($app, 'GET', $detailPath);
+        $viewerHtml = (string) $viewerResponse->getBody();
+        self::assertSame(200, $viewerResponse->getStatusCode());
+        self::assertStringContainsString('Cargos del arrendamiento', $viewerHtml);
+        self::assertStringContainsString('Saldo pendiente', $viewerHtml);
+        self::assertStringContainsString('75.25', $viewerHtml);
+        self::assertStringContainsString('&lt;b&gt;Caldera reparada&lt;/b&gt;', $viewerHtml);
+        self::assertStringNotContainsString('<b>Caldera reparada</b>', $viewerHtml);
+        self::assertStringNotContainsString('name="period_month"', $viewerHtml);
+        self::assertStringNotContainsString('name="void_reason"', $viewerHtml);
+
+        $this->login($managerId);
+        $managerResponse = $this->request($app, 'GET', $detailPath);
+        $managerHtml = (string) $managerResponse->getBody();
+        self::assertSame(200, $managerResponse->getStatusCode());
+        self::assertStringContainsString('action="/sub/admin/leases/' . $fixture['lease_id'] . '/charges/monthly"', $managerHtml);
+        self::assertStringContainsString('action="/sub/admin/leases/' . $fixture['lease_id'] . '/charges"', $managerHtml);
+        self::assertStringContainsString('action="/sub/admin/charges/' . $chargeId . '/void"', $managerHtml);
+        self::assertStringContainsString('name="csrf_token"', $managerHtml);
+        foreach (['service', 'fine', 'repair', 'other'] as $manualType) {
+            self::assertStringContainsString('value="' . $manualType . '"', $managerHtml);
+        }
+        self::assertStringNotContainsString('value="rent"', $managerHtml);
+        self::assertStringNotContainsString('value="administration"', $managerHtml);
+
+        $this->login($contractViewerId);
+        $contractOnly = $this->request($app, 'GET', $detailPath);
+        $contractOnlyHtml = (string) $contractOnly->getBody();
+        self::assertSame(200, $contractOnly->getStatusCode());
+        self::assertStringContainsString('Arrendamiento', $contractOnlyHtml);
+        self::assertStringNotContainsString('Cargos del arrendamiento', $contractOnlyHtml);
+        self::assertStringNotContainsString('75.25', $contractOnlyHtml);
+        self::assertStringNotContainsString('/admin/leases/' . $fixture['lease_id'] . '/charges', $contractOnlyHtml);
+    }
+
     private function app(string $basePath = ''): App
     {
         $factory = require dirname(__DIR__, 3) . '/bootstrap/app.php';
