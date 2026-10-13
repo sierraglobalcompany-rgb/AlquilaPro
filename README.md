@@ -5,11 +5,10 @@ Aplicación web mobile-first y autoinstalable para administrar arrendamientos de
 **Dominio objetivo:** `https://alquilapro.sierraglobalcompany.com`  
 **Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + CSS/JS mínimo  
 **Destino:** Hostinger; subdominio o subcarpeta HTTPS.  
-**Estado actual:** F0–F6 CLOSED / VERIFIED / MERGED.  
-**F5 merge SHA:** `8511f8f8eb0c086e84c1170940353ff5460da66b`.  
-**F6 final branch HEAD:** `7fccbba585c85988913f86cf140be59e8a3f6b20`.  
+**Estado actual:** F0–F6 CLOSED / VERIFIED / MERGED; **F7 CLOSED / VERIFIED / NOT MERGED**.  
 **F6 merge SHA:** `875c990a5a3c9fa7a2adba3edcad6a790703280e`.  
-**F6 final CI:** `38338228406` — PHP 8.3/8.4/8.5 PASS; PHP 8.3 `234 tests / 1672 assertions / 0 failures / 0 errors`.
+**F7 final product HEAD:** `d10939aa2478a558fde0f104351c642ef23b91af`.  
+**F7 final product CI:** `38355249681` — PHP 8.3/8.4/8.5 PASS; PHP 8.3 `274 tests / 2214 assertions / 0 failures / 0 errors`.
 
 ---
 
@@ -20,11 +19,17 @@ Antes de tocar código:
 1. `README.md`;
 2. `docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.2_AUDITADO.md`;
 3. `docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.2_AUDITADO.md`;
-4. `docs/checkpoints/F6_MERGED_2026-10-12.md` como autoridad de integración F6;
-5. `docs/checkpoints/F6_CLOSED_2026-10-12.md` como autoridad técnica F6;
-6. `docs/specs/F6_INSURER_SCREENING_SPEC.md` y `docs/plans/F6_INSURER_SCREENING_IMPLEMENTATION_PLAN.md` cuando F6/F7 sea relevante;
+4. último checkpoint `*_MERGED_*` de la fase integrada en `main`;
+5. último checkpoint `*_CLOSED_*` de la fase activa/cerrada todavía no integrada;
+6. SPEC/PLAN específica de la fase relevante;
 7. tests y CI reales;
 8. código real del repositorio.
+
+Para F7 específicamente:
+
+- `docs/checkpoints/F7_CLOSED_2026-10-12.md` — autoridad técnica de cierre hasta merge;
+- `docs/specs/F7_CONTRACT_ENGINE_SPEC.md`;
+- `docs/plans/F7_CONTRACT_ENGINE_IMPLEMENTATION_PLAN.md`.
 
 Regla de autoridad:
 
@@ -78,6 +83,7 @@ REPO: sierraglobalcompany-rgb/AlquilaPro
 TARGET: alquilapro.sierraglobalcompany.com
 
 F0: CLOSED
+
 F1: CLOSED / VERIFIED / MERGED
 F1_MERGE_SHA: a5225151358aaeca4698adf8cb85d815752a5ac4
 
@@ -104,16 +110,24 @@ F6_FINAL_BRANCH_HEAD: 7fccbba585c85988913f86cf140be59e8a3f6b20
 F6_PR: #9 CLOSED / MERGED
 F6_MERGE_SHA: 875c990a5a3c9fa7a2adba3edcad6a790703280e
 F6_FINAL_CI: 38338228406 — PHP 8.3 / 8.4 / 8.5 PASS — 234 tests / 1672 assertions / 0 failures / 0 errors
-F6_SECURITY_QA: PASS
-F6_VISUAL_QA: PASS — CSS delta 0
+
+F7: CLOSED / VERIFIED / NOT MERGED
+F7_BRANCH: impl/f7-contracts-20261012
+F7_PR: #10 OPEN
+F7_BASE_MAIN: 1b9ee85ebb224b310d4ab4f0c84a28628b86b747
+F7_FINAL_PRODUCT_HEAD: d10939aa2478a558fde0f104351c642ef23b91af
+F7_FINAL_PRODUCT_CI: 38355249681 — PHP 8.3 / 8.4 / 8.5 PASS
+F7_PHP83: 274 tests / 2214 assertions / 0 failures / 0 errors
+F7_SECURITY_QA: PASS
+F7_VISUAL_QA: PASS — one reproduced overflow fixed with 7 CSS lines
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
 
-CURRENT_GATE: F7 SCOPE / PRE-KISS / DESIGN
-NEXT: freeze F7 contract before SPEC/PLAN/implementation
+CURRENT_GATE: F7 FINAL PR REVIEW / READY FOR REVIEW
+NEXT: merge only on explicit project continuation authorization
 ```
 
-No reimplementar F1–F6. No reabrir una fase certificada sin evidencia de regresión o una nueva SPEC aprobada.
+No reimplementar F1–F7. No reabrir una fase certificada sin evidencia de regresión o una nueva SPEC aprobada.
 
 ---
 
@@ -135,7 +149,7 @@ F4 usa exactamente:
 - `units` para `apartment|parking`;
 - `unit_media`.
 
-F5/F6 reutilizan `units.id`; no existe inventario paralelo.
+F5–F7 reutilizan `units.id`; no existe inventario paralelo.
 
 ## 5.3 Precio y disponibilidad
 
@@ -144,7 +158,9 @@ F5/F6 reutilizan `units.id`; no existe inventario paralelo.
 - intención de publicación: `units.is_public`;
 - publicabilidad real: propiedad activa + `available` + `is_public=1` + precio + descripción + requisitos + al menos una foto válida.
 
-Ni F5 ni F6 cambian `units.status` automáticamente.
+F5–F7 no cambian `units.status` automáticamente.
+
+F7 copia el canon contractual acordado a `contracts.monthly_rent`; no sincroniza ese snapshot de vuelta al precio comercial.
 
 ## 5.4 Identificador y media pública
 
@@ -168,7 +184,7 @@ Estados F5 exactos:
 
 `new | incomplete | verification | pending_screening | withdrawn`.
 
-F6 comienza únicamente sobre `pending_screening` y **no duplica los estados de aseguradora en `candidates.status`**.
+F6 comienza únicamente sobre `pending_screening`; F7 consume el candidato aprobado por screening y **no duplica estados contractuales dentro de `candidates.status`**.
 
 ## 5.6 Estudio de aseguradora único
 
@@ -185,9 +201,48 @@ Estados del screening:
 
 `pending | in_progress | approved | rejected`.
 
-`approved|rejected` son terminales en F6. El resultado no autoaprueba al candidato y no crea contrato.
+`approved|rejected` son terminales en F6. El resultado no cambia automáticamente el estado del candidato ni crea contrato por sí solo.
 
-## 5.7 Permisos
+## 5.7 Contrato único F7
+
+F7 usa exactamente:
+
+- `contract_templates`;
+- `contract_template_versions`;
+- `contracts`;
+- `ContractService`;
+- `ContractPdfRenderer`.
+
+Estados:
+
+`draft | generated | finalized`.
+
+Documentos V1:
+
+- `urban_housing`;
+- `independent_parking`.
+
+Reglas clave:
+
+- candidato debe seguir `pending_screening` con screening `approved` al crear/generar;
+- unidad y propiedad se releen antes de mutaciones críticas;
+- template version es inmutable;
+- generated congela snapshot/PDF/hash/evidencia;
+- `tasks_json` puede variar hasta finalized y no integra el snapshot contractual;
+- finalized es terminal F7;
+- F7 no crea tenant/lease, no ocupa la unidad y no representa firma digital;
+- fecha inicial, final y duración son valores explícitos confirmados por administrador, sin inferencia legal automática;
+- 0 rutas contractuales públicas.
+
+PDF:
+
+- Dompdf `^3.1.6`;
+- remote resources off;
+- storage privado `storage/contracts/`;
+- nombre físico aleatorio sin PII;
+- validación `%PDF-` + tamaño + SHA-256 + realpath antes de servir.
+
+## 5.8 Permisos
 
 F4:
 
@@ -199,16 +254,21 @@ F5/F6:
 - `candidates.view`;
 - `candidates.manage`.
 
-F6 agrega **0 permisos**. Owner conserva bypass.
+F7:
 
-## 5.8 Portal candidato y screening
+- `contracts.view`;
+- `contracts.manage`.
+
+Owner conserva bypass.
+
+## 5.9 Portal candidato y screening
 
 Rutas públicas de aplicación siguen siendo las mismas F5:
 
 - `GET|POST /apply/{publicKey}`;
 - `GET|POST /apply/continue/{token}` y subacciones existentes.
 
-F6 agrega **0 rutas públicas**. El screening se proyecta dentro de la continuación existente mediante `ScreeningService::publicForCandidate()`.
+F6 y F7 agregan **0 rutas públicas**. El screening se proyecta dentro de la continuación existente mediante `ScreeningService::publicForCandidate()`.
 
 La URL externa del estudio:
 
@@ -252,19 +312,9 @@ Resultado integrado:
 - portal candidato dentro de `/apply/continue/{token}`;
 - proyección pública por allowlist;
 - no IDs/notes/support/responsible en portal;
-- enlace externo `noopener noreferrer`;
-- fallback sin URL;
-- screening terminal visible sin CTA;
-- withdrawal conserva estudio y bloquea mutación/CTA;
 - screening no cambia candidate status ni unit status;
 - security regression PASS;
 - visual audit PASS con CSS delta 0;
-- dependencias runtime +0;
-- npm +0;
-- auth +0;
-- permisos +0;
-- route files +0;
-- API SURA +0;
 - LEY 1 KISS PASS;
 - LEY 2 CERO RUIDO PASS.
 
@@ -275,7 +325,44 @@ Autoridad:
 
 ---
 
-# 8. ROADMAP V1.2
+# 8. RESULTADO F7
+
+F7 está **CLOSED / VERIFIED / NOT MERGED**.
+
+Resultado técnico:
+
+- exactamente 3 tablas contractuales;
+- exactamente 2 clases productivas F7;
+- exactamente 1 route file Contracts;
+- 2 permisos;
+- Dompdf como única dependencia runtime directa nueva;
+- templates versionados e inmutables;
+- placeholders simples sin template engine;
+- draft + preview seguro;
+- snapshot HTML interno escapado;
+- PDF privado con SHA-256/tamaño exactos;
+- finalización terminal;
+- candidate context delegado al ContractService;
+- 0 rutas públicas contractuales;
+- 0 tenant/lease/user/ocupación automática;
+- security regression PASS;
+- visual QA PASS después de corregir un overflow reproducido con 7 líneas CSS;
+- CI final de producto `38355249681` PASS en PHP 8.3/8.4/8.5;
+- PHP 8.3: 274 tests / 2214 assertions;
+- LEY 1 KISS PASS;
+- LEY 2 CERO RUIDO PASS.
+
+Autoridad de cierre hasta integración:
+
+- `docs/checkpoints/F7_CLOSED_2026-10-12.md`.
+
+Después del merge verificado deberá existir:
+
+- `docs/checkpoints/F7_MERGED_2026-10-12.md`.
+
+---
+
+# 9. ROADMAP V1.2
 
 - F0 — SPEC + plan ✅
 - F1 — Foundation + installer ✅
@@ -284,8 +371,8 @@ Autoridad:
 - F4 — Propiedades + unidades + landing + catálogo público ✅ CLOSED / VERIFIED / MERGED
 - F5 — Aplicaciones + candidatos + referencias ✅ CLOSED / VERIFIED / MERGED
 - F6 — Aseguradora/SURA ✅ CLOSED / VERIFIED / MERGED
-- **F7 — Contratos — NEXT: SCOPE / PRE-KISS / DESIGN**
-- F8 — Inquilino + lease + portal usando auth único
+- **F7 — Contratos ✅ CLOSED / VERIFIED / NOT MERGED**
+- F8 — Inquilino + lease + portal usando auth único — bloqueado hasta merge F7 verificado
 - F9 — Cargos + cartera
 - F10 — Medios de pago
 - F11 — Reporte + conciliación
@@ -307,28 +394,39 @@ Autoridad:
 
 ---
 
-# 9. PROTOCOLO DE RECUPERACIÓN
+# 10. PROTOCOLO DE RECUPERACIÓN
 
-Al retomar trabajo:
+Al retomar trabajo mientras F7 no esté mergeado:
 
 1. verificar `main` real;
-2. leer `docs/checkpoints/F6_MERGED_2026-10-12.md`;
-3. no reabrir F6 sin evidencia de regresión o nueva SPEC;
-4. F7 debe consumir candidato + screening + unidad ya existentes, sin entidades paralelas;
-5. mantener KISS + Cero Ruido + TDD por microfases;
-6. antes de implementar F7: SCOPE → PRE-KISS → diseño aprobado → SPEC → PLAN.
+2. verificar branch `impl/f7-contracts-20261012` y PR #10;
+3. leer `docs/checkpoints/F7_CLOSED_2026-10-12.md`;
+4. no reabrir F7 sin evidencia de regresión o nueva SPEC;
+5. revisar CI exacto del HEAD vigente antes de integrar;
+6. no iniciar F8 antes de que F7 esté mergeado y el merge verificado;
+7. mantener KISS + Cero Ruido + TDD por microfases.
+
+Después del merge F7, el checkpoint `F7_MERGED_2026-10-12.md` pasa a ser la autoridad de integración.
 
 ---
 
-# 10. GATE ACTUAL
+# 11. GATE ACTUAL
 
 ```text
-LAST_PHASE: F6 CLOSED / VERIFIED / MERGED
-F6_FINAL_BRANCH_HEAD: 7fccbba585c85988913f86cf140be59e8a3f6b20
-F6_FINAL_CI: 38338228406
+LAST_MERGED_PHASE: F6 CLOSED / VERIFIED / MERGED
 F6_MERGE_SHA: 875c990a5a3c9fa7a2adba3edcad6a790703280e
-PR: #9 CLOSED / MERGED
-NEXT_PHASE: F7 — CONTRATOS
-F7_STATUS: SCOPE / PRE-KISS / DESIGN
-NEXT_ACTION: READ MASTER CONTRACT SCOPE → AUDIT EXISTING MODEL → PROPOSE MINIMAL F7 DESIGN
+
+ACTIVE_CLOSED_PHASE: F7 CLOSED / VERIFIED / NOT MERGED
+F7_BRANCH: impl/f7-contracts-20261012
+F7_PR: #10
+F7_BASE_MAIN: 1b9ee85ebb224b310d4ab4f0c84a28628b86b747
+F7_FINAL_PRODUCT_HEAD: d10939aa2478a558fde0f104351c642ef23b91af
+F7_FINAL_PRODUCT_CI: 38355249681
+F7_TESTS_PHP83: 274 / 2214
+LEY_1_KISS: PASS
+LEY_2_CERO_RUIDO: PASS
+
+CURRENT_ACTION: FINAL PR REVIEW → READY FOR REVIEW IF CLEAN
+MERGE_ALLOWED: NO UNTIL NEXT EXPLICIT CONTINUA
+NEXT_PHASE_AFTER_MERGE: F8 — INQUILINO + LEASE + PORTAL
 ```
