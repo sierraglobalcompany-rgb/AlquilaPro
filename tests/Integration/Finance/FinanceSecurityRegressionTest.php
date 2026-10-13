@@ -15,6 +15,107 @@ final class FinanceSecurityRegressionTest extends TestCase
         $this->root = dirname(__DIR__, 3);
     }
 
+    public function testF9ArchitectureRemainsWithinTheApprovedBudget(): void
+    {
+        $migration = $this->file('database/migrations/009_create_charges.sql');
+        preg_match_all('/CREATE TABLE\s+([a-z_]+)/i', $migration, $tables);
+        self::assertSame(['charges'], $tables[1] ?? []);
+        foreach ([
+            'payments',
+            'payment_allocations',
+            'payment_methods',
+            'payment_reports',
+            'balances',
+            'charge_status',
+            'charge_status_history',
+            'ledger_entries',
+            'tenant_users',
+            'tenant_sessions',
+            'lease_units',
+        ] as $forbiddenSchemaName) {
+            self::assertStringNotContainsString($forbiddenSchemaName, $migration);
+        }
+        foreach (['status', 'balance', 'days_overdue', 'outstanding_amount', 'paid_amount'] as $derivedColumn) {
+            self::assertDoesNotMatchRegularExpression('/^\s*' . preg_quote($derivedColumn, '/') . '\s+/mi', $migration);
+        }
+
+        $serviceFiles = glob($this->root . '/app/Finance/*Service.php') ?: [];
+        $serviceFiles = array_map(static fn (string $path): string => str_replace('\\', '/', $path), $serviceFiles);
+        sort($serviceFiles);
+        self::assertSame([str_replace('\\', '/', $this->root) . '/app/Finance/FinanceService.php'], $serviceFiles);
+
+        $financePhpFiles = glob($this->root . '/app/Finance/*.php') ?: [];
+        $financePhpFiles = array_map(static fn (string $path): string => str_replace('\\', '/', $path), $financePhpFiles);
+        sort($financePhpFiles);
+        self::assertSame([
+            str_replace('\\', '/', $this->root) . '/app/Finance/FinanceService.php',
+            str_replace('\\', '/', $this->root) . '/app/Finance/routes.php',
+        ], $financePhpFiles);
+
+        $routeFiles = glob($this->root . '/app/Finance/routes.php') ?: [];
+        self::assertCount(1, $routeFiles);
+        $financeRoutes = $this->file('app/Finance/routes.php');
+        preg_match_all('/\$app->(?:get|post)\(\'([^\']+)\'/i', $financeRoutes, $routeMatches);
+        self::assertSame([
+            '/admin/finance',
+            '/admin/leases/{id:[0-9]+}/charges/monthly',
+            '/admin/leases/{id:[0-9]+}/charges',
+            '/admin/charges/{id:[0-9]+}/void',
+        ], $routeMatches[1] ?? []);
+        foreach ($routeMatches[1] ?? [] as $route) {
+            self::assertStringStartsWith('/admin/', $route, 'F9 routes must remain private staff routes.');
+        }
+
+        $permissionSource = $this->file('app/Auth/Permissions.php');
+        preg_match_all('/^\s*\'(finance\.[a-z]+)\',?\s*$/m', $permissionSource, $permissionMatches);
+        self::assertSame(['finance.view', 'finance.manage'], $permissionMatches[1] ?? []);
+
+        $composer = json_decode($this->file('composer.json'), true, 32, JSON_THROW_ON_ERROR);
+        $runtimeRequirements = array_keys($composer['require'] ?? []);
+        sort($runtimeRequirements);
+        self::assertSame(['dompdf/dompdf', 'php', 'slim/psr7', 'slim/slim'], $runtimeRequirements);
+        self::assertSame(['phpunit/phpunit'], array_keys($composer['require-dev'] ?? []));
+
+        $financeSource = $this->file('app/Finance/FinanceService.php');
+        foreach (['session_start(', 'new SessionGuard(', 'new Csrf(', 'cron', 'scheduler', 'worker'] as $forbiddenCore) {
+            self::assertStringNotContainsString($forbiddenCore, $financeSource);
+        }
+        self::assertSame(1, substr_count($financeSource, 'private function chargeSummaryExpressions('));
+        self::assertSame(2, substr_count($financeSource, '$this->chargeSummaryExpressions('));
+
+        $migrations = implode("\n", array_map(
+            static fn (string $path): string => (string) file_get_contents($path),
+            glob($this->root . '/database/migrations/*.sql') ?: [],
+        ));
+        foreach (['tenant_users', 'tenant_sessions', 'lease_units'] as $duplicateTenantSchema) {
+            self::assertDoesNotMatchRegularExpression('/CREATE TABLE\s+' . preg_quote($duplicateTenantSchema, '/') . '\b/i', $migrations);
+        }
+    }
+
+    public function testManualAndTenantSurfacesKeepFinancialAndPrivacyBoundaries(): void
+    {
+        $financeService = $this->file('app/Finance/FinanceService.php');
+        self::assertStringContainsString("private const MANUAL_TYPES = ['service', 'fine', 'repair', 'other'];", $financeService);
+
+        $home = $this->file('resources/views/tenant_home.php');
+        $tenantDetail = $this->file('resources/views/tenant_lease_detail.php');
+        foreach (['Pagos', 'Reportes', 'Póliza', 'Mantenimiento', 'Solicitudes'] as $futureUi) {
+            self::assertStringNotContainsString($futureUi, $home . "\n" . $tenantDetail);
+        }
+        self::assertStringNotContainsString('Cartera', $home);
+        self::assertStringContainsString('Cartera', $tenantDetail);
+
+        $layout = $this->file('resources/views/layouts/app.php');
+        $financeRoutes = $this->file('app/Finance/routes.php');
+        self::assertStringContainsString(
+            '\\AlquilaPro\\Auth\\Permissions::allows($user, \'finance.view\')',
+            $layout,
+        );
+        self::assertStringContainsString("\$isTenant = (\$user['role'] ?? null) === 'tenant';", $layout);
+        self::assertStringNotContainsString("new SessionGuard(", $financeRoutes);
+        self::assertStringNotContainsString("new Csrf(", $financeRoutes);
+    }
+
     public function testTenantPortfolioReusesOwnedLeaseRouteAndResolvesOwnershipBeforeFinance(): void
     {
         $routes = $this->file('app/Leases/routes.php');
