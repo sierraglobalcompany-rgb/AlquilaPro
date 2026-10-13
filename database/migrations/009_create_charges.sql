@@ -1,0 +1,22 @@
+CREATE TABLE charges (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    lease_id BIGINT UNSIGNED NOT NULL,
+    type VARCHAR(32) NOT NULL,
+    period_month DATE NULL,
+    due_date DATE NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    description VARCHAR(500) NULL,
+    created_by_user_id BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    voided_by_user_id BIGINT UNSIGNED NULL,
+    voided_at DATETIME NULL,
+    void_reason VARCHAR(500) NULL,
+    PRIMARY KEY (id),
+    KEY charges_lease_due_index (lease_id, due_date),
+    KEY charges_lease_period_type_index (lease_id, period_month, type),
+    KEY charges_created_by_user_index (created_by_user_id),
+    KEY charges_voided_by_user_index (voided_by_user_id),
+    CONSTRAINT charges_lease_fk FOREIGN KEY (lease_id) REFERENCES leases (id) ON DELETE RESTRICT,
+    CONSTRAINT charges_created_by_user_fk FOREIGN KEY (created_by_user_id) REFERENCES users (id) ON DELETE SET NULL,
+    CONSTRAINT charges_voided_by_user_fk FOREIGN KEY (voided_by_user_id) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
