@@ -51,6 +51,10 @@ return static function (App $app, array $deps): void {
             return $response->withHeader('Location', $path('/account/password'))->withStatus(302);
         }
 
+        if (($user['role'] ?? null) === 'tenant') {
+            return $response->withHeader('Location', $path('/tenant'))->withStatus(302);
+        }
+
         $response->getBody()->write($view->renderApp('home', [
             'pageTitle' => 'Inicio',
             'user' => $user,
