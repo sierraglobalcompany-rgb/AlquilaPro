@@ -5,7 +5,7 @@ Aplicación web mobile-first y autoinstalable para administrar arrendamientos de
 **Dominio objetivo:** `https://alquilapro.sierraglobalcompany.com`  
 **Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + CSS/JS mínimo  
 **Destino:** Hostinger; subdominio o subcarpeta HTTPS.  
-**Estado actual:** F0–F7 CLOSED / VERIFIED; **F1–F7 MERGED**.  
+**Estado actual:** F0–F8 CLOSED / VERIFIED; **F1–F7 MERGED**; **F8 CLOSED / VERIFIED / NOT MERGED**.  
 **F7 merge SHA:** `b6ab43fefd7b4d2933e3e3adff0ac4c23efdf1b8`.  
 **F7 final product HEAD:** `829955f2b297959380df06a8c8cc3e3424115e74`.  
 **F7 final product CI:** `38360814842` — PHP 8.3/8.4/8.5 PASS.  
