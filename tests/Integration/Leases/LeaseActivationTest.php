@@ -36,9 +36,9 @@ final class LeaseActivationTest extends TestCase
         foreach (['draft', 'generated'] as $status) {
             $fixture = $this->fixture(contractStatus: $status, candidateEmail: $status . '@example.com');
             $this->assertRejected(fn () => $this->service()->activate($fixture['contract_id'], $this->actorId, 1791870000));
-            self::assertSame(0, $this->count('leases'));
+            self::assertSame(0, $this->tableCount('leases'));
             self::assertSame('available', $this->unitStatus($fixture['unit_id']));
-            self::assertSame(1, $this->count('users'));
+            self::assertSame(1, $this->tableCount('users'));
         }
     }
 
@@ -100,12 +100,12 @@ final class LeaseActivationTest extends TestCase
                 candidateEmail: 'blocked-' . $status . '@example.com',
                 suffix: 'b' . $index,
             );
-            $usersBefore = $this->count('users');
+            $usersBefore = $this->tableCount('users');
 
             $this->assertRejected(fn () => $this->service()->activate($fixture['contract_id'], $this->actorId, 1791870200));
 
-            self::assertSame(0, $this->count('leases'));
-            self::assertSame($usersBefore, $this->count('users'));
+            self::assertSame(0, $this->tableCount('leases'));
+            self::assertSame($usersBefore, $this->tableCount('users'));
             self::assertSame($status, $this->unitStatus($fixture['unit_id']));
         }
     }
@@ -115,12 +115,12 @@ final class LeaseActivationTest extends TestCase
         $fixture = $this->fixture(candidateEmail: 'once@example.com');
         $service = $this->service();
         $first = $service->activate($fixture['contract_id'], $this->actorId, 1791870300);
-        $usersAfterFirst = $this->count('users');
+        $usersAfterFirst = $this->tableCount('users');
 
         $this->assertRejected(fn () => $service->activate($fixture['contract_id'], $this->actorId, 1791870310));
 
-        self::assertSame(1, $this->count('leases'));
-        self::assertSame($usersAfterFirst, $this->count('users'));
+        self::assertSame(1, $this->tableCount('leases'));
+        self::assertSame($usersAfterFirst, $this->tableCount('users'));
         self::assertSame($first['lease']['id'], $service->findByContract($fixture['contract_id'])['id']);
     }
 
@@ -142,26 +142,26 @@ final class LeaseActivationTest extends TestCase
         $active = (int) $this->pdo->query('SELECT COUNT(*) FROM leases WHERE ended_at IS NULL')->fetchColumn();
         self::assertSame(1, $active);
         self::assertSame('occupied', $this->unitStatus($first['unit_id']));
-        self::assertSame(2, $this->count('users'));
+        self::assertSame(2, $this->tableCount('users'));
     }
 
     public function testEmailCollisionRollsBackWithoutLeaseOrOccupation(): void
     {
         $fixture = $this->fixture(candidateEmail: 'collision@example.com');
         $this->insertUser('admin', 'Existing Staff', 'collision@example.com');
-        $usersBefore = $this->count('users');
+        $usersBefore = $this->tableCount('users');
 
         $this->assertRejected(fn () => $this->service()->activate($fixture['contract_id'], $this->actorId, 1791870500));
 
-        self::assertSame($usersBefore, $this->count('users'));
-        self::assertSame(0, $this->count('leases'));
+        self::assertSame($usersBefore, $this->tableCount('users'));
+        self::assertSame(0, $this->tableCount('leases'));
         self::assertSame('available', $this->unitStatus($fixture['unit_id']));
     }
 
     public function testFailureAfterTenantCreationRollsBackUserLeaseAndUnit(): void
     {
         $fixture = $this->fixture(candidateEmail: 'rollback@example.com');
-        $usersBefore = $this->count('users');
+        $usersBefore = $this->tableCount('users');
         $this->pdo->exec(
             "CREATE TRIGGER leases_force_failure BEFORE INSERT ON leases FOR EACH ROW "
             . "SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced lease insert failure'",
@@ -173,8 +173,8 @@ final class LeaseActivationTest extends TestCase
             $this->pdo->exec('DROP TRIGGER IF EXISTS leases_force_failure');
         }
 
-        self::assertSame($usersBefore, $this->count('users'));
-        self::assertSame(0, $this->count('leases'));
+        self::assertSame($usersBefore, $this->tableCount('users'));
+        self::assertSame(0, $this->tableCount('leases'));
         self::assertSame('available', $this->unitStatus($fixture['unit_id']));
     }
 
@@ -401,7 +401,7 @@ final class LeaseActivationTest extends TestCase
         return (int) $this->pdo->lastInsertId();
     }
 
-    private function count(string $table): int
+    private function tableCount(string $table): int
     {
         return (int) $this->pdo->query('SELECT COUNT(*) FROM `' . $table . '`')->fetchColumn();
     }
