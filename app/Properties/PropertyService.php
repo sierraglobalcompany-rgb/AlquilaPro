@@ -192,7 +192,9 @@ final class PropertyService
             . 'WHERE c.unit_id = :unit_id AND l.ended_at IS NULL LIMIT 1',
         );
         $activeLease->execute(['unit_id' => $unitId]);
-        if ($activeLease->fetchColumn() !== false && $data['status'] !== 'occupied') {
+        $hasActiveLease = $activeLease->fetchColumn() !== false;
+        $activeLease->closeCursor();
+        if ($hasActiveLease && $data['status'] !== 'occupied') {
             throw new RuntimeException('La unidad con arrendamiento activo debe permanecer ocupada.');
         }
 
