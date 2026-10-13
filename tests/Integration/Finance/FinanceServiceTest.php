@@ -190,6 +190,226 @@ final class FinanceServiceTest extends TestCase
         }
     }
 
+    public function testMonthlyChargesSnapshotRentAndAdministrationFromTheContractOnAnEndedLease(): void
+    {
+        $fixture = $this->createLease(ended: true);
+        $before = $this->authoritySnapshot();
+
+        $created = $this->service()->createMonthlyCharges(
+            $fixture['lease_id'], '2026-10-01', '2026-10-05', $fixture['actor_id'],
+        );
+
+        self::assertSame(['rent', 'administration'], array_column($created, 'type'));
+        self::assertSame(['1500000.00', '200000.00'], array_column($created, 'amount'));
+        self::assertSame(['2026-10-01', '2026-10-01'], array_column($created, 'period_month'));
+        self::assertSame(['2026-10-05', '2026-10-05'], array_column($created, 'due_date'));
+        self::assertSame($before, $this->authoritySnapshot());
+
+        $updateContract = $this->pdo->prepare(
+            'UPDATE contracts SET monthly_rent = :rent, administration_fee = :fee WHERE id = :id',
+        );
+        $updateContract->execute(['rent' => '3100000.00', 'fee' => '0.00', 'id' => $fixture['contract_id']]);
+        $stored = $this->pdo->prepare(
+            'SELECT type, amount FROM charges WHERE lease_id = :lease_id ORDER BY type',
+        );
+        $stored->execute(['lease_id' => $fixture['lease_id']]);
+        self::assertSame([
+            ['type' => 'administration', 'amount' => '200000.00'],
+            ['type' => 'rent', 'amount' => '1500000.00'],
+        ], $stored->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    public function testMonthlyPeriodIncludesContractStartAndEndMonthsAndRejectsOutsideOrMalformedValues(): void
+    {
+        $fixture = $this->createLease();
+        $this->service()->createMonthlyCharges($fixture['lease_id'], '2026-10-01', '2026-10-05', $fixture['actor_id']);
+        $this->service()->createMonthlyCharges($fixture['lease_id'], '2027-09-01', '2027-09-05', $fixture['actor_id']);
+        self::assertSame(4, $this->chargeCount($fixture['lease_id']));
+
+        foreach (['2026-09-01', '2027-10-01', '2026-10-02', '2026-02-30', '2026-2-01'] as $period) {
+            $this->assertRejected(fn () => $this->service()->createMonthlyCharges(
+                $fixture['lease_id'], $period, '2026-10-05', $fixture['actor_id'],
+            ));
+        }
+        $this->assertRejected(fn () => $this->service()->createMonthlyCharges(
+            $fixture['lease_id'], '2026-11-01', '2026-02-30', $fixture['actor_id'],
+        ));
+        self::assertSame(4, $this->chargeCount($fixture['lease_id']));
+    }
+
+    public function testMonthlyGenerationOmitsNullOrZeroAdministrationFee(): void
+    {
+        $nullFee = $this->createLease();
+        $setNull = $this->pdo->prepare('UPDATE contracts SET administration_fee = NULL WHERE id = :id');
+        $setNull->execute(['id' => $nullFee['contract_id']]);
+        $nullRows = $this->service()->createMonthlyCharges(
+            $nullFee['lease_id'], '2026-10-01', '2026-10-05', $nullFee['actor_id'],
+        );
+        self::assertSame(['rent'], array_column($nullRows, 'type'));
+
+        $zeroFee = $this->createLease();
+        $setZero = $this->pdo->prepare('UPDATE contracts SET administration_fee = :fee WHERE id = :id');
+        $setZero->execute(['fee' => '0.00', 'id' => $zeroFee['contract_id']]);
+        $zeroRows = $this->service()->createMonthlyCharges(
+            $zeroFee['lease_id'], '2026-10-01', '2026-10-05', $zeroFee['actor_id'],
+        );
+        self::assertSame(['rent'], array_column($zeroRows, 'type'));
+    }
+
+    public function testMonthlyDuplicateAndPartialCorrectionPreserveValidActiveCharges(): void
+    {
+        $fixture = $this->createLease();
+        $created = $this->service()->createMonthlyCharges(
+            $fixture['lease_id'], '2026-10-01', '2026-10-05', $fixture['actor_id'],
+        );
+        $this->assertRejected(fn () => $this->service()->createMonthlyCharges(
+            $fixture['lease_id'], '2026-10-01', '2026-10-05', $fixture['actor_id'],
+        ));
+        self::assertSame(2, $this->chargeCount($fixture['lease_id']));
+
+        $voidType = $this->pdo->prepare(
+            'UPDATE charges SET voided_by_user_id = :actor, voided_at = :voided_at, void_reason = :reason '
+            . 'WHERE lease_id = :lease_id AND period_month = :period AND type = :type',
+        );
+        $voidType->execute([
+            'actor' => $fixture['actor_id'],
+            'voided_at' => '2026-10-13 12:00:00',
+            'reason' => 'Corrección de prueba',
+            'lease_id' => $fixture['lease_id'],
+            'period' => '2026-10-01',
+            'type' => 'administration',
+        ]);
+        $adminCorrection = $this->service()->createMonthlyCharges(
+            $fixture['lease_id'], '2026-10-01', '2026-10-05', $fixture['actor_id'],
+        );
+        self::assertSame(['administration'], array_column($adminCorrection, 'type'));
+
+        $voidType->execute([
+            'actor' => $fixture['actor_id'],
+            'voided_at' => '2026-10-13 12:01:00',
+            'reason' => 'Corrección de prueba',
+            'lease_id' => $fixture['lease_id'],
+            'period' => '2026-10-01',
+            'type' => 'rent',
+        ]);
+        $rentCorrection = $this->service()->createMonthlyCharges(
+            $fixture['lease_id'], '2026-10-01', '2026-10-05', $fixture['actor_id'],
+        );
+        self::assertSame(['rent'], array_column($rentCorrection, 'type'));
+
+        $voidBoth = $this->pdo->prepare(
+            'UPDATE charges SET voided_by_user_id = :actor, voided_at = :voided_at, void_reason = :reason '
+            . 'WHERE lease_id = :lease_id AND period_month = :period AND voided_at IS NULL',
+        );
+        $voidBoth->execute([
+            'actor' => $fixture['actor_id'],
+            'voided_at' => '2026-10-13 12:02:00',
+            'reason' => 'Corrección de prueba',
+            'lease_id' => $fixture['lease_id'],
+            'period' => '2026-10-01',
+        ]);
+        $bothCorrections = $this->service()->createMonthlyCharges(
+            $fixture['lease_id'], '2026-10-01', '2026-10-05', $fixture['actor_id'],
+        );
+        self::assertSame(['rent', 'administration'], array_column($bothCorrections, 'type'));
+        self::assertSame(6, $this->chargeCount($fixture['lease_id']));
+        self::assertSame(['rent', 'administration'], array_column($created, 'type'));
+    }
+
+    public function testMonthlyInsertFailureRollsBackOnlyNewRowsAndPreservesExistingActiveCharge(): void
+    {
+        $fixture = $this->createLease();
+        $rentId = $this->insertCharge(
+            $fixture['lease_id'], 'rent', '2026-10-01', '2026-10-05', '1500000.00', 'Canon mensual',
+        );
+        $this->pdo->exec(
+            "CREATE TRIGGER fail_monthly_administration BEFORE INSERT ON charges FOR EACH ROW "
+            . "BEGIN IF NEW.type = 'administration' THEN SIGNAL SQLSTATE '45000' "
+            . "SET MESSAGE_TEXT = 'forced F9 rollback test'; END IF; END",
+        );
+
+        $this->assertRejected(fn () => $this->service()->createMonthlyCharges(
+            $fixture['lease_id'], '2026-10-01', '2026-10-05', $fixture['actor_id'],
+        ));
+
+        self::assertSame(1, $this->chargeCount($fixture['lease_id']));
+        self::assertSame('rent', $this->charge($rentId)['type']);
+        self::assertNull($this->charge($rentId)['voided_at']);
+    }
+
+    public function testMonthlyGenerationLocksLeaseBeforeActiveChargeReadAndInsert(): void
+    {
+        $fixture = $this->createLease();
+        $host = getenv('TEST_DB_HOST') ?: '127.0.0.1';
+        $port = getenv('TEST_DB_PORT') ?: '3306';
+        $database = getenv('TEST_DB_NAME') ?: 'alquila_test';
+        $username = getenv('TEST_DB_USER') ?: 'root';
+        $password = getenv('TEST_DB_PASSWORD') ?: 'root';
+        $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4', $host, $port, $database);
+        $pdo = new class($dsn, $username, $password) extends PDO {
+            public array $events = [];
+
+            public function __construct(string $dsn, string $username, string $password)
+            {
+                parent::__construct($dsn, $username, $password, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+            }
+
+            public function beginTransaction(): bool
+            {
+                $this->events[] = ['kind' => 'begin'];
+
+                return parent::beginTransaction();
+            }
+
+            public function prepare(string $query, array $options = []): \PDOStatement|false
+            {
+                $this->events[] = ['kind' => 'prepare', 'sql' => $query];
+
+                return parent::prepare($query, $options);
+            }
+
+            public function commit(): bool
+            {
+                $this->events[] = ['kind' => 'commit'];
+
+                return parent::commit();
+            }
+        };
+
+        (new FinanceService($pdo))->createMonthlyCharges(
+            $fixture['lease_id'], '2026-10-01', '2026-10-05', $fixture['actor_id'],
+        );
+
+        $eventIndex = static function (array $events, callable $matches): int {
+            foreach ($events as $index => $event) {
+                if ($matches($event)) {
+                    return $index;
+                }
+            }
+
+            throw new RuntimeException('Expected monthly SQL operation was not observed.');
+        };
+        $lock = $eventIndex($pdo->events, static fn (array $event): bool =>
+            ($event['kind'] ?? '') === 'prepare'
+            && str_contains($event['sql'], 'FROM leases')
+            && str_contains($event['sql'], 'FOR UPDATE'));
+        $contract = $eventIndex($pdo->events, static fn (array $event): bool =>
+            ($event['kind'] ?? '') === 'prepare' && str_contains($event['sql'], 'FROM contracts'));
+        $activeCharges = $eventIndex($pdo->events, static fn (array $event): bool =>
+            ($event['kind'] ?? '') === 'prepare'
+            && str_contains($event['sql'], 'FROM charges')
+            && str_contains($event['sql'], 'voided_at IS NULL'));
+        $insert = $eventIndex($pdo->events, static fn (array $event): bool =>
+            ($event['kind'] ?? '') === 'prepare' && str_contains($event['sql'], 'INSERT INTO charges'));
+        $commit = $eventIndex($pdo->events, static fn (array $event): bool => ($event['kind'] ?? '') === 'commit');
+
+        self::assertSame('begin', $pdo->events[0]['kind']);
+        self::assertLessThan($contract, $lock);
+        self::assertLessThan($activeCharges, $contract);
+        self::assertLessThan($insert, $activeCharges);
+        self::assertLessThan($commit, $insert);
+    }
+
     private function service(): FinanceService
     {
         return new FinanceService($this->pdo);

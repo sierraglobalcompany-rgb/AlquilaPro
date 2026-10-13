@@ -116,6 +116,112 @@ final readonly class FinanceService
         return $charges;
     }
 
+    /** @return list<array{id:int,lease_id:int,type:string,period_month:string,due_date:string,amount:string,description:null}> */
+    public function createMonthlyCharges(int $leaseId, string $periodMonth, string $dueDate, int $actorUserId): array
+    {
+        if ($leaseId <= 0 || $actorUserId <= 0 || $this->pdo->inTransaction()) {
+            throw new RuntimeException('No fue posible generar los cargos mensuales.');
+        }
+
+        try {
+            if (!$this->pdo->beginTransaction()) {
+                throw new RuntimeException('No fue posible generar los cargos mensuales.');
+            }
+
+            $leaseLock = $this->pdo->prepare(
+                'SELECT id, contract_id FROM leases WHERE id = :id FOR UPDATE',
+            );
+            $leaseLock->execute(['id' => $leaseId]);
+            $lease = $leaseLock->fetch(PDO::FETCH_ASSOC);
+            if (!is_array($lease)) {
+                throw new RuntimeException('No fue posible generar los cargos mensuales.');
+            }
+
+            $contractStatement = $this->pdo->prepare(
+                'SELECT monthly_rent, administration_fee, start_date, end_date '
+                . 'FROM contracts WHERE id = :id LIMIT 1',
+            );
+            $contractStatement->execute(['id' => (int) $lease['contract_id']]);
+            $contract = $contractStatement->fetch(PDO::FETCH_ASSOC);
+            if (!is_array($contract)) {
+                throw new RuntimeException('No fue posible generar los cargos mensuales.');
+            }
+
+            $period = $this->normalizePeriod($periodMonth);
+            if ($period === null) {
+                throw new RuntimeException('No fue posible generar los cargos mensuales.');
+            }
+            $due = $this->normalizeDate($dueDate);
+            $firstContractMonth = $this->parseDate((string) $contract['start_date'])->format('Y-m-01');
+            $lastContractMonth = $this->parseDate((string) $contract['end_date'])->format('Y-m-01');
+            if ($period < $firstContractMonth || $period > $lastContractMonth) {
+                throw new RuntimeException('No fue posible generar los cargos mensuales.');
+            }
+
+            $expectedAmounts = ['rent' => $this->normalizeAmount((string) $contract['monthly_rent'])];
+            if (
+                $contract['administration_fee'] !== null
+                && $this->isPositiveAmount((string) $contract['administration_fee'])
+            ) {
+                $expectedAmounts['administration'] = $this->normalizeAmount((string) $contract['administration_fee']);
+            }
+
+            $active = $this->pdo->prepare(
+                'SELECT type FROM charges '
+                . 'WHERE lease_id = :lease_id AND period_month = :period_month '
+                . "AND type IN ('rent', 'administration') AND voided_at IS NULL",
+            );
+            $active->execute(['lease_id' => $leaseId, 'period_month' => $period]);
+            $activeTypes = array_fill_keys(array_map('strval', $active->fetchAll(PDO::FETCH_COLUMN)), true);
+
+            $missing = [];
+            foreach ($expectedAmounts as $type => $amount) {
+                if (!isset($activeTypes[$type])) {
+                    $missing[$type] = $amount;
+                }
+            }
+            if ($missing === []) {
+                throw new RuntimeException('Los cargos de este período ya están registrados.');
+            }
+
+            $insert = $this->pdo->prepare(
+                'INSERT INTO charges '
+                . '(lease_id, type, period_month, due_date, amount, created_by_user_id) '
+                . 'VALUES (:lease_id, :type, :period_month, :due_date, :amount, :created_by_user_id)',
+            );
+            $created = [];
+            foreach ($missing as $type => $amount) {
+                $insert->execute([
+                    'lease_id' => $leaseId,
+                    'type' => $type,
+                    'period_month' => $period,
+                    'due_date' => $due,
+                    'amount' => $amount,
+                    'created_by_user_id' => $actorUserId,
+                ]);
+                $created[] = [
+                    'id' => (int) $this->pdo->lastInsertId(),
+                    'lease_id' => $leaseId,
+                    'type' => $type,
+                    'period_month' => $period,
+                    'due_date' => $due,
+                    'amount' => $amount,
+                    'description' => null,
+                ];
+            }
+
+            $this->pdo->commit();
+
+            return $created;
+        } catch (RuntimeException $exception) {
+            $this->rollbackIfNeeded();
+            throw $exception;
+        } catch (Throwable) {
+            $this->rollbackIfNeeded();
+            throw new RuntimeException('No fue posible generar los cargos mensuales.');
+        }
+    }
+
     private function normalizeAmount(string $amount): string
     {
         $amount = trim($amount);
@@ -136,6 +242,18 @@ final readonly class FinanceService
         }
 
         return $normalized;
+    }
+
+    private function isPositiveAmount(string $amount): bool
+    {
+        $amount = trim($amount);
+        if (!preg_match('/\A\d+(?:\.\d{1,2})?\z/', $amount)) {
+            return false;
+        }
+
+        [$whole, $fraction] = array_pad(explode('.', $amount, 2), 2, '');
+
+        return ltrim($whole, '0') !== '' || trim($fraction, '0') !== '';
     }
 
     private function normalizeDate(string $date): string
@@ -177,5 +295,12 @@ final readonly class FinanceService
         }
 
         return $parsed;
+    }
+
+    private function rollbackIfNeeded(): void
+    {
+        if ($this->pdo->inTransaction()) {
+            $this->pdo->rollBack();
+        }
     }
 }
