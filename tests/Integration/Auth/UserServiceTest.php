@@ -239,7 +239,7 @@ final class UserServiceTest extends TestCase
 
         $service->setPermissions($tenantId, []);
         $encoded = $this->pdo->query('SELECT permissions_json FROM users WHERE id = ' . $tenantId)->fetchColumn();
-        self::assertFalse($encoded);
+        self::assertNull($encoded);
 
         self::assertFalse(Permissions::allows(
             ['role' => 'tenant', 'permissions' => ['contracts.manage', 'users.manage']],
