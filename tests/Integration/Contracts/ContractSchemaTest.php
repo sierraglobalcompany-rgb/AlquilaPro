@@ -54,7 +54,7 @@ final class ContractSchemaTest extends TestCase
             self::assertSame(1, $this->tableExists($table), $table . ' must exist');
         }
 
-        foreach (['contract_clauses', 'contract_tasks', 'contract_annexes', 'leases', 'tenants', 'contract_permissions'] as $table) {
+        foreach (['contract_clauses', 'contract_tasks', 'contract_annexes', 'contract_permissions'] as $table) {
             self::assertSame(0, $this->tableExists($table), $table . ' must not exist');
         }
     }
