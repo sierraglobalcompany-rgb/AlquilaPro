@@ -108,6 +108,31 @@ final class ContractSecurityRegressionTest extends TestCase
         self::assertStringContainsString("array_diff(array_keys(\$annex), ['title', 'note'])", $service);
     }
 
+    public function testGenerateLocksDraftBeforeResolvingImmutableEvidence(): void
+    {
+        $service = $this->file('app/Contracts/ContractService.php');
+        $start = strpos($service, 'public function generate(');
+        $end = strpos($service, 'public function privatePdf(', $start === false ? 0 : $start);
+        self::assertNotFalse($start, 'ContractService::generate must exist.');
+        self::assertNotFalse($end, 'ContractService::privatePdf must delimit generate().');
+
+        $generate = substr($service, $start, $end - $start);
+        self::assertIsString($generate);
+
+        $begin = strpos($generate, '$this->pdo->beginTransaction();');
+        $lock = strpos($generate, 'SELECT status FROM contracts WHERE id = :id FOR UPDATE');
+        $resolve = strpos($generate, '$this->resolvedDocument(');
+        $render = strpos($generate, '$renderer->render(');
+
+        self::assertNotFalse($begin, 'generate() must start a transaction.');
+        self::assertNotFalse($lock, 'generate() must lock the draft row.');
+        self::assertNotFalse($resolve, 'generate() must resolve immutable evidence.');
+        self::assertNotFalse($render, 'generate() must render the PDF.');
+        self::assertTrue($begin < $lock, 'generate() must begin its transaction before locking the draft.');
+        self::assertTrue($lock < $resolve, 'generate() must lock the draft before resolving snapshot values.');
+        self::assertTrue($lock < $render, 'generate() must lock the draft before rendering PDF bytes.');
+    }
+
     public function testLongContractTextSurfacesHaveResponsiveWrappingContract(): void
     {
         $css = $this->file('assets/app.css');
