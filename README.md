@@ -5,11 +5,11 @@ Aplicación web mobile-first y autoinstalable para administrar arrendamientos de
 **Dominio objetivo:** `https://alquilapro.sierraglobalcompany.com`  
 **Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + CSS/JS mínimo  
 **Destino:** Hostinger; subdominio o subcarpeta HTTPS.  
-**Estado actual:** F0–F5 CLOSED / VERIFIED / MERGED.  
-**F4 merge SHA:** `3226feeea0b1740659df46fae6499842dfbc894a`.  
+**Estado actual:** F0–F5 CLOSED / VERIFIED / MERGED; F6 CLOSED / VERIFIED / NOT MERGED.  
 **F5 merge SHA:** `8511f8f8eb0c086e84c1170940353ff5460da66b`.  
-**F5 final branch HEAD:** `2010920d7bb1f0c854a32ddb22224abba531f408`.  
-**F5 final CI:** `38292601759` — PHP 8.3/8.4/8.5 PASS; PHP 8.3 `207 tests / 1465 assertions`.
+**F6 functional product HEAD:** `0be1cef83276091be1f7dfb8399da057f6093e35`.  
+**F6 verified closure HEAD:** `4d2bd2ca6ad51d0af347121fe869cfe84a8c8ab6`.  
+**F6 verified closure CI:** `38337944987` — PHP 8.3/8.4/8.5 PASS; PHP 8.3 `234 tests / 1672 assertions`.
 
 ---
 
@@ -20,15 +20,15 @@ Antes de tocar código:
 1. `README.md`;
 2. `docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.2_AUDITADO.md`;
 3. `docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.2_AUDITADO.md`;
-4. `docs/checkpoints/F5_MERGED_2026-10-12.md` como autoridad de integración F5;
-5. `docs/checkpoints/F5_CLOSED_2026-10-12.md` para evidencia técnica pre-merge;
-6. `docs/specs/F5_APPLICATIONS_CANDIDATES_REFERENCES_SPEC.md` y `docs/plans/F5_APPLICATIONS_CANDIDATES_REFERENCES_IMPLEMENTATION_PLAN.md` cuando F5/F6 sea relevante;
+4. `docs/checkpoints/F6_CLOSED_2026-10-12.md` como autoridad técnica F6 actual;
+5. `docs/specs/F6_INSURER_SCREENING_SPEC.md` y `docs/plans/F6_INSURER_SCREENING_IMPLEMENTATION_PLAN.md` cuando F6/F7 sea relevante;
+6. `docs/checkpoints/F5_MERGED_2026-10-12.md` como autoridad histórica de integración F5;
 7. tests y CI reales;
 8. código real del repositorio.
 
 Regla de autoridad:
 
-`SPEC maestra → PLAN maestro → decisiones canónicas README → SPEC/PLAN específica de fase → checkpoint de integración → tests/CI → código`.
+`SPEC maestra → PLAN maestro → decisiones canónicas README → SPEC/PLAN específica de fase → checkpoint final → tests/CI → código`.
 
 V1.1 queda histórica.
 
@@ -66,7 +66,7 @@ Ciclo:
 
 `SCOPE → PRE-KISS → SPEC/DESIGN → PLAN → RED → VERIFY RED → MINIMAL GREEN → VERIFY GREEN → CONVERGE → QA → TWO LAWS GATE → CHECKPOINT → REVIEW → MERGE`.
 
-No merge sin aprobación explícita del usuario. Regla operativa actual: cuando el usuario diga **“continua”**, autoriza ejecutar el siguiente gate previsto; si la fase ya está CLOSED / VERIFIED / READY, esa continuidad incluye el merge correspondiente.
+No merge sin aprobación del usuario. Regla operativa vigente: cuando el usuario diga **“continua”**, autoriza ejecutar el siguiente gate previsto; si la fase ya está CLOSED / VERIFIED / READY, esa continuidad incluye el merge correspondiente.
 
 ---
 
@@ -88,27 +88,30 @@ F3: CLOSED / VERIFIED / MERGED
 F3_MERGE_SHA: b35c32b9f8c99646879e22b1af92e6a54690ceca
 
 F4: CLOSED / VERIFIED / MERGED
-F4_FINAL_HEAD: 5e1faa5d18b4397fcaac1b834d33c1d4fbd8bdea
-F4_PR: #7 CLOSED / MERGED
 F4_MERGE_SHA: 3226feeea0b1740659df46fae6499842dfbc894a
 F4_FINAL_CI: 38213578871 — PHP 8.3 / 8.4 / 8.5 PASS — 151 tests / 873 assertions
 
 F5: CLOSED / VERIFIED / MERGED
-F5_FINAL_PRODUCT_HEAD: e47bae4e4873f9c07b5353a2134ea6b95f20b4c6
 F5_FINAL_BRANCH_HEAD: 2010920d7bb1f0c854a32ddb22224abba531f408
 F5_PR: #8 CLOSED / MERGED
 F5_MERGE_SHA: 8511f8f8eb0c086e84c1170940353ff5460da66b
 F5_FINAL_CI: 38292601759 — PHP 8.3 / 8.4 / 8.5 PASS — 207 tests / 1465 assertions
-F5_SECURITY_QA: PASS
-F5_VISUAL_QA: PASS
+
+F6: CLOSED / VERIFIED / NOT MERGED
+F6_FUNCTIONAL_PRODUCT_HEAD: 0be1cef83276091be1f7dfb8399da057f6093e35
+F6_VERIFIED_CLOSURE_HEAD: 4d2bd2ca6ad51d0af347121fe869cfe84a8c8ab6
+F6_PR: #9 OPEN / DRAFT
+F6_VERIFIED_CLOSURE_CI: 38337944987 — PHP 8.3 / 8.4 / 8.5 PASS — 234 tests / 1672 assertions
+F6_SECURITY_QA: PASS
+F6_VISUAL_QA: PASS — CSS delta 0
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
 
-CURRENT_GATE: F6 — NOT STARTED
-NEXT: F6 SCOPE / PRE-KISS / SPEC / PLAN
+CURRENT_GATE: F6 FINAL DOCUMENT CONVERGENCE / PR REVIEW
+NEXT: F7 only after F6 final CI + review + merge
 ```
 
-No reimplementar F1–F5. No reabrir una fase certificada sin evidencia de regresión o una nueva SPEC aprobada.
+No reimplementar F1–F6. No reabrir una fase certificada sin evidencia de regresión o una nueva SPEC aprobada.
 
 ---
 
@@ -118,7 +121,7 @@ No reimplementar F1–F5. No reabrir una fase certificada sin evidencia de regre
 
 Propietario, administrador, gestor e inquilino usan el mismo login, sesión, CSRF, recuperación, cambio de contraseña y logout. F8 debe evolucionar el auth existente, no duplicarlo.
 
-F5 tampoco creó login de candidato: la continuación pública usa un capability token criptográfico hash-only en DB.
+El candidato no tiene login tradicional: continúa por capability token criptográfico hash-only en DB.
 
 No crear `tenant-login`, `admin-login`, candidate login, segundo `AuthService` ni segunda tabla de sesiones.
 
@@ -130,7 +133,7 @@ F4 usa exactamente:
 - `units` para `apartment|parking`;
 - `unit_media`.
 
-F5 reutiliza `units.id` como unidad actual del candidato y no crea inventario paralelo.
+F5/F6 reutilizan `units.id`; no existe inventario paralelo.
 
 ## 5.3 Precio y disponibilidad
 
@@ -139,7 +142,7 @@ F5 reutiliza `units.id` como unidad actual del candidato y no crea inventario pa
 - intención de publicación: `units.is_public`;
 - publicabilidad real: propiedad activa + `available` + `is_public=1` + precio + descripción + requisitos + al menos una foto válida.
 
-F5 no cambia `units.status` automáticamente al iniciar o enviar una candidatura.
+Ni F5 ni F6 cambian `units.status` automáticamente.
 
 ## 5.4 Identificador y media pública
 
@@ -153,82 +156,128 @@ Foto pública:
 
 `GET /catalog/{publicKey}/photo/{position}`.
 
-No se expone `unit_media.id` en URLs públicas. Las fotos viven fuera del webroot y solo se sirven mientras la unidad siga publicable. Cache F4: `no-store`.
+No se expone `unit_media.id` en URLs públicas. Las fotos viven fuera del webroot y solo se sirven mientras la unidad siga publicable. Video V1 sigue siendo enlace HTTPS externo.
 
-Video V1: enlace HTTPS externo; sin upload, transcoding ni iframe arbitrario.
+## 5.5 Candidato único
 
-## 5.5 Superficie pública
+F5 mantiene una sola entidad `candidates` y una sola `unit_id` activa. No existe `lead` ni `application` paralelo.
 
-- visitante instalado en `/` → landing pública;
-- usuario autenticado en `/` → shell privado F3;
-- `/catalog` → listado público;
-- `/catalog/{publicKey}` → detalle;
-- F5 añade CTA **Aplicar** en detalle publicable;
-- `GET|POST /apply/{publicKey}` inicia candidatura;
-- `GET|POST /apply/continue/{token}` continúa el mismo candidato;
-- rutas públicas F5 nunca usan candidate/document IDs internos.
+Estados F5 exactos:
 
-## 5.6 Permisos
+`new | incomplete | verification | pending_screening | withdrawn`.
+
+F6 comienza únicamente sobre `pending_screening` y **no duplica los estados de aseguradora en `candidates.status`**.
+
+## 5.6 Estudio de aseguradora único
+
+F6 usa exactamente una tabla `screening_processes` y un servicio `ScreeningService`.
+
+SURA es el proveedor inicial sugerido en UI, no una arquitectura específica:
+
+- no `sura_*` tables;
+- no `SuraService`;
+- no adapter/API/webhook/scraping/polling;
+- no proveedor CRUD paralelo.
+
+Estados del screening:
+
+`pending | in_progress | approved | rejected`.
+
+`approved|rejected` son terminales en F6. El resultado no autoaprueba al candidato y no crea contrato.
+
+## 5.7 Permisos
 
 F4:
 
 - `properties.view`;
 - `properties.manage`.
 
-F5 añade exactamente:
+F5/F6:
 
 - `candidates.view`;
 - `candidates.manage`.
 
-Owner conserva bypass.
+F6 agrega **0 permisos**. Owner conserva bypass.
+
+## 5.8 Portal candidato y screening
+
+Rutas públicas de aplicación siguen siendo las mismas F5:
+
+- `GET|POST /apply/{publicKey}`;
+- `GET|POST /apply/continue/{token}` y subacciones existentes.
+
+F6 agrega **0 rutas públicas**. El screening se proyecta dentro de la continuación existente mediante `ScreeningService::publicForCandidate()`.
+
+La URL externa del estudio:
+
+- debe ser HTTPS absoluta;
+- no recibe basePath ni token;
+- usa `noopener noreferrer`;
+- no se consulta server-side.
 
 ---
 
 # 6. RESULTADO F5
 
-F5 quedó implementada, verificada y mergeada con:
+F5 está **CLOSED / VERIFIED / MERGED**. Autoridad:
 
-- candidato único candidate-centric; no `lead` ni `application` paralelo;
-- +4 tablas exactas: `candidates`, `candidate_references`, `unit_application_requirements`, `candidate_documents`;
-- +2 permisos exactos;
-- +2 servicios exactos: `CandidateService`, `CandidateDocumentService`;
-- una sola `unit_id` activa por candidato;
-- identidad única normalizada por `(document_type, document_number)`;
-- duplicate identity genérico, sin token ni datos privados;
-- token raw 256-bit, SHA-256 persistido, TTL 7 días, rotación invalidante;
-- raw continuation token redactado de error logs;
-- perfil, referencias y cambio controlado de unidad;
-- requisitos estructurados por unidad sin delete físico;
-- documentos PDF/JPEG/PNG <=10 MiB, MIME real y storage privado;
-- submit con validación física de documentos obligatorios;
-- administración privada de candidatos y documentos anti-IDOR;
-- CTA Aplicar por `public_key`;
-- lifecycle que conserva candidatos existentes si la unidad deja de ser publicable;
-- CSRF global, forced-password, basePath y auth existentes reutilizados;
-- throttle V1 session-local sin mutación al 429;
-- visual QA con wrap de valores largos y primitives F3/F4 reutilizados;
-- +0 dependencias runtime;
-- +0 npm;
-- +0 auth paralelo;
-- +0 notification engine;
-- LEY 1 KISS PASS;
-- LEY 2 CERO RUIDO PASS.
+- `docs/checkpoints/F5_CLOSED_2026-10-12.md`;
+- `docs/checkpoints/F5_MERGED_2026-10-12.md`.
 
-Checkpoint técnico: `docs/checkpoints/F5_CLOSED_2026-10-12.md`.  
-Checkpoint de integración: `docs/checkpoints/F5_MERGED_2026-10-12.md`.
+No reabrir F5 sin evidencia.
 
 ---
 
-# 7. ROADMAP V1.2
+# 7. RESULTADO F6
+
+F6 quedó implementada y verificada con:
+
+- +1 tabla exacta `screening_processes`;
+- +1 servicio exacto `ScreeningService`;
+- UNIQUE candidate_id;
+- responsable interno nullable con FK a users;
+- proveedor genérico y SURA solo como prefill;
+- estados `pending|in_progress|approved|rejected`;
+- terminal inmutable y resultado obligatorio;
+- timestamps de inicio/resultado;
+- URL HTTPS opcional sin requests externos;
+- administración dentro del candidate detail existente;
+- una sola mutación admin `/admin/candidates/{id}/screening` dentro del route file existente;
+- `candidates.view/manage` reutilizados;
+- auth / forced-password / CSRF / basePath reutilizados;
+- portal candidato dentro de `/apply/continue/{token}`;
+- proyección pública por allowlist;
+- no IDs/notes/support/responsible en portal;
+- enlace externo `noopener noreferrer`;
+- fallback sin URL;
+- screening terminal visible sin CTA;
+- withdrawal conserva estudio y bloquea mutación/CTA;
+- screening no cambia candidate status ni unit status;
+- security regression PASS;
+- visual audit PASS con CSS delta 0;
+- dependencias runtime +0;
+- npm +0;
+- auth +0;
+- permisos +0;
+- route files +0;
+- API SURA +0;
+- LEY 1 KISS PASS;
+- LEY 2 CERO RUIDO PASS.
+
+Checkpoint canónico: `docs/checkpoints/F6_CLOSED_2026-10-12.md`.
+
+---
+
+# 8. ROADMAP V1.2
 
 - F0 — SPEC + plan ✅
 - F1 — Foundation + installer ✅
 - F2 — Auth + usuarios + permisos ✅
 - F3 — Shell móvil + sistema visual ✅
 - F4 — Propiedades + unidades + landing + catálogo público ✅ CLOSED / VERIFIED / MERGED
-- F5 — Aplicaciones + candidatos + referencias ✅ **CLOSED / VERIFIED / MERGED**
-- **F6 — Aseguradora/SURA — NEXT / NOT STARTED**
-- F7 — Contratos
+- F5 — Aplicaciones + candidatos + referencias ✅ CLOSED / VERIFIED / MERGED
+- F6 — Aseguradora/SURA ✅ **CLOSED / VERIFIED / NOT MERGED**
+- **F7 — Contratos — BLOCKED hasta merge de F6**
 - F8 — Inquilino + lease + portal usando auth único
 - F9 — Cargos + cartera
 - F10 — Medios de pago
@@ -251,29 +300,28 @@ Checkpoint de integración: `docs/checkpoints/F5_MERGED_2026-10-12.md`.
 
 ---
 
-# 8. PROTOCOLO DE RECUPERACIÓN
+# 9. PROTOCOLO DE RECUPERACIÓN
 
 Al retomar trabajo:
 
-1. verificar `main` y HEAD reales;
-2. leer `docs/checkpoints/F5_MERGED_2026-10-12.md`;
-3. leer SPEC/PLAN maestra V1.2 para el alcance exacto de F6;
-4. ejecutar PRE-KISS antes de diseñar F6;
-5. extender el mismo candidato desde `pending_screening`, sin copiarlo a una entidad paralela;
-6. crear SPEC/PLAN específica de F6 solo si elimina ambigüedad real;
-7. mantener KISS + Cero Ruido + TDD por microfases;
-8. no reabrir F5 sin evidencia.
+1. verificar `main`, HEAD y PR #9 reales;
+2. leer `docs/checkpoints/F6_CLOSED_2026-10-12.md`;
+3. confirmar la CI exacta del HEAD final de PR #9;
+4. no reabrir F6 sin evidencia de regresión o nueva SPEC;
+5. F7 puede usar candidato + screening aprobados, sin copiarlos a entidades paralelas;
+6. mantener KISS + Cero Ruido + TDD por microfases;
+7. no abrir implementación F7 antes de integrar F6.
 
 ---
 
-# 9. GATE ACTUAL
+# 10. GATE ACTUAL
 
 ```text
-LAST_PHASE: F5 CLOSED / VERIFIED / MERGED
-F5_MERGE_SHA: 8511f8f8eb0c086e84c1170940353ff5460da66b
-F5_FINAL_CI: 38292601759
-PR: #8 CLOSED / MERGED
-NEXT_PHASE: F6 — ASEGURADORA / SURA
-F6_STATUS: NOT STARTED
-NEXT_ACTION: SCOPE → PRE-KISS → SPEC/DESIGN → PLAN
+LAST_PHASE: F6 CLOSED / VERIFIED / NOT MERGED
+F6_VERIFIED_CLOSURE_HEAD: 4d2bd2ca6ad51d0af347121fe869cfe84a8c8ab6
+F6_VERIFIED_CLOSURE_CI: 38337944987
+PR: #9 OPEN / DRAFT UNTIL FINAL REVIEW
+NEXT_PHASE: F7 — CONTRATOS
+F7_STATUS: BLOCKED UNTIL F6 MERGE
+NEXT_ACTION: FINAL DOC CONVERGENCE → EXACT CI → FINAL PR REVIEW → READY FOR REVIEW → STOP BEFORE MERGE
 ```
