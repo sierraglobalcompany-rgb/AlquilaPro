@@ -34,7 +34,11 @@ final class LeaseActivationTest extends TestCase
     public function testOnlyFinalizedContractCanActivateLease(): void
     {
         foreach (['draft', 'generated'] as $status) {
-            $fixture = $this->fixture(contractStatus: $status, candidateEmail: $status . '@example.com');
+            $fixture = $this->fixture(
+                contractStatus: $status,
+                candidateEmail: $status . '@example.com',
+                suffix: $status,
+            );
             $this->assertRejected(fn () => $this->service()->activate($fixture['contract_id'], $this->actorId, 1791870000));
             self::assertSame(0, $this->tableCount('leases'));
             self::assertSame('available', $this->unitStatus($fixture['unit_id']));
