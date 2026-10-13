@@ -121,6 +121,7 @@ contract_id BIGINT UNSIGNED NOT NULL UNIQUE
 user_id BIGINT UNSIGNED NOT NULL
 activated_by_user_id BIGINT UNSIGNED NULL
 activated_at DATETIME NOT NULL
+ended_by_user_id BIGINT UNSIGNED NULL
 ended_at DATETIME NULL
 ```
 
@@ -129,9 +130,11 @@ ended_at DATETIME NULL
 - UNIQUE `contract_id`;
 - INDEX `user_id`;
 - INDEX `activated_by_user_id`;
+- INDEX `ended_by_user_id`;
 - FK `contract_id → contracts.id ON DELETE RESTRICT`;
 - FK `user_id → users.id ON DELETE RESTRICT`;
-- FK `activated_by_user_id → users.id ON DELETE SET NULL`.
+- FK `activated_by_user_id → users.id ON DELETE SET NULL`;
+- FK `ended_by_user_id → users.id ON DELETE SET NULL`.
 
 No `status` persistido.
 
@@ -195,7 +198,9 @@ El portal no depende de permisos administrativos; depende de identidad autentica
 
 No se habilita `tenant` en el formulario genérico `/admin/users`.
 
-La identidad se crea exclusivamente desde el flujo de activación del lease mediante una extensión mínima de `UserService`.
+`UserService::create()` conserva su catálogo administrativo actual (`admin|gestor`). No se amplía ese método para aceptar `tenant`, porque la ruta `/admin/users` recibe el rol desde formulario y eso abriría creación manual de tenant huérfano.
+
+La identidad tenant se crea exclusivamente desde activación F8 mediante un método específico y mínimo de `UserService` (nombre final a definir en plan, por ejemplo `createTenantIdentity()`).
 
 Datos de alta:
 
@@ -231,7 +236,7 @@ Razones:
 
 Activación F8 no auto-vincula un candidato a un usuario existente por coincidencia de email.
 
-Si el email del candidato ya existe en `users` y no pertenece a una activación F8 previamente reconocida, el flujo falla cerrado con error administrativo explícito.
+Si el email del candidato ya existe en `users`, el flujo falla cerrado con error administrativo explícito.
 
 No se cambia el rol de un staff existente a `tenant` ni se vincula silenciosamente una identidad ajena.
 
@@ -310,6 +315,7 @@ Reglas:
 - requiere `contracts.manage`;
 - lease debe estar ACTIVE;
 - lock del lease;
+- registra `ended_by_user_id`;
 - `ended_at = now`;
 - no altera contrato F7;
 - no borra usuario;
@@ -324,9 +330,23 @@ El tenant puede conservar acceso autenticado a información histórica de sus le
 
 ---
 
-## 8. PORTAL DEL INQUILINO
+## 8. INTEGRIDAD DE `units.status`
 
-### 8.1 Rutas privadas mínimas
+`units.status` continúa siendo la única autoridad de disponibilidad/ocupación.
+
+F8 debe impedir una contradicción nueva: mientras exista un lease ACTIVE para una unidad, ninguna mutación administrativa existente puede cambiar esa unidad desde `occupied` a `available`, `in_process`, `inactive` o `maintenance`.
+
+La protección debe incorporarse al flujo canónico de actualización de unidad existente, sin crear `is_occupied`, `lease_status`, `catalog_available` ni segunda fuente.
+
+Después de terminar el lease, el administrador puede elegir explícitamente el siguiente estado usando el editor de unidad existente.
+
+F8 no decide automáticamente si la unidad queda `available`, `maintenance` o `inactive`.
+
+---
+
+## 9. PORTAL DEL INQUILINO
+
+### 9.1 Rutas privadas mínimas
 
 ```text
 GET /tenant
@@ -336,7 +356,7 @@ GET /tenant/leases/{id}/contract
 
 No rutas públicas F8.
 
-### 8.2 Ownership
+### 9.2 Ownership
 
 Cada lectura debe derivar contexto desde el usuario de sesión:
 
@@ -350,7 +370,7 @@ Lease inexistente o ajeno:
 
 `404` preferido para no filtrar existencia.
 
-### 8.3 `/tenant`
+### 9.3 `/tenant`
 
 Muestra los leases propios, priorizando ACTIVE.
 
@@ -366,7 +386,7 @@ Para cada lease puede mostrar únicamente datos ya existentes y seguros:
 - estado derivado Active/Ended;
 - enlace al contrato.
 
-### 8.4 Detalle contextual por tipo de unidad
+### 9.4 Detalle contextual por tipo de unidad
 
 Apartamento:
 
@@ -386,7 +406,7 @@ Parqueadero:
 
 No se muestran módulos de vivienda que no apliquen a parking.
 
-### 8.5 Contrato PDF
+### 9.5 Contrato PDF
 
 El portal no lee archivos directamente.
 
@@ -405,7 +425,7 @@ No se expone `pdf_stored_name`.
 
 ---
 
-## 9. NAVEGACIÓN / SHELL
+## 10. NAVEGACIÓN / SHELL
 
 Después del login:
 
@@ -422,13 +442,13 @@ se conserva el home privado actual.
 
 No se crea un segundo layout de autenticación.
 
-El portal puede reutilizar `renderApp()` y shell F3 con navegación mínima pertinente.
+El portal reutiliza `renderApp()` y shell F3 con navegación mínima pertinente.
 
 No se muestran tarjetas administrativas a tenant.
 
 ---
 
-## 10. ADMINISTRACIÓN DE USUARIOS
+## 11. ADMINISTRACIÓN DE USUARIOS
 
 `/admin/users` no debe convertirse en gestor manual de tenants.
 
@@ -438,11 +458,11 @@ Usuarios `tenant` pueden aparecer en lectura administrativa si hacerlo no rompe 
 - no se asignan permisos administrativos;
 - desactivarlos mediante operación existente bloquea login, pero no borra lease/histórico.
 
-Si la UI actual necesita filtrar opciones de rol, solo conserva owner/admin/gestor según reglas ya existentes.
+El catálogo de roles permitido por el alta genérica sigue sin incluir `tenant`.
 
 ---
 
-## 11. REGLAS DE INTEGRIDAD
+## 12. REGLAS DE INTEGRIDAD
 
 1. Un contrato puede producir máximo un lease.
 2. Solo contrato `finalized` puede activarse.
@@ -451,15 +471,17 @@ Si la UI actual necesita filtrar opciones de rol, solo conserva owner/admin/gest
 5. Activación serializa por unidad para evitar doble ocupación concurrente.
 6. `units.status` sigue siendo única fuente de disponibilidad operativa.
 7. Activación cambia `available|in_process → occupied`.
-8. Terminación no presume `occupied → available`.
-9. Contrato F7 y PDF son inmutables desde F8.
-10. F8 no cambia `candidates.status` ni `screening_processes`.
-11. F8 no copia economía/fechas contractuales.
-12. F8 no borra lease ni contrato desde operación normal.
+8. Mientras haya lease ACTIVE, la unidad no puede salir de `occupied` por el editor existente.
+9. Terminación no presume `occupied → available`.
+10. Contrato F7 y PDF son inmutables desde F8.
+11. F8 no cambia `candidates.status` ni `screening_processes`.
+12. F8 no copia economía/fechas contractuales.
+13. F8 no borra lease ni contrato desde operación normal.
+14. Terminar lease registra actor + timestamp una sola vez.
 
 ---
 
-## 12. SEGURIDAD
+## 13. SEGURIDAD
 
 Debe conservar:
 
@@ -483,15 +505,16 @@ Pruebas específicas:
 
 - tenant A no puede leer lease/PDF de tenant B;
 - staff sin `contracts.manage` no activa/termina lease;
-- tenant no puede acceder a `/admin/*` por su rol vacío de permisos;
+- tenant no puede acceder a `/admin/*` por su rol sin permisos;
 - password temporal obliga cambio;
 - usuario desactivado no puede entrar;
 - colisión email falla cerrado;
-- activation concurrency no crea dos leases activos para la misma unidad.
+- activation concurrency no crea dos leases activos para la misma unidad;
+- unidad con lease ACTIVE no puede ser desocupada/publicada por mutación administrativa lateral.
 
 ---
 
-## 13. UI / UX MÍNIMA
+## 14. UI / UX MÍNIMA
 
 ### Administración
 
@@ -500,7 +523,8 @@ En contrato finalized:
 - resumen de unidad/candidato;
 - botón `Activar arrendamiento`;
 - tras éxito: mostrar email + contraseña temporal una única vez con advertencia de entrega segura;
-- si ya existe lease: mostrar estado y enlace contextual, sin repetir credencial.
+- si ya existe lease: mostrar estado y enlace contextual, sin repetir credencial;
+- si lease ACTIVE: botón `Finalizar arrendamiento` con confirmación simple.
 
 ### Tenant
 
@@ -526,7 +550,7 @@ Esos módulos aparecerán solo cuando su fase real exista.
 
 ---
 
-## 14. NO INCLUYE F8
+## 15. NO INCLUYE F8
 
 - cargos/cartera F9;
 - medios de pago F10;
@@ -550,20 +574,22 @@ Esos módulos aparecerán solo cuando su fase real exista.
 
 ---
 
-## 15. TEST PLAN OBLIGATORIO PARA FUTURO PLAN DE IMPLEMENTACIÓN
+## 16. TEST PLAN OBLIGATORIO PARA FUTURO PLAN DE IMPLEMENTACIÓN
 
 ### Schema
 
 - migration crea exactamente `leases` y ninguna tabla tenant paralela;
 - `contract_id` UNIQUE;
 - FKs correctas/restrictivas;
+- actor de activación y terminación preservados con `SET NULL`;
 - no `unit_id`, `candidate_id`, economía ni fechas duplicadas en leases;
 - no status persistido.
 
 ### Auth/User
 
-- tenant role solo por flujo F8;
-- formulario admin genérico no crea tenant;
+- `UserService::create()` continúa rechazando `tenant`;
+- tenant identity solo se crea por método específico F8;
+- formulario admin genérico no crea tenant ni por POST manipulado;
 - password temporal aleatoria/hash-only;
 - must-change-password obligatorio;
 - login usa email existente;
@@ -582,11 +608,18 @@ Esos módulos aparecerán solo cuando su fase real exista.
 - doble activación concurrente por misma unidad produce solo un ACTIVE;
 - no muta candidate/screening/contract snapshot.
 
+### Unit authority
+
+- unidad con lease ACTIVE permanece `occupied`;
+- update lateral a `available|in_process|inactive|maintenance` se rechaza;
+- tras `ended_at`, el editor vuelve a permitir transición manual según reglas existentes;
+- catálogo nunca publica unidad con lease ACTIVE.
+
 ### End
 
-- solo active;
-- set ended_at una vez;
-- segunda terminación rechazada/idempotencia definida por plan;
+- solo ACTIVE;
+- guarda `ended_by_user_id + ended_at` una vez;
+- segunda terminación falla cerrado o queda idempotente según decisión exacta del plan, sin reescribir actor/fecha;
 - no libera unidad automáticamente;
 - no borra/desactiva usuario;
 - histórico permanece visible al dueño.
@@ -615,7 +648,7 @@ Esos módulos aparecerán solo cuando su fase real exista.
 
 ---
 
-## 16. TWO LAWS GATE — DISEÑO
+## 17. TWO LAWS GATE — DISEÑO
 
 ```text
 LEY_1_KISS: PASS PROVISIONAL
@@ -624,7 +657,7 @@ LEY_2_CERO_RUIDO: PASS PROVISIONAL
 ADDED:
 - 1 table: leases
 - 1 domain class: LeaseService
-- tenant role support inside existing users/auth
+- tenant identity path inside existing UserService/auth
 - private tenant routes/views
 
 REMOVED_FROM_INITIAL_SCOPE:
@@ -651,18 +684,19 @@ PUBLIC_ROUTES_DELTA: 0
 
 ---
 
-## 17. OPEN REVIEW POINTS
+## 18. OPEN REVIEW POINTS
 
-Esta SPEC pide aprobación explícita sobre dos decisiones que refinan el SCOPE inicial:
+Esta SPEC pide aprobación explícita sobre tres decisiones que refinan/cerran el SCOPE inicial:
 
 1. **Eliminar la tabla `tenants`** y representar tenant como `users(role=tenant)` + relación contractual en `leases`.
-2. **Incluir `ended_at` y terminación mínima** en F8, sin liberar automáticamente la unidad.
+2. **Incluir `ended_at + ended_by_user_id` y terminación mínima** en F8, sin liberar automáticamente la unidad.
+3. **Bloquear cambios laterales de `units.status` mientras exista lease ACTIVE**, manteniendo `units.status` como única autoridad.
 
-Si estas dos decisiones se aprueban, el siguiente gate será redactar el PLAN F8. No se debe implementar antes.
+Si estas decisiones se aprueban, el siguiente gate será redactar el PLAN F8. No se debe implementar antes.
 
 ---
 
-## 18. GATE
+## 19. GATE
 
 ```text
 F7: CLOSED / VERIFIED / MERGED
