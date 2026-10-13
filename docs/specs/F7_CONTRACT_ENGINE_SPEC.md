@@ -4,7 +4,7 @@
 **Proyecto:** Alquila Pro  
 **Repositorio:** `sierraglobalcompany-rgb/AlquilaPro`  
 **Fase:** F7 — Motor de contratos  
-**Estado:** **SPEC ESCRITA — PENDIENTE DE APROBACIÓN DEL USUARIO**  
+**Estado:** **SPEC ESPECÍFICA — APROBADA**  
 **Base exacta:** `main @ 1b9ee85ebb224b310d4ab4f0c84a28628b86b747`  
 **Branch:** `impl/f7-contracts-20261012`
 
@@ -14,7 +14,7 @@
 
 Orden vigente:
 
-`SPEC maestra V1.2 → PLAN maestro V1.2 → README → esta SPEC F7 → futuro PLAN F7 → tests/CI → código real`.
+`SPEC maestra V1.2 → PLAN maestro V1.2 → README → esta SPEC F7 → PLAN F7 → tests/CI → código real`.
 
 F0–F6 están cerradas; F6 está **CLOSED / VERIFIED / MERGED**.
 
@@ -1042,13 +1042,13 @@ F7_PRE_KISS: APPROVED
 F7_DESIGN_IN_CHAT: APPROVED
 F7_PDF_SPIKE: PASS
 F7_SPEC_WRITTEN: YES
-F7_SPEC_APPROVED_BY_USER: NO
-F7_PLAN_WRITTEN: NO
+F7_SPEC_APPROVED_BY_USER: YES
+F7_PLAN_WRITTEN: YES
 F7_IMPLEMENTATION_ALLOWED: NO
 ```
 
 Siguiente gate:
 
-`USER APPROVES SPEC → WRITE F7 IMPLEMENTATION PLAN → USER APPROVES PLAN → RED F7.1`.
+`USER APPROVES F7 IMPLEMENTATION PLAN → RED F7.1`.
 
-Presentar esta SPEC no autoriza todavía PLAN ni código productivo.
+La SPEC está aprobada. El PLAN existe pero requiere aprobación explícita del siguiente gate antes de iniciar RED o código productivo.
