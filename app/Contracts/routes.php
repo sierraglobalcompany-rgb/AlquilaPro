@@ -44,6 +44,195 @@ return static function (App $app, array $deps): void {
         return $user;
     };
 
+    $jsonField = static function (
+        array $body,
+        string $field,
+        string $default,
+        bool $list,
+    ): array {
+        $raw = trim((string) ($body[$field] ?? $default));
+        if ($raw === '') {
+            $raw = $default;
+        }
+
+        try {
+            $decoded = json_decode($raw, true, 64, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            throw new RuntimeException('Los datos contractuales en JSON no son válidos.');
+        }
+
+        if (!is_array($decoded)) {
+            throw new RuntimeException('Los datos contractuales en JSON no son válidos.');
+        }
+        if ($list && !array_is_list($decoded)) {
+            throw new RuntimeException('Los datos contractuales en JSON no son válidos.');
+        }
+        if (!$list && $decoded !== [] && array_is_list($decoded)) {
+            throw new RuntimeException('Los datos contractuales en JSON no son válidos.');
+        }
+
+        return $decoded;
+    };
+
+    $versionOptions = static function (?string $documentType = null, bool $activeOnly = false) use ($contracts): array {
+        $options = [];
+        foreach ($contracts->listTemplates() as $template) {
+            if ($activeOnly && !$template['is_active']) {
+                continue;
+            }
+            if ($documentType !== null && $template['document_type'] !== $documentType) {
+                continue;
+            }
+
+            foreach ($contracts->listTemplateVersions((int) $template['id']) as $version) {
+                $options[] = [
+                    'id' => (int) $version['id'],
+                    'template_name' => (string) $template['name'],
+                    'document_type' => (string) $template['document_type'],
+                    'version_number' => (int) $version['version_number'],
+                ];
+            }
+        }
+
+        return $options;
+    };
+
+    $app->get('/admin/contracts', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ) use ($adminGuard, $contracts, $view, $csrf, $versionOptions): ResponseInterface {
+        $user = $adminGuard($response, 'contracts.view');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $response->getBody()->write($view->renderApp('contracts', [
+            'pageTitle' => 'Contratos',
+            'user' => $user,
+            'activeNav' => 'apps',
+            'csrfToken' => $csrf->token(),
+            'contracts' => $contracts->listContracts(),
+            'versionOptions' => $versionOptions(null, true),
+            'canManage' => Permissions::allows($user, 'contracts.manage'),
+        ]));
+
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    });
+
+    $app->post('/admin/contracts', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ) use ($adminGuard, $contracts, $jsonField, $path): ResponseInterface {
+        $user = $adminGuard($response, 'contracts.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $body = (array) ($request->getParsedBody() ?? []);
+        try {
+            $created = $contracts->createDraft(
+                (int) ($body['candidate_id'] ?? 0),
+                (int) ($body['template_version_id'] ?? 0),
+                (int) $user['id'],
+                [
+                    'monthly_rent' => $body['monthly_rent'] ?? null,
+                    'administration_fee' => $body['administration_fee'] ?? null,
+                    'start_date' => $body['start_date'] ?? null,
+                    'end_date' => $body['end_date'] ?? null,
+                    'duration_text' => $body['duration_text'] ?? null,
+                    'manual_variables' => $jsonField($body, 'manual_variables_json', '{}', false),
+                    'tasks' => $jsonField($body, 'tasks_json', '[]', true),
+                    'annexes' => $jsonField($body, 'annexes_json', '[]', true),
+                ],
+                time(),
+            );
+        } catch (RuntimeException $exception) {
+            $response->getBody()->write($exception->getMessage());
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/admin/contracts/' . (int) $created['id']))
+            ->withStatus(303);
+    });
+
+    $app->get('/admin/contracts/{id:[0-9]+}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminGuard, $contracts, $view, $csrf, $versionOptions): ResponseInterface {
+        $user = $adminGuard($response, 'contracts.view');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $contract = $contracts->findContract((int) $args['id']);
+        if ($contract === null) {
+            return $response->withStatus(404);
+        }
+
+        $previewHtml = null;
+        if ($contract['status'] === 'draft') {
+            $previewHtml = $contracts->previewHtml((int) $contract['id']);
+        }
+
+        $response->getBody()->write($view->renderApp('contract_detail', [
+            'pageTitle' => 'Contrato #' . (int) $contract['id'],
+            'user' => $user,
+            'activeNav' => 'apps',
+            'csrfToken' => $csrf->token(),
+            'contract' => $contract,
+            'previewHtml' => $previewHtml,
+            'versionOptions' => $versionOptions((string) $contract['document_type']),
+            'canManage' => Permissions::allows($user, 'contracts.manage'),
+        ]));
+
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    });
+
+    $app->post('/admin/contracts/{id:[0-9]+}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminGuard, $contracts, $jsonField, $path): ResponseInterface {
+        $user = $adminGuard($response, 'contracts.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $contractId = (int) $args['id'];
+        $body = (array) ($request->getParsedBody() ?? []);
+
+        try {
+            if (trim((string) ($body['action'] ?? '')) !== 'save') {
+                throw new RuntimeException('La acción contractual no es válida.');
+            }
+
+            $input = [
+                'monthly_rent' => $body['monthly_rent'] ?? null,
+                'administration_fee' => $body['administration_fee'] ?? null,
+                'start_date' => $body['start_date'] ?? null,
+                'end_date' => $body['end_date'] ?? null,
+                'duration_text' => $body['duration_text'] ?? null,
+                'manual_variables' => $jsonField($body, 'manual_variables_json', '{}', false),
+                'tasks' => $jsonField($body, 'tasks_json', '[]', true),
+                'annexes' => $jsonField($body, 'annexes_json', '[]', true),
+            ];
+            if (array_key_exists('template_version_id', $body)) {
+                $input['template_version_id'] = $body['template_version_id'];
+            }
+
+            $contracts->updateDraft($contractId, $input, time());
+        } catch (RuntimeException $exception) {
+            $response->getBody()->write($exception->getMessage());
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/admin/contracts/' . $contractId))
+            ->withStatus(303);
+    });
+
     $app->get('/admin/contract-templates', static function (
         ServerRequestInterface $request,
         ResponseInterface $response,
