@@ -1,10 +1,11 @@
 # F8 — INQUILINO + LEASE + PORTAL — SPEC
 
 **Fecha:** 2026-10-13 (America/Bogota)  
-**Estado:** DRAFT / USER REVIEW REQUIRED / IMPLEMENTATION NOT AUTHORIZED  
+**Estado:** APPROVED BY USER / PLAN APPROVED / IMPLEMENTATION IN PROGRESS  
 **Base:** `main @ f4a7e3f4d5ec7dc9cdc0f3a7e78777f98c85461d`  
 **F7 integrado:** `b6ab43fefd7b4d2933e3e3adff0ac4c23efdf1b8`  
-**Branch de diseño:** `spec/f8-tenant-lease-portal-20261013`
+**Branch de diseño:** `spec/f8-tenant-lease-portal-20261013`  
+**Branch de implementación:** `impl/f8-tenant-lease-portal-20261013`
 
 ---
 
@@ -12,9 +13,9 @@
 
 Orden aplicable:
 
-`SPEC maestra V1.2 → PLAN maestro V1.2 → README → esta SPEC F8 → plan F8 futuro → tests/CI → código real`.
+`SPEC maestra V1.2 → PLAN maestro V1.2 → README → esta SPEC F8 → plan F8 → tests/CI → código real`.
 
-Esta SPEC no autoriza implementación. Primero debe ser revisada y aprobada por el usuario; solo después puede redactarse el plan de implementación.
+Esta SPEC fue aprobada por el usuario el 2026-10-13. El PLAN F8 también fue aprobado y la ejecución Native quedó autorizada. La implementación debe seguir el plan y detenerse antes del merge hasta una autorización explícita posterior.
 
 ---
 
@@ -53,7 +54,7 @@ y
 
 Agregar esa tabla duplicaría una relación ya demostrable sin aportar estado, integridad o consulta imprescindible.
 
-**Decisión propuesta para aprobación:** F8 agrega solo `leases`.
+**Decisión aprobada:** F8 agrega solo `leases`.
 
 Si en una fase futura aparece información/ciclo real de tenant que no pertenezca a `users`, `candidates` o `leases`, se reevalúa con evidencia.
 
@@ -695,15 +696,13 @@ PUBLIC_ROUTES_DELTA: 0
 
 ---
 
-## 18. OPEN REVIEW POINTS
+## 18. REVIEW POINTS — RESOLVED
 
-Esta SPEC pide aprobación explícita sobre tres decisiones que refinan/cerran el SCOPE inicial:
+Aprobados por el usuario el 2026-10-13:
 
-1. **Eliminar la tabla `tenants`** y representar tenant como `users(role=tenant)` + relación contractual en `leases`.
-2. **Incluir `ended_at + ended_by_user_id` y terminación mínima** en F8, sin liberar automáticamente la unidad.
-3. **Bloquear cambios laterales de `units.status` mientras exista lease ACTIVE**, manteniendo `units.status` como única autoridad.
-
-Si estas decisiones se aprueban, el siguiente gate será redactar el PLAN F8. No se debe implementar antes.
+1. **Sin tabla `tenants`**: tenant se representa como `users(role=tenant)` + relación contractual en `leases`.
+2. **Terminación mínima**: `ended_at + ended_by_user_id`, sin liberar automáticamente la unidad.
+3. **Bloqueo lateral de `units.status`** mientras exista lease ACTIVE, manteniendo `units.status` como única autoridad.
 
 ---
 
@@ -712,8 +711,9 @@ Si estas decisiones se aprueban, el siguiente gate será redactar el PLAN F8. No
 ```text
 F7: CLOSED / VERIFIED / MERGED
 F8_SCOPE_PRE_KISS: APPROVED BY USER
-F8_SPEC_STATUS: DRAFT / USER REVIEW REQUIRED
-F8_PLAN_ALLOWED: NO
-F8_IMPLEMENTATION_ALLOWED: NO
-NEXT: USER REVIEW / APPROVAL OF THIS SPEC
+F8_SPEC_STATUS: APPROVED BY USER 2026-10-13
+F8_PLAN_STATUS: APPROVED BY USER 2026-10-13
+F8_IMPLEMENTATION_ALLOWED: YES / NATIVE EXECUTION
+F8_MERGE_ALLOWED: NO
+NEXT: TASK 1 — SCHEMA RED
 ```
