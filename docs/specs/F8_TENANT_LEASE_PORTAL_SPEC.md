@@ -221,6 +221,8 @@ Contraseña temporal:
 - nunca se registra en logs, URL, DB ni checkpoint;
 - el inquilino debe cambiarla antes de entrar al portal por el gate existente `must_change_password`.
 
+Si la contraseña temporal se pierde después de la pantalla de activación, **no se vuelve a revelar ni regenerar silenciosamente**. El administrador usa el mecanismo existente de reset link, que mantiene una sola autoridad de recuperación.
+
 ### 5.4 Documento como contraseña — RECHAZADO
 
 La idea histórica de usar documento como login/contraseña no se implementa.
@@ -455,10 +457,14 @@ No se muestran tarjetas administrativas a tenant.
 Usuarios `tenant` pueden aparecer en lectura administrativa si hacerlo no rompe UI, pero:
 
 - no se crean manualmente desde esa pantalla;
-- no se asignan permisos administrativos;
+- no pueden recibir permisos administrativos;
 - desactivarlos mediante operación existente bloquea login, pero no borra lease/histórico.
 
 El catálogo de roles permitido por el alta genérica sigue sin incluir `tenant`.
+
+`UserService::setPermissions()` debe rechazar cualquier intento de asignar permisos no vacíos a un usuario `role=tenant`, incluso mediante POST manipulado. Vaciar permisos de un tenant es idempotente/permitido.
+
+Esto evita que una identidad de portal se convierta lateralmente en usuario administrativo sin un cambio arquitectónico explícito.
 
 ---
 
@@ -478,6 +484,7 @@ El catálogo de roles permitido por el alta genérica sigue sin incluir `tenant`
 12. F8 no copia economía/fechas contractuales.
 13. F8 no borra lease ni contrato desde operación normal.
 14. Terminar lease registra actor + timestamp una sola vez.
+15. Un usuario tenant nunca obtiene permisos administrativos dentro de F8.
 
 ---
 
@@ -506,6 +513,7 @@ Pruebas específicas:
 - tenant A no puede leer lease/PDF de tenant B;
 - staff sin `contracts.manage` no activa/termina lease;
 - tenant no puede acceder a `/admin/*` por su rol sin permisos;
+- tenant no puede recibir permisos administrativos por POST manipulado;
 - password temporal obliga cambio;
 - usuario desactivado no puede entrar;
 - colisión email falla cerrado;
@@ -523,6 +531,7 @@ En contrato finalized:
 - resumen de unidad/candidato;
 - botón `Activar arrendamiento`;
 - tras éxito: mostrar email + contraseña temporal una única vez con advertencia de entrega segura;
+- si la credencial se pierde: usar reset link existente, nunca volver a mostrar la contraseña temporal;
 - si ya existe lease: mostrar estado y enlace contextual, sin repetir credencial;
 - si lease ACTIVE: botón `Finalizar arrendamiento` con confirmación simple.
 
@@ -590,10 +599,12 @@ Esos módulos aparecerán solo cuando su fase real exista.
 - `UserService::create()` continúa rechazando `tenant`;
 - tenant identity solo se crea por método específico F8;
 - formulario admin genérico no crea tenant ni por POST manipulado;
+- tenant no acepta permisos no vacíos en `setPermissions()`;
 - password temporal aleatoria/hash-only;
 - must-change-password obligatorio;
 - login usa email existente;
 - reset/change-password existentes funcionan;
+- temp password perdida se resuelve con reset, no revelación;
 - email collision fail-closed.
 
 ### Activation
