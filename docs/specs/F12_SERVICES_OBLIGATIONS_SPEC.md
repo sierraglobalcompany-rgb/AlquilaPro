@@ -172,7 +172,7 @@ ObligationService → FinanceService
 
 FinanceService sigue creando el cargo canónico.
 
-`lease_obligations.charge_id` solo conserva el vínculo/procedencia.
+`lease_obligations.charge_id` solo conserva vínculo/procedencia.
 
 ## 4.4 Dos dimensiones, no un estado artificial
 
@@ -308,17 +308,16 @@ voided_by_user_id → users.id ON DELETE SET NULL
 UNIQUE KEY lease_obligations_charge_unique (charge_id)
 ```
 
-Índices mínimos esperados:
+Ese UNIQUE ya indexa `charge_id`; NO crear un segundo índice simple redundante.
+
+Índices mínimos congelados:
 
 ```text
 KEY lease_obligations_lease_due_index (lease_id, due_on)
 KEY lease_obligations_lease_period_type_index (lease_id, period_month, type)
-KEY lease_obligations_charge_index (charge_id)
-KEY lease_obligations_settled_index (settled_at)
-KEY lease_obligations_voided_index (voided_at)
 ```
 
-La implementación debe confirmar necesidad real de los dos últimos índices contra queries finales; no agregar índices decorativos.
+Los índices de FK/actor que MariaDB/MySQL exija para integridad se resuelven según la migration real, sin añadir índices de consulta decorativos sobre `settled_at` o `voided_at` hasta demostrar una query que los necesite.
 
 No cascade de obligaciones ni cargos.
 
@@ -512,7 +511,23 @@ No intentar condensar `settled_external` + `is_charged` en un enum único.
 
 ---
 
-# 13. CREACIÓN / EDICIÓN
+# 13. LEASE ACTIVO O TERMINADO
+
+F12 puede registrar obligaciones legítimas sobre un lease activo o terminado mientras el lease exista.
+
+Casos válidos incluyen:
+
+- factura final recibida después de terminación;
+- multa PH emitida por un hecho del período arrendado;
+- administración PH pendiente de soporte histórico.
+
+F12 no reabre el lease ni cambia `ended_at`.
+
+Tenant solo ve obligaciones del lease que continúa siendo suyo por ownership canónico.
+
+---
+
+# 14. CREACIÓN / EDICIÓN
 
 Operación conceptual:
 
@@ -540,7 +555,7 @@ AND charge_id IS NULL
 AND settled_at IS NULL
 ```
 
-Puede corregir campos operativos y reemplazar/remover soportes mientras sigue completamente abierta y sin efecto financiero/externo terminal.
+Puede corregir campos operativos y reemplazar/remover soporte fuente mientras sigue completamente abierta y sin efecto financiero/externo terminal.
 
 Después de estar cargada financieramente o marcada satisfecha externamente, los datos esenciales quedan inmutables en V1.
 
@@ -555,7 +570,7 @@ No tabla de historial de ediciones.
 
 ---
 
-# 14. SOPORTE FUENTE PRIVADO
+# 15. SOPORTE FUENTE PRIVADO
 
 Opcional.
 
@@ -594,7 +609,7 @@ No tabla media porque F12 permite un soporte fuente por obligación.
 
 ---
 
-# 15. SOPORTE DE SATISFACCIÓN EXTERNA
+# 16. SOPORTE DE SATISFACCIÓN EXTERNA
 
 Opcional.
 
@@ -610,7 +625,7 @@ F11 conserva la autoridad de pagos del tenant.
 
 ---
 
-# 16. MARCAR SATISFACCIÓN EXTERNA
+# 17. MARCAR SATISFACCIÓN EXTERNA
 
 Operación conceptual:
 
@@ -637,7 +652,7 @@ Marcar satisfacción externa NO modifica ni concilia el cargo F9.
 
 ---
 
-# 17. GENERAR CARGO PARA `utility`
+# 18. GENERAR CARGO PARA `utility`
 
 Acción explícita, nunca automática.
 
@@ -658,29 +673,34 @@ Para `utility`:
 
 No copiar automáticamente `due_on` del proveedor como vencimiento del tenant: son obligaciones distintas.
 
-Invocar:
+Atomicidad requerida usando el mismo PDO/transaction boundary:
 
 ```text
-FinanceService::createManualCharge(
-  leaseId,
-  'service',
-  amount,
-  chargeDueDate,
-  description,
-  periodMonth?,
-  actorUserId
-)
+BEGIN
+→ obligation FOR UPDATE
+→ revalidate not voided / charge_id IS NULL
+→ FinanceService::createManualCharge(... type=service ...)
+→ persist returned charge_id on obligation
+→ COMMIT
 ```
 
-Luego guardar el `charge_id` creado en la obligación dentro de una operación que preserve consistencia.
+F9 `createManualCharge()` es la autoridad de validación/INSERT del cargo y debe participar en la transacción exterior cuando comparta el mismo PDO; no duplicar su lógica ni crear una segunda escritura de `charges` en ObligationService.
+
+Si crear el cargo o guardar el vínculo falla:
+
+```text
+ROLLBACK cargo + vínculo
+```
+
+No puede quedar cargo huérfano creado por F12.
 
 No crear un segundo cargo si `charge_id` ya existe.
 
 ---
 
-# 18. GENERAR CARGO PARA `fine_ph`
+# 19. GENERAR CARGO PARA `fine_ph`
 
-Misma operación explícita.
+Misma acción explícita y misma atomicidad.
 
 Mapeo:
 
@@ -688,20 +708,22 @@ Mapeo:
 fine_ph → FinanceService manual type `fine`
 ```
 
-Reglas iguales a utility:
+Reglas:
 
-- no voided;
+- not voided;
 - no existing charge;
 - exact obligation amount;
 - explicit charge due date;
 - concept visible/sanitized;
+- outer transaction sobre obligation + FinanceService insert + link;
+- rollback conjunto ante fallo;
 - no duplicate generation.
 
 Una multa PH nunca se genera automáticamente por tiempo, evento ni cron.
 
 ---
 
-# 19. ADMINISTRACIÓN PH — NO DUPLICAR DEUDA
+# 20. ADMINISTRACIÓN PH — NO DUPLICAR DEUDA
 
 F9 ya genera mensualmente el cargo financiero `administration` desde el snapshot contractual.
 
@@ -731,15 +753,17 @@ Validar:
 - charge period_month = obligation period_month;
 - charge no está enlazado a otra obligación F12.
 
-NO exigir igualdad de monto.
+No exigir igualdad de monto.
 
 Razón: el valor externo cobrado por PH y el valor contractual financiero del tenant pueden diferir legítimamente; cada autoridad conserva su propio monto.
 
 La UI puede mostrar mismatch como información, no como error automático.
 
+Link debe hacerse bajo transaction/locks coherentes; `UNIQUE(charge_id)` es la última barrera relacional contra doble vínculo concurrente.
+
 ---
 
-# 20. CONSISTENCIA ENTRE OBLIGACIÓN Y CARGO
+# 21. CONSISTENCIA ENTRE OBLIGACIÓN Y CARGO
 
 `charge_id` es procedencia/vínculo, no saldo duplicado.
 
@@ -751,21 +775,23 @@ Si una obligación genera cargo `utility|fine_ph`:
 Si el cargo enlazado es anulado posteriormente en F9:
 
 - el vínculo histórico permanece;
-- `is_charged` puede proyectarse como vínculo existente;
-- UI administrativa debe mostrar que el cargo está anulado usando la proyección canónica F9;
+- `is_charged` representa que existió vínculo;
+- UI administrativa muestra que el cargo está anulado usando proyección canónica F9;
 - F12 no crea automáticamente reemplazo.
 
-Para corregir:
+Para corregir una obligación cuyo cargo fue anulado:
 
 ```text
-acción administrativa explícita
+void obligation when allowed
+→ create corrected obligation
+→ explicit new charge/link action
 ```
 
 No cascada automática.
 
 ---
 
-# 21. ANULACIÓN DE OBLIGACIÓN
+# 22. ANULACIÓN DE OBLIGACIÓN
 
 No DELETE operativo.
 
@@ -793,7 +819,7 @@ Segundo intento falla cerrado y conserva originales.
 
 ---
 
-# 22. LIFECYCLE DE SOPORTES
+# 23. LIFECYCLE DE SOPORTES
 
 Mientras obligación completamente abierta (`charge_id NULL`, `settled_at NULL`, `voided_at NULL`):
 
@@ -806,16 +832,25 @@ Después de `settled_at` o `charge_id`:
 - no reemplazar soporte de satisfacción;
 - no borrar archivos desde operación normal.
 
-Si un nuevo archivo fue movido y DB falla:
+Reemplazo de soporte fuente abierto usa orden seguro:
+
+```text
+validate new file
+→ store new file
+→ update DB metadata
+→ after DB success remove superseded file
+```
+
+Si DB falla después de mover el nuevo archivo:
 
 - limpiar archivo nuevo;
-- conservar autoridad previa intacta.
+- conservar archivo/metadatos anteriores.
 
 No filesystem transaction framework.
 
 ---
 
-# 23. STORAGE / INTEGRIDAD DE SOPORTES
+# 24. STORAGE / INTEGRIDAD DE SOPORTES
 
 Lectura privada valida:
 
@@ -844,7 +879,7 @@ No exponer stored filename ni path físico.
 
 ---
 
-# 24. ADMINISTRACIÓN / UX
+# 25. ADMINISTRACIÓN / UX
 
 F12 se integra en la superficie financiera existente.
 
@@ -875,7 +910,7 @@ No dashboard decorativo.
 
 ---
 
-# 25. TENANT PORTAL
+# 26. TENANT PORTAL
 
 Reutilizar `GET /tenant/leases/{id}`.
 
@@ -887,7 +922,14 @@ Tenant puede ver sus obligaciones propias relevantes:
 - period/fechas;
 - estado externo derivado;
 - si existe cargo financiero asociado, su estado financiero canónico F9/F11;
-- soportes que la UI marque explícitamente como visibles al tenant.
+- soporte fuente cuando exista y la obligación no esté anulada.
+
+Por defecto NO mostrar al tenant:
+
+- `external_reference` si puede contener número de cuenta/referencia administrativa sensible;
+- settlement support;
+- actor IDs;
+- notas administrativas internas.
 
 F12 V1 NO permite al tenant:
 
@@ -899,31 +941,28 @@ F12 V1 NO permite al tenant:
 - vincular cargo;
 - anular.
 
-Razón: un flujo tenant-upload/review/reject crearía un segundo proceso de conciliación muy parecido a F11 y no está exigido por el roadmap actual.
+Razón: un flujo tenant-upload/review/reject crearía un segundo proceso de conciliación parecido a F11 y no está exigido por el roadmap actual.
 
 Ownership debe resolverse antes de cualquier lookup lateral de obligación/soporte.
 
 ---
 
-# 26. VISIBILIDAD DE SOPORTES AL TENANT
+# 27. VISIBILIDAD DE SOPORTES AL TENANT
 
-Por defecto:
+Regla fija KISS V1:
 
-- soporte fuente puede mostrarse al tenant si es parte legítima del cobro/obligación;
-- soporte de satisfacción externa es staff-only salvo decisión explícita de producto posterior.
+```text
+source support: tenant-visible for owned, non-voided obligation
+settlement support: staff-only
+```
 
-La SPEC de implementación debe congelar el flag/regla de visibilidad sin introducir una tabla ACL.
+No agregar ACL/tabla/enum de visibilidad mientras estas dos reglas cubran el producto.
 
-Preferencia KISS V1:
-
-- source support tenant-visible;
-- settlement support staff-only.
-
-No agregar `visibility` genérico si estas dos reglas fijas cubren el producto.
+La lectura tenant del source support siempre exige primero ownership del lease y pertenencia de la obligación a ese lease.
 
 ---
 
-# 27. RUTAS CONCEPTUALES MÍNIMAS
+# 28. RUTAS CONCEPTUALES MÍNIMAS
 
 Preferencia: reutilizar route files financieros/leases existentes.
 
@@ -947,17 +986,17 @@ Tenant conceptual:
 GET /tenant/leases/{leaseId}/obligations/{obligationId}/source-support
 ```
 
-El detalle del lease existente muestra las obligaciones sin ruta de listado tenant separada.
+El detalle del lease existente muestra obligaciones sin ruta de listado tenant separada.
 
 No ruta pública.
 
 No JSON API nueva salvo necesidad real demostrada.
 
-La implementación puede converger cantidad de POST routes mediante una actualización única si eso mejora claridad sin volver el boundary ambiguo; debe documentarlo en PLAN/preflight.
+El PLAN/preflight puede converger varios POST en una actualización única si mejora claridad sin volver ambiguo el boundary; no crear endpoints por simetría.
 
 ---
 
-# 28. AUTORIZACIÓN
+# 29. AUTORIZACIÓN
 
 Staff:
 
@@ -991,7 +1030,7 @@ Forced-password gate permanece.
 
 ---
 
-# 29. PRIVACIDAD Y SEGURIDAD
+# 30. PRIVACIDAD Y SEGURIDAD
 
 Invariantes:
 
@@ -1001,17 +1040,18 @@ Invariantes:
 - MIME por bytes;
 - integrity check antes de servir;
 - no path leak;
+- `external_reference` staff-only por defecto;
 - no datos sensibles innecesarios en `description`;
 - HTML escaped;
 - CSRF en POST;
 - basePath/subfolder;
 - no payload completo de archivos/obligación en logs;
-- no proveedor credentials;
+- no provider credentials;
 - no integraciones bancarias.
 
 ---
 
-# 30. NO INCLUIDO EN F12
+# 31. NO INCLUIDO EN F12
 
 No implementar:
 
@@ -1038,7 +1078,7 @@ No implementar:
 
 ---
 
-# 31. CONCURRENCIA
+# 32. CONCURRENCIA
 
 Debe probarse al menos:
 
@@ -1056,15 +1096,17 @@ lease_obligations row FOR UPDATE
 
 Para link/generate que toque cargo:
 
-- lock obligación primero;
-- luego usar/consultar autoridad F9 de forma consistente;
-- no crear lock service.
+- lock obligation primero;
+- usar el mismo PDO/transaction boundary cuando se cree cargo F9;
+- luego leer/lockear cargo si la operación de link lo necesita;
+- deterministic order para múltiples filas;
+- no lock service.
 
-La implementación/PLAN debe congelar orden exacto tras conocer F11/F9 final.
+El PLAN debe congelar el orden exacto tras conocer F11/F9 final integrado.
 
 ---
 
-# 32. ARQUITECTURA DE ARCHIVOS ESPERADA
+# 33. ARQUITECTURA DE ARCHIVOS ESPERADA
 
 F12 probablemente crea:
 
@@ -1096,39 +1138,42 @@ No congelar constructor/rutas exactas hasta leer F11 final integrado.
 
 ---
 
-# 33. CRITERIOS DE ACEPTACIÓN
+# 34. CRITERIOS DE ACEPTACIÓN
 
 F12 no puede cerrar si falla cualquiera:
 
 1. una sola tabla `lease_obligations`;
 2. tipos exactos `utility|administration_ph|fine_ph`;
 3. money/date validation;
-4. status externo derivado, no persistido;
-5. `settled_at` y `charge_id` pueden coexistir legítimamente;
-6. source support privado e íntegro;
-7. settlement support privado e íntegro;
-8. utility puede generar un único cargo F9 `service` explícitamente;
-9. fine_ph puede generar un único cargo F9 `fine` explícitamente;
-10. administration_ph NO genera segundo cargo y solo enlaza `administration` existente;
-11. link de administración valida mismo lease/período/tipo;
-12. mismatch de monto administración no destruye ninguna autoridad;
-13. F12 no calcula saldo;
-14. F12 no crea payments;
-15. tenant ownership aislado;
-16. staff permissions reutilizadas;
-17. tenant no muta obligaciones en V1;
-18. no rutas públicas;
-19. no cron/notificaciones/OCR/provider integrations;
-20. no document table genérica;
-21. concurrencia no duplica cargos/links/settlements;
-22. full QA PHP 8.3/8.4/8.5 PASS;
-23. KISS PASS;
-24. Cero Ruido PASS;
-25. Patch stacking NONE.
+4. lease activo o terminado válido;
+5. status externo derivado, no persistido;
+6. `settled_at` y `charge_id` pueden coexistir legítimamente;
+7. source support privado e íntegro;
+8. settlement support privado e íntegro;
+9. utility puede generar un único cargo F9 `service` explícitamente y de forma atómica;
+10. fine_ph puede generar un único cargo F9 `fine` explícitamente y de forma atómica;
+11. administration_ph NO genera segundo cargo y solo enlaza `administration` existente;
+12. link de administración valida mismo lease/período/tipo;
+13. mismatch de monto administración no destruye ninguna autoridad;
+14. F12 no calcula saldo;
+15. F12 no crea payments;
+16. tenant ownership aislado;
+17. staff permissions reutilizadas;
+18. tenant no muta obligaciones en V1;
+19. source support tenant-visible y settlement support staff-only según regla fija;
+20. no rutas públicas;
+21. no cron/notificaciones/OCR/provider integrations;
+22. no document table genérica;
+23. concurrencia no duplica cargos/links/settlements;
+24. no cargo huérfano si falla el vínculo F12;
+25. full QA PHP 8.3/8.4/8.5 PASS;
+26. KISS PASS;
+27. Cero Ruido PASS;
+28. Patch stacking NONE.
 
 ---
 
-# 34. GATE KISS / CERO RUIDO
+# 35. GATE KISS / CERO RUIDO
 
 Presupuesto esperado:
 
@@ -1161,7 +1206,7 @@ PROOF
 
 ---
 
-# 35. AUTOAUDITORÍA DE DISEÑO — 10 PASADAS
+# 36. AUTOAUDITORÍA DE DISEÑO — 10 PASADAS
 
 ## Pasada 1 — autoridad financiera
 
@@ -1169,11 +1214,11 @@ F12 conserva F9/F11 como única autoridad de deuda/saldo/pagos; `charge_id` es v
 
 ## Pasada 2 — KISS de persistencia
 
-Una tabla cubre servicios, administración y multas sin tablas paralelas; dos slots de soporte evitan media table prematura. — PASS.
+Una tabla cubre servicios, administración y multas sin tablas paralelas; dos slots de soporte evitan media table prematura; se eliminó índice `charge_id` redundante porque UNIQUE ya lo cubre. — PASS.
 
 ## Pasada 3 — convergencia con F9
 
-`utility → service`, `fine_ph → fine`; `administration_ph` reutiliza el cargo mensual F9 y nunca crea duplicado. — PASS.
+`utility → service`, `fine_ph → fine`; `administration_ph` reutiliza cargo mensual F9 y nunca crea duplicado. — PASS.
 
 ## Pasada 4 — dimensiones independientes
 
@@ -1181,23 +1226,23 @@ Se corrigió el supuesto de exclusión entre satisfacción externa y cargo: amba
 
 ## Pasada 5 — dinero/fechas
 
-Monto externo no se confunde con saldo financiero; due date externo no se copia automáticamente al cargo tenant. — PASS.
+Monto externo no se confunde con saldo financiero; due date externo no se copia al cargo tenant; administración puede tener monto externo distinto del cargo contractual. — PASS.
 
-## Pasada 6 — soportes
+## Pasada 6 — soportes/privacidad
 
-Dos archivos máximos, privados, MIME/hash/size, sin sistema documental genérico F18 adelantado. — PASS.
+Dos archivos máximos, privados, MIME/hash/size, replacement seguro solo antes de terminalidad; visibilidad tenant fija sin ACL genérica. — PASS.
 
 ## Pasada 7 — lifecycle/trazabilidad
 
-Edición solo antes de efectos terminales; settle/void idempotencia fail-closed; no DELETE. — PASS.
+Edición solo antes de efectos terminales; settle/void fail-closed; no DELETE; lease terminado soportado para obligaciones finales/históricas. — PASS.
 
 ## Pasada 8 — seguridad/ownership
 
-Tenant ownership antes de lateral lookup; 0 permisos nuevos; tenant read-only F12 V1. — PASS.
+Tenant ownership antes de lateral lookup; 0 permisos nuevos; tenant read-only F12 V1; external_reference staff-only. — PASS.
 
-## Pasada 9 — concurrencia/antiparches
+## Pasada 9 — concurrencia/atomicidad/antiparches
 
-Fila obligation es autoridad de serialización; no lock service; generar/linkear/settle/void requieren pruebas de carrera. — PASS.
+Fila obligation es lock principal; generación de cargo + link comparte transaction/como PDO para evitar cargo huérfano; no lock service ni segundo writer de charges. — PASS.
 
 ## Pasada 10 — scope futuro
 
@@ -1205,7 +1250,7 @@ Sin cron, recordatorios, OCR, providers, F13/F14/F16/F18, contabilidad o segundo
 
 ---
 
-# 36. GATE DE DOCUMENTO
+# 37. GATE DE DOCUMENTO
 
 ```text
 F12_PRE_KISS: APPROVED BY USER
