@@ -15,6 +15,7 @@ use Throwable;
 final class ContractService
 {
     private const DOCUMENT_TYPES = ['urban_housing', 'independent_parking'];
+    private const ELIGIBLE_UNIT_STATUSES = ['available', 'in_process'];
 
     private const AUTOMATIC_PLACEHOLDERS = [
         'candidate.full_name',
@@ -218,6 +219,553 @@ final class ContractService
         return $created;
     }
 
+    /** @return list<array<string,mixed>> */
+    public function listContracts(): array
+    {
+        $rows = $this->pdo->query($this->contractSelect() . ' ORDER BY c.id DESC')->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(fn (array $row): array => $this->normalizeContract($row), $rows);
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function listForCandidate(int $candidateId): array
+    {
+        if ($candidateId <= 0) {
+            return [];
+        }
+
+        $statement = $this->pdo->prepare($this->contractSelect() . ' WHERE c.candidate_id = :candidate_id ORDER BY c.id DESC');
+        $statement->execute(['candidate_id' => $candidateId]);
+
+        return array_map(
+            fn (array $row): array => $this->normalizeContract($row),
+            $statement->fetchAll(PDO::FETCH_ASSOC),
+        );
+    }
+
+    public function canCreateDraftForCandidate(int $candidateId): bool
+    {
+        if ($candidateId <= 0) {
+            return false;
+        }
+
+        $candidate = $this->candidates->findCandidate($candidateId);
+        if ($candidate === null || $candidate['status'] !== 'pending_screening') {
+            return false;
+        }
+
+        $screening = $this->screening->findForCandidate($candidateId);
+        if ($screening === null || $screening['status'] !== 'approved') {
+            return false;
+        }
+
+        $unit = $this->properties->findUnit((int) $candidate['unit_id']);
+        if ($unit === null || !in_array($unit['status'], self::ELIGIBLE_UNIT_STATUSES, true)) {
+            return false;
+        }
+
+        $property = $this->properties->findProperty((int) $unit['property_id']);
+        if ($property === null || !$property['is_active']) {
+            return false;
+        }
+
+        $statement = $this->pdo->prepare(
+            "SELECT 1 FROM contracts WHERE candidate_id = :candidate_id AND status IN ('draft', 'finalized') LIMIT 1",
+        );
+        $statement->execute(['candidate_id' => $candidateId]);
+
+        return $statement->fetchColumn() === false;
+    }
+
+    public function findContract(int $contractId): ?array
+    {
+        if ($contractId <= 0) {
+            return null;
+        }
+
+        $statement = $this->pdo->prepare($this->contractSelect() . ' WHERE c.id = :id LIMIT 1');
+        $statement->execute(['id' => $contractId]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $this->normalizeContract($row) : null;
+    }
+
+    public function createDraft(
+        int $candidateId,
+        int $templateVersionId,
+        int $createdByUserId,
+        array $input,
+        int $now,
+    ): array {
+        if ($candidateId <= 0 || $templateVersionId <= 0) {
+            throw new RuntimeException('Los datos del borrador contractual no son válidos.');
+        }
+        $this->assertUser($createdByUserId);
+
+        try {
+            $this->pdo->beginTransaction();
+
+            $lock = $this->pdo->prepare('SELECT id FROM candidates WHERE id = :id FOR UPDATE');
+            $lock->execute(['id' => $candidateId]);
+            if ($lock->fetchColumn() === false) {
+                throw new RuntimeException('El candidato no existe.');
+            }
+
+            [$candidate, $unit, $property] = $this->eligibleCandidateContext($candidateId);
+            [$version, $template] = $this->versionContext($templateVersionId);
+            if (!$template['is_active']) {
+                throw new RuntimeException('La plantilla contractual está inactiva.');
+            }
+
+            $documentType = $this->documentTypeForUnit((string) $unit['type']);
+            if ($template['document_type'] !== $documentType) {
+                throw new RuntimeException('La plantilla no corresponde al tipo de unidad.');
+            }
+
+            $existing = $this->pdo->prepare(
+                "SELECT 1 FROM contracts WHERE candidate_id = :candidate_id AND status IN ('draft', 'finalized') LIMIT 1",
+            );
+            $existing->execute(['candidate_id' => $candidateId]);
+            if ($existing->fetchColumn() !== false) {
+                throw new RuntimeException('El candidato ya tiene un contrato inicial abierto o finalizado.');
+            }
+
+            $data = $this->validatedDraftInput($input, $version);
+            $insert = $this->pdo->prepare(
+                'INSERT INTO contracts ('
+                . 'candidate_id, unit_id, template_version_id, document_type, status, monthly_rent, administration_fee, '
+                . 'start_date, end_date, duration_text, manual_variables_json, tasks_json, annexes_json, '
+                . 'created_by_user_id, updated_at'
+                . ') VALUES ('
+                . ':candidate_id, :unit_id, :template_version_id, :document_type, :status, :monthly_rent, :administration_fee, '
+                . ':start_date, :end_date, :duration_text, :manual_variables_json, :tasks_json, :annexes_json, '
+                . ':created_by_user_id, :updated_at'
+                . ')',
+            );
+            $insert->execute([
+                'candidate_id' => (int) $candidate['id'],
+                'unit_id' => (int) $unit['id'],
+                'template_version_id' => (int) $version['id'],
+                'document_type' => $documentType,
+                'status' => 'draft',
+                'monthly_rent' => $data['monthly_rent'],
+                'administration_fee' => $data['administration_fee'],
+                'start_date' => $data['start_date'],
+                'end_date' => $data['end_date'],
+                'duration_text' => $data['duration_text'],
+                'manual_variables_json' => $this->encodeJson($data['manual_variables']),
+                'tasks_json' => $this->encodeJson($data['tasks']),
+                'annexes_json' => $this->encodeJson($data['annexes']),
+                'created_by_user_id' => $createdByUserId,
+                'updated_at' => $this->dateTime($now),
+            ]);
+            $contractId = (int) $this->pdo->lastInsertId();
+            $this->pdo->commit();
+        } catch (RuntimeException $exception) {
+            $this->rollbackIfNeeded();
+            throw $exception;
+        } catch (Throwable) {
+            $this->rollbackIfNeeded();
+            throw new RuntimeException('No fue posible crear el borrador contractual.');
+        }
+
+        $created = $this->findContract($contractId);
+        if ($created === null) {
+            throw new RuntimeException('No fue posible crear el borrador contractual.');
+        }
+
+        return $created;
+    }
+
+    public function updateDraft(int $contractId, array $input, int $now): array
+    {
+        $contract = $this->findContract($contractId);
+        if ($contract === null) {
+            throw new RuntimeException('El contrato no existe.');
+        }
+        if ($contract['status'] !== 'draft') {
+            throw new RuntimeException('El contrato ya no admite cambios de contenido.');
+        }
+
+        $templateVersionId = array_key_exists('template_version_id', $input)
+            ? $this->positiveInteger($input['template_version_id'], 'La versión contractual no es válida.')
+            : (int) $contract['template_version_id'];
+        [$version, $template] = $this->versionContext($templateVersionId);
+        if ($template['document_type'] !== $contract['document_type']) {
+            throw new RuntimeException('La versión contractual no corresponde al tipo del contrato.');
+        }
+
+        $data = $this->validatedDraftInput($input, $version);
+        $statement = $this->pdo->prepare(
+            'UPDATE contracts SET '
+            . 'template_version_id = :template_version_id, monthly_rent = :monthly_rent, '
+            . 'administration_fee = :administration_fee, start_date = :start_date, end_date = :end_date, '
+            . 'duration_text = :duration_text, manual_variables_json = :manual_variables_json, '
+            . 'tasks_json = :tasks_json, annexes_json = :annexes_json, updated_at = :updated_at '
+            . "WHERE id = :id AND status = 'draft'",
+        );
+        $statement->execute([
+            'template_version_id' => (int) $version['id'],
+            'monthly_rent' => $data['monthly_rent'],
+            'administration_fee' => $data['administration_fee'],
+            'start_date' => $data['start_date'],
+            'end_date' => $data['end_date'],
+            'duration_text' => $data['duration_text'],
+            'manual_variables_json' => $this->encodeJson($data['manual_variables']),
+            'tasks_json' => $this->encodeJson($data['tasks']),
+            'annexes_json' => $this->encodeJson($data['annexes']),
+            'updated_at' => $this->dateTime($now),
+            'id' => $contractId,
+        ]);
+        if ($statement->rowCount() !== 1) {
+            throw new RuntimeException('El contrato ya no admite cambios de contenido.');
+        }
+
+        $updated = $this->findContract($contractId);
+        if ($updated === null) {
+            throw new RuntimeException('No fue posible actualizar el borrador contractual.');
+        }
+
+        return $updated;
+    }
+
+    public function previewHtml(int $contractId): string
+    {
+        $contract = $this->findContract($contractId);
+        if ($contract === null) {
+            throw new RuntimeException('El contrato no existe.');
+        }
+        if ($contract['status'] !== 'draft') {
+            throw new RuntimeException('La vista previa solo está disponible para borradores.');
+        }
+
+        [$version] = $this->versionContext((int) $contract['template_version_id']);
+        $candidate = $this->candidates->findCandidate((int) $contract['candidate_id']);
+        $unit = $this->properties->findUnit((int) $contract['unit_id']);
+        if ($candidate === null || $unit === null) {
+            throw new RuntimeException('No fue posible resolver el borrador contractual.');
+        }
+        $property = $this->properties->findProperty((int) $unit['property_id']);
+        if ($property === null) {
+            throw new RuntimeException('No fue posible resolver el borrador contractual.');
+        }
+
+        $manual = $this->decodeObject((string) ($contract['manual_variables_json'] ?? '[]'));
+        $tasks = $this->decodeList((string) ($contract['tasks_json'] ?? '[]'));
+        $annexes = $this->decodeList((string) ($contract['annexes_json'] ?? '[]'));
+
+        $values = [
+            'candidate.full_name' => $candidate['full_name'] ?? '',
+            'candidate.document_type' => $candidate['document_type'] ?? '',
+            'candidate.document_number' => $candidate['document_number'] ?? '',
+            'candidate.phone' => $candidate['phone'] ?? '',
+            'candidate.email' => $candidate['email'] ?? '',
+            'candidate.current_address' => $candidate['current_address'] ?? '',
+            'property.name' => $property['name'] ?? '',
+            'property.address' => $property['address'] ?? '',
+            'property.city' => $property['city'] ?? '',
+            'property.sector' => $property['sector'] ?? '',
+            'unit.code' => $unit['code'] ?? '',
+            'unit.type' => $unit['type'] ?? '',
+            'unit.location_label' => $unit['location_label'] ?? '',
+            'unit.unit_number' => $unit['unit_number'] ?? '',
+            'unit.tower' => $unit['tower'] ?? '',
+            'unit.floor' => $unit['floor'] ?? '',
+            'contract.monthly_rent' => $contract['monthly_rent'],
+            'contract.administration_fee' => $contract['administration_fee'] ?? '',
+            'contract.start_date' => $contract['start_date'],
+            'contract.end_date' => $contract['end_date'],
+            'contract.duration' => $contract['duration_text'],
+            ...$manual,
+        ];
+
+        $safeBody = $this->escape((string) $version['body_template']);
+        $replacements = [];
+        foreach ($values as $key => $value) {
+            $replacements['{{' . $key . '}}'] = $this->escape((string) $value);
+        }
+        $safeBody = strtr($safeBody, $replacements);
+
+        $html = '<article class="contract-preview">'
+            . '<p><strong>BORRADOR</strong></p>'
+            . '<div class="contract-preview__body">' . nl2br($safeBody, false) . '</div>';
+
+        if ($tasks !== []) {
+            $html .= '<section><h2>Tareas</h2><ul>';
+            foreach ($tasks as $task) {
+                $html .= '<li>' . $this->escape((string) ($task['label'] ?? ''))
+                    . (!empty($task['done']) ? ' — completada' : ' — pendiente') . '</li>';
+            }
+            $html .= '</ul></section>';
+        }
+
+        if ($annexes !== []) {
+            $html .= '<section><h2>Anexos</h2><ul>';
+            foreach ($annexes as $annex) {
+                $html .= '<li><strong>' . $this->escape((string) ($annex['title'] ?? '')) . '</strong>';
+                if (($annex['note'] ?? null) !== null && trim((string) $annex['note']) !== '') {
+                    $html .= '<br>' . nl2br($this->escape((string) $annex['note']), false);
+                }
+                $html .= '</li>';
+            }
+            $html .= '</ul></section>';
+        }
+
+        return $html . '</article>';
+    }
+
+    private function eligibleCandidateContext(int $candidateId): array
+    {
+        $candidate = $this->candidates->findCandidate($candidateId);
+        if ($candidate === null || $candidate['status'] !== 'pending_screening') {
+            throw new RuntimeException('El candidato no está habilitado para contrato.');
+        }
+
+        $screening = $this->screening->findForCandidate($candidateId);
+        if ($screening === null || $screening['status'] !== 'approved') {
+            throw new RuntimeException('El candidato no tiene estudio aprobado.');
+        }
+
+        $unit = $this->properties->findUnit((int) $candidate['unit_id']);
+        if ($unit === null || !in_array($unit['status'], self::ELIGIBLE_UNIT_STATUSES, true)) {
+            throw new RuntimeException('La unidad no está habilitada para contrato.');
+        }
+
+        $property = $this->properties->findProperty((int) $unit['property_id']);
+        if ($property === null || !$property['is_active']) {
+            throw new RuntimeException('La propiedad no está habilitada para contrato.');
+        }
+
+        return [$candidate, $unit, $property];
+    }
+
+    private function versionContext(int $versionId): array
+    {
+        $version = $this->findTemplateVersion($versionId);
+        if ($version === null) {
+            throw new RuntimeException('La versión contractual no existe.');
+        }
+        $template = $this->findTemplate((int) $version['template_id']);
+        if ($template === null) {
+            throw new RuntimeException('La plantilla contractual no existe.');
+        }
+
+        return [$version, $template];
+    }
+
+    private function documentTypeForUnit(string $unitType): string
+    {
+        return match ($unitType) {
+            'apartment' => 'urban_housing',
+            'parking' => 'independent_parking',
+            default => throw new RuntimeException('El tipo de unidad no admite contrato F7.'),
+        };
+    }
+
+    private function validatedDraftInput(array $input, array $version): array
+    {
+        $monthlyRent = $this->decimal($input['monthly_rent'] ?? null, false, true, 'El canon mensual no es válido.');
+        $administrationFee = $this->decimal(
+            $input['administration_fee'] ?? null,
+            true,
+            false,
+            'La administración no es válida.',
+        );
+        $startDate = $this->date($input['start_date'] ?? null, 'La fecha de inicio no es válida.');
+        $endDate = $this->date($input['end_date'] ?? null, 'La fecha final no es válida.');
+        if ($endDate < $startDate) {
+            throw new RuntimeException('La fecha final no puede ser anterior a la fecha de inicio.');
+        }
+
+        $duration = trim((string) ($input['duration_text'] ?? ''));
+        if ($duration === '' || mb_strlen($duration) > 120 || !mb_check_encoding($duration, 'UTF-8')) {
+            throw new RuntimeException('La duración contractual no es válida.');
+        }
+
+        $declarations = json_decode((string) $version['variables_json'], true);
+        if (!is_array($declarations)) {
+            throw new RuntimeException('La versión contractual tiene variables inválidas.');
+        }
+
+        return [
+            'monthly_rent' => $monthlyRent,
+            'administration_fee' => $administrationFee,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'duration_text' => $duration,
+            'manual_variables' => $this->validatedManualValues($input['manual_variables'] ?? [], $declarations),
+            'tasks' => $this->validatedTasks($input['tasks'] ?? []),
+            'annexes' => $this->validatedAnnexes($input['annexes'] ?? []),
+        ];
+    }
+
+    private function validatedManualValues(mixed $input, array $declarations): array
+    {
+        if (!is_array($input)) {
+            throw new RuntimeException('Las variables manuales del contrato no son válidas.');
+        }
+
+        $declared = [];
+        foreach ($declarations as $declaration) {
+            if (!is_array($declaration) || !isset($declaration['key'])) {
+                throw new RuntimeException('La versión contractual tiene variables inválidas.');
+            }
+            $declared[(string) $declaration['key']] = !empty($declaration['required']);
+        }
+
+        $result = [];
+        foreach ($input as $key => $value) {
+            if (!is_string($key) || !array_key_exists($key, $declared) || !is_scalar($value) || is_bool($value)) {
+                throw new RuntimeException('Las variables manuales del contrato no son válidas.');
+            }
+            $text = trim((string) $value);
+            if (!mb_check_encoding($text, 'UTF-8') || mb_strlen($text) > 4000) {
+                throw new RuntimeException('Las variables manuales del contrato no son válidas.');
+            }
+            $result[$key] = $text;
+        }
+
+        foreach ($declared as $key => $required) {
+            if ($required && (!array_key_exists($key, $result) || $result[$key] === '')) {
+                throw new RuntimeException('Falta una variable manual obligatoria.');
+            }
+        }
+
+        ksort($result);
+
+        return $result;
+    }
+
+    private function validatedTasks(mixed $input): array
+    {
+        if (!is_array($input) || !array_is_list($input) || count($input) > 30) {
+            throw new RuntimeException('Las tareas contractuales no son válidas.');
+        }
+
+        $result = [];
+        foreach ($input as $task) {
+            if (!is_array($task)
+                || array_diff(array_keys($task), ['label', 'done']) !== []
+                || !array_key_exists('done', $task)
+                || !is_bool($task['done'])) {
+                throw new RuntimeException('Las tareas contractuales no son válidas.');
+            }
+            $label = trim((string) ($task['label'] ?? ''));
+            if ($label === '' || mb_strlen($label) > 190 || !mb_check_encoding($label, 'UTF-8')) {
+                throw new RuntimeException('Las tareas contractuales no son válidas.');
+            }
+            $result[] = ['label' => $label, 'done' => $task['done']];
+        }
+
+        return $result;
+    }
+
+    private function validatedAnnexes(mixed $input): array
+    {
+        if (!is_array($input) || !array_is_list($input) || count($input) > 20) {
+            throw new RuntimeException('Los anexos contractuales no son válidos.');
+        }
+
+        $result = [];
+        foreach ($input as $annex) {
+            if (!is_array($annex) || array_diff(array_keys($annex), ['title', 'note']) !== []) {
+                throw new RuntimeException('Los anexos contractuales no son válidos.');
+            }
+            $title = trim((string) ($annex['title'] ?? ''));
+            if ($title === '' || mb_strlen($title) > 190 || !mb_check_encoding($title, 'UTF-8')) {
+                throw new RuntimeException('Los anexos contractuales no son válidos.');
+            }
+            $note = $annex['note'] ?? null;
+            if ($note !== null && !is_scalar($note)) {
+                throw new RuntimeException('Los anexos contractuales no son válidos.');
+            }
+            $note = $note === null ? null : trim((string) $note);
+            if ($note === '') {
+                $note = null;
+            }
+            if ($note !== null && !mb_check_encoding($note, 'UTF-8')) {
+                throw new RuntimeException('Los anexos contractuales no son válidos.');
+            }
+            $result[] = ['title' => $title, 'note' => $note];
+        }
+
+        return $result;
+    }
+
+    private function decimal(mixed $value, bool $nullable, bool $positive, string $message): ?string
+    {
+        if ($value === null || trim((string) $value) === '') {
+            if ($nullable) {
+                return null;
+            }
+            throw new RuntimeException($message);
+        }
+
+        $text = trim((string) $value);
+        if (preg_match('/^\d{1,10}(?:\.\d{1,2})?$/D', $text) !== 1) {
+            throw new RuntimeException($message);
+        }
+        $number = (float) $text;
+        if (!is_finite($number) || $number > 9999999999.99 || ($positive ? $number <= 0 : $number < 0)) {
+            throw new RuntimeException($message);
+        }
+
+        return number_format($number, 2, '.', '');
+    }
+
+    private function date(mixed $value, string $message): string
+    {
+        $date = trim((string) $value);
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D', $date, $matches) !== 1
+            || !checkdate((int) $matches[2], (int) $matches[3], (int) $matches[1])) {
+            throw new RuntimeException($message);
+        }
+
+        return $date;
+    }
+
+    private function positiveInteger(mixed $value, string $message): int
+    {
+        if (filter_var($value, FILTER_VALIDATE_INT) === false || (int) $value <= 0) {
+            throw new RuntimeException($message);
+        }
+
+        return (int) $value;
+    }
+
+    private function encodeJson(array $value): string
+    {
+        return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    }
+
+    private function decodeObject(string $json): array
+    {
+        try {
+            $decoded = json_decode($json, true, 64, JSON_THROW_ON_ERROR);
+        } catch (Throwable) {
+            throw new RuntimeException('Los datos manuales almacenados no son válidos.');
+        }
+        if (!is_array($decoded) || array_is_list($decoded) && $decoded !== []) {
+            throw new RuntimeException('Los datos manuales almacenados no son válidos.');
+        }
+
+        return $decoded;
+    }
+
+    private function decodeList(string $json): array
+    {
+        try {
+            $decoded = json_decode($json, true, 64, JSON_THROW_ON_ERROR);
+        } catch (Throwable) {
+            throw new RuntimeException('Los datos contractuales almacenados no son válidos.');
+        }
+        if (!is_array($decoded) || !array_is_list($decoded)) {
+            throw new RuntimeException('Los datos contractuales almacenados no son válidos.');
+        }
+
+        return $decoded;
+    }
+
     private function assertUser(int $userId): void
     {
         if ($userId <= 0) {
@@ -320,6 +868,34 @@ final class ContractService
         }
     }
 
+    private function contractSelect(): string
+    {
+        return 'SELECT c.*, cand.full_name AS candidate_name, u.code AS unit_code, '
+            . 't.name AS template_name, v.version_number AS template_version_number '
+            . 'FROM contracts c '
+            . 'INNER JOIN candidates cand ON cand.id = c.candidate_id '
+            . 'INNER JOIN units u ON u.id = c.unit_id '
+            . 'INNER JOIN contract_template_versions v ON v.id = c.template_version_id '
+            . 'INNER JOIN contract_templates t ON t.id = v.template_id';
+    }
+
+    private function escape(string $value): string
+    {
+        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    private function dateTime(int $timestamp): string
+    {
+        return gmdate('Y-m-d H:i:s', $timestamp);
+    }
+
+    private function rollbackIfNeeded(): void
+    {
+        if ($this->pdo->inTransaction()) {
+            $this->pdo->rollBack();
+        }
+    }
+
     /** @return array<string,mixed> */
     private function normalizeTemplate(array $row): array
     {
@@ -345,6 +921,42 @@ final class ContractService
             'variables_json' => (string) $row['variables_json'],
             'created_by_user_id' => $row['created_by_user_id'] === null ? null : (int) $row['created_by_user_id'],
             'created_at' => (string) $row['created_at'],
+        ];
+    }
+
+    /** @return array<string,mixed> */
+    private function normalizeContract(array $row): array
+    {
+        return [
+            'id' => (int) $row['id'],
+            'candidate_id' => (int) $row['candidate_id'],
+            'unit_id' => (int) $row['unit_id'],
+            'template_version_id' => (int) $row['template_version_id'],
+            'document_type' => (string) $row['document_type'],
+            'status' => (string) $row['status'],
+            'monthly_rent' => (string) $row['monthly_rent'],
+            'administration_fee' => $row['administration_fee'] === null ? null : (string) $row['administration_fee'],
+            'start_date' => (string) $row['start_date'],
+            'end_date' => (string) $row['end_date'],
+            'duration_text' => (string) $row['duration_text'],
+            'manual_variables_json' => $row['manual_variables_json'] === null ? null : (string) $row['manual_variables_json'],
+            'tasks_json' => $row['tasks_json'] === null ? null : (string) $row['tasks_json'],
+            'annexes_json' => $row['annexes_json'] === null ? null : (string) $row['annexes_json'],
+            'resolved_variables_json' => $row['resolved_variables_json'] === null ? null : (string) $row['resolved_variables_json'],
+            'snapshot_html' => $row['snapshot_html'] === null ? null : (string) $row['snapshot_html'],
+            'pdf_stored_name' => $row['pdf_stored_name'] === null ? null : (string) $row['pdf_stored_name'],
+            'pdf_sha256' => $row['pdf_sha256'] === null ? null : (string) $row['pdf_sha256'],
+            'pdf_size_bytes' => $row['pdf_size_bytes'] === null ? null : (int) $row['pdf_size_bytes'],
+            'created_by_user_id' => $row['created_by_user_id'] === null ? null : (int) $row['created_by_user_id'],
+            'finalized_by_user_id' => $row['finalized_by_user_id'] === null ? null : (int) $row['finalized_by_user_id'],
+            'generated_at' => $row['generated_at'] === null ? null : (string) $row['generated_at'],
+            'finalized_at' => $row['finalized_at'] === null ? null : (string) $row['finalized_at'],
+            'created_at' => (string) $row['created_at'],
+            'updated_at' => $row['updated_at'] === null ? null : (string) $row['updated_at'],
+            'candidate_name' => isset($row['candidate_name']) ? (string) $row['candidate_name'] : null,
+            'unit_code' => isset($row['unit_code']) ? (string) $row['unit_code'] : null,
+            'template_name' => isset($row['template_name']) ? (string) $row['template_name'] : null,
+            'template_version_number' => isset($row['template_version_number']) ? (int) $row['template_version_number'] : null,
         ];
     }
 }
