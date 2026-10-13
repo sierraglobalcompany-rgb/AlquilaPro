@@ -315,6 +315,8 @@ El snapshot es histórico, no autoridad para resolver el medio actual.
 
 `payment_method_id` conserva la referencia canónica al método configurado.
 
+Si el método se desactiva después del reporte, el payment pendiente sigue siendo conciliable porque su snapshot histórico ya quedó congelado. La desactivación posterior del método no invalida el hecho reportado.
+
 ---
 
 # 8. MODELO `payment_allocations`
@@ -361,19 +363,29 @@ Reglas:
 - dentro de `DECIMAL(12,2)`;
 - no `float` como autoridad;
 - `SUM(allocation.amount) = payment.amount` en reporte y conciliación;
-- cada allocation > 0.
+- cada allocation > 0;
+- al reportar, cada allocation propuesta debe ser `<= outstanding` actual del cargo calculado únicamente con pagos ya conciliados;
+- allocations pendientes de otros reportes no reducen ese outstanding y no bloquean un nuevo reporte legítimo; pueden originar duplicate/overlap warnings para revisión humana.
 
 F11 no permite “saldo sin aplicar”.
 
 Razón: introducir `unapplied cash`/créditos antes de una necesidad real crearía una tercera autoridad financiera.
 
-Si un pago real excede los cargos seleccionados, el tenant debe distribuirlo solo hasta donde corresponda o esperar definición futura; F11 V1 no inventa créditos a favor.
+Si un pago real excede los cargos seleccionados, el tenant no puede forzar una allocation mayor al outstanding. F11 V1 no inventa créditos a favor.
 
 ---
 
 # 10. FECHA Y HORA DEL PAGO
 
 `paid_on` es obligatorio.
+
+Regla exacta:
+
+```text
+paid_on <= today (America/Bogota)
+```
+
+No se aceptan fechas futuras.
 
 `paid_time` es opcional porque el roadmap exige hora aproximada cuando exista, no precisión falsa.
 
@@ -382,11 +394,11 @@ No persistir timezone por fila: la aplicación opera en `America/Bogota` en V1.
 Validaciones:
 
 - fecha real válida;
-- no aceptar fechas absurdamente futuras;
+- `paid_on` no posterior al día local actual;
 - hora `HH:MM[:SS]` normalizada si se entrega;
 - `reported_at` es timestamp del sistema, distinto de fecha/hora declarada del pago.
 
-El PLAN debe fijar el límite futuro permitido de forma simple y testeable; no introducir motor temporal.
+No hace falta rechazar una hora aproximada posterior a la hora actual si `paid_on=today`; esa precisión falsa generaría fricción sin aportar integridad financiera. La fecha sí debe ser no futura.
 
 ---
 
@@ -410,24 +422,28 @@ FinanceService::reportPayment(
 Orden mínimo:
 
 1. ownership ya resuelto por route mediante F8 `LeaseService::findForUser`;
-2. validar lease y payment method aplicable/activo para property canónica del lease;
-3. validar amount/date/time;
-4. validar allocations pertenecen al mismo lease;
-5. validar charges no anulados;
-6. validar sum allocations = payment amount;
-7. validar comprobante opcional;
-8. congelar snapshot sanitizado del payment method;
-9. BEGIN;
-10. insertar payment pendiente;
-11. insertar allocations propuestas;
-12. COMMIT;
-13. devolver reporte + advertencias de duplicado probable.
+2. permitir lease activo o terminado mientras siga perteneciendo al tenant y existan cargos con outstanding;
+3. validar payment method actualmente activo y aplicable a la property canónica del lease;
+4. validar amount/date/time;
+5. validar allocations pertenecen al mismo lease;
+6. validar charges no anulados y con outstanding > 0;
+7. validar cada allocation propuesta `<= outstanding` actual calculado con payments reconciliados solamente;
+8. validar sum allocations = payment amount;
+9. validar comprobante opcional;
+10. congelar snapshot sanitizado del payment method;
+11. BEGIN;
+12. insertar payment pendiente;
+13. insertar allocations propuestas;
+14. COMMIT;
+15. devolver reporte + advertencias de duplicado probable.
 
 No reduce cartera todavía.
 
 No cambia charge.
 
 No cambia payment method.
+
+El método debe estar activo/aplicable al momento del reporte. Si se desactiva después, eso no bloquea la conciliación del payment ya reportado.
 
 ---
 
@@ -452,7 +468,7 @@ Cuando el payment queda rejected:
 - las allocations permanecen históricas;
 - no reducen saldo.
 
-Esto evita tabla adicional de “proposed allocations”.
+La propuesta original de allocations no tiene una tabla de historial separada. Mientras el payment está pendiente, las allocations son una intención operativa mutable por conciliación; el histórico inmutable del reporte se concentra en monto total, fecha/hora declarada, medio snapshot y comprobante. Crear una historia de allocations antes de que tengan efecto financiero sería ruido en V1.
 
 ---
 
@@ -482,6 +498,8 @@ BEGIN
 → set reconciled_by_user_id / reconciled_at
 → COMMIT
 ```
+
+No revalidar que `payment_method_id` siga activo en F10: el método pudo desactivarse después del reporte y el snapshot histórico ya es la evidencia relevante.
 
 No persiste saldo.
 
@@ -655,6 +673,8 @@ No mostrar detalles de otros leases al tenant.
 
 El duplicate detector no decide conciliación.
 
+Un payment rechazado puede seguir aparecer como antecedente de warning por comprobante/hash idéntico; el warning informa similitud, no afirma doble cobro.
+
 ---
 
 # 17. SALDO POST-F11
@@ -762,7 +782,7 @@ El tenant puede:
 - ver outstanding actual;
 - ver cargos;
 - seleccionar allocations;
-- reportar pago;
+- reportar pago sobre lease activo o terminado que siga siendo suyo y tenga outstanding;
 - ver sus reportes y estado derivado;
 - descargar/ver su propio comprobante si la UI lo necesita;
 - ver motivo de rechazo operativo si existe.
@@ -776,6 +796,7 @@ No puede:
 - elegir `property_id` como autoridad;
 - asignar a charge de otro lease;
 - asignar a charge voided;
+- asignar a charge sin outstanding;
 - ver actor staff interno si no aporta valor.
 
 Ownership debe resolverse antes de cualquier lookup lateral de payment/receipt.
@@ -942,11 +963,12 @@ No implementar:
 
 Debe probarse al menos:
 
-1. dos reconciliaciones simultáneas no sobreasignan el mismo cargo;
+1. dos conciliaciones simultáneas no sobreasignan el mismo cargo;
 2. segundo reconcile sobre mismo payment falla cerrado;
 3. reconcile vs reject concurrentes dejan un único resultado terminal;
 4. payment pendiente no afecta saldo;
-5. payment reconciliado sí afecta saldo exactamente una vez.
+5. payment reconciliado sí afecta saldo exactamente una vez;
+6. un payment method desactivado después del reporte no invalida una conciliación pendiente ya existente.
 
 Usar locks existentes y deterministic ordering.
 
@@ -996,26 +1018,28 @@ F11 no puede cerrar si falla cualquiera:
 1. tenant reporta pago con allocations exactas;
 2. comprobante opcional;
 3. ownership tenant aislado;
-4. payment method aplicable validado desde F10;
-5. snapshot sanitizado histórico;
-6. payment pendiente no reduce cartera;
-7. reconcile humano reduce saldo vía allocations;
-8. partial funciona;
-9. over-allocation rechazada;
-10. concurrencia no sobreasigna;
-11. reject preserva evidencia y no reduce saldo;
-12. duplicate probable advierte sin bloquear;
-13. receipt privado íntegro;
-14. no payment_reports table;
-15. no status persistido;
-16. no balance persistido;
-17. no nuevos permisos;
-18. no rutas públicas;
-19. no bank/provider integration;
-20. full QA PHP 8.3/8.4/8.5 PASS;
-21. KISS PASS;
-22. Cero Ruido PASS;
-23. Patch stacking NONE.
+4. payment method aplicable/activo validado al reportar;
+5. payment method puede desactivarse después sin invalidar reporte pendiente;
+6. snapshot sanitizado histórico;
+7. payment pendiente no reduce cartera;
+8. reconcile humano reduce saldo vía allocations;
+9. partial funciona;
+10. over-allocation rechazada tanto al reportar como al conciliar;
+11. concurrencia no sobreasigna;
+12. reject preserva evidencia y no reduce saldo;
+13. duplicate probable advierte sin bloquear;
+14. receipt privado íntegro;
+15. lease terminado owned puede reportar outstanding;
+16. no payment_reports table;
+17. no status persistido;
+18. no balance persistido;
+19. no nuevos permisos;
+20. no rutas públicas;
+21. no bank/provider integration;
+22. full QA PHP 8.3/8.4/8.5 PASS;
+23. KISS PASS;
+24. Cero Ruido PASS;
+25. Patch stacking NONE.
 
 ---
 
@@ -1067,7 +1091,7 @@ Dos tablas son el mínimo con integridad relacional para un pago que puede distr
 
 ## Pasada 4 — parciales y saldo
 
-Solo allocations reconciliadas reducen outstanding; no balance cache ni paid_amount persistido. — PASS.
+Solo allocations reconciliadas reducen outstanding; no balance cache ni paid_amount persistido. Report allocations se validan contra outstanding reconciliado actual y se revalidan al conciliar. — PASS.
 
 ## Pasada 5 — conciliación humana
 
@@ -1083,15 +1107,15 @@ Un archivo opcional vive en `payments`; no media table. MIME/hash/size/storage p
 
 ## Pasada 8 — seguridad/ownership
 
-Lease ownership antes de payment/receipt; staff reutiliza finance permissions; 0 permisos nuevos. — PASS.
+Lease ownership antes de payment/receipt; staff reutiliza finance permissions; 0 permisos nuevos; lease terminado owned puede reportar deuda real. — PASS.
 
 ## Pasada 9 — antiparches/concurrencia
 
-Locks en payment + charges con orden estable, sin lock service/dedupe architecture. — PASS.
+Locks en payment + charges con orden estable, sin lock service/dedupe architecture. Desactivación posterior del medio no invalida snapshot/report pendiente. — PASS.
 
 ## Pasada 10 — scope futuro
 
-No credits/refunds/webhooks/cron/accounting/F12+ adelantado. — PASS.
+No credits/refunds/webhooks/cron/accounting/F12+ adelantado. Fecha de pago no puede ser futura; no se inventa tolerancia temporal compleja. — PASS.
 
 ---
 
