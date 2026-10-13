@@ -29,7 +29,7 @@ final class UserServiceTest extends TestCase
         ]));
 
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (['unit_media', 'units', 'properties', 'settings', 'users', 'schema_migrations'] as $table) {
+        foreach (['leases', 'unit_media', 'units', 'properties', 'settings', 'users', 'schema_migrations'] as $table) {
             $this->pdo->exec(sprintf('DROP TABLE IF EXISTS `%s`', $table));
         }
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
@@ -123,15 +123,75 @@ final class UserServiceTest extends TestCase
         $service->create('Other Admin', 'NATALIA@example.com', 'admin', 'AnotherPass123', []);
     }
 
+    public function testTenantIdentityIsCreatedOnlyByDedicatedPathWithRandomHashOnlyPassword(): void
+    {
+        $service = $this->service();
+
+        $first = $service->createTenantIdentity('  Ana Tenant  ', '  ANA@Example.COM ');
+        $second = $service->createTenantIdentity('Luis Tenant', 'luis@example.com');
+
+        self::assertGreaterThan(0, $first['id']);
+        self::assertGreaterThan(0, $second['id']);
+        self::assertNotSame($first['id'], $second['id']);
+        self::assertIsString($first['temporary_password']);
+        self::assertGreaterThanOrEqual(12, strlen($first['temporary_password']));
+        self::assertNotSame($first['temporary_password'], $second['temporary_password']);
+
+        $statement = $this->pdo->prepare('SELECT * FROM users WHERE id = :id LIMIT 1');
+        $statement->execute(['id' => $first['id']]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($row);
+        self::assertSame('Ana Tenant', $row['full_name']);
+        self::assertSame('ana@example.com', $row['email']);
+        self::assertSame('tenant', $row['role']);
+        self::assertSame(1, (int) $row['is_active']);
+        self::assertSame(1, (int) $row['must_change_password']);
+        self::assertNull($row['permissions_json']);
+        self::assertTrue(password_verify($first['temporary_password'], (string) $row['password_hash']));
+        self::assertNotSame($first['temporary_password'], $row['password_hash']);
+
+        $listed = array_values(array_filter(
+            $service->listUsers(),
+            static fn (array $user): bool => $user['id'] === $first['id'],
+        ));
+        self::assertCount(1, $listed);
+        self::assertSame([], $listed[0]['permissions']);
+        self::assertArrayNotHasKey('password_hash', $listed[0]);
+        self::assertArrayNotHasKey('temporary_password', $listed[0]);
+    }
+
+    public function testTenantIdentityFailsClosedOnExistingNormalizedEmail(): void
+    {
+        $service = $this->service();
+        $service->create('Admin', 'existing@example.com', 'admin', 'TemporaryPass123', []);
+
+        try {
+            $service->createTenantIdentity('Tenant Collision', ' EXISTING@EXAMPLE.COM ');
+            self::fail('Tenant identity must not auto-link an existing user email.');
+        } catch (RuntimeException $exception) {
+            self::assertSame('El correo ya está registrado.', $exception->getMessage());
+        }
+
+        self::assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM users')->fetchColumn());
+    }
+
     public function testRejectsUnsupportedRoleAndShortTemporaryPassword(): void
     {
         $service = $this->service();
 
-        try {
-            $service->create('Owner Two', 'owner2@example.com', 'owner', 'TemporaryPass123', []);
-            self::fail('Only admin or gestor may be created from UserService.');
-        } catch (InvalidArgumentException) {
-            self::assertTrue(true);
+        foreach (['owner', 'tenant'] as $unsupportedRole) {
+            try {
+                $service->create(
+                    ucfirst($unsupportedRole),
+                    $unsupportedRole . '@example.com',
+                    $unsupportedRole,
+                    'TemporaryPass123',
+                    [],
+                );
+                self::fail('Generic UserService create must reject role ' . $unsupportedRole . '.');
+            } catch (InvalidArgumentException) {
+                self::assertTrue(true);
+            }
         }
 
         $this->expectException(InvalidArgumentException::class);
@@ -165,6 +225,28 @@ final class UserServiceTest extends TestCase
         self::assertSame(['users.permissions', 'users.view'], $listed[0]['permissions']);
     }
 
+    public function testTenantCannotReceiveAdministrativePermissionsEvenIfProjectionIsTampered(): void
+    {
+        $service = $this->service();
+        $tenantId = $this->insertTenant();
+
+        try {
+            $service->setPermissions($tenantId, ['contracts.manage']);
+            self::fail('Tenant must reject non-empty administrative permissions.');
+        } catch (RuntimeException) {
+            self::assertTrue(true);
+        }
+
+        $service->setPermissions($tenantId, []);
+        $encoded = $this->pdo->query('SELECT permissions_json FROM users WHERE id = ' . $tenantId)->fetchColumn();
+        self::assertFalse($encoded);
+
+        self::assertFalse(Permissions::allows(
+            ['role' => 'tenant', 'permissions' => ['contracts.manage', 'users.manage']],
+            'contracts.manage',
+        ));
+    }
+
     private function service(): UserService
     {
         if (!class_exists(UserService::class)) {
@@ -190,6 +272,17 @@ final class UserServiceTest extends TestCase
             . 'VALUES (\'owner\', \'Owner\', \'owner@example.com\', :password_hash, 1)',
         );
         $statement->execute(['password_hash' => password_hash('OwnerPassword123', PASSWORD_DEFAULT)]);
+
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    private function insertTenant(): int
+    {
+        $statement = $this->pdo->prepare(
+            'INSERT INTO users (role, full_name, email, password_hash, is_active, permissions_json, must_change_password) '
+            . 'VALUES (\'tenant\', \'Tenant\', \'tenant@example.com\', :password_hash, 1, NULL, 1)',
+        );
+        $statement->execute(['password_hash' => password_hash('TenantPassword123', PASSWORD_DEFAULT)]);
 
         return (int) $this->pdo->lastInsertId();
     }
