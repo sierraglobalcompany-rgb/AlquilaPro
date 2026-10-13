@@ -3,7 +3,7 @@
 **Proyecto:** AlquilaPro  
 **Fecha:** 2026-10-13 (America/Bogota)  
 **Rama de diseño:** `spec/f9-charges-portfolio-20261013`  
-**Estado:** `DRAFT / USER REVIEW REQUIRED / IMPLEMENTATION BLOCKED ON F8 FINAL AUDIT`  
+**Estado:** `APPROVED / IMPLEMENTATION IN PROGRESS`
 **Fuentes canónicas:** `ALQUILA_PRO_SPEC_MAESTRO_V1.2_AUDITADO.md`, `ALQUILA_PRO_PLAN_DESARROLLO_V1.2_AUDITADO.md`, F8 SPEC/PLAN/checkpoints y código real del repositorio.
 
 ---
@@ -860,11 +860,11 @@ No se encontró motivo demostrado para una segunda tabla F9, segunda clase de do
 # 25. GATE DE APROBACIÓN
 
 ```text
-F9_PRE_KISS: READY FOR USER REVIEW
-F9_SPEC: DRAFT / USER REVIEW REQUIRED
-F9_PLAN: NOT AUTHORIZED YET
-F9_IMPLEMENTATION: BLOCKED
-F8_DEPENDENCY: WAITING FINAL AUDIT
+F9_SPEC: APPROVED
+F9_PLAN: APPROVED
+F9_IMPLEMENTATION: IN PROGRESS
+F8_INTEGRATED_BASE_SHA: 89811cbba5ae922bab00b50dd02af08dbaa1cb8b
+MERGE_AUTHORIZED: NO
 ```
 
 Después de aprobación explícita de esta SPEC:
