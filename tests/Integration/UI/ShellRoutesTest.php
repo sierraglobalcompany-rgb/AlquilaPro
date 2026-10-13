@@ -147,6 +147,71 @@ final class ShellRoutesTest extends TestCase
         self::assertSame('/account/password', $account->getHeaderLine('Location'));
     }
 
+    public function testTenantRootKeepsPasswordGateThenRedirectsToPrivatePortal(): void
+    {
+        $this->insertUser(
+            'tenant-forced@example.com',
+            'TenantPassword123',
+            'tenant',
+            [],
+            true,
+            'Tenant Forced',
+        );
+        $forcedApp = $this->app('/sub');
+        $this->login($forcedApp, 'tenant-forced@example.com', 'TenantPassword123', '/sub');
+
+        $forcedRoot = $this->request($forcedApp, 'GET', '/sub/');
+        self::assertSame(302, $forcedRoot->getStatusCode());
+        self::assertSame('/sub/account/password', $forcedRoot->getHeaderLine('Location'));
+
+        $_SESSION = [];
+        $this->insertUser(
+            'tenant-ready@example.com',
+            'TenantPassword123',
+            'tenant',
+            [],
+            false,
+            'Tenant Ready',
+        );
+        $readyApp = $this->app('/sub');
+        $this->login($readyApp, 'tenant-ready@example.com', 'TenantPassword123', '/sub');
+
+        $readyRoot = $this->request($readyApp, 'GET', '/sub/');
+        self::assertSame(302, $readyRoot->getStatusCode());
+        self::assertSame('/sub/tenant', $readyRoot->getHeaderLine('Location'));
+    }
+
+    public function testTenantShellHasOnlyTenantHomeAndAccountEvenWithPollutedPermissions(): void
+    {
+        $this->insertUser(
+            'tenant-polluted@example.com',
+            'TenantPassword123',
+            'tenant',
+            ['users.view', 'users.manage', 'properties.view', 'candidates.view', 'contracts.view', 'contracts.manage'],
+            false,
+            'Tenant Polluted',
+        );
+        $app = $this->app('/sub');
+        $this->login($app, 'tenant-polluted@example.com', 'TenantPassword123', '/sub');
+
+        $response = $this->request($app, 'GET', '/sub/tenant');
+        $body = (string) $response->getBody();
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringContainsString('data-f3-app-shell', $body);
+        self::assertStringContainsString('href="/sub/tenant"', $body);
+        self::assertStringContainsString('href="/sub/account"', $body);
+        self::assertStringContainsString('Inicio', $body);
+        self::assertStringContainsString('Cuenta', $body);
+        self::assertStringNotContainsString('data-apps-open', $body);
+        self::assertStringNotContainsString('apps-dialog', $body);
+        self::assertStringNotContainsString('>Apps<', $body);
+        self::assertStringNotContainsString('/sub/admin/', $body);
+        self::assertStringNotContainsString('No tienes aplicaciones disponibles', $body);
+
+        self::assertSame(403, $this->request($app, 'GET', '/sub/admin/users')->getStatusCode());
+    }
+
     public function testShellUsesConfiguredBrandingAndSafeFallbacks(): void
     {
         $this->insertUser('owner@example.com', 'OwnerPassword123', 'owner');
