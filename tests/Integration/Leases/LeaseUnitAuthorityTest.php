@@ -91,6 +91,35 @@ final class LeaseUnitAuthorityTest extends TestCase
         self::assertCount(0, $service->listPublicUnits(null, 'Medellín', 'Calasanz'));
     }
 
+    public function testUnitEditorSerializesStatusCheckWithLeaseActivation(): void
+    {
+        $path = dirname(__DIR__, 3) . '/app/Properties/PropertyService.php';
+        self::assertFileExists($path);
+        $source = (string) file_get_contents($path);
+
+        $start = strpos($source, 'public function updateUnit(');
+        $end = strpos($source, 'public function findUnit(', $start === false ? 0 : $start);
+        self::assertNotFalse($start);
+        self::assertNotFalse($end);
+        $method = substr($source, $start, $end - $start);
+
+        $transaction = strpos($method, '$this->pdo->beginTransaction()');
+        $unitLock = strpos($method, 'FROM units WHERE id = :id FOR UPDATE');
+        $leaseCheck = strpos($method, 'FROM leases l');
+        $unitUpdate = strpos($method, 'UPDATE units SET');
+        $commit = strpos($method, '$this->pdo->commit()');
+
+        self::assertNotFalse($transaction, 'The editor must update the unit inside a transaction.');
+        self::assertNotFalse($unitLock, 'The editor must lock the canonical unit row.');
+        self::assertNotFalse($leaseCheck, 'The editor must check the active lease while serialized on the unit.');
+        self::assertNotFalse($unitUpdate, 'The editor must update the canonical unit row.');
+        self::assertNotFalse($commit, 'The editor must commit only after the guarded update.');
+        self::assertLessThan($unitLock, $transaction);
+        self::assertLessThan($leaseCheck, $unitLock);
+        self::assertLessThan($unitUpdate, $leaseCheck);
+        self::assertLessThan($commit, $unitUpdate);
+    }
+
     /** @return array{owner_id:int,unit_id:int,lease_id:int,code:string} */
     private function fixture(bool $publicReady = false): array
     {

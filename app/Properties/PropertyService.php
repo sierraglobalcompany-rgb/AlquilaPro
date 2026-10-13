@@ -7,6 +7,7 @@ namespace AlquilaPro\Properties;
 use PDO;
 use PDOException;
 use RuntimeException;
+use Throwable;
 
 final class PropertyService
 {
@@ -170,62 +171,84 @@ final class PropertyService
 
     public function updateUnit(int $unitId, array $input): array
     {
-        $existing = $this->findUnit($unitId);
-        if ($existing === null) {
-            throw new RuntimeException('La unidad no existe.');
+        $ownsTransaction = !$this->pdo->inTransaction();
+        if ($ownsTransaction) {
+            $this->pdo->beginTransaction();
         }
-
-        if (trim((string) ($input['public_key'] ?? '')) !== '') {
-            throw new RuntimeException('El identificador público es generado por el sistema.');
-        }
-
-        $requestedType = trim((string) ($input['type'] ?? ''));
-        if (in_array($requestedType, self::UNIT_TYPES, true) && $requestedType !== $existing['type']) {
-            throw new RuntimeException('El tipo de la unidad no se puede cambiar.');
-        }
-
-        $data = $this->validateUnit($existing['property_id'], $input, $unitId);
-
-        $activeLease = $this->pdo->prepare(
-            'SELECT 1 FROM leases l '
-            . 'INNER JOIN contracts c ON c.id = l.contract_id '
-            . 'WHERE c.unit_id = :unit_id AND l.ended_at IS NULL LIMIT 1',
-        );
-        $activeLease->execute(['unit_id' => $unitId]);
-        if ($activeLease->fetchColumn() !== false && $data['status'] !== 'occupied') {
-            throw new RuntimeException('La unidad con arrendamiento activo debe permanecer ocupada.');
-        }
-
-        $data['is_public'] = $this->normalizePublicFlag($input, $existing['is_public']) ? 1 : 0;
-        if (!$existing['is_public'] && $data['is_public']) {
-            $this->assertPublicationComplete($unitId, $data);
-        }
-        $data['id'] = $unitId;
-
-        $statement = $this->pdo->prepare(
-            'UPDATE units SET '
-            . 'type = :type, code = :code, location_label = :location_label, status = :status, '
-            . 'is_public = :is_public, monthly_price = :monthly_price, description = :description, requirements = :requirements, '
-            . 'private_notes = :private_notes, unit_number = :unit_number, tower = :tower, floor = :floor, '
-            . 'area_m2 = :area_m2, bedrooms = :bedrooms, bathrooms = :bathrooms, '
-            . 'administration_fee = :administration_fee, registry_number = :registry_number, '
-            . 'parking_level = :parking_level, dimensions = :dimensions, vehicle_type = :vehicle_type, '
-            . 'linked_apartment_id = :linked_apartment_id, updated_at = CURRENT_TIMESTAMP '
-            . 'WHERE id = :id',
-        );
 
         try {
+            $unitStatement = $this->pdo->prepare('SELECT * FROM units WHERE id = :id FOR UPDATE');
+            $unitStatement->execute(['id' => $unitId]);
+            $row = $unitStatement->fetch(PDO::FETCH_ASSOC);
+            $existing = is_array($row) ? $this->normalizeUnit($row) : null;
+            if ($existing === null) {
+                throw new RuntimeException('La unidad no existe.');
+            }
+
+            if (trim((string) ($input['public_key'] ?? '')) !== '') {
+                throw new RuntimeException('El identificador público es generado por el sistema.');
+            }
+
+            $requestedType = trim((string) ($input['type'] ?? ''));
+            if (in_array($requestedType, self::UNIT_TYPES, true) && $requestedType !== $existing['type']) {
+                throw new RuntimeException('El tipo de la unidad no se puede cambiar.');
+            }
+
+            $data = $this->validateUnit($existing['property_id'], $input, $unitId);
+
+            $activeLease = $this->pdo->prepare(
+                'SELECT 1 FROM leases l '
+                . 'INNER JOIN contracts c ON c.id = l.contract_id '
+                . 'WHERE c.unit_id = :unit_id AND l.ended_at IS NULL LIMIT 1',
+            );
+            $activeLease->execute(['unit_id' => $unitId]);
+            if ($activeLease->fetchColumn() !== false && $data['status'] !== 'occupied') {
+                throw new RuntimeException('La unidad con arrendamiento activo debe permanecer ocupada.');
+            }
+
+            $data['is_public'] = $this->normalizePublicFlag($input, $existing['is_public']) ? 1 : 0;
+            if (!$existing['is_public'] && $data['is_public']) {
+                $this->assertPublicationComplete($unitId, $data);
+            }
+            $data['id'] = $unitId;
+
+            $statement = $this->pdo->prepare(
+                'UPDATE units SET '
+                . 'type = :type, code = :code, location_label = :location_label, status = :status, '
+                . 'is_public = :is_public, monthly_price = :monthly_price, description = :description, requirements = :requirements, '
+                . 'private_notes = :private_notes, unit_number = :unit_number, tower = :tower, floor = :floor, '
+                . 'area_m2 = :area_m2, bedrooms = :bedrooms, bathrooms = :bathrooms, '
+                . 'administration_fee = :administration_fee, registry_number = :registry_number, '
+                . 'parking_level = :parking_level, dimensions = :dimensions, vehicle_type = :vehicle_type, '
+                . 'linked_apartment_id = :linked_apartment_id, updated_at = CURRENT_TIMESTAMP '
+                . 'WHERE id = :id',
+            );
+
             $statement->execute($data);
+
+            $unit = $this->findUnit($unitId);
+            if ($unit === null) {
+                throw new RuntimeException('No fue posible actualizar la unidad.');
+            }
+
+            if ($ownsTransaction && !$this->pdo->commit()) {
+                throw new RuntimeException('No fue posible actualizar la unidad.');
+            }
+
+            return $unit;
         } catch (PDOException $exception) {
+            if ($ownsTransaction && $this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+
             throw new RuntimeException('No fue posible actualizar la unidad. Verifica que el código no esté repetido.');
-        }
+        } catch (Throwable $exception) {
+            if ($ownsTransaction && $this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
 
-        $unit = $this->findUnit($unitId);
-        if ($unit === null) {
-            throw new RuntimeException('No fue posible actualizar la unidad.');
+            throw $exception;
         }
-
-        return $unit;
     }
 
     public function findUnit(int $unitId): ?array
