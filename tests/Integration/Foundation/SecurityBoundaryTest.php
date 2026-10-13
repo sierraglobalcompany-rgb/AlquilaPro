@@ -43,6 +43,17 @@ final class SecurityBoundaryTest extends TestCase
         self::assertMatchesRegularExpression('/\\[F(?:,|\\])/', $rules, 'Sensitive path rule must fail the request instead of rewriting it.');
     }
 
+    public function testRuntimeStorageIsIgnoredByGit(): void
+    {
+        $ignore = file_get_contents(dirname(__DIR__, 3) . '/.gitignore');
+        self::assertIsString($ignore);
+        self::assertMatchesRegularExpression(
+            '/^\/storage\/\s*$/m',
+            $ignore,
+            'All runtime storage must stay outside version control, including private PDFs and uploaded documents.',
+        );
+    }
+
     private function app(): App
     {
         $directory = sys_get_temp_dir() . '/alquila_security_' . bin2hex(random_bytes(6));

@@ -77,6 +77,8 @@ final class AppBootstrapTest extends TestCase
         self::assertSame(200, $response->getStatusCode());
         self::assertStringContainsString('Instalar Alquila Pro', $body);
         self::assertStringContainsString('Diagnóstico del servidor', $body);
+        self::assertStringContainsString('dom:', $body);
+        self::assertStringContainsString('gd:', $body);
         self::assertStringContainsString('Base de datos', $body);
         self::assertStringContainsString('Propietario inicial', $body);
         self::assertStringContainsString('name="csrf_token"', $body);

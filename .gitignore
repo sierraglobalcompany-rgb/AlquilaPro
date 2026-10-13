@@ -1,7 +1,6 @@
 /vendor/
 /config/database.php
-/storage/app/
-/storage/logs/
+/storage/
 /.phpunit.result.cache
 /.env
 /.env.*

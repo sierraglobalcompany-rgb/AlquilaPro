@@ -14,6 +14,7 @@ $initials = $initials !== '' ? $initials : 'AP';
 $canViewUsers = \AlquilaPro\Auth\Permissions::allows($user, 'users.view');
 $canViewProperties = \AlquilaPro\Auth\Permissions::allows($user, 'properties.view');
 $canViewCandidates = \AlquilaPro\Auth\Permissions::allows($user, 'candidates.view');
+$canViewContracts = \AlquilaPro\Auth\Permissions::allows($user, 'contracts.view');
 $isOwner = ($user['role'] ?? null) === 'owner';
 ?>
 <!doctype html>
@@ -71,13 +72,19 @@ $isOwner = ($user['role'] ?? null) === 'owner';
                     <span>Candidaturas y documentación</span>
                 </a>
             <?php endif; ?>
+            <?php if ($canViewContracts): ?>
+                <a class="app-card" href="<?= $escape($basePath) ?>/admin/contract-templates">
+                    <strong>Contratos</strong>
+                    <span>Plantillas y versiones</span>
+                </a>
+            <?php endif; ?>
             <?php if ($isOwner): ?>
                 <a class="app-card" href="<?= $escape($basePath) ?>/admin/appearance">
                     <strong>Apariencia</strong>
                     <span>Nombre, color y logo</span>
                 </a>
             <?php endif; ?>
-            <?php if (!$canViewUsers && !$canViewProperties && !$canViewCandidates && !$isOwner): ?>
+            <?php if (!$canViewUsers && !$canViewProperties && !$canViewCandidates && !$canViewContracts && !$isOwner): ?>
                 <p class="empty-state">No tienes aplicaciones disponibles.</p>
             <?php endif; ?>
         </div>

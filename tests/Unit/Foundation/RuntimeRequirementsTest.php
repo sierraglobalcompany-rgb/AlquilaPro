@@ -15,7 +15,7 @@ final class RuntimeRequirementsTest extends TestCase
             self::fail('RuntimeRequirements must exist before this behavior can pass.');
         }
 
-        $result = RuntimeRequirements::evaluate('8.2.29', ['pdo', 'pdo_mysql', 'mbstring', 'fileinfo'], true);
+        $result = RuntimeRequirements::evaluate('8.2.29', ['pdo', 'pdo_mysql', 'mbstring', 'fileinfo', 'dom', 'gd'], true);
 
         self::assertFalse($result['ok']);
         self::assertFalse($result['checks']['php']['ok']);
@@ -27,7 +27,7 @@ final class RuntimeRequirementsTest extends TestCase
             self::fail('RuntimeRequirements must exist before this behavior can pass.');
         }
 
-        $result = RuntimeRequirements::evaluate('8.6.0', ['pdo', 'pdo_mysql', 'mbstring', 'fileinfo'], true);
+        $result = RuntimeRequirements::evaluate('8.6.0', ['pdo', 'pdo_mysql', 'mbstring', 'fileinfo', 'dom', 'gd'], true);
 
         self::assertFalse($result['ok']);
         self::assertFalse($result['checks']['php']['ok']);
@@ -39,7 +39,7 @@ final class RuntimeRequirementsTest extends TestCase
             self::fail('RuntimeRequirements must exist before this behavior can pass.');
         }
 
-        $result = RuntimeRequirements::evaluate('8.4.0', ['pdo', 'mbstring', 'fileinfo'], true);
+        $result = RuntimeRequirements::evaluate('8.4.0', ['pdo', 'mbstring', 'fileinfo', 'dom', 'gd'], true);
 
         self::assertFalse($result['ok']);
         self::assertFalse($result['checks']['pdo_mysql']['ok']);
@@ -51,10 +51,36 @@ final class RuntimeRequirementsTest extends TestCase
             self::fail('RuntimeRequirements must exist before this behavior can pass.');
         }
 
-        $result = RuntimeRequirements::evaluate('8.4.0', ['pdo', 'pdo_mysql', 'mbstring'], true);
+        $result = RuntimeRequirements::evaluate('8.4.0', ['pdo', 'pdo_mysql', 'mbstring', 'dom', 'gd'], true);
 
         self::assertFalse($result['ok']);
         self::assertFalse($result['checks']['fileinfo']['ok']);
+    }
+
+    public function testRejectsMissingDom(): void
+    {
+        if (!class_exists(RuntimeRequirements::class)) {
+            self::fail('RuntimeRequirements must exist before this behavior can pass.');
+        }
+
+        $result = RuntimeRequirements::evaluate('8.4.0', ['pdo', 'pdo_mysql', 'mbstring', 'fileinfo', 'gd'], true);
+
+        self::assertFalse($result['ok']);
+        self::assertArrayHasKey('dom', $result['checks']);
+        self::assertFalse($result['checks']['dom']['ok']);
+    }
+
+    public function testRejectsMissingGd(): void
+    {
+        if (!class_exists(RuntimeRequirements::class)) {
+            self::fail('RuntimeRequirements must exist before this behavior can pass.');
+        }
+
+        $result = RuntimeRequirements::evaluate('8.4.0', ['pdo', 'pdo_mysql', 'mbstring', 'fileinfo', 'dom'], true);
+
+        self::assertFalse($result['ok']);
+        self::assertArrayHasKey('gd', $result['checks']);
+        self::assertFalse($result['checks']['gd']['ok']);
     }
 
     public function testRejectsUnwritableStorage(): void
@@ -63,7 +89,7 @@ final class RuntimeRequirementsTest extends TestCase
             self::fail('RuntimeRequirements must exist before this behavior can pass.');
         }
 
-        $result = RuntimeRequirements::evaluate('8.4.0', ['pdo', 'pdo_mysql', 'mbstring', 'fileinfo'], false);
+        $result = RuntimeRequirements::evaluate('8.4.0', ['pdo', 'pdo_mysql', 'mbstring', 'fileinfo', 'dom', 'gd'], false);
 
         self::assertFalse($result['ok']);
         self::assertFalse($result['checks']['storage']['ok']);
@@ -75,7 +101,7 @@ final class RuntimeRequirementsTest extends TestCase
             self::fail('RuntimeRequirements must exist before this behavior can pass.');
         }
 
-        $result = RuntimeRequirements::evaluate('8.5.1', ['PDO', 'pdo_mysql', 'mbstring', 'fileinfo'], true);
+        $result = RuntimeRequirements::evaluate('8.5.1', ['PDO', 'pdo_mysql', 'mbstring', 'fileinfo', 'dom', 'gd'], true);
 
         self::assertTrue($result['ok']);
         self::assertTrue($result['checks']['php']['ok']);
@@ -83,6 +109,10 @@ final class RuntimeRequirementsTest extends TestCase
         self::assertTrue($result['checks']['pdo_mysql']['ok']);
         self::assertTrue($result['checks']['mbstring']['ok']);
         self::assertTrue($result['checks']['fileinfo']['ok']);
+        self::assertArrayHasKey('dom', $result['checks']);
+        self::assertTrue($result['checks']['dom']['ok']);
+        self::assertArrayHasKey('gd', $result['checks']);
+        self::assertTrue($result['checks']['gd']['ok']);
         self::assertTrue($result['checks']['storage']['ok']);
     }
 }
