@@ -1,0 +1,28 @@
+name: F7 Lock Bootstrap
+
+on:
+  push:
+    branches:
+      - 'impl/f7-contracts-20261012'
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: pdo, pdo_mysql, mbstring, dom, gd, fileinfo
+          coverage: none
+
+      - name: Generate Dompdf lock
+        run: |
+          composer require 'dompdf/dompdf:^3.1.6' --no-install --no-interaction --no-progress
+          echo 'F7_LOCK_GZIP_BASE64_BEGIN'
+          gzip -c composer.lock | base64 -w0
+          echo
+          echo 'F7_LOCK_GZIP_BASE64_END'
