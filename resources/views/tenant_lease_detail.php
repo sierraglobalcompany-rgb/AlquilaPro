@@ -5,6 +5,11 @@ declare(strict_types=1);
 $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $isApartment = (string) $lease['unit_type'] === 'apartment';
 $isParking = (string) $lease['unit_type'] === 'parking';
+$chargeStateLabels = [
+    'pending' => 'Pendiente',
+    'overdue' => 'Vencido',
+    'voided' => 'Anulado',
+];
 ?>
 <section class="surface">
     <p class="eyebrow">Portal del inquilino</p>
@@ -12,6 +17,41 @@ $isParking = (string) $lease['unit_type'] === 'parking';
     <p class="hint">Estado: <?= $lease['is_active'] ? 'Activo' : 'Finalizado' ?></p>
     <a class="button button--quiet" href="<?= $escape($basePath) ?>/tenant">Volver</a>
     <a class="button button--quiet" href="<?= $escape($basePath) ?>/tenant/leases/<?= $escape($lease['id']) ?>/contract">Descargar contrato</a>
+</section>
+
+<section class="surface">
+    <h2>Cartera</h2>
+    <div class="users-grid">
+        <article class="user-card">
+            <div>Saldo pendiente: $<?= $escape($financeSummary['outstanding']) ?></div>
+            <div>Saldo vencido: $<?= $escape($financeSummary['overdue']) ?></div>
+            <div>Vencimiento pendiente más antiguo: <?= $escape($financeSummary['oldest_due_date'] ?? '—') ?></div>
+        </article>
+    </div>
+    <?php if ($charges === []): ?>
+        <p class="empty-state">No hay cargos registrados para este arrendamiento.</p>
+    <?php else: ?>
+        <div class="users-grid">
+            <?php foreach ($charges as $charge): ?>
+                <article class="user-card">
+                    <div class="user-card__head">
+                        <strong><?= $escape($charge['description'] ?? 'Cargo') ?></strong>
+                        <span class="status-pill" data-charge-state="<?= $escape($charge['state']) ?>">
+                            <?= $escape($chargeStateLabels[$charge['state']] ?? 'Cargo') ?>
+                        </span>
+                    </div>
+                    <?php if ($charge['period_month'] !== null): ?>
+                        <div>Periodo: <?= $escape(substr($charge['period_month'], 0, 7)) ?></div>
+                    <?php endif; ?>
+                    <div>Vencimiento: <?= $escape($charge['due_date']) ?></div>
+                    <div>Valor: $<?= $escape($charge['amount']) ?></div>
+                    <?php if ($charge['days_overdue'] > 0): ?>
+                        <div>Días vencidos: <?= $escape($charge['days_overdue']) ?></div>
+                    <?php endif; ?>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
 </section>
 
 <section class="surface">

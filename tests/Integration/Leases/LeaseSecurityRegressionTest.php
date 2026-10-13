@@ -108,7 +108,9 @@ final class LeaseSecurityRegressionTest extends TestCase
         $detail = $this->file('resources/views/tenant_lease_detail.php');
         $credential = $this->file('resources/views/lease_activation_credential.php');
 
-        foreach (['Cartera', 'Pagos', 'Póliza', 'Mantenimiento', 'Solicitudes'] as $futureLabel) {
+        self::assertStringNotContainsString('Cartera', $home);
+        self::assertStringContainsString('Cartera', $detail);
+        foreach (['Pagos', 'Póliza', 'Mantenimiento', 'Solicitudes'] as $futureLabel) {
             self::assertStringNotContainsString($futureLabel, $home . "\n" . $detail);
         }
 
