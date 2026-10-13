@@ -16,6 +16,7 @@ final class ContractService
 {
     private const DOCUMENT_TYPES = ['urban_housing', 'independent_parking'];
     private const ELIGIBLE_UNIT_STATUSES = ['available', 'in_process'];
+    private const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
     private const AUTOMATIC_PLACEHOLDERS = [
         'candidate.full_name',
@@ -440,18 +441,214 @@ final class ContractService
         }
 
         [$version] = $this->versionContext((int) $contract['template_version_id']);
-        $candidate = $this->candidates->findCandidate((int) $contract['candidate_id']);
-        $unit = $this->properties->findUnit((int) $contract['unit_id']);
-        if ($candidate === null || $unit === null) {
-            throw new RuntimeException('No fue posible resolver el borrador contractual.');
+        [$candidate, $unit, $property] = $this->contractSourceContext($contract, false);
+        $document = $this->resolvedDocument($contract, $version, $candidate, $unit, $property, true);
+
+        return $document['html'];
+    }
+
+    public function generate(int $contractId, int $now): array
+    {
+        $contract = $this->findContract($contractId);
+        if ($contract === null) {
+            throw new RuntimeException('El contrato no existe.');
         }
-        $property = $this->properties->findProperty((int) $unit['property_id']);
-        if ($property === null) {
-            throw new RuntimeException('No fue posible resolver el borrador contractual.');
+        if ($contract['status'] !== 'draft') {
+            throw new RuntimeException('Solo un borrador puede generar evidencia contractual.');
         }
 
+        [$candidate, $unit, $property] = $this->contractSourceContext($contract, true);
+        [$version, $template] = $this->versionContext((int) $contract['template_version_id']);
+        if ($template['document_type'] !== $contract['document_type']) {
+            throw new RuntimeException('La versión contractual no corresponde al contrato.');
+        }
+        $document = $this->resolvedDocument($contract, $version, $candidate, $unit, $property, false);
+        $snapshotHtml = $document['html'];
+        $resolvedJson = $this->encodeJson($document['values']);
+
+        $renderer = new ContractPdfRenderer();
+        $bytes = $renderer->render($snapshotHtml);
+        $size = strlen($bytes);
+        if (!str_starts_with($bytes, '%PDF-') || $size <= 0 || $size > self::MAX_PDF_BYTES) {
+            throw new RuntimeException('El PDF contractual generado no es válido.');
+        }
+        $hash = hash('sha256', $bytes);
+
+        $tempPath = null;
+        $finalPath = null;
+        try {
+            $this->ensureContractDirectory();
+            $storedName = bin2hex(random_bytes(16)) . '.pdf';
+            $tempPath = $this->contractDirectory . DIRECTORY_SEPARATOR . '.tmp-' . bin2hex(random_bytes(16));
+            $finalPath = $this->contractDirectory . DIRECTORY_SEPARATOR . $storedName;
+            if (file_exists($finalPath)) {
+                throw new RuntimeException('No fue posible reservar el archivo contractual.');
+            }
+
+            $written = @file_put_contents($tempPath, $bytes, LOCK_EX);
+            if ($written !== $size) {
+                throw new RuntimeException('No fue posible guardar el PDF contractual.');
+            }
+            @chmod($tempPath, 0600);
+            clearstatcache(true, $tempPath);
+            if (@filesize($tempPath) !== $size || @hash_file('sha256', $tempPath) !== $hash) {
+                throw new RuntimeException('No fue posible verificar el PDF contractual.');
+            }
+            if (!@rename($tempPath, $finalPath)) {
+                throw new RuntimeException('No fue posible publicar el PDF contractual.');
+            }
+            $tempPath = null;
+            @chmod($finalPath, 0600);
+
+            $this->pdo->beginTransaction();
+            $lock = $this->pdo->prepare('SELECT status FROM contracts WHERE id = :id FOR UPDATE');
+            $lock->execute(['id' => $contractId]);
+            if ($lock->fetchColumn() !== 'draft') {
+                throw new RuntimeException('El contrato ya no admite generación.');
+            }
+
+            $fresh = $this->findContract($contractId);
+            if ($fresh === null || $fresh['status'] !== 'draft') {
+                throw new RuntimeException('El contrato ya no admite generación.');
+            }
+            $this->contractSourceContext($fresh, true);
+
+            $update = $this->pdo->prepare(
+                "UPDATE contracts SET status = 'generated', resolved_variables_json = :resolved_variables_json, "
+                . 'snapshot_html = :snapshot_html, pdf_stored_name = :pdf_stored_name, pdf_sha256 = :pdf_sha256, '
+                . 'pdf_size_bytes = :pdf_size_bytes, generated_at = :generated_at, updated_at = :updated_at '
+                . "WHERE id = :id AND status = 'draft'",
+            );
+            $update->execute([
+                'resolved_variables_json' => $resolvedJson,
+                'snapshot_html' => $snapshotHtml,
+                'pdf_stored_name' => $storedName,
+                'pdf_sha256' => $hash,
+                'pdf_size_bytes' => $size,
+                'generated_at' => $this->dateTime($now),
+                'updated_at' => $this->dateTime($now),
+                'id' => $contractId,
+            ]);
+            if ($update->rowCount() !== 1) {
+                throw new RuntimeException('El contrato ya no admite generación.');
+            }
+            $this->pdo->commit();
+        } catch (RuntimeException $exception) {
+            $this->rollbackIfNeeded();
+            if ($tempPath !== null) {
+                @unlink($tempPath);
+            }
+            if ($finalPath !== null) {
+                @unlink($finalPath);
+            }
+            throw $exception;
+        } catch (Throwable) {
+            $this->rollbackIfNeeded();
+            if ($tempPath !== null) {
+                @unlink($tempPath);
+            }
+            if ($finalPath !== null) {
+                @unlink($finalPath);
+            }
+            throw new RuntimeException('No fue posible generar el contrato.');
+        }
+
+        $generated = $this->findContract($contractId);
+        if ($generated === null || $generated['status'] !== 'generated') {
+            if ($finalPath !== null) {
+                @unlink($finalPath);
+            }
+            throw new RuntimeException('No fue posible generar el contrato.');
+        }
+
+        return $generated;
+    }
+
+    /** @return array{path:string,stored_name:string,size_bytes:int,sha256:string}|null */
+    public function privatePdf(int $contractId): ?array
+    {
+        $contract = $this->findContract($contractId);
+        if ($contract === null || !in_array($contract['status'], ['generated', 'finalized'], true)) {
+            return null;
+        }
+
+        $name = (string) ($contract['pdf_stored_name'] ?? '');
+        $expectedHash = (string) ($contract['pdf_sha256'] ?? '');
+        $expectedSize = (int) ($contract['pdf_size_bytes'] ?? 0);
+        if (preg_match('/^[a-f0-9]{32}\.pdf$/D', $name) !== 1
+            || preg_match('/^[a-f0-9]{64}$/D', $expectedHash) !== 1
+            || $expectedSize <= 0
+            || $expectedSize > self::MAX_PDF_BYTES) {
+            return null;
+        }
+
+        $directory = realpath($this->contractDirectory);
+        if ($directory === false || !is_dir($directory)) {
+            return null;
+        }
+        $path = $this->contractDirectory . DIRECTORY_SEPARATOR . $name;
+        $realPath = realpath($path);
+        if ($realPath === false || dirname($realPath) !== $directory || !is_file($realPath) || !is_readable($realPath)) {
+            return null;
+        }
+
+        clearstatcache(true, $realPath);
+        $actualSize = @filesize($realPath);
+        if (!is_int($actualSize) || $actualSize !== $expectedSize || $actualSize > self::MAX_PDF_BYTES) {
+            return null;
+        }
+        if (@file_get_contents($realPath, false, null, 0, 5) !== '%PDF-') {
+            return null;
+        }
+        $actualHash = @hash_file('sha256', $realPath);
+        if (!is_string($actualHash) || !hash_equals($expectedHash, $actualHash)) {
+            return null;
+        }
+
+        return [
+            'path' => $realPath,
+            'stored_name' => $name,
+            'size_bytes' => $actualSize,
+            'sha256' => $actualHash,
+        ];
+    }
+
+    private function contractSourceContext(array $contract, bool $requireEligibility): array
+    {
+        if ($requireEligibility) {
+            [$candidate, $unit, $property] = $this->eligibleCandidateContext((int) $contract['candidate_id']);
+        } else {
+            $candidate = $this->candidates->findCandidate((int) $contract['candidate_id']);
+            $unit = $this->properties->findUnit((int) $contract['unit_id']);
+            if ($candidate === null || $unit === null) {
+                throw new RuntimeException('No fue posible resolver el borrador contractual.');
+            }
+            $property = $this->properties->findProperty((int) $unit['property_id']);
+            if ($property === null) {
+                throw new RuntimeException('No fue posible resolver el borrador contractual.');
+            }
+        }
+
+        if ((int) $candidate['unit_id'] !== (int) $contract['unit_id']
+            || (int) $unit['id'] !== (int) $contract['unit_id']
+            || $this->documentTypeForUnit((string) $unit['type']) !== $contract['document_type']) {
+            throw new RuntimeException('La unidad canónica del candidato ya no corresponde al contrato.');
+        }
+
+        return [$candidate, $unit, $property];
+    }
+
+    /** @return array{values:array<string,mixed>,html:string} */
+    private function resolvedDocument(
+        array $contract,
+        array $version,
+        array $candidate,
+        array $unit,
+        array $property,
+        bool $draft,
+    ): array {
         $manual = $this->decodeObject((string) ($contract['manual_variables_json'] ?? '[]'));
-        $tasks = $this->decodeList((string) ($contract['tasks_json'] ?? '[]'));
+        $tasks = $draft ? $this->decodeList((string) ($contract['tasks_json'] ?? '[]')) : [];
         $annexes = $this->decodeList((string) ($contract['annexes_json'] ?? '[]'));
 
         $values = [
@@ -478,6 +675,7 @@ final class ContractService
             'contract.duration' => $contract['duration_text'],
             ...$manual,
         ];
+        ksort($values);
 
         $safeBody = $this->escape((string) $version['body_template']);
         $replacements = [];
@@ -486,9 +684,11 @@ final class ContractService
         }
         $safeBody = strtr($safeBody, $replacements);
 
-        $html = '<article class="contract-preview">'
-            . '<p><strong>BORRADOR</strong></p>'
-            . '<div class="contract-preview__body">' . nl2br($safeBody, false) . '</div>';
+        $html = '<article class="contract-preview">';
+        if ($draft) {
+            $html .= '<p><strong>BORRADOR</strong></p>';
+        }
+        $html .= '<div class="contract-preview__body">' . nl2br($safeBody, false) . '</div>';
 
         if ($tasks !== []) {
             $html .= '<section><h2>Tareas</h2><ul>';
@@ -511,7 +711,21 @@ final class ContractService
             $html .= '</ul></section>';
         }
 
-        return $html . '</article>';
+        return ['values' => $values, 'html' => $html . '</article>'];
+    }
+
+    private function ensureContractDirectory(): void
+    {
+        if (file_exists($this->contractDirectory) && !is_dir($this->contractDirectory)) {
+            throw new RuntimeException('El almacenamiento contractual no está disponible.');
+        }
+        if (!is_dir($this->contractDirectory) && !@mkdir($this->contractDirectory, 0700, true) && !is_dir($this->contractDirectory)) {
+            throw new RuntimeException('El almacenamiento contractual no está disponible.');
+        }
+        @chmod($this->contractDirectory, 0700);
+        if (!is_writable($this->contractDirectory)) {
+            throw new RuntimeException('El almacenamiento contractual no está disponible.');
+        }
     }
 
     private function eligibleCandidateContext(int $candidateId): array
