@@ -9,6 +9,7 @@ use AlquilaPro\Auth\UserService;
 use AlquilaPro\Candidates\CandidateDocumentService;
 use AlquilaPro\Candidates\CandidateService;
 use AlquilaPro\Candidates\ScreeningService;
+use AlquilaPro\Contracts\ContractService;
 use AlquilaPro\Foundation\DatabaseConfig;
 use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
@@ -37,6 +38,7 @@ return static function (array $settings): App {
     $candidateDocumentDirectory = (string) (
         $settings['candidate_document_directory'] ?? dirname(__DIR__) . '/storage/candidate-documents'
     );
+    $contractDirectory = (string) ($settings['contract_directory'] ?? dirname(__DIR__) . '/storage/contracts');
 
     $lock = new InstallationLock($lockPath);
     $installer = new Installer($lock, $migrationDirectory, $databaseConfigPath);
@@ -148,6 +150,7 @@ return static function (array $settings): App {
             $candidateDocuments = new CandidateDocumentService($pdo, $candidateDocumentDirectory);
             $candidates = new CandidateService($pdo, candidateDocumentService: $candidateDocuments);
             $screening = new ScreeningService($pdo, $candidates);
+            $contracts = new ContractService($pdo, $candidates, $screening, $properties, $contractDirectory);
 
             $currentUser = static function () use ($session, $auth): ?array {
                 $userId = $session->userId(time());
@@ -195,6 +198,9 @@ return static function (array $settings): App {
                 'properties' => $properties,
                 'screening' => $screening,
             ]);
+
+            $contractRoutes = require dirname(__DIR__) . '/app/Contracts/routes.php';
+            $contractRoutes($app, $shared + ['contracts' => $contracts]);
         }
     }
 
