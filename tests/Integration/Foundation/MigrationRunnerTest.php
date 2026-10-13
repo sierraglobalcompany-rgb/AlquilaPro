@@ -32,6 +32,7 @@ final class MigrationRunnerTest extends TestCase
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
         foreach ([
             'migration_probe',
+            'screening_processes',
             'candidate_documents',
             'candidate_references',
             'unit_application_requirements',
@@ -59,7 +60,7 @@ final class MigrationRunnerTest extends TestCase
         $first = MigrationRunner::migrate($this->pdo, $directory);
         $second = MigrationRunner::migrate($this->pdo, $directory);
 
-        self::assertSame(5, $first['applied']);
+        self::assertSame(6, $first['applied']);
         self::assertSame(
             [
                 '001_create_users.sql',
@@ -67,12 +68,13 @@ final class MigrationRunnerTest extends TestCase
                 '003_extend_users_for_auth.sql',
                 '004_create_properties_units_media.sql',
                 '005_create_candidates_references_requirements_documents.sql',
+                '006_create_screening_processes.sql',
             ],
             $first['migrations'],
         );
         self::assertSame(0, $second['applied']);
         self::assertSame([], $second['migrations']);
-        self::assertSame(5, (int) $this->pdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn());
+        self::assertSame(6, (int) $this->pdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn());
         self::assertSame(1, $this->tableExists('users'));
         self::assertSame(1, $this->tableExists('settings'));
         self::assertSame(1, $this->tableExists('properties'));
@@ -82,6 +84,7 @@ final class MigrationRunnerTest extends TestCase
         self::assertSame(1, $this->tableExists('candidate_references'));
         self::assertSame(1, $this->tableExists('unit_application_requirements'));
         self::assertSame(1, $this->tableExists('candidate_documents'));
+        self::assertSame(1, $this->tableExists('screening_processes'));
     }
 
     public function testFailedMigrationIsNotRecordedAsApplied(): void
