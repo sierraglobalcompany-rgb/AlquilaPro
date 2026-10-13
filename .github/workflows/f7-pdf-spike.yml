@@ -40,3 +40,11 @@ jobs:
 
       - name: Run PDF probe
         run: php tests/Spikes/F7PdfProbe.php
+
+      - name: Upload generated PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: f7-pdf-spike-${{ matrix.php }}
+          path: f7-pdf-spike-${{ matrix.php }}.pdf
+          if-no-files-found: error
+          retention-days: 1
