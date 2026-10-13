@@ -9,7 +9,7 @@ Aplicación web mobile-first y autoinstalable para administrar arrendamientos de
 **F8 merge SHA:** `a1b50f0d1c6556531626fd35cba0668bd5c4029f`.  
 **F8 final audited closure HEAD:** `f258cd48f6a2c301b38e6a85683e5f30b8368770`.  
 **F8 final audit CI:** `38443826390` — PHP 8.3/8.4/8.5 PASS; PHP 8.3 `310 tests / 2611 assertions / 0 failures / 0 errors`.  
-**F9:** `CLOSED / VERIFIED / NOT MERGED` sobre `impl/f9-charges-portfolio-20261013`; base F8 `89811cbba5ae922bab00b50dd02af08dbaa1cb8b`. Product HEAD `225648a21fdf5dc50cd5c397f4dbbe13c234d9e4`; CI `38482891971` — PHP 8.3/8.4/8.5 PASS, cada matriz `340 tests / 2990 assertions / 0 failures / 0 errors`. El cierre documental y su CI exacto se registran en el checkpoint F9 y en el PR.
+**F9:** `CLOSED / VERIFIED / NOT MERGED` sobre `impl/f9-charges-portfolio-20261013`; base F8 `89811cbba5ae922bab00b50dd02af08dbaa1cb8b`. Product HEAD `225648a21fdf5dc50cd5c397f4dbbe13c234d9e4`; CI `38482891971` — PHP 8.3/8.4/8.5 PASS, cada matriz `340 tests / 2990 assertions / 0 failures / 0 errors`. PR [#12](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/12) está abierto y sin merge; el informe F9 enlaza la evidencia de cierre.
 **F7 merge SHA:** `b6ab43fefd7b4d2933e3e3adff0ac4c23efdf1b8`.  
 **F7 final product HEAD:** `829955f2b297959380df06a8c8cc3e3424115e74`.  
 **F7 final product CI:** `38360814842` — PHP 8.3/8.4/8.5 PASS.  
@@ -152,6 +152,7 @@ F9_BRANCH: impl/f9-charges-portfolio-20261013
 F9_BASE: 89811cbba5ae922bab00b50dd02af08dbaa1cb8b
 F9_PRODUCT_HEAD: 225648a21fdf5dc50cd5c397f4dbbe13c234d9e4
 F9_PRODUCT_CI: 38482891971 — PHP 8.3 / 8.4 / 8.5 PASS — each 340 tests / 2990 assertions
+F9_PR: #12 OPEN — https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/12
 F9_CLOSURE_HEAD: exact commit containing this checkpoint; see branch and CI evidence
 MERGE_AUTHORIZED: NO
 NEXT: CLOSURE CI, THEN REVIEW-READY PR; STOP BEFORE MERGE
@@ -461,7 +462,8 @@ F9_BRANCH: impl/f9-charges-portfolio-20261013
 F9_PRODUCT_HEAD: 225648a21fdf5dc50cd5c397f4dbbe13c234d9e4
 F9_PRODUCT_CI: 38482891971 — PHP 8.3 / 8.4 / 8.5 PASS
 F9_CLOSURE_HEAD: exact commit containing this checkpoint; see branch and CI evidence
+F9_PR: #12 OPEN — https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/12
 MERGE_AUTHORIZED: NO
-CURRENT_ACTION: F9 DOCUMENTATION CLOSURE
-NEXT: EXACT CLOSURE CI, THEN REVIEW-READY PR; STOP BEFORE MERGE
+CURRENT_ACTION: F9 REVIEW-READY PR #12; VERIFY CURRENT HEAD CI
+NEXT: FINAL FORENSIC AUDIT; STOP BEFORE MERGE
 ```
