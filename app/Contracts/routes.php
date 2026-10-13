@@ -190,6 +190,40 @@ return static function (App $app, array $deps): void {
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
     });
 
+    $app->get('/admin/contracts/{id:[0-9]+}/pdf', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminGuard, $contracts): ResponseInterface {
+        $user = $adminGuard($response, 'contracts.view');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $contractId = (int) $args['id'];
+        $pdf = $contracts->privatePdf($contractId);
+        if ($pdf === null) {
+            return $response->withStatus(404);
+        }
+
+        $bytes = @file_get_contents($pdf['path']);
+        if (!is_string($bytes)
+            || !str_starts_with($bytes, '%PDF-')
+            || strlen($bytes) !== $pdf['size_bytes']
+            || !hash_equals($pdf['sha256'], hash('sha256', $bytes))) {
+            return $response->withStatus(404);
+        }
+
+        $response->getBody()->write($bytes);
+
+        return $response
+            ->withHeader('Content-Type', 'application/pdf')
+            ->withHeader('Content-Disposition', 'attachment; filename="contrato-' . $contractId . '.pdf"')
+            ->withHeader('Content-Length', (string) strlen($bytes))
+            ->withHeader('Cache-Control', 'private, no-store')
+            ->withHeader('X-Content-Type-Options', 'nosniff');
+    });
+
     $app->post('/admin/contracts/{id:[0-9]+}', static function (
         ServerRequestInterface $request,
         ResponseInterface $response,
@@ -204,25 +238,27 @@ return static function (App $app, array $deps): void {
         $body = (array) ($request->getParsedBody() ?? []);
 
         try {
-            if (trim((string) ($body['action'] ?? '')) !== 'save') {
+            $action = trim((string) ($body['action'] ?? ''));
+            if ($action === 'save') {
+                $input = [
+                    'monthly_rent' => $body['monthly_rent'] ?? null,
+                    'administration_fee' => $body['administration_fee'] ?? null,
+                    'start_date' => $body['start_date'] ?? null,
+                    'end_date' => $body['end_date'] ?? null,
+                    'duration_text' => $body['duration_text'] ?? null,
+                    'manual_variables' => $jsonField($body, 'manual_variables_json', '{}', false),
+                    'tasks' => $jsonField($body, 'tasks_json', '[]', true),
+                    'annexes' => $jsonField($body, 'annexes_json', '[]', true),
+                ];
+                if (array_key_exists('template_version_id', $body)) {
+                    $input['template_version_id'] = $body['template_version_id'];
+                }
+                $contracts->updateDraft($contractId, $input, time());
+            } elseif ($action === 'generate') {
+                $contracts->generate($contractId, time());
+            } else {
                 throw new RuntimeException('La acción contractual no es válida.');
             }
-
-            $input = [
-                'monthly_rent' => $body['monthly_rent'] ?? null,
-                'administration_fee' => $body['administration_fee'] ?? null,
-                'start_date' => $body['start_date'] ?? null,
-                'end_date' => $body['end_date'] ?? null,
-                'duration_text' => $body['duration_text'] ?? null,
-                'manual_variables' => $jsonField($body, 'manual_variables_json', '{}', false),
-                'tasks' => $jsonField($body, 'tasks_json', '[]', true),
-                'annexes' => $jsonField($body, 'annexes_json', '[]', true),
-            ];
-            if (array_key_exists('template_version_id', $body)) {
-                $input['template_version_id'] = $body['template_version_id'];
-            }
-
-            $contracts->updateDraft($contractId, $input, time());
         } catch (RuntimeException $exception) {
             $response->getBody()->write($exception->getMessage());
             return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
