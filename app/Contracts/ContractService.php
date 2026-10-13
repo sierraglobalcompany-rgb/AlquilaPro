@@ -581,34 +581,46 @@ final class ContractService
 
     public function generate(int $contractId, int $now): array
     {
-        $contract = $this->findContract($contractId);
-        if ($contract === null) {
+        $initial = $this->findContract($contractId);
+        if ($initial === null) {
             throw new RuntimeException('El contrato no existe.');
         }
-        if ($contract['status'] !== 'draft') {
+        if ($initial['status'] !== 'draft') {
             throw new RuntimeException('Solo un borrador puede generar evidencia contractual.');
         }
-
-        [$candidate, $unit, $property] = $this->contractSourceContext($contract, true);
-        [$version, $template] = $this->versionContext((int) $contract['template_version_id']);
-        if ($template['document_type'] !== $contract['document_type']) {
-            throw new RuntimeException('La versión contractual no corresponde al contrato.');
-        }
-        $document = $this->resolvedDocument($contract, $version, $candidate, $unit, $property, false);
-        $snapshotHtml = $document['html'];
-        $resolvedJson = $this->encodeJson($document['values']);
-
-        $renderer = new ContractPdfRenderer();
-        $bytes = $renderer->render($snapshotHtml);
-        $size = strlen($bytes);
-        if (!str_starts_with($bytes, '%PDF-') || $size <= 0 || $size > self::MAX_PDF_BYTES) {
-            throw new RuntimeException('El PDF contractual generado no es válido.');
-        }
-        $hash = hash('sha256', $bytes);
 
         $tempPath = null;
         $finalPath = null;
         try {
+            $this->pdo->beginTransaction();
+            $lock = $this->pdo->prepare('SELECT status FROM contracts WHERE id = :id FOR UPDATE');
+            $lock->execute(['id' => $contractId]);
+            if ($lock->fetchColumn() !== 'draft') {
+                throw new RuntimeException('El contrato ya no admite generación.');
+            }
+
+            $contract = $this->findContract($contractId);
+            if ($contract === null || $contract['status'] !== 'draft') {
+                throw new RuntimeException('El contrato ya no admite generación.');
+            }
+
+            [$candidate, $unit, $property] = $this->contractSourceContext($contract, true);
+            [$version, $template] = $this->versionContext((int) $contract['template_version_id']);
+            if ($template['document_type'] !== $contract['document_type']) {
+                throw new RuntimeException('La versión contractual no corresponde al contrato.');
+            }
+            $document = $this->resolvedDocument($contract, $version, $candidate, $unit, $property, false);
+            $snapshotHtml = $document['html'];
+            $resolvedJson = $this->encodeJson($document['values']);
+
+            $renderer = new ContractPdfRenderer();
+            $bytes = $renderer->render($snapshotHtml);
+            $size = strlen($bytes);
+            if (!str_starts_with($bytes, '%PDF-') || $size <= 0 || $size > self::MAX_PDF_BYTES) {
+                throw new RuntimeException('El PDF contractual generado no es válido.');
+            }
+            $hash = hash('sha256', $bytes);
+
             $this->ensureContractDirectory();
             $storedName = bin2hex(random_bytes(16)) . '.pdf';
             $tempPath = $this->contractDirectory . DIRECTORY_SEPARATOR . '.tmp-' . bin2hex(random_bytes(16));
@@ -631,19 +643,6 @@ final class ContractService
             }
             $tempPath = null;
             @chmod($finalPath, 0600);
-
-            $this->pdo->beginTransaction();
-            $lock = $this->pdo->prepare('SELECT status FROM contracts WHERE id = :id FOR UPDATE');
-            $lock->execute(['id' => $contractId]);
-            if ($lock->fetchColumn() !== 'draft') {
-                throw new RuntimeException('El contrato ya no admite generación.');
-            }
-
-            $fresh = $this->findContract($contractId);
-            if ($fresh === null || $fresh['status'] !== 'draft') {
-                throw new RuntimeException('El contrato ya no admite generación.');
-            }
-            $this->contractSourceContext($fresh, true);
 
             $update = $this->pdo->prepare(
                 "UPDATE contracts SET status = 'generated', resolved_variables_json = :resolved_variables_json, "
