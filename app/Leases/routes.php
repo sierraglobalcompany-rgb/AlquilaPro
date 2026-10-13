@@ -5,6 +5,7 @@ declare(strict_types=1);
 use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
+use AlquilaPro\Contracts\ContractService;
 use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
@@ -14,6 +15,8 @@ use Slim\App;
 return static function (App $app, array $deps): void {
     /** @var LeaseService $leases */
     $leases = $deps['leases'];
+    /** @var ContractService $contracts */
+    $contracts = $deps['contracts'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -35,6 +38,21 @@ return static function (App $app, array $deps): void {
             return $response->withHeader('Location', $path('/account/password'))->withStatus(302);
         }
         if (!Permissions::allows($user, 'contracts.manage')) {
+            return $response->withStatus(403);
+        }
+
+        return $user;
+    };
+
+    $tenantGuard = static function (ResponseInterface $response) use ($currentUser, $session, $path): array|ResponseInterface {
+        $user = $currentUser();
+        if ($user === null) {
+            return $response->withHeader('Location', $path('/login'))->withStatus(302);
+        }
+        if ($session->mustChangePassword()) {
+            return $response->withHeader('Location', $path('/account/password'))->withStatus(302);
+        }
+        if ((string) ($user['role'] ?? '') !== 'tenant') {
             return $response->withStatus(403);
         }
 
@@ -93,5 +111,89 @@ return static function (App $app, array $deps): void {
         return $response
             ->withHeader('Location', $path('/admin/contracts/' . (int) $lease['contract_id']))
             ->withStatus(303);
+    });
+
+    $app->get('/tenant', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ) use ($tenantGuard, $leases, $view, $csrf): ResponseInterface {
+        $user = $tenantGuard($response);
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $response->getBody()->write($view->renderApp('tenant_home', [
+            'pageTitle' => 'Mis arrendamientos',
+            'user' => $user,
+            'activeNav' => 'home',
+            'csrfToken' => $csrf->token(),
+            'leases' => $leases->listForUser((int) $user['id']),
+        ]));
+
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    });
+
+    $app->get('/tenant/leases/{id:[0-9]+}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($tenantGuard, $leases, $view, $csrf): ResponseInterface {
+        $user = $tenantGuard($response);
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $lease = $leases->findForUser((int) $args['id'], (int) $user['id']);
+        if ($lease === null) {
+            return $response->withStatus(404);
+        }
+
+        $response->getBody()->write($view->renderApp('tenant_lease_detail', [
+            'pageTitle' => 'Arrendamiento #' . (int) $lease['id'],
+            'user' => $user,
+            'activeNav' => 'home',
+            'csrfToken' => $csrf->token(),
+            'lease' => $lease,
+        ]));
+
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    });
+
+    $app->get('/tenant/leases/{id:[0-9]+}/contract', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($tenantGuard, $leases, $contracts): ResponseInterface {
+        $user = $tenantGuard($response);
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $lease = $leases->findForUser((int) $args['id'], (int) $user['id']);
+        if ($lease === null) {
+            return $response->withStatus(404);
+        }
+
+        $pdf = $contracts->privatePdf((int) $lease['contract_id']);
+        if ($pdf === null) {
+            return $response->withStatus(404);
+        }
+
+        $bytes = @file_get_contents($pdf['path']);
+        if (!is_string($bytes)
+            || !str_starts_with($bytes, '%PDF-')
+            || strlen($bytes) !== $pdf['size_bytes']
+            || !hash_equals($pdf['sha256'], hash('sha256', $bytes))) {
+            return $response->withStatus(404);
+        }
+
+        $response->getBody()->write($bytes);
+
+        return $response
+            ->withHeader('Content-Type', 'application/pdf')
+            ->withHeader('Content-Disposition', 'attachment; filename="contrato-arrendamiento-' . (int) $lease['id'] . '.pdf"')
+            ->withHeader('Content-Length', (string) strlen($bytes))
+            ->withHeader('Cache-Control', 'private, no-store')
+            ->withHeader('X-Content-Type-Options', 'nosniff');
     });
 };
