@@ -185,6 +185,17 @@ final class PropertyService
         }
 
         $data = $this->validateUnit($existing['property_id'], $input, $unitId);
+
+        $activeLease = $this->pdo->prepare(
+            'SELECT 1 FROM leases l '
+            . 'INNER JOIN contracts c ON c.id = l.contract_id '
+            . 'WHERE c.unit_id = :unit_id AND l.ended_at IS NULL LIMIT 1',
+        );
+        $activeLease->execute(['unit_id' => $unitId]);
+        if ($activeLease->fetchColumn() !== false && $data['status'] !== 'occupied') {
+            throw new RuntimeException('La unidad con arrendamiento activo debe permanecer ocupada.');
+        }
+
         $data['is_public'] = $this->normalizePublicFlag($input, $existing['is_public']);
         if (!$existing['is_public'] && $data['is_public']) {
             $this->assertPublicationComplete($unitId, $data);

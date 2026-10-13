@@ -119,6 +119,57 @@ final readonly class LeaseService
         }
     }
 
+    public function end(int $leaseId, int $endedByUserId, int $now): array
+    {
+        if ($leaseId <= 0 || $endedByUserId <= 0) {
+            throw new RuntimeException('No fue posible finalizar el arrendamiento.');
+        }
+
+        try {
+            $this->pdo->beginTransaction();
+
+            $lock = $this->pdo->prepare(
+                'SELECT contract_id, ended_at FROM leases WHERE id = :id FOR UPDATE',
+            );
+            $lock->execute(['id' => $leaseId]);
+            $lease = $lock->fetch(PDO::FETCH_ASSOC);
+            if (!is_array($lease)) {
+                throw new RuntimeException('El arrendamiento no existe.');
+            }
+            if ($lease['ended_at'] !== null) {
+                throw new RuntimeException('El arrendamiento ya fue finalizado.');
+            }
+
+            $update = $this->pdo->prepare(
+                'UPDATE leases SET ended_by_user_id = :ended_by_user_id, ended_at = :ended_at '
+                . 'WHERE id = :id AND ended_at IS NULL',
+            );
+            $update->execute([
+                'ended_by_user_id' => $endedByUserId,
+                'ended_at' => gmdate('Y-m-d H:i:s', $now),
+                'id' => $leaseId,
+            ]);
+            if ($update->rowCount() !== 1) {
+                throw new RuntimeException('El arrendamiento ya fue finalizado.');
+            }
+
+            $this->pdo->commit();
+
+            $ended = $this->findByContract((int) $lease['contract_id']);
+            if ($ended === null || $ended['is_active']) {
+                throw new RuntimeException('No fue posible finalizar el arrendamiento.');
+            }
+
+            return $ended;
+        } catch (RuntimeException $exception) {
+            $this->rollbackIfNeeded();
+            throw $exception;
+        } catch (Throwable) {
+            $this->rollbackIfNeeded();
+            throw new RuntimeException('No fue posible finalizar el arrendamiento.');
+        }
+    }
+
     public function findByContract(int $contractId): ?array
     {
         if ($contractId <= 0) {
