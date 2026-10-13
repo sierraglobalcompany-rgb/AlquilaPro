@@ -41,11 +41,19 @@ final class LeaseSecurityRegressionTest extends TestCase
             '/tenant/leases/{id:[0-9]+}/contract',
         ], $routeMatches[1] ?? []);
 
-        $f8Source = implode("\n", [
+        $leaseCore = implode("\n", [
             $this->file('app/Leases/LeaseService.php'),
             $routes,
-            $this->file('bootstrap/app.php'),
         ]);
+        foreach (['session_start(', 'new SessionGuard(', 'new Csrf('] as $forbidden) {
+            self::assertStringNotContainsString(
+                $forbidden,
+                $leaseCore,
+                'F8 lease core must reuse shared auth/session/CSRF: ' . $forbidden,
+            );
+        }
+
+        $f8Composition = $leaseCore . "\n" . $this->file('bootstrap/app.php');
         foreach ([
             '/tenant-login',
             'tenant_sessions',
@@ -53,11 +61,12 @@ final class LeaseSecurityRegressionTest extends TestCase
             'lease_units',
             'TenantAuth',
             'TenantSession',
-            'session_start(',
-            'new SessionGuard(',
-            'new Csrf(',
         ] as $forbidden) {
-            self::assertStringNotContainsString($forbidden, $f8Source, 'Unexpected F8 parallel architecture: ' . $forbidden);
+            self::assertStringNotContainsString(
+                $forbidden,
+                $f8Composition,
+                'Unexpected F8 parallel architecture: ' . $forbidden,
+            );
         }
 
         $composer = json_decode($this->file('composer.json'), true, 32, JSON_THROW_ON_ERROR);
