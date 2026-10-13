@@ -1,7 +1,7 @@
 # F8 — INQUILINO + LEASE + PORTAL — SPEC
 
 **Fecha:** 2026-10-13 (America/Bogota)  
-**Estado:** APPROVED BY USER / PLAN APPROVED / IMPLEMENTATION IN PROGRESS  
+**Estado:** CLOSED / VERIFIED / NOT MERGED  
 **Base:** `main @ f4a7e3f4d5ec7dc9cdc0f3a7e78777f98c85461d`  
 **F7 integrado:** `b6ab43fefd7b4d2933e3e3adff0ac4c23efdf1b8`  
 **Branch de diseño:** `spec/f8-tenant-lease-portal-20261013`  
