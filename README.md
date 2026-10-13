@@ -5,7 +5,10 @@ Aplicación web mobile-first y autoinstalable para administrar arrendamientos de
 **Dominio objetivo:** `https://alquilapro.sierraglobalcompany.com`  
 **Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + CSS/JS mínimo  
 **Destino:** Hostinger; subdominio o subcarpeta HTTPS.  
-**Estado actual:** F0–F8 CLOSED / VERIFIED; **F1–F7 MERGED**; **F8 CLOSED / VERIFIED / NOT MERGED**.  
+**Estado actual:** F0–F8 CLOSED / VERIFIED; **F1–F8 MERGED**.  
+**F8 merge SHA:** `a1b50f0d1c6556531626fd35cba0668bd5c4029f`.  
+**F8 final audited closure HEAD:** `f258cd48f6a2c301b38e6a85683e5f30b8368770`.  
+**F8 final audit CI:** `38443826390` — PHP 8.3/8.4/8.5 PASS; PHP 8.3 `310 tests / 2611 assertions / 0 failures / 0 errors`.  
 **F7 merge SHA:** `b6ab43fefd7b4d2933e3e3adff0ac4c23efdf1b8`.  
 **F7 final product HEAD:** `829955f2b297959380df06a8c8cc3e3424115e74`.  
 **F7 final product CI:** `38360814842` — PHP 8.3/8.4/8.5 PASS.  
@@ -26,12 +29,12 @@ Antes de tocar código:
 7. tests y CI reales;
 8. código real del repositorio.
 
-Para F7 específicamente:
+Para F8 específicamente:
 
-- `docs/checkpoints/F7_MERGED_2026-10-12.md` — autoridad de integración;
-- `docs/checkpoints/F7_CLOSED_2026-10-12.md` — autoridad técnica de cierre;
-- `docs/specs/F7_CONTRACT_ENGINE_SPEC.md`;
-- `docs/plans/F7_CONTRACT_ENGINE_IMPLEMENTATION_PLAN.md`.
+- `docs/checkpoints/F8_MERGED_2026-10-13.md` — autoridad de integración;
+- `docs/checkpoints/F8_CLOSED_2026-10-13.md` — autoridad técnica de cierre pre-merge;
+- `docs/specs/F8_TENANT_LEASE_PORTAL_SPEC.md`;
+- `docs/superpowers/plans/2026-10-13-f8-tenant-lease-portal.md`.
 
 Regla de autoridad:
 
@@ -126,14 +129,28 @@ F7_PHP83: 277 tests / 2230 assertions / 0 failures / 0 errors
 F7_SECURITY_QA: PASS
 F7_VISUAL_QA: PASS — one reproduced overflow fixed with 7 CSS lines
 F7_FORENSIC_REVIEW: PASS — concurrency, JSON capacity and runtime storage gaps closed by RED→GREEN before merge
+
+F8: CLOSED / VERIFIED / MERGED
+F8_BRANCH: impl/f8-tenant-lease-portal-20261013
+F8_PR: #11 CLOSED / MERGED
+F8_BASE_MAIN: f4a7e3f4d5ec7dc9cdc0f3a7e78777f98c85461d
+F8_PRODUCT_HEAD: 5569e07ec45170c95fc981c7f00254a637aa5e35
+F8_INITIAL_CLOSURE_HEAD: 3d9d4a85375944fbc97b1aadd6a4e4ae3b8522a7
+F8_FINAL_AUDITED_CLOSURE_HEAD: f258cd48f6a2c301b38e6a85683e5f30b8368770
+F8_MERGE_SHA: a1b50f0d1c6556531626fd35cba0668bd5c4029f
+F8_PRODUCT_CI: 38440025461 — PHP 8.3 / 8.4 / 8.5 PASS
+F8_INITIAL_CLOSURE_CI: 38440844989 — PHP 8.3 / 8.4 / 8.5 PASS
+F8_FINAL_AUDIT_CI: 38443826390 — PHP 8.3 / 8.4 / 8.5 PASS
+F8_PHP83: 310 tests / 2611 assertions / 0 failures / 0 errors
+F8_FORENSIC_REVIEW: PASS — unit-edit/lease-activation TOCTOU race closed by serializing on canonical units row
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
 
-CURRENT_GATE: F8 CLOSED / VERIFIED / NOT MERGED
-NEXT: FINAL F8 FORENSIC REVIEW / MERGE GATE
+CURRENT_GATE: F8 CLOSED / VERIFIED / MERGED
+NEXT: F9 SCOPE / PRE-KISS
 ```
 
-No reimplementar F1–F7. No reabrir una fase certificada sin evidencia de regresión o una nueva SPEC aprobada.
+No reimplementar F1–F8. No reabrir una fase certificada sin evidencia de regresión o una nueva SPEC aprobada.
 
 ---
 
@@ -386,7 +403,7 @@ Autoridad técnica de cierre:
 - F5 — Aplicaciones + candidatos + referencias ✅ CLOSED / VERIFIED / MERGED
 - F6 — Aseguradora/SURA ✅ CLOSED / VERIFIED / MERGED
 - **F7 — Contratos ✅ CLOSED / VERIFIED / MERGED**
-- **F8 — Inquilino + lease + portal usando auth único ✅ CLOSED / VERIFIED / NOT MERGED**
+- **F8 — Inquilino + lease + portal usando auth único ✅ CLOSED / VERIFIED / MERGED**
 - F9 — Cargos + cartera
 - F10 — Medios de pago
 - F11 — Reporte + conciliación
@@ -410,17 +427,17 @@ Autoridad técnica de cierre:
 
 # 10. PROTOCOLO DE RECUPERACIÓN
 
-Al retomar trabajo después del cierre F8:
+Al retomar trabajo para F9:
 
 1. verificar `main` real;
-2. leer `docs/checkpoints/F7_MERGED_2026-10-12.md` y `F7_CLOSED_2026-10-12.md`;
-3. no reabrir F7 sin evidencia de regresión o nueva SPEC;
-4. verificar CI/evidencia exacta antes de cualquier cambio que toque autoridades F7;
-5. revisar el PR F8 contra su `CLOSURE_HEAD` y CI exacto antes del merge gate;
-6. no crear segundo auth, inventario, candidato, contrato ni fuentes paralelas;
-7. no fusionar F8 sin autorización explícita; mantener KISS + Cero Ruido.
+2. leer `docs/checkpoints/F8_MERGED_2026-10-13.md` y `F8_CLOSED_2026-10-13.md`;
+3. no reabrir F8 sin evidencia de regresión o nueva SPEC aprobada;
+4. conservar las autoridades únicas de auth, unidades, candidatos, screening, contratos y leases;
+5. iniciar F9 por `SCOPE → PRE-KISS` antes de diseñar tablas, estados o rutas;
+6. no adelantar F10+ ni crear fuentes paralelas;
+7. mantener KISS + Cero Ruido y TDD por gate.
 
-El checkpoint `F7_MERGED_2026-10-12.md` es la autoridad de integración F7.
+El checkpoint `F8_MERGED_2026-10-13.md` es la autoridad de integración F8.
 
 ---
 
@@ -428,22 +445,18 @@ El checkpoint `F7_MERGED_2026-10-12.md` es la autoridad de integración F7.
 
 ```text
 F0_F8_STATUS: CLOSED / VERIFIED
-F1_F7_STATUS: MERGED
-LAST_MERGED_PHASE: F7 CLOSED / VERIFIED / MERGED
-F7_PR: #10 CLOSED / MERGED
-F7_FINAL_PRODUCT_HEAD: 829955f2b297959380df06a8c8cc3e3424115e74
-F7_CLOSURE_HEAD: 9e272a3b3b31aaa8f83f34298d1aa0c7ff16688c
-F7_MERGE_SHA: b6ab43fefd7b4d2933e3e3adff0ac4c23efdf1b8
-F7_FINAL_PRODUCT_CI: 38360814842
-F7_CLOSURE_CI: 38361376137
-F7_TESTS_PHP83: 277 / 2230
-F8_STATUS: CLOSED / VERIFIED / NOT MERGED
+F1_F8_STATUS: MERGED
+LAST_MERGED_PHASE: F8 CLOSED / VERIFIED / MERGED
+F8_PR: #11 CLOSED / MERGED
 F8_PRODUCT_HEAD: 5569e07ec45170c95fc981c7f00254a637aa5e35
-F8_PRODUCT_CI: 38440025461 (PHP 8.3/8.4/8.5 PASS)
+F8_FINAL_AUDITED_CLOSURE_HEAD: f258cd48f6a2c301b38e6a85683e5f30b8368770
+F8_MERGE_SHA: a1b50f0d1c6556531626fd35cba0668bd5c4029f
+F8_PRODUCT_CI: 38440025461
+F8_FINAL_AUDIT_CI: 38443826390
 F8_TESTS_PHP83: 310 / 2611
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
-MERGE_AUTHORIZED: NO
-CURRENT_ACTION: F8 REVIEW-READY / NOT MERGED
-NEXT: FINAL F8 FORENSIC REVIEW / MERGE GATE
+MERGE_AUTHORIZED: YES / EXECUTED 2026-10-13
+CURRENT_ACTION: F8 MERGED CHECKPOINT
+NEXT: F9 SCOPE / PRE-KISS
 ```
