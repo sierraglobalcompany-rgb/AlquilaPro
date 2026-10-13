@@ -430,6 +430,122 @@ final class ContractService
         return $updated;
     }
 
+    public function updateTasks(int $contractId, array $tasks, int $now): array
+    {
+        $validated = $this->validatedTasks($tasks);
+
+        try {
+            $this->pdo->beginTransaction();
+            $lock = $this->pdo->prepare('SELECT status FROM contracts WHERE id = :id FOR UPDATE');
+            $lock->execute(['id' => $contractId]);
+            $status = $lock->fetchColumn();
+            if (!is_string($status) || !in_array($status, ['draft', 'generated'], true)) {
+                throw new RuntimeException('El contrato ya no admite cambios de tareas.');
+            }
+
+            $update = $this->pdo->prepare(
+                'UPDATE contracts SET tasks_json = :tasks_json, updated_at = :updated_at WHERE id = :id',
+            );
+            $update->execute([
+                'tasks_json' => $this->encodeJson($validated),
+                'updated_at' => $this->dateTime($now),
+                'id' => $contractId,
+            ]);
+            $this->pdo->commit();
+        } catch (RuntimeException $exception) {
+            $this->rollbackIfNeeded();
+            throw $exception;
+        } catch (Throwable) {
+            $this->rollbackIfNeeded();
+            throw new RuntimeException('No fue posible actualizar las tareas contractuales.');
+        }
+
+        $updated = $this->findContract($contractId);
+        if ($updated === null || !in_array($updated['status'], ['draft', 'generated'], true)) {
+            throw new RuntimeException('No fue posible actualizar las tareas contractuales.');
+        }
+
+        return $updated;
+    }
+
+    public function finalize(int $contractId, int $finalizedByUserId, int $now): array
+    {
+        if ($contractId <= 0) {
+            throw new RuntimeException('El contrato no existe.');
+        }
+        $this->assertUser($finalizedByUserId);
+
+        $initial = $this->findContract($contractId);
+        if ($initial === null) {
+            throw new RuntimeException('El contrato no existe.');
+        }
+        $candidateId = (int) $initial['candidate_id'];
+
+        try {
+            $this->pdo->beginTransaction();
+
+            $candidateLock = $this->pdo->prepare('SELECT status FROM candidates WHERE id = :id FOR UPDATE');
+            $candidateLock->execute(['id' => $candidateId]);
+            $candidateStatus = $candidateLock->fetchColumn();
+            if (!is_string($candidateStatus)) {
+                throw new RuntimeException('El candidato no existe.');
+            }
+            if ($candidateStatus === 'withdrawn') {
+                throw new RuntimeException('El candidato retirado no puede finalizar contrato.');
+            }
+
+            $contractLock = $this->pdo->prepare('SELECT candidate_id, status FROM contracts WHERE id = :id FOR UPDATE');
+            $contractLock->execute(['id' => $contractId]);
+            $locked = $contractLock->fetch(PDO::FETCH_ASSOC);
+            if (!is_array($locked)
+                || (int) $locked['candidate_id'] !== $candidateId
+                || (string) $locked['status'] !== 'generated') {
+                throw new RuntimeException('Solo un contrato generado puede finalizarse.');
+            }
+
+            $existing = $this->pdo->prepare(
+                "SELECT 1 FROM contracts WHERE candidate_id = :candidate_id AND status = 'finalized' AND id <> :id LIMIT 1",
+            );
+            $existing->execute([
+                'candidate_id' => $candidateId,
+                'id' => $contractId,
+            ]);
+            if ($existing->fetchColumn() !== false) {
+                throw new RuntimeException('El candidato ya tiene un contrato finalizado.');
+            }
+
+            $update = $this->pdo->prepare(
+                "UPDATE contracts SET status = 'finalized', finalized_by_user_id = :finalized_by_user_id, "
+                . 'finalized_at = :finalized_at, updated_at = :updated_at '
+                . "WHERE id = :id AND status = 'generated'",
+            );
+            $update->execute([
+                'finalized_by_user_id' => $finalizedByUserId,
+                'finalized_at' => $this->dateTime($now),
+                'updated_at' => $this->dateTime($now),
+                'id' => $contractId,
+            ]);
+            if ($update->rowCount() !== 1) {
+                throw new RuntimeException('Solo un contrato generado puede finalizarse.');
+            }
+
+            $this->pdo->commit();
+        } catch (RuntimeException $exception) {
+            $this->rollbackIfNeeded();
+            throw $exception;
+        } catch (Throwable) {
+            $this->rollbackIfNeeded();
+            throw new RuntimeException('No fue posible finalizar el contrato.');
+        }
+
+        $finalized = $this->findContract($contractId);
+        if ($finalized === null || $finalized['status'] !== 'finalized') {
+            throw new RuntimeException('No fue posible finalizar el contrato.');
+        }
+
+        return $finalized;
+    }
+
     public function previewHtml(int $contractId): string
     {
         $contract = $this->findContract($contractId);
