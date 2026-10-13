@@ -4,7 +4,7 @@
 **Fase:** F6 — Estudio de aseguradora  
 **Branch:** `impl/f6-screening-20261012`  
 **PR:** #9 — Draft  
-**Estado:** F6.1–F6.4 **CLOSED / VERIFIED**; F6.5 **NEXT**
+**Estado:** F6.1–F6.4 **CLOSED / VERIFIED**; F6.5 **SECURITY/VISUAL VERIFIED LOCALLY BY CONTRACT — FINAL MATRIX PENDING**
 
 ---
 
@@ -41,7 +41,6 @@ RED `b007dfd84c4e2d548766d4f8c388585c5d6598ba` / CI `38336536438`: PHP 8.3 **225
 GREEN final `015017639f2dd2a16266bebdd52bbeea797062e7` / CI `38336774996`: PHP 8.3/8.4/8.5 PASS; PHP 8.3 **225 tests / 1619 assertions**.
 
 Resultado:
-
 - lectura en GET existente `/admin/candidates/{id}`;
 - un único POST `/admin/candidates/{id}/screening`;
 - permisos/auth/forced-password/CSRF/basePath existentes;
@@ -53,67 +52,80 @@ Resultado:
 
 ## 5. F6.4 — CANDIDATE PORTAL SCREENING PROJECTION
 
-### RED válido
+RED `4afbf28c6967c8cd3c9f0023c2096ca08bbd7d28` / CI `38337021295`: PHP 8.3 **231 tests / 1627 assertions / 5 expected failures**.  
+GREEN final `0be1cef83276091be1f7dfb8399da057f6093e35` / CI `38337267371`: PHP 8.3/8.4/8.5 PASS; PHP 8.3 **231 tests / 1647 assertions**.
 
-HEAD RED: `4afbf28c6967c8cd3c9f0023c2096ca08bbd7d28`  
-CI RED: `38337021295`
-
-PHP 8.3:
-
-- **231 tests**
-- **1627 assertions**
-- **5 failures exactos**
-- faltaba screening público;
-- faltaba escape/allowlist pública visible;
-- faltaba fallback sin URL;
-- faltaba resultado terminal;
-- faltaba screening visible tras withdrawal.
-
-El contrato histórico token inválido + subfolder ya permanecía GREEN. RED: **VALID**.
-
-### GREEN mínimo
-
-Vista pública: `4bd15bf1ae93a29e94f4ee14eba7236a4615aa03`  
-HEAD final F6.4: `0be1cef83276091be1f7dfb8399da057f6093e35`
-
-Producto modificado únicamente:
-
-- `resources/views/public_candidate_continue.php`;
-- `app/Candidates/routes.php` — el render existente recibe solo `ScreeningService::publicForCandidate()`.
-
-Contratos certificados:
-
+Resultado:
 - ninguna ruta pública nueva;
-- screening ligado exclusivamente al candidato resuelto por capability token;
-- proyección pública por allowlist;
+- `ScreeningService::publicForCandidate()` como única proyección al portal;
 - no IDs internos/notes/support/responsible;
 - provider/product/result escapados;
-- estados humanos Pendiente / En estudio / Aprobado / No aprobado;
+- estados humanos;
 - URL externa exacta, sin basePath ni token;
 - `target="_blank" rel="noopener noreferrer"`;
-- fallback neutral sin URL;
+- fallback sin URL;
 - terminal muestra resultado y oculta CTA;
 - withdrawn conserva screening y oculta CTA;
 - subfolder intacto;
 - 0 CSS nuevo.
 
-CI F6.4: `38337267371` — **SUCCESS**
+---
 
-- PHP 8.3 PASS — **231 tests / 1647 assertions / 0 failures / 0 errors**
-- PHP 8.4 PASS
-- PHP 8.5 PASS
-- Composer validate --strict PASS
+## 6. F6.5 — SECURITY + VISUAL + CERO RUIDO
+
+### Auditoría visual
+
+No se reprodujo defecto visual F6 nuevo. Las primitives F3–F5 existentes ya cubren:
+- controles 100% de ancho;
+- touch targets 44/48 px;
+- foco visible;
+- safe-area/bottom-nav;
+- imágenes responsive;
+- links largos con `overflow-wrap:anywhere`;
+- `dl dd` y `.user-card > div` con wrap para valores largos.
+
+**CSS_DELTA: 0**.
+
+### Regresión de seguridad
+
+Archivo: `tests/Integration/Candidates/ScreeningSecurityRegressionTest.php`.
+
+Primer intento `c7d19a7ddfe5e1bac6345c997676cc1f8a54db9a` / CI `38337569417` encontró dos expectativas estáticas mal calibradas, no defectos de producto:
+1. prohibía `findForCandidate()` también en la superficie admin privada;
+2. una expectativa de CSRF buscaba barras invertidas literales.
+
+Se corrigió **solo el test**, sin delta de producto, en:
+`f8b31dc08743ef2f2832de8e1853e61f44314fb9`.
+
+PHP 8.3 de CI `38337687592`: **234 tests / 1672 assertions / PASS**.  
+PHP 8.5: PASS.  
+PHP 8.4 quedó prolongado en ejecución sin fallo reportado; no se usa como prueba final.
+
+La regresión certifica:
+- una sola arquitectura F6;
+- no `SuraService`, route file paralelo ni permisos `screening.*`;
+- sin curl/Guzzle/webhook/requests de tercero;
+- portal recibe `publicForCandidate()`, no fila privada;
+- `noopener noreferrer`;
+- sin notes/support/responsible/internal IDs en vista pública;
+- admin reutiliza `candidates.manage`;
+- CSRF global existente;
+- redacción existente del raw continuation token.
+
+### Cero Ruido
+
+PR #9 auditado: archivos de producto dentro del presupuesto aprobado; no cambios en `Permissions.php`, `composer.*`, CSS, auth ni route files nuevos. Comentarios del PR: 0.
 
 ---
 
-## 6. DELTA KISS ACUMULADO F6.1–F6.4
+## 7. DELTA KISS F6
 
 ```text
-LEY_1_KISS: PASS
-LEY_2_CERO_RUIDO: PASS
-ADDED: 1 table + 1 service + 1 admin POST route in existing route file + screening sections in existing views
+LEY_1_KISS: PASS PENDIENTE SOLO DE MATRIZ FINAL
+LEY_2_CERO_RUIDO: PASS PENDIENTE SOLO DE MATRIZ FINAL
+ADDED: 1 table + 1 service + 1 admin POST route inside existing route file + screening sections in existing views + focused tests
 REMOVED: 0
-MERGED_OR_CONVERGED: admin and candidate screening reuse the existing Candidates module, routes, auth and continuation token
+MERGED_OR_CONVERGED: F6 lives entirely inside the existing Candidates/auth/token/SSR architecture
 DEPENDENCIES_DELTA: 0
 DB_SCHEMA_DELTA: +1 table
 PUBLIC_ROUTES_DELTA: 0
@@ -122,24 +134,20 @@ NEW_AUTH: 0
 NEW_ROUTE_FILES: 0
 NEW_SERVICES: 1 exacto
 CSS_DELTA: 0
+SURA_API_DELTA: 0
 ```
 
 ---
 
-## 7. NEXT GATE — F6.5
+## 8. FINAL GATE
 
-`Security + Visual QA + Zero-Noise Closure`
+Este checkpoint no declara aún F6 CLOSED.
 
-Orden:
-
-`SECURITY REGRESSION → VISUAL CONTRACT AUDIT → ONLY IF REAL DEFECT: RED/GREEN → CERO RUIDO → FINAL CHECKPOINT → FINAL CI → REVIEW`
-
-Reglas:
-
-- no añadir funcionalidad;
-- no CSS sin defecto reproducible;
-- comprobar token/ID/private-field leakage, CSRF/auth/permissions/basePath, terminal/withdrawn fail-closed, URL noreferrer y errores genéricos;
-- revisar visualmente/estáticamente admin create/update/read-only y portal candidate screening sobre primitives existentes;
-- conservar exactamente 1 tabla / 1 servicio / 0 permisos / 0 auth / 0 route files / 0 deps;
-- reemplazar este rolling checkpoint por `F6_CLOSED_2026-10-12.md` al cerrar;
-- README debe quedar F6 CLOSED / VERIFIED / NOT MERGED; F7 bloqueada hasta merge.
+Siguiente acción obligatoria:
+1. obtener una **nueva matriz completa PHP 8.3/8.4/8.5** sobre la HEAD actual;
+2. si es GREEN, crear `F6_CLOSED_2026-10-12.md`;
+3. converger README a F6 CLOSED / VERIFIED / NOT MERGED;
+4. eliminar este rolling checkpoint;
+5. ejecutar CI exacta del HEAD documental final;
+6. revisión final PR #9 → Ready for Review;
+7. detenerse antes de merge.
