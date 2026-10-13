@@ -176,8 +176,54 @@ final readonly class LeaseService
             return null;
         }
 
+        $statement = $this->pdo->prepare($this->leaseSelect() . ' WHERE l.contract_id = :contract_id LIMIT 1');
+        $statement->execute(['contract_id' => $contractId]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $this->normalizeLease($row) : null;
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function listForUser(int $userId): array
+    {
+        if ($userId <= 0) {
+            return [];
+        }
+
         $statement = $this->pdo->prepare(
-            'SELECT l.id, l.contract_id, l.user_id, l.activated_by_user_id, l.activated_at, '
+            $this->leaseSelect()
+            . ' WHERE l.user_id = :user_id '
+            . 'ORDER BY CASE WHEN l.ended_at IS NULL THEN 0 ELSE 1 END, l.activated_at DESC, l.id DESC',
+        );
+        $statement->execute(['user_id' => $userId]);
+
+        return array_map(
+            fn (array $row): array => $this->normalizeLease($row),
+            $statement->fetchAll(PDO::FETCH_ASSOC),
+        );
+    }
+
+    public function findForUser(int $leaseId, int $userId): ?array
+    {
+        if ($leaseId <= 0 || $userId <= 0) {
+            return null;
+        }
+
+        $statement = $this->pdo->prepare(
+            $this->leaseSelect() . ' WHERE l.id = :id AND l.user_id = :user_id LIMIT 1',
+        );
+        $statement->execute([
+            'id' => $leaseId,
+            'user_id' => $userId,
+        ]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $this->normalizeLease($row) : null;
+    }
+
+    private function leaseSelect(): string
+    {
+        return 'SELECT l.id, l.contract_id, l.user_id, l.activated_by_user_id, l.activated_at, '
             . 'l.ended_by_user_id, l.ended_at, '
             . 'c.candidate_id, c.unit_id, c.document_type, c.monthly_rent, c.administration_fee, '
             . 'c.start_date, c.end_date, c.duration_text, '
@@ -189,13 +235,7 @@ final readonly class LeaseService
             . 'INNER JOIN contracts c ON c.id = l.contract_id '
             . 'INNER JOIN users tu ON tu.id = l.user_id '
             . 'INNER JOIN units un ON un.id = c.unit_id '
-            . 'INNER JOIN properties p ON p.id = un.property_id '
-            . 'WHERE l.contract_id = :contract_id LIMIT 1',
-        );
-        $statement->execute(['contract_id' => $contractId]);
-        $row = $statement->fetch(PDO::FETCH_ASSOC);
-
-        return is_array($row) ? $this->normalizeLease($row) : null;
+            . 'INNER JOIN properties p ON p.id = un.property_id';
     }
 
     private function normalizeLease(array $row): array
