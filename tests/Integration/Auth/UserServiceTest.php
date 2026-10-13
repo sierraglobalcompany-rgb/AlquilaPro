@@ -63,6 +63,34 @@ final class UserServiceTest extends TestCase
         );
     }
 
+    public function testContractPermissionsAreKnownAndUnknownContractActionsStayRejected(): void
+    {
+        $permissions = $this->permissions();
+
+        self::assertSame(
+            ['contracts.view', 'contracts.manage'],
+            $permissions::sanitize([
+                'contracts.view',
+                'contracts.manage',
+                'contracts.finalize',
+                'contract.view',
+                'contracts.view',
+            ]),
+        );
+        self::assertTrue($permissions::allows(
+            ['role' => 'admin', 'permissions' => ['contracts.view']],
+            'contracts.view',
+        ));
+        self::assertFalse($permissions::allows(
+            ['role' => 'admin', 'permissions' => ['contracts.view']],
+            'contracts.manage',
+        ));
+        self::assertTrue($permissions::allows(
+            ['role' => 'owner', 'permissions' => []],
+            'contracts.manage',
+        ));
+    }
+
     public function testCreatesManagedUserWithTemporaryPasswordAndNormalizedUniqueEmail(): void
     {
         $service = $this->service();
