@@ -222,6 +222,134 @@ final readonly class FinanceService
         }
     }
 
+    /** @return array<string, int|string|null> */
+    public function voidCharge(int $chargeId, int $actorUserId, string $reason, int $now): array
+    {
+        if ($chargeId <= 0 || $actorUserId <= 0 || $this->pdo->inTransaction()) {
+            throw new RuntimeException('No fue posible anular el cargo.');
+        }
+
+        $normalizedReason = trim($reason);
+
+        try {
+            if (!$this->pdo->beginTransaction()) {
+                throw new RuntimeException('No fue posible anular el cargo.');
+            }
+
+            $chargeStatement = $this->pdo->prepare('SELECT * FROM charges WHERE id = :id FOR UPDATE');
+            $chargeStatement->execute(['id' => $chargeId]);
+            $charge = $chargeStatement->fetch(PDO::FETCH_ASSOC);
+            if (!is_array($charge) || $charge['voided_at'] !== null) {
+                throw new RuntimeException('No fue posible anular el cargo.');
+            }
+            if ($normalizedReason === '' || mb_strlen($normalizedReason, 'UTF-8') > 500) {
+                throw new RuntimeException('No fue posible anular el cargo.');
+            }
+
+            $voidedAt = gmdate('Y-m-d H:i:s', $now);
+            $update = $this->pdo->prepare(
+                'UPDATE charges SET voided_by_user_id = :actor_id, voided_at = :voided_at, '
+                . 'void_reason = :reason WHERE id = :id AND voided_at IS NULL',
+            );
+            $update->execute([
+                'actor_id' => $actorUserId,
+                'voided_at' => $voidedAt,
+                'reason' => $normalizedReason,
+                'id' => $chargeId,
+            ]);
+            if ($update->rowCount() !== 1) {
+                throw new RuntimeException('No fue posible anular el cargo.');
+            }
+
+            $this->pdo->commit();
+
+            $charge['voided_by_user_id'] = $actorUserId;
+            $charge['voided_at'] = $voidedAt;
+            $charge['void_reason'] = $normalizedReason;
+
+            return $charge;
+        } catch (RuntimeException $exception) {
+            $this->rollbackIfNeeded();
+            throw $exception;
+        } catch (Throwable) {
+            $this->rollbackIfNeeded();
+            throw new RuntimeException('No fue posible anular el cargo.');
+        }
+    }
+
+    /** @return array{outstanding:string,overdue:string,oldest_due_date:?string} */
+    public function summaryForLease(int $leaseId, string $today): array
+    {
+        $this->parseDate($today);
+        if ($leaseId <= 0) {
+            return ['outstanding' => '0.00', 'overdue' => '0.00', 'oldest_due_date' => null];
+        }
+
+        $statement = $this->pdo->prepare(
+            'SELECT ' . $this->chargeSummaryExpressions('ch') . ' '
+            . 'FROM charges ch WHERE ch.lease_id = :lease_id',
+        );
+        $statement->execute(['lease_id' => $leaseId, 'today' => $today]);
+        $summary = $statement->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($summary)) {
+            return ['outstanding' => '0.00', 'overdue' => '0.00', 'oldest_due_date' => null];
+        }
+
+        return [
+            'outstanding' => $this->normalizeTotal($summary['outstanding'] ?? null),
+            'overdue' => $this->normalizeTotal($summary['overdue'] ?? null),
+            'oldest_due_date' => $summary['oldest_due_date'] === null
+                ? null
+                : (string) $summary['oldest_due_date'],
+        ];
+    }
+
+    /** @return list<array{lease_id:int,tenant_id:int,tenant_name:string,contract_id:int,unit_id:int,unit_code:string,property_id:int,property_name:string,property_address:string,property_city:string,outstanding:string,overdue:string,oldest_due_date:?string}> */
+    public function portfolio(string $today): array
+    {
+        $this->parseDate($today);
+        $statement = $this->pdo->prepare(
+            'SELECT l.id AS lease_id, l.user_id AS tenant_id, tenant.full_name AS tenant_name, '
+            . 'c.id AS contract_id, unit.id AS unit_id, unit.code AS unit_code, '
+            . 'property.id AS property_id, property.name AS property_name, '
+            . 'property.address AS property_address, property.city AS property_city, '
+            . $this->chargeSummaryExpressions('ch') . ' '
+            . 'FROM charges ch '
+            . 'INNER JOIN leases l ON l.id = ch.lease_id '
+            . 'INNER JOIN contracts c ON c.id = l.contract_id '
+            . 'INNER JOIN users tenant ON tenant.id = l.user_id '
+            . 'INNER JOIN units unit ON unit.id = c.unit_id '
+            . 'INNER JOIN properties property ON property.id = unit.property_id '
+            . 'GROUP BY l.id, l.user_id, tenant.full_name, c.id, unit.id, unit.code, '
+            . 'property.id, property.name, property.address, property.city '
+            . 'ORDER BY property.name, unit.code, tenant.full_name, l.id',
+        );
+        $statement->execute(['today' => $today]);
+
+        $portfolio = [];
+        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $portfolio[] = [
+                'lease_id' => (int) $row['lease_id'],
+                'tenant_id' => (int) $row['tenant_id'],
+                'tenant_name' => (string) $row['tenant_name'],
+                'contract_id' => (int) $row['contract_id'],
+                'unit_id' => (int) $row['unit_id'],
+                'unit_code' => (string) $row['unit_code'],
+                'property_id' => (int) $row['property_id'],
+                'property_name' => (string) $row['property_name'],
+                'property_address' => (string) $row['property_address'],
+                'property_city' => (string) $row['property_city'],
+                'outstanding' => $this->normalizeTotal($row['outstanding'] ?? null),
+                'overdue' => $this->normalizeTotal($row['overdue'] ?? null),
+                'oldest_due_date' => $row['oldest_due_date'] === null
+                    ? null
+                    : (string) $row['oldest_due_date'],
+            ];
+        }
+
+        return $portfolio;
+    }
+
     private function normalizeAmount(string $amount): string
     {
         $amount = trim($amount);
@@ -254,6 +382,29 @@ final readonly class FinanceService
         [$whole, $fraction] = array_pad(explode('.', $amount, 2), 2, '');
 
         return ltrim($whole, '0') !== '' || trim($fraction, '0') !== '';
+    }
+
+    private function chargeSummaryExpressions(string $alias): string
+    {
+        return 'COALESCE(SUM(CASE WHEN ' . $alias . '.voided_at IS NULL '
+            . 'THEN ' . $alias . '.amount ELSE 0 END), 0.00) AS outstanding, '
+            . 'COALESCE(SUM(CASE WHEN ' . $alias . '.voided_at IS NULL '
+            . 'AND ' . $alias . '.due_date < :today THEN ' . $alias . '.amount ELSE 0 END), 0.00) AS overdue, '
+            . 'MIN(CASE WHEN ' . $alias . '.voided_at IS NULL THEN ' . $alias . '.due_date ELSE NULL END) '
+            . 'AS oldest_due_date';
+    }
+
+    private function normalizeTotal(mixed $amount): string
+    {
+        $amount = $amount === null ? '0' : (string) $amount;
+        if (!preg_match('/\A\d+(?:\.\d{1,2})?\z/', $amount)) {
+            throw new RuntimeException('No fue posible calcular el saldo.');
+        }
+
+        [$whole, $fraction] = array_pad(explode('.', $amount, 2), 2, '');
+        $whole = ltrim($whole, '0');
+
+        return ($whole === '' ? '0' : $whole) . '.' . str_pad($fraction, 2, '0');
     }
 
     private function normalizeDate(string $date): string

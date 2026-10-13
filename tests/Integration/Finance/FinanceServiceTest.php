@@ -190,6 +190,130 @@ final class FinanceServiceTest extends TestCase
         }
     }
 
+    public function testVoidChargeStoresActorTimeAndReasonOnceAndPreservesAuthorityRows(): void
+    {
+        $fixture = $this->createLease();
+        $chargeId = $this->insertCharge(
+            $fixture['lease_id'], 'fine', null, '2026-10-12', '125000.25', 'Cargo observado',
+        );
+        $before = $this->authoritySnapshot();
+        $now = 1791900000;
+
+        $voided = $this->service()->voidCharge($chargeId, $fixture['actor_id'], '  Duplicado  ', $now);
+
+        self::assertSame($chargeId, $voided['id']);
+        self::assertSame($fixture['actor_id'], $voided['voided_by_user_id']);
+        self::assertSame(gmdate('Y-m-d H:i:s', $now), $voided['voided_at']);
+        self::assertSame('Duplicado', $voided['void_reason']);
+        self::assertSame(1, $this->chargeCount($fixture['lease_id']));
+        self::assertSame($before, $this->authoritySnapshot());
+
+        $this->assertRejected(fn () => $this->service()->voidCharge(
+            $chargeId, $fixture['actor_id'], 'Segundo intento', $now + 60,
+        ));
+
+        $stored = $this->charge($chargeId);
+        self::assertSame($fixture['actor_id'], (int) $stored['voided_by_user_id']);
+        self::assertSame(gmdate('Y-m-d H:i:s', $now), $stored['voided_at']);
+        self::assertSame('Duplicado', $stored['void_reason']);
+        self::assertSame(1, $this->chargeCount($fixture['lease_id']));
+        self::assertSame('voided', $this->service()->listForLease($fixture['lease_id'], '2026-10-13')[0]['state']);
+    }
+
+    public function testVoidChargeRejectsBlankReasonAndInvalidChargeOrActor(): void
+    {
+        $fixture = $this->createLease();
+        $chargeId = $this->insertCharge(
+            $fixture['lease_id'], 'service', null, '2026-10-20', '50.00', 'Servicio',
+        );
+
+        foreach (['', '   '] as $reason) {
+            $this->assertRejected(fn () => $this->service()->voidCharge(
+                $chargeId, $fixture['actor_id'], $reason, 1791900000,
+            ));
+        }
+        $this->assertRejected(fn () => $this->service()->voidCharge(
+            0, $fixture['actor_id'], 'Motivo', 1791900000,
+        ));
+        $this->assertRejected(fn () => $this->service()->voidCharge(
+            $chargeId, 0, 'Motivo', 1791900000,
+        ));
+        $this->assertRejected(fn () => $this->service()->voidCharge(
+            PHP_INT_MAX, $fixture['actor_id'], 'Motivo', 1791900000,
+        ));
+
+        self::assertNull($this->charge($chargeId)['voided_at']);
+        self::assertSame(1, $this->chargeCount($fixture['lease_id']));
+    }
+
+    public function testSummaryForLeaseUsesExactAmountsStrictOverdueBoundaryAndIgnoresVoidedCharges(): void
+    {
+        $fixture = $this->createLease();
+        $empty = $this->createLease();
+        $this->insertCharge($fixture['lease_id'], 'rent', null, '2026-10-12', '9999999999.99', 'Renta vencida');
+        $this->insertCharge($fixture['lease_id'], 'service', null, '2026-10-13', '0.01', 'Vence hoy');
+        $this->insertCharge($fixture['lease_id'], 'repair', null, '2026-10-14', '25.00', 'Vence después');
+        $this->insertCharge(
+            $fixture['lease_id'], 'fine', null, '2026-10-01', '80.00', 'Anulado', '2026-10-02 12:00:00',
+        );
+
+        self::assertSame([
+            'outstanding' => '10000000025.00',
+            'overdue' => '9999999999.99',
+            'oldest_due_date' => '2026-10-12',
+        ], $this->service()->summaryForLease($fixture['lease_id'], '2026-10-13'));
+        self::assertSame([
+            'outstanding' => '0.00',
+            'overdue' => '0.00',
+            'oldest_due_date' => null,
+        ], $this->service()->summaryForLease($empty['lease_id'], '2026-10-13'));
+
+        $columns = $this->pdo->query('SHOW COLUMNS FROM charges')->fetchAll(PDO::FETCH_COLUMN);
+        foreach (['status', 'balance', 'outstanding_amount', 'paid_amount', 'remaining_amount'] as $persistedSummary) {
+            self::assertNotContains($persistedSummary, $columns);
+        }
+    }
+
+    public function testPortfolioAggregatesOneCanonicalContextRowPerLeaseWithChargeHistory(): void
+    {
+        $first = $this->createLease();
+        $second = $this->createLease();
+        $withoutHistory = $this->createLease();
+        $this->insertCharge($first['lease_id'], 'rent', null, '2026-10-12', '100.10', 'Canon vencido');
+        $this->insertCharge($first['lease_id'], 'service', null, '2026-10-13', '20.20', 'Servicio hoy');
+        $this->insertCharge(
+            $first['lease_id'], 'fine', null, '2026-10-01', '500.00', 'Anulado', '2026-10-02 12:00:00',
+        );
+        $this->insertCharge(
+            $second['lease_id'], 'repair', null, '2026-10-01', '75.55', 'Todo anulado', '2026-10-02 12:00:00',
+        );
+
+        $portfolio = $this->service()->portfolio('2026-10-13');
+
+        self::assertCount(2, $portfolio);
+        $byLease = [];
+        foreach ($portfolio as $row) {
+            self::assertArrayNotHasKey($row['lease_id'], $byLease);
+            $byLease[$row['lease_id']] = $row;
+        }
+        self::assertArrayNotHasKey($withoutHistory['lease_id'], $byLease);
+        self::assertSame([
+            'outstanding' => '120.30',
+            'overdue' => '100.10',
+            'oldest_due_date' => '2026-10-12',
+        ], array_intersect_key($byLease[$first['lease_id']], array_flip(['outstanding', 'overdue', 'oldest_due_date'])));
+        self::assertSame([
+            'outstanding' => '0.00',
+            'overdue' => '0.00',
+            'oldest_due_date' => null,
+        ], array_intersect_key($byLease[$second['lease_id']], array_flip(['outstanding', 'overdue', 'oldest_due_date'])));
+        self::assertSame($first['tenant_id'], $byLease[$first['lease_id']]['tenant_id']);
+        self::assertSame($second['tenant_id'], $byLease[$second['lease_id']]['tenant_id']);
+        self::assertSame($first['unit_id'], $byLease[$first['lease_id']]['unit_id']);
+        self::assertSame($second['unit_id'], $byLease[$second['lease_id']]['unit_id']);
+        self::assertNotSame($byLease[$first['lease_id']]['property_name'], $byLease[$second['lease_id']]['property_name']);
+    }
+
     public function testMonthlyChargesSnapshotRentAndAdministrationFromTheContractOnAnEndedLease(): void
     {
         $fixture = $this->createLease(ended: true);
