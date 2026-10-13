@@ -129,8 +129,8 @@ F7_FORENSIC_REVIEW: PASS — concurrency, JSON capacity and runtime storage gaps
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
 
-CURRENT_GATE: F7 INTEGRATED / DOCUMENTED
-NEXT: F8 SCOPE / PRE-KISS only on next explicit project continuation
+CURRENT_GATE: F8 CLOSED / VERIFIED / NOT MERGED
+NEXT: FINAL F8 FORENSIC REVIEW / MERGE GATE
 ```
 
 No reimplementar F1–F7. No reabrir una fase certificada sin evidencia de regresión o una nueva SPEC aprobada.
@@ -386,7 +386,7 @@ Autoridad técnica de cierre:
 - F5 — Aplicaciones + candidatos + referencias ✅ CLOSED / VERIFIED / MERGED
 - F6 — Aseguradora/SURA ✅ CLOSED / VERIFIED / MERGED
 - **F7 — Contratos ✅ CLOSED / VERIFIED / MERGED**
-- F8 — Inquilino + lease + portal usando auth único — siguiente fase; iniciar por SCOPE / PRE-KISS, no por implementación directa
+- **F8 — Inquilino + lease + portal usando auth único ✅ CLOSED / VERIFIED / NOT MERGED**
 - F9 — Cargos + cartera
 - F10 — Medios de pago
 - F11 — Reporte + conciliación
@@ -410,15 +410,15 @@ Autoridad técnica de cierre:
 
 # 10. PROTOCOLO DE RECUPERACIÓN
 
-Al retomar trabajo después del merge F7:
+Al retomar trabajo después del cierre F8:
 
 1. verificar `main` real;
 2. leer `docs/checkpoints/F7_MERGED_2026-10-12.md` y `F7_CLOSED_2026-10-12.md`;
 3. no reabrir F7 sin evidencia de regresión o nueva SPEC;
 4. verificar CI/evidencia exacta antes de cualquier cambio que toque autoridades F7;
-5. iniciar F8 únicamente por `SCOPE → PRE-KISS → SPEC/DESIGN → PLAN`;
+5. revisar el PR F8 contra su `CLOSURE_HEAD` y CI exacto antes del merge gate;
 6. no crear segundo auth, inventario, candidato, contrato ni fuentes paralelas;
-7. mantener KISS + Cero Ruido + TDD por microfases.
+7. no fusionar F8 sin autorización explícita; mantener KISS + Cero Ruido.
 
 El checkpoint `F7_MERGED_2026-10-12.md` es la autoridad de integración F7.
 
@@ -427,6 +427,8 @@ El checkpoint `F7_MERGED_2026-10-12.md` es la autoridad de integración F7.
 # 11. GATE ACTUAL
 
 ```text
+F0_F8_STATUS: CLOSED / VERIFIED
+F1_F7_STATUS: MERGED
 LAST_MERGED_PHASE: F7 CLOSED / VERIFIED / MERGED
 F7_PR: #10 CLOSED / MERGED
 F7_FINAL_PRODUCT_HEAD: 829955f2b297959380df06a8c8cc3e3424115e74
@@ -435,10 +437,13 @@ F7_MERGE_SHA: b6ab43fefd7b4d2933e3e3adff0ac4c23efdf1b8
 F7_FINAL_PRODUCT_CI: 38360814842
 F7_CLOSURE_CI: 38361376137
 F7_TESTS_PHP83: 277 / 2230
+F8_STATUS: CLOSED / VERIFIED / NOT MERGED
+F8_PRODUCT_HEAD: 5569e07ec45170c95fc981c7f00254a637aa5e35
+F8_PRODUCT_CI: 38440025461 (PHP 8.3/8.4/8.5 PASS)
+F8_TESTS_PHP83: 310 / 2611
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
-
-F8_IMPLEMENTATION: NOT STARTED
-CURRENT_ACTION: F7 MERGED / DOCUMENTED
-NEXT: F8 SCOPE / PRE-KISS ON NEXT EXPLICIT CONTINUA
+MERGE_AUTHORIZED: NO
+CURRENT_ACTION: F8 REVIEW-READY / NOT MERGED
+NEXT: FINAL F8 FORENSIC REVIEW / MERGE GATE
 ```

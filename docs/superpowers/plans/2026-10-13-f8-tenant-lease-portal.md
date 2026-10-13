@@ -486,9 +486,15 @@ Never combine multiple REDs into one broad patch. If implementation discovers a 
 F7: CLOSED / VERIFIED / MERGED
 F8_SCOPE_PRE_KISS: APPROVED
 F8_SPEC: APPROVED BY USER 2026-10-13
-F8_PLAN: USER REVIEW REQUIRED
-F8_IMPLEMENTATION: NOT AUTHORIZED
-NEXT: USER APPROVAL OF THIS PLAN + EXECUTION METHOD
+F8_PLAN: APPROVED BY USER 2026-10-13
+F8_IMPLEMENTATION: COMPLETE / VERIFIED
+F8_QA: VERIFIED
+F8_TWO_LAWS: PASS
+F8_STATUS: CLOSED / VERIFIED / NOT MERGED
+MERGE_AUTHORIZED: NO
+NEXT: FINAL F8 FORENSIC REVIEW / MERGE GATE
 ```
+
+The former `USER REVIEW REQUIRED` / `NOT AUTHORIZED` footer was stale: the SPEC approval gate was committed as `044cb9b`, and the user subsequently directed execution with “ejecuta el prompt.” This closure records that authorization and the completed gates; it does not change the approved design.
 
 **Recommended execution method: Native.** The eight tasks are sequential and share the same PDO/auth/lease interfaces, and the user has explicitly preferred ChatGPT to implement most work directly. Use an independent whole-branch review at the end; do not invoke Codex/subagents unless a demonstrated blocker makes that extra context materially useful.
