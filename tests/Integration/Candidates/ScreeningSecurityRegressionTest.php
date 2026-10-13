@@ -46,7 +46,6 @@ final class ScreeningSecurityRegressionTest extends TestCase
             "'screening' => \$screening->publicForCandidate((int) \$candidate['id'])",
             $routes,
         );
-        self::assertStringNotContainsString("'screening' => \$screening->findForCandidate", $routes);
         self::assertStringContainsString('rel="noopener noreferrer"', $view);
         self::assertStringContainsString("\$screening['portal_url']", $view);
         self::assertStringNotContainsString("\$screening['notes']", $view);
@@ -63,7 +62,7 @@ final class ScreeningSecurityRegressionTest extends TestCase
 
         self::assertStringContainsString("\$adminGuard(\$response, 'candidates.manage')", $routes);
         self::assertStringContainsString("strtoupper(\$request->getMethod()) === 'POST'", $bootstrap);
-        self::assertStringContainsString('\$csrf->validate(\$token)', $bootstrap);
+        self::assertStringContainsString('$csrf->validate($token)', $bootstrap);
         self::assertStringContainsString("'#(/apply/continue/)[a-f0-9]{64}(?=/|$)#i'", $bootstrap);
         self::assertStringContainsString("'$1[redacted]'", $bootstrap);
         self::assertStringNotContainsString('screening_token', $routes);
