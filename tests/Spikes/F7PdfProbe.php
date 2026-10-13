@@ -90,10 +90,17 @@ if ($failures !== []) {
     exit(1);
 }
 
+$outputPath = sprintf('f7-pdf-spike-%d.%d.pdf', PHP_MAJOR_VERSION, PHP_MINOR_VERSION);
+if (file_put_contents($outputPath, $pdf) === false) {
+    fwrite(STDERR, 'F7_PDF_SPIKE_FAIL: unable to persist PDF artifact' . PHP_EOL);
+    exit(1);
+}
+
 printf(
-    "F7_PDF_SPIKE_PASS php=%s dompdf=%s pages=%d bytes=%d ext_dom=yes ext_mbstring=yes ext_gd=yes\n",
+    "F7_PDF_SPIKE_PASS php=%s dompdf=%s pages=%d bytes=%d ext_dom=yes ext_mbstring=yes ext_gd=yes artifact=%s\n",
     PHP_VERSION,
     defined('Dompdf\\Dompdf::VERSION') ? Dompdf::VERSION : 'installed',
     $pageCount,
     strlen($pdf),
+    $outputPath,
 );
