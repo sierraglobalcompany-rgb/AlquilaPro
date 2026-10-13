@@ -1,7 +1,7 @@
 # F8 — INQUILINO + LEASE + PORTAL — SPEC
 
 **Fecha:** 2026-10-13 (America/Bogota)  
-**Estado:** CLOSED / VERIFIED / NOT MERGED  
+**Estado:** CLOSED / VERIFIED / MERGED  
 **Base:** `main @ f4a7e3f4d5ec7dc9cdc0f3a7e78777f98c85461d`  
 **F7 integrado:** `b6ab43fefd7b4d2933e3e3adff0ac4c23efdf1b8`  
 **Branch de diseño:** `spec/f8-tenant-lease-portal-20261013`  
@@ -15,7 +15,7 @@ Orden aplicable:
 
 `SPEC maestra V1.2 → PLAN maestro V1.2 → README → esta SPEC F8 → plan F8 → tests/CI → código real`.
 
-Esta SPEC fue aprobada por el usuario el 2026-10-13. El PLAN F8 también fue aprobado y la ejecución Native quedó autorizada. La implementación debe seguir el plan y detenerse antes del merge hasta una autorización explícita posterior.
+Esta SPEC fue aprobada por el usuario el 2026-10-13. El PLAN F8 también fue aprobado, la ejecución Native quedó autorizada y el merge de PR #11 fue autorizado posteriormente mediante el gate explícito `continua`. La integración final vive en `docs/checkpoints/F8_MERGED_2026-10-13.md`.
 
 ---
 
@@ -663,8 +663,8 @@ Esos módulos aparecerán solo cuando su fase real exista.
 ## 17. TWO LAWS GATE — DISEÑO
 
 ```text
-LEY_1_KISS: PASS PROVISIONAL
-LEY_2_CERO_RUIDO: PASS PROVISIONAL
+LEY_1_KISS: PASS
+LEY_2_CERO_RUIDO: PASS
 
 ADDED:
 - 1 table: leases
@@ -716,7 +716,10 @@ F8_PLAN: APPROVED
 F8_IMPLEMENTATION: COMPLETE
 F8_QA: VERIFIED
 F8_TWO_LAWS: PASS
-F8_STATUS: CLOSED / VERIFIED / NOT MERGED
-MERGE_AUTHORIZED: NO
-NEXT: FINAL F8 FORENSIC REVIEW / MERGE GATE
+F8_STATUS: CLOSED / VERIFIED / MERGED
+F8_FINAL_AUDITED_CLOSURE_HEAD: f258cd48f6a2c301b38e6a85683e5f30b8368770
+F8_FINAL_AUDIT_CI: 38443826390 — PHP 8.3/8.4/8.5 PASS
+F8_MERGE_SHA: a1b50f0d1c6556531626fd35cba0668bd5c4029f
+MERGE_AUTHORIZED: YES / EXECUTED 2026-10-13
+NEXT: F9 SCOPE / PRE-KISS
 ```
