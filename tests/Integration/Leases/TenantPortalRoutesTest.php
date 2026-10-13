@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AlquilaPro\Tests\Integration\Leases;
 
 use AlquilaPro\Auth\Csrf;
+use AlquilaPro\Finance\FinanceService;
 use AlquilaPro\Foundation\DatabaseConfig;
 use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
@@ -173,6 +174,8 @@ final class TenantPortalRoutesTest extends TestCase
             'unit_number' => '401',
             'tower' => 'Torre Norte',
             'floor' => '4',
+            'start_date' => '2026-10-01',
+            'end_date' => '2027-09-30',
         ]);
         $parking = $this->createLease($tenantId, [
             'type' => 'parking',
@@ -188,9 +191,12 @@ final class TenantPortalRoutesTest extends TestCase
             'unit_code' => 'APT-SECRET',
         ]);
 
-        $this->insertCharge(
-            $apartment['lease_id'], $tenantId, 'rent', '2026-10-01', '2026-10-12', '20.00', 'Canon vencido',
+        $tracedPdo = $this->tracedPdo();
+        $monthlyCharges = (new FinanceService($tracedPdo))->createMonthlyCharges(
+            $apartment['lease_id'], '2026-10-01', '2026-10-12', $tenantId,
         );
+        self::assertSame(['rent', 'administration'], array_column($monthlyCharges, 'type'));
+        self::assertSame([null, null], array_column($monthlyCharges, 'description'));
         $this->insertCharge(
             $apartment['lease_id'], $tenantId, 'service', null, '2026-11-03', '75.25', '<script>tenant()</script>',
         );
@@ -202,8 +208,7 @@ final class TenantPortalRoutesTest extends TestCase
             $parking['lease_id'], $tenantId, 'repair', null, '2026-10-12', '30.00', 'Reparación histórica',
         );
 
-        $tracedPdo = $this->tracedPdo();
-        $app = $this->app('/tenant-base', $tracedPdo);
+        $app = $this->app('/tenant-base', $tracedPdo, static fn (): string => '2026-10-14');
         $this->login($app, 'detail@example.com', 'TenantPassword123', '/tenant-base');
 
         $apartmentResponse = $this->request(
@@ -217,14 +222,16 @@ final class TenantPortalRoutesTest extends TestCase
             self::assertStringContainsString($value, $apartmentHtml);
         }
         self::assertStringContainsString('Cartera', $apartmentHtml);
-        self::assertStringContainsString('Saldo pendiente: $95.25', $apartmentHtml);
-        self::assertStringContainsString('Saldo vencido: $20.00', $apartmentHtml);
+        self::assertStringContainsString('Saldo pendiente: $1720075.25', $apartmentHtml);
+        self::assertStringContainsString('Saldo vencido: $1720000.00', $apartmentHtml);
         self::assertStringContainsString('Vencimiento pendiente más antiguo: 2026-10-12', $apartmentHtml);
-        self::assertStringContainsString('Canon vencido', $apartmentHtml);
+        self::assertStringContainsString('Canon mensual', $apartmentHtml);
+        self::assertStringContainsString('Administración', $apartmentHtml);
+        self::assertStringContainsString('Periodo: 2026-10', $apartmentHtml);
         self::assertStringContainsString('pending', $apartmentHtml);
         self::assertStringContainsString('overdue', $apartmentHtml);
         self::assertStringContainsString('voided', $apartmentHtml);
-        self::assertStringContainsString('Días vencidos: 1', $apartmentHtml);
+        self::assertStringContainsString('Días vencidos: 2', $apartmentHtml);
         self::assertStringContainsString('&lt;script&gt;tenant()&lt;/script&gt;', $apartmentHtml);
         self::assertStringNotContainsString('<script>tenant()</script>', $apartmentHtml);
         self::assertStringNotContainsString('MOTIVO PRIVADO TENANT', $apartmentHtml);
@@ -330,7 +337,7 @@ final class TenantPortalRoutesTest extends TestCase
         );
     }
 
-    private function app(string $basePath = '', ?PDO $pdo = null): App
+    private function app(string $basePath = '', ?PDO $pdo = null, ?\Closure $today = null): App
     {
         $factory = require dirname(__DIR__, 3) . '/bootstrap/app.php';
 
@@ -345,6 +352,7 @@ final class TenantPortalRoutesTest extends TestCase
             'candidate_document_directory' => $this->directory . '/candidate-documents',
             'contract_directory' => $this->contractDirectory,
             'pdo' => $pdo ?? $this->pdo,
+            'today' => $today,
         ]);
     }
 
@@ -440,7 +448,7 @@ final class TenantPortalRoutesTest extends TestCase
         ?string $periodMonth,
         string $dueDate,
         string $amount,
-        string $description,
+        ?string $description,
         ?string $voidedAt = null,
         ?string $voidReason = null,
     ): void {
@@ -479,6 +487,8 @@ final class TenantPortalRoutesTest extends TestCase
         $activatedAt = (string) ($options['activated_at'] ?? '2026-10-13 10:00:00');
         $endedAt = $options['ended_at'] ?? null;
         $withPdf = (bool) ($options['with_pdf'] ?? false);
+        $startDate = (string) ($options['start_date'] ?? '2026-11-01');
+        $endDate = (string) ($options['end_date'] ?? '2027-10-31');
 
         $property = $this->pdo->prepare(
             'INSERT INTO properties (name, address, city, sector, is_active) VALUES (:name, :address, :city, :sector, 1)',
@@ -580,8 +590,8 @@ final class TenantPortalRoutesTest extends TestCase
             'document_type' => $documentType,
             'monthly_rent' => '1500000.00',
             'administration_fee' => $type === 'apartment' ? '220000.00' : null,
-            'start_date' => '2026-11-01',
-            'end_date' => '2027-10-31',
+            'start_date' => $startDate,
+            'end_date' => $endDate,
             'duration_text' => 'Doce meses',
             'pdf_stored_name' => $withPdf ? $pdfName : null,
             'pdf_sha256' => $pdfHash,

@@ -29,6 +29,8 @@ return static function (App $app, array $deps): void {
     /** @var Closure(): ?array $currentUser */
     $currentUser = $deps['current_user'];
     $basePath = (string) ($deps['base_path'] ?? '');
+    $todayProvider = $deps['today'] ?? static fn (): string =>
+        (new DateTimeImmutable('now', new DateTimeZone('America/Bogota')))->format('Y-m-d');
 
     $path = static fn (string $value): string => $basePath . $value;
 
@@ -140,7 +142,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($tenantGuard, $leases, $finance, $view, $csrf): ResponseInterface {
+    ) use ($tenantGuard, $leases, $finance, $view, $csrf, $todayProvider): ResponseInterface {
         $user = $tenantGuard($response);
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -151,7 +153,7 @@ return static function (App $app, array $deps): void {
             return $response->withStatus(404);
         }
 
-        $today = (new DateTimeImmutable('now', new DateTimeZone('America/Bogota')))->format('Y-m-d');
+        $today = $todayProvider();
         $financeSummary = $finance->summaryForLease((int) $lease['id'], $today);
         $charges = $finance->listForLease((int) $lease['id'], $today);
 

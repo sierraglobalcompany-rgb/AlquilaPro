@@ -10,6 +10,14 @@ $chargeStateLabels = [
     'overdue' => 'Vencido',
     'voided' => 'Anulado',
 ];
+$chargeTypeLabels = [
+    'rent' => 'Canon mensual',
+    'administration' => 'Administración',
+    'service' => 'Servicio',
+    'fine' => 'Multa',
+    'repair' => 'Reparación',
+    'other' => 'Otro',
+];
 ?>
 <section class="surface">
     <p class="eyebrow">Portal del inquilino</p>
@@ -35,11 +43,14 @@ $chargeStateLabels = [
             <?php foreach ($charges as $charge): ?>
                 <article class="user-card">
                     <div class="user-card__head">
-                        <strong><?= $escape($charge['description'] ?? 'Cargo') ?></strong>
+                        <strong><?= $escape($chargeTypeLabels[(string) $charge['type']] ?? 'Cargo') ?></strong>
                         <span class="status-pill" data-charge-state="<?= $escape($charge['state']) ?>">
                             <?= $escape($chargeStateLabels[$charge['state']] ?? 'Cargo') ?>
                         </span>
                     </div>
+                    <?php if ($charge['description'] !== null): ?>
+                        <div><?= $escape($charge['description']) ?></div>
+                    <?php endif; ?>
                     <?php if ($charge['period_month'] !== null): ?>
                         <div>Periodo: <?= $escape(substr($charge['period_month'], 0, 7)) ?></div>
                     <?php endif; ?>

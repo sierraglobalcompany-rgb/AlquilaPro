@@ -140,16 +140,21 @@ final class FinanceSecurityRegressionTest extends TestCase
 
         $ownership = strpos($detailRoute, '$leases->findForUser(');
         $notFound = strpos($detailRoute, '$lease === null');
+        $todayProvider = strpos($detailRoute, '$todayProvider()');
         $summary = strpos($detailRoute, '$finance->summaryForLease(');
         $list = strpos($detailRoute, '$finance->listForLease(');
         $render = strpos($detailRoute, "\$view->renderApp('tenant_lease_detail'");
         self::assertNotFalse($ownership);
         self::assertNotFalse($notFound);
+        self::assertNotFalse($todayProvider);
         self::assertNotFalse($summary);
         self::assertNotFalse($list);
         self::assertNotFalse($render);
-        self::assertTrue($ownership < $notFound && $notFound < $summary && $summary < $list && $list < $render);
-        self::assertStringContainsString('use ($tenantGuard, $leases, $finance, $view, $csrf)', $detailRoute);
+        self::assertTrue(
+            $ownership < $notFound && $notFound < $todayProvider && $todayProvider < $summary
+            && $summary < $list && $list < $render,
+        );
+        self::assertStringContainsString('use ($tenantGuard, $leases, $finance, $view, $csrf, $todayProvider)', $detailRoute);
     }
 
     public function testFinanceServiceIsSharedAndTenantViewExposesOnlySafeReadFields(): void
@@ -171,7 +176,18 @@ final class FinanceSecurityRegressionTest extends TestCase
         ] as $privateOrMutationField) {
             self::assertStringNotContainsString($privateOrMutationField, $view);
         }
-        self::assertStringContainsString("\$escape(\$charge['description'] ?? 'Cargo')", $view);
+        foreach ([
+            "'rent' => 'Canon mensual'",
+            "'administration' => 'Administración'",
+            "'service' => 'Servicio'",
+            "'fine' => 'Multa'",
+            "'repair' => 'Reparación'",
+            "'other' => 'Otro'",
+        ] as $typeLabel) {
+            self::assertStringContainsString($typeLabel, $view);
+        }
+        self::assertStringContainsString("\$charge['description'] !== null", $view);
+        self::assertStringContainsString("\$escape(\$charge['description'])", $view);
         self::assertStringContainsString("\$escape(\$charge['state'])", $view);
         self::assertStringContainsString("\$escape(\$charge['due_date'])", $view);
         self::assertStringContainsString("\$escape(\$charge['amount'])", $view);

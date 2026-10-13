@@ -269,6 +269,71 @@ final class FinanceRoutesTest extends TestCase
         self::assertStringNotContainsString('/admin/leases/' . $fixture['lease_id'] . '/charges', $contractOnlyHtml);
     }
 
+    public function testFinanceOnlyManagerCanFollowPortfolioAndMutationRedirectsSafely(): void
+    {
+        $fixture = $this->createLease('Finance Workflow Tenant', 'Finance Workflow Property', 'FIN-WORKFLOW');
+        $this->insertCharge(
+            $fixture['lease_id'], 'rent', '2026-10-01', '2026-10-05', '1500000.00', 'Existing rent',
+        );
+        $managerId = $this->insertUser(
+            'Finance Only Manager', 'finance-only-manager@example.com', 'gestor', ['finance.view', 'finance.manage'],
+        );
+        $app = $this->app('/sub');
+        $contractPath = '/sub/admin/contracts/' . $fixture['contract_id'];
+
+        $this->login($managerId);
+        $portfolio = $this->request($app, 'GET', '/sub/admin/finance');
+        self::assertSame(200, $portfolio->getStatusCode());
+        self::assertStringContainsString('href="' . $contractPath . '"', (string) $portfolio->getBody());
+
+        $detail = $this->request($app, 'GET', $contractPath);
+        self::assertSame(200, $detail->getStatusCode());
+        $detailHtml = (string) $detail->getBody();
+        self::assertStringContainsString('Cargos del arrendamiento', $detailHtml);
+        self::assertStringNotContainsString('Plantilla:', $detailHtml);
+        self::assertStringNotContainsString('Resumen', $detailHtml);
+
+        $manual = $this->request($app, 'POST', '/sub/admin/leases/' . $fixture['lease_id'] . '/charges', [
+            'type' => 'service',
+            'amount' => '25.00',
+            'due_date' => '2026-10-20',
+            'description' => 'Finance-only manual service',
+        ]);
+        self::assertSame(303, $manual->getStatusCode());
+        self::assertSame($contractPath, $manual->getHeaderLine('Location'));
+        $manualDetail = $this->request($app, 'GET', $manual->getHeaderLine('Location'));
+        self::assertSame(200, $manualDetail->getStatusCode());
+        self::assertStringContainsString('Finance-only manual service', (string) $manualDetail->getBody());
+
+        $monthly = $this->request($app, 'POST', '/sub/admin/leases/' . $fixture['lease_id'] . '/charges/monthly', [
+            'period_month' => '2026-10-01',
+            'due_date' => '2026-10-30',
+        ]);
+        self::assertSame(303, $monthly->getStatusCode());
+        self::assertSame($contractPath, $monthly->getHeaderLine('Location'));
+        self::assertSame(200, $this->request($app, 'GET', $monthly->getHeaderLine('Location'))->getStatusCode());
+
+        $chargeId = (int) $this->pdo->query(
+            "SELECT id FROM charges WHERE lease_id = " . $fixture['lease_id'] . " AND type = 'rent' ORDER BY id LIMIT 1",
+        )->fetchColumn();
+        self::assertGreaterThan(0, $chargeId);
+        $void = $this->request($app, 'POST', '/sub/admin/charges/' . $chargeId . '/void', [
+            'reason' => 'Finance-only correction',
+        ]);
+        self::assertSame(303, $void->getStatusCode());
+        self::assertSame($contractPath, $void->getHeaderLine('Location'));
+        $voidDetail = $this->request($app, 'GET', $void->getHeaderLine('Location'));
+        self::assertSame(200, $voidDetail->getStatusCode());
+        self::assertStringContainsString('voided', (string) $voidDetail->getBody());
+        self::assertStringNotContainsString('Finance-only correction', (string) $voidDetail->getBody());
+
+        self::assertSame(
+            403,
+            $this->request($app, 'GET', $contractPath . '/pdf')->getStatusCode(),
+            'Finance permission must not grant access to the contract PDF.',
+        );
+    }
+
     private function app(string $basePath = ''): App
     {
         $factory = require dirname(__DIR__, 3) . '/bootstrap/app.php';

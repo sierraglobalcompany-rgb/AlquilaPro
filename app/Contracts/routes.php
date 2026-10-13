@@ -34,7 +34,7 @@ return static function (App $app, array $deps): void {
 
     $adminGuard = static function (
         ResponseInterface $response,
-        string $permission,
+        string|array $permission,
     ) use ($currentUser, $session, $path): array|ResponseInterface {
         $user = $currentUser();
         if ($user === null) {
@@ -43,7 +43,14 @@ return static function (App $app, array $deps): void {
         if ($session->mustChangePassword()) {
             return $response->withHeader('Location', $path('/account/password'))->withStatus(302);
         }
-        if (!Permissions::allows($user, $permission)) {
+        $hasPermission = false;
+        foreach (is_array($permission) ? $permission : [$permission] as $requiredPermission) {
+            if (Permissions::allows($user, $requiredPermission)) {
+                $hasPermission = true;
+                break;
+            }
+        }
+        if (!$hasPermission) {
             return $response->withStatus(403);
         }
 
@@ -166,8 +173,8 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($adminGuard, $contracts, $leases, $finance, $view, $csrf, $versionOptions): ResponseInterface {
-        $user = $adminGuard($response, 'contracts.view');
+    ) use ($adminGuard, $contracts, $leases, $finance, $view, $csrf, $versionOptions, $path): ResponseInterface {
+        $user = $adminGuard($response, ['contracts.view', 'finance.view', 'finance.manage']);
         if ($user instanceof ResponseInterface) {
             return $user;
         }
@@ -177,13 +184,20 @@ return static function (App $app, array $deps): void {
             return $response->withStatus(404);
         }
 
+        $canViewContract = Permissions::allows($user, 'contracts.view');
+        $lease = $leases->findByContract((int) $contract['id']);
+        if (!$canViewContract && $lease === null) {
+            return $response->withStatus(404);
+        }
+
         $previewHtml = null;
-        if ($contract['status'] === 'draft') {
+        if ($canViewContract && $contract['status'] === 'draft') {
             $previewHtml = $contracts->previewHtml((int) $contract['id']);
         }
 
-        $lease = $leases->findByContract((int) $contract['id']);
-        $canViewFinance = $lease !== null && Permissions::allows($user, 'finance.view');
+        $canViewFinance = $lease !== null && (
+            Permissions::allows($user, 'finance.view') || Permissions::allows($user, 'finance.manage')
+        );
         $canManageFinance = $lease !== null && Permissions::allows($user, 'finance.manage');
         $financeSummary = null;
         $charges = [];
@@ -194,15 +208,18 @@ return static function (App $app, array $deps): void {
         }
 
         $response->getBody()->write($view->renderApp('contract_detail', [
-            'pageTitle' => 'Contrato #' . (int) $contract['id'],
+            'pageTitle' => $canViewContract
+                ? 'Contrato #' . (int) $contract['id']
+                : 'Cartera del arrendamiento #' . (int) $lease['id'],
             'user' => $user,
             'activeNav' => 'apps',
             'csrfToken' => $csrf->token(),
             'contract' => $contract,
             'lease' => $lease,
             'previewHtml' => $previewHtml,
-            'versionOptions' => $versionOptions((string) $contract['document_type']),
+            'versionOptions' => $canViewContract ? $versionOptions((string) $contract['document_type']) : [],
             'canManage' => Permissions::allows($user, 'contracts.manage'),
+            'canViewContract' => $canViewContract,
             'canViewFinance' => $canViewFinance,
             'canManageFinance' => $canManageFinance,
             'financeSummary' => $financeSummary,

@@ -11,6 +11,7 @@ $isDraft = $status === 'draft';
 $isGenerated = $status === 'generated';
 $isFinalized = $status === 'finalized';
 $hasPdf = in_array($status, ['generated', 'finalized'], true);
+$canViewContract = (bool) ($canViewContract ?? false);
 $canViewFinance = (bool) ($canViewFinance ?? false);
 $canManageFinance = (bool) ($canManageFinance ?? false);
 $financeSummary = is_array($financeSummary ?? null) ? $financeSummary : null;
@@ -18,61 +19,73 @@ $charges = is_array($charges ?? null) ? $charges : [];
 $today = (string) ($today ?? '');
 $currentPeriodMonth = (string) ($currentPeriodMonth ?? '');
 ?>
-<section class="surface">
-    <p class="eyebrow">Contratos</p>
-    <h1>Contrato #<?= $escape($contract['id']) ?></h1>
-    <p class="hint">Estado: <?= $escape($status) ?></p>
-    <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/contracts">Volver a contratos</a>
-    <?php if ($hasPdf): ?>
-        <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($contract['id']) ?>/pdf">Descargar PDF</a>
-    <?php endif; ?>
-</section>
+<?php if ($canViewContract): ?>
+    <section class="surface">
+        <p class="eyebrow">Contratos</p>
+        <h1>Contrato #<?= $escape($contract['id']) ?></h1>
+        <p class="hint">Estado: <?= $escape($status) ?></p>
+        <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/contracts">Volver a contratos</a>
+        <?php if ($hasPdf): ?>
+            <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($contract['id']) ?>/pdf">Descargar PDF</a>
+        <?php endif; ?>
+    </section>
 
-<section class="surface">
-    <h2>Resumen</h2>
-    <div class="users-grid">
-        <article class="user-card">
-            <div class="user-card__head">
-                <strong><?= $escape($contract['candidate_name'] ?? '') ?></strong>
-                <span class="status-pill"><?= $escape($status) ?></span>
-            </div>
-            <div>Unidad: <?= $escape($contract['unit_code'] ?? '') ?></div>
-            <div>Tipo: <?= $escape($contract['document_type']) ?></div>
-            <div>Plantilla: <?= $escape($contract['template_name'] ?? '') ?> · v<?= $escape($contract['template_version_number'] ?? '') ?></div>
-            <div>Canon: <?= $escape($contract['monthly_rent']) ?></div>
-            <div>Administración: <?= $contract['administration_fee'] === null ? 'No aplica' : $escape($contract['administration_fee']) ?></div>
-            <div>Inicio: <?= $escape($contract['start_date']) ?></div>
-            <div>Fin: <?= $escape($contract['end_date']) ?></div>
-            <div>Duración: <?= $escape($contract['duration_text']) ?></div>
-        </article>
-    </div>
-</section>
+    <section class="surface">
+        <h2>Resumen</h2>
+        <div class="users-grid">
+            <article class="user-card">
+                <div class="user-card__head">
+                    <strong><?= $escape($contract['candidate_name'] ?? '') ?></strong>
+                    <span class="status-pill"><?= $escape($status) ?></span>
+                </div>
+                <div>Unidad: <?= $escape($contract['unit_code'] ?? '') ?></div>
+                <div>Tipo: <?= $escape($contract['document_type']) ?></div>
+                <div>Plantilla: <?= $escape($contract['template_name'] ?? '') ?> · v<?= $escape($contract['template_version_number'] ?? '') ?></div>
+                <div>Canon: <?= $escape($contract['monthly_rent']) ?></div>
+                <div>Administración: <?= $contract['administration_fee'] === null ? 'No aplica' : $escape($contract['administration_fee']) ?></div>
+                <div>Inicio: <?= $escape($contract['start_date']) ?></div>
+                <div>Fin: <?= $escape($contract['end_date']) ?></div>
+                <div>Duración: <?= $escape($contract['duration_text']) ?></div>
+            </article>
+        </div>
+    </section>
+<?php else: ?>
+    <section class="surface">
+        <p class="eyebrow">Administración</p>
+        <h1>Cartera del arrendamiento #<?= $escape($lease['id']) ?></h1>
+        <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/finance">Volver a cartera</a>
+    </section>
+<?php endif; ?>
 
 <?php if ($isFinalized): ?>
     <section class="surface">
-        <h2>Arrendamiento</h2>
+        <h2><?= $canViewContract ? 'Arrendamiento' : 'Cartera del arrendamiento' ?></h2>
         <?php if ($lease === null): ?>
-            <p class="hint">El contrato está finalizado y todavía no tiene arrendamiento activo.</p>
-            <?php if ($canManage): ?>
-                <form method="post" action="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($contract['id']) ?>/lease">
-                    <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
-                    <button class="button" type="submit">Activar arrendamiento</button>
-                </form>
-            <?php endif; ?>
-        <?php else: ?>
-            <div>Inquilino: <?= $escape($lease['tenant_name']) ?></div>
-            <div>Correo: <?= $escape($lease['tenant_email']) ?></div>
-            <div>Activado: <?= $escape($lease['activated_at']) ?></div>
-            <?php if ($lease['is_active']): ?>
-                <p class="hint">Arrendamiento activo.</p>
+            <?php if ($canViewContract): ?>
+                <p class="hint">El contrato está finalizado y todavía no tiene arrendamiento activo.</p>
                 <?php if ($canManage): ?>
-                    <form method="post" action="<?= $escape($basePath) ?>/admin/leases/<?= $escape($lease['id']) ?>/end">
+                    <form method="post" action="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($contract['id']) ?>/lease">
                         <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
-                        <button class="button" type="submit">Finalizar arrendamiento</button>
+                        <button class="button" type="submit">Activar arrendamiento</button>
                     </form>
                 <?php endif; ?>
-            <?php else: ?>
-                <p class="hint">Arrendamiento finalizado</p>
+            <?php endif; ?>
+        <?php else: ?>
+            <?php if ($canViewContract): ?>
+                <div>Inquilino: <?= $escape($lease['tenant_name']) ?></div>
+                <div>Correo: <?= $escape($lease['tenant_email']) ?></div>
+                <div>Activado: <?= $escape($lease['activated_at']) ?></div>
+                <?php if ($lease['is_active']): ?>
+                    <p class="hint">Arrendamiento activo.</p>
+                    <?php if ($canManage): ?>
+                        <form method="post" action="<?= $escape($basePath) ?>/admin/leases/<?= $escape($lease['id']) ?>/end">
+                            <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                            <button class="button" type="submit">Finalizar arrendamiento</button>
+                        </form>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <p class="hint">Arrendamiento finalizado</p>
+                <?php endif; ?>
             <?php endif; ?>
 
             <?php if ($canViewFinance): ?>
@@ -172,7 +185,7 @@ $currentPeriodMonth = (string) ($currentPeriodMonth ?? '');
     </section>
 <?php endif; ?>
 
-<?php if ($previewHtml !== null): ?>
+<?php if ($canViewContract && $previewHtml !== null): ?>
     <section class="surface">
         <h2>Vista previa</h2>
         <p class="hint">Esta vista previa no genera PDF ni congela el contrato.</p>

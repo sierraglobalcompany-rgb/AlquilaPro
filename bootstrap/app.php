@@ -182,6 +182,7 @@ return static function (array $settings): App {
                 'view' => $view,
                 'current_user' => $currentUser,
                 'finance' => $finance,
+                'today' => $settings['today'] ?? null,
             ];
 
             $authRoutes = require dirname(__DIR__) . '/app/Auth/routes.php';
