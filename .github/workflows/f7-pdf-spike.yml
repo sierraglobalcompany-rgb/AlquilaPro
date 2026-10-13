@@ -1,0 +1,42 @@
+name: F7 PDF Spike
+
+on:
+  push:
+    branches:
+      - 'spike/f7-dompdf-20261012'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    name: Dompdf PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4', '8.5']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, mbstring, gd, fileinfo
+          coverage: none
+
+      - name: Install project dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Install Dompdf only for spike
+        run: composer require dompdf/dompdf:^3.1.6 --no-interaction --prefer-dist --no-progress --with-all-dependencies --no-scripts
+
+      - name: Verify platform requirements
+        run: composer check-platform-reqs
+
+      - name: Show Dompdf package contract
+        run: composer show dompdf/dompdf
+
+      - name: Run PDF probe
+        run: php tests/Spikes/F7PdfProbe.php
