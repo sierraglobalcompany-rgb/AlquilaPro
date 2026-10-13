@@ -12,20 +12,20 @@
 
 # 0. AUTORIDAD Y CONTEXTO
 
-Orden de autoridad vigente:
+Orden vigente:
 
 `SPEC maestra V1.2 → PLAN maestro V1.2 → README → esta SPEC F7 → futuro PLAN F7 → tests/CI → código real`.
 
 F0–F6 están cerradas; F6 está **CLOSED / VERIFIED / MERGED**.
 
-F7 parte de entidades ya existentes y no las duplica:
+F7 reutiliza, sin duplicar:
 
-- `users` + auth/sesión/CSRF/forced-password existentes;
+- `users` + auth/sesión/CSRF/forced-password;
 - `properties` y `units` como inventario único;
 - `candidates` como candidatura única;
-- `screening_processes` como único estudio de aseguradora.
+- `screening_processes` como estudio de aseguradora único.
 
-No se reabre F1–F6 salvo evidencia concreta de regresión.
+No reabrir F1–F6 salvo evidencia concreta de regresión.
 
 ---
 
@@ -33,48 +33,40 @@ No se reabre F1–F6 salvo evidencia concreta de regresión.
 
 Antes de esta SPEC se ejecutó un spike throwaway aprobado por el usuario.
 
-## 1.1 Evidencia
-
-- Rama throwaway: `spike/f7-dompdf-20261012`
-- HEAD final del spike: `352dd3abcec6d26644906ccc9247dc51d7545c18`
+- Rama: `spike/f7-dompdf-20261012`
+- HEAD final: `352dd3abcec6d26644906ccc9247dc51d7545c18`
 - Workflow: `F7 PDF Spike`
 - Run final: `38339899173`
-- Dompdf probado: `v3.1.6`
-- PHP 8.3: PASS
-- PHP 8.4: PASS
-- PHP 8.5: PASS
+- Dompdf: `v3.1.6`
+- PHP 8.3 / 8.4 / 8.5: PASS
 - `composer check-platform-reqs`: PASS en las tres versiones
-- PDF generado: 2 páginas, UTF-8 español, CSS, tabla, PNG local, salto de página, header/footer y numeración
-- salida observada: `22583` bytes
+- PDF: 2 páginas, UTF-8 español, CSS, tabla, PNG local, salto, header/footer y numeración
+- salida: `22583` bytes
 - revisión visual: PASS
-- `ext-dom`: requerida por Dompdf
-- `ext-mbstring`: requerida por Dompdf y ya requerida por Alquila Pro
-- `ext-gd`: adoptada como requisito F7 para procesamiento de imágenes
+- `ext-dom`: requerida
+- `ext-mbstring`: requerida y ya presente en Alquila Pro
+- `ext-gd`: adoptada como requisito F7 para imágenes
 - binarios externos: ninguno
-- licencia observada del paquete: `LGPL-2.1-only`
-- la rama del spike NO se integra a `main`.
+- licencia observada: `LGPL-2.1-only`
+- rama spike: NO MERGE a `main`.
 
-## 1.2 Decisión congelada
-
-F7 usará:
+Decisión congelada:
 
 `dompdf/dompdf:^3.1.6`
 
-No se usarán wkhtmltopdf, Chromium, Chrome headless, Node, Puppeteer ni ejecutables externos.
-
-Dompdf operará con recursos remotos desactivados.
+No wkhtmltopdf, Chromium, Chrome headless, Node, Puppeteer ni otro ejecutable externo. Dompdf opera con recursos remotos desactivados.
 
 ---
 
 # 2. OBJETIVO
 
-Construir el motor administrativo mínimo para convertir un candidato con estudio aprobado en un contrato versionado, previsualizable, congelable y descargable en PDF, preservando el contexto real de candidato/unidad y sin crear todavía inquilino, lease ni portal contractual público.
+Construir el motor administrativo mínimo para convertir un candidato con estudio aprobado en un contrato versionado, previsualizable, congelable y descargable en PDF, preservando candidato/unidad reales y sin crear todavía inquilino, lease ni portal contractual público.
 
-F7 debe resolver:
+Flujo F7:
 
-`candidato + screening aprobado → borrador contractual → preview → snapshot → PDF + hash → finalización administrativa`.
+`candidato + screening approved → draft → preview → immutable snapshot → PDF + SHA-256 → finalized`.
 
-F7 **NO activa el arrendamiento**. La creación de tenant/lease y la ocupación operacional pertenecen a F8.
+F7 **NO activa el arrendamiento**. Tenant, lease y ocupación operacional pertenecen a F8.
 
 ---
 
@@ -82,17 +74,15 @@ F7 **NO activa el arrendamiento**. La creación de tenant/lease y la ocupación 
 
 ## LEY 1 — KISS
 
-Máximo estructural F7 aprobado:
+Máximo estructural F7:
 
 - **3 tablas nuevas**;
 - **2 clases de dominio nuevas**;
 - **2 permisos nuevos**;
 - **1 route file nuevo**;
 - **1 dependencia runtime directa nueva**: Dompdf;
-- **0 auth nuevos**;
-- **0 login nuevos**;
-- **0 repositories**;
-- **0 interfaces/adapters/factories/DTOs**;
+- **0 auth/login nuevos**;
+- **0 repositories/interfaces/adapters/factories/DTOs**;
 - **0 editor WYSIWYG / Word web**;
 - **0 SPA**;
 - **0 workers/queues/cron**;
@@ -106,75 +96,71 @@ Orden:
 
 `ELIMINAR → UNIR/CONVERGER → SIMPLIFICAR → MEJORAR → AGREGAR`.
 
-F7 debe reutilizar:
+Reutilizar:
 
 - `CandidateService`;
 - `ScreeningService`;
 - `PropertyService`;
-- auth/session/forced-password existentes;
-- CSRF existente;
-- `basePath` existente;
+- auth/session/forced-password;
+- CSRF;
+- `basePath`;
 - shell visual F3;
-- storage privado existente;
-- patrón SSR existente.
+- storage privado;
+- SSR existente.
 
 No crear fuentes paralelas para candidato, unidad, precio comercial, aseguradora, usuario o sesión.
 
 ---
 
-# 4. ALCANCE FUNCIONAL
+# 4. ALCANCE
 
 ## 4.1 Incluye
 
-- plantillas contractuales;
-- versiones inmutables de plantilla;
-- cuerpo de plantilla en texto UTF-8, no HTML arbitrario;
+- plantillas;
+- versiones inmutables;
+- plantilla en texto UTF-8, nunca HTML arbitrario;
 - placeholders simples y allowlisted;
-- cláusulas contenidas dentro del texto versionado;
+- cláusulas dentro del texto versionado;
 - variables automáticas + manuales declaradas;
-- borrador contractual;
-- condiciones económicas finales del contrato;
-- fecha de inicio y duración;
+- draft contractual;
+- canon/administración finales;
+- fecha inicio, fecha fin y duración textual explícita;
 - preview SSR;
 - snapshot HTML interno;
 - PDF privado;
-- SHA-256 del PDF;
+- SHA-256 y tamaño;
 - estados `draft | generated | finalized`;
-- checklist/tareas simples en JSON;
-- anexos descriptivos simples en JSON;
+- checklist/tareas JSON simples;
+- anexos descriptivos JSON simples;
 - permisos administrativos propios;
-- acceso privado al PDF;
+- descarga privada PDF;
 - enlace contextual desde candidato aprobado;
-- trazabilidad de creador/generación/finalización.
+- trazabilidad de creación/generación/finalización.
 
 ## 4.2 No incluye
 
-- tenant;
-- lease;
-- ocupación automática de unidad;
-- cambio automático de `units.status`;
+- tenant/lease;
+- ocupación o cambio automático de `units.status`;
 - cambio automático de `candidates.status`;
-- portal contractual del candidato/inquilino;
+- portal contractual candidato/inquilino;
 - firma electrónica/digital;
-- integración notarial;
-- upload de anexos arbitrarios;
+- notaría integrada;
+- uploads arbitrarios de anexos;
 - merge de PDFs externos;
 - OCR;
 - Word/DOCX;
-- editor rich-text/WYSIWYG;
-- HTML ingresado por usuarios;
-- JavaScript obligatorio;
+- rich-text/WYSIWYG;
+- HTML/CSS/JS ingresado por usuarios;
 - email/WhatsApp;
 - recordatorios/cron;
-- generación automática de conclusiones jurídicas;
-- asesoría jurídica automática;
+- conclusiones o asesoría jurídica automáticas;
 - plantillas obtenidas dinámicamente de internet.
 
 ---
 
-# 5. REFINAMIENTO KISS DE TIPOS DOCUMENTALES
+# 5. REFINAMIENTO KISS DE TIPOS
 
-La SPEC maestra enumera como familia documental futura:
+La SPEC maestra conserva en roadmap:
 
 - vivienda urbana;
 - parqueadero independiente;
@@ -185,14 +171,12 @@ La SPEC maestra enumera como familia documental futura:
 - aviso de reajuste;
 - aviso de terminación.
 
-F7 V1 **operará únicamente los dos contratos iniciales que pueden resolverse correctamente con el contexto existente F4–F6**:
+F7 V1 opera solo los dos tipos que tienen contexto completo con F4–F6:
 
 - `urban_housing` — vivienda urbana;
 - `independent_parking` — parqueadero independiente.
 
-Los demás tipos permanecen en el roadmap, pero **no se crean botones, filas precargadas, rutas muertas ni lógica futura** en F7. Se activarán mediante SPEC posterior cuando exista el contexto de lease/documentos correspondiente.
-
-Este refinamiento evita construir funcionalidad sin ciclo de vida real y mantiene Ley 1 + Ley 2.
+Los demás permanecen en roadmap, pero F7 no crea botones, seeds, rutas ni lógica muerta para ellos. Una SPEC posterior los habilitará cuando exista contexto de lease/documentos.
 
 ---
 
@@ -201,8 +185,6 @@ Este refinamiento evita construir funcionalidad sin ciclo de vida real y mantien
 Migration prevista: `007_create_contract_engine.sql`.
 
 ## 6.1 `contract_templates`
-
-Campos congelados:
 
 - `id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT`
 - `name VARCHAR(190) NOT NULL`
@@ -215,7 +197,7 @@ Campos congelados:
 - UNIQUE `name`
 - FK `created_by_user_id → users.id ON DELETE SET NULL`
 
-`document_type` permitido en F7:
+Tipos F7 exactos:
 
 - `urban_housing`
 - `independent_parking`
@@ -223,8 +205,6 @@ Campos congelados:
 No tabla de tipos.
 
 ## 6.2 `contract_template_versions`
-
-Campos congelados:
 
 - `id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT`
 - `template_id BIGINT UNSIGNED NOT NULL`
@@ -238,13 +218,9 @@ Campos congelados:
 - FK `template_id → contract_templates.id`
 - FK `created_by_user_id → users.id ON DELETE SET NULL`
 
-No `updated_at`: una versión creada es inmutable.
-
-No DELETE de versiones desde UI.
+No `updated_at`: una versión es inmutable. No DELETE de versiones desde UI.
 
 ## 6.3 `contracts`
-
-Campos congelados:
 
 - `id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT`
 - `candidate_id BIGINT UNSIGNED NOT NULL`
@@ -255,7 +231,8 @@ Campos congelados:
 - `monthly_rent DECIMAL(12,2) NOT NULL`
 - `administration_fee DECIMAL(12,2) NULL`
 - `start_date DATE NOT NULL`
-- `duration_months SMALLINT UNSIGNED NOT NULL`
+- `end_date DATE NOT NULL`
+- `duration_text VARCHAR(120) NOT NULL`
 - `manual_variables_json TEXT NULL`
 - `tasks_json TEXT NULL`
 - `annexes_json TEXT NULL`
@@ -281,90 +258,71 @@ Campos congelados:
 - FK `created_by_user_id → users.id ON DELETE SET NULL`
 - FK `finalized_by_user_id → users.id ON DELETE SET NULL`
 
-No `ON DELETE CASCADE` sobre candidato, unidad, template version o contrato: un contrato/documento no debe desaparecer por cascada.
+No `ON DELETE CASCADE` sobre candidato, unidad o template version: evidencia contractual no desaparece por cascada.
 
-## 6.4 JSON sin nueva abstracción de BD
+## 6.4 JSON
 
-Se usa `TEXT/LONGTEXT` con JSON canónico validado por PHP, siguiendo el patrón simple ya existente de `permissions_json`.
-
-No se agrega dependencia de funciones JSON del motor SQL.
+Usar `TEXT/LONGTEXT` con JSON canónico validado en PHP, siguiendo el patrón simple de `permissions_json`. No depender de funciones JSON SQL.
 
 ---
 
 # 7. FUENTES DE VERDAD
 
-## 7.1 Candidato
+## Candidato
 
-`candidates` sigue siendo la fuente del candidato.
+`candidates` sigue siendo la fuente. F7 no copia una persona contractual paralela.
 
-F7 no copia una “persona contractual” a otra tabla.
+## Unidad
 
-## 7.2 Unidad
+`units` sigue siendo inventario único. `contracts.unit_id` se deriva del `candidate.unit_id` al crear draft; no se confía en un unit ID enviado por formulario.
 
-`units` sigue siendo la fuente de unidad/inventario.
+## Estudio
 
-El `unit_id` del contrato debe ser exactamente el `unit_id` vigente del candidato al crear el borrador. No se acepta un `unit_id` arbitrario enviado por formulario.
+`screening_processes` sigue siendo única fuente de aseguradora. No agregar `insurance_approved` ni screening status en contracts.
 
-## 7.3 Estudio
+## Precio
 
-`screening_processes` sigue siendo la única fuente del resultado de aseguradora.
+`units.monthly_price` = precio comercial.  
+`contracts.monthly_rent` = canon contractual final snapshot.
 
-F7 no agrega `screening_status`, `insurance_approved` ni equivalentes a `contracts`.
+No sincronizar automáticamente uno con otro.
 
-## 7.4 Precio
+## Estados externos
 
-`units.monthly_price` continúa siendo precio comercial/publicado.
-
-`contracts.monthly_rent` es el **valor contractual final acordado** y constituye snapshot económico propio del contrato.
-
-No debe sincronizarse automáticamente hacia atrás con `units.monthly_price`.
-
-## 7.5 Estado de candidato y unidad
-
-F7 **no duplica el estado contractual dentro de `candidates.status`**.
-
-F7 **no cambia `units.status` automáticamente**.
-
-F8 decidirá, con SPEC propia, cuándo un contrato finalizado crea lease, tenant y ocupación.
+F7 no duplica contrato en `candidates.status` y no cambia `units.status`. F8 decide cuándo finalized genera lease/tenant/ocupación.
 
 ---
 
-# 8. ELEGIBILIDAD PARA CREAR BORRADOR
+# 8. ELEGIBILIDAD PARA CREAR DRAFT
 
-Se puede crear un contrato inicial solo si todas son verdaderas:
+Todas deben ser verdaderas:
 
 1. candidato existe;
 2. `candidate.status = pending_screening`;
-3. existe exactamente un `screening_processes` para ese candidato;
-4. `screening_processes.status = approved`;
-5. la unidad del candidato existe;
-6. la unidad es del tipo compatible con la plantilla:
+3. existe screening para ese candidato;
+4. `screening.status = approved`;
+5. unidad del candidato existe;
+6. compatibilidad:
    - `apartment → urban_housing`;
    - `parking → independent_parking`;
-7. `units.status` es `available` o `in_process`;
-8. la propiedad existe y está activa;
-9. la plantilla/version está activa/usable al crear el borrador.
+7. `units.status ∈ {available, in_process}`;
+8. propiedad existe y `is_active = 1`;
+9. template activo y version perteneciente a ese template.
 
-No se permite contrato sobre screening `pending`, `in_progress` o `rejected`.
+Screening `pending|in_progress|rejected` bloquea. Candidate `withdrawn` bloquea crear/generar/finalizar.
 
-Un `candidate.status = withdrawn` no puede crear, generar ni finalizar contratos nuevos.
+## Duplicados
 
-## 8.1 Duplicados
+- máximo un `draft` activo por candidato;
+- `generated` históricos pueden conservarse para no sobrescribir evidencia;
+- máximo un `finalized` por candidato F7;
+- finalized impide nuevos contratos iniciales F7.
 
-F7 permite conservar borradores/PDFs históricos porque un documento generado es evidencia y no debe sobrescribirse.
-
-Regla de servicio:
-
-- máximo **un `draft` activo** por candidato en F7;
-- puede existir más de un `generated` histórico si un documento tuvo que corregirse mediante un nuevo borrador;
-- máximo **un `finalized`** por candidato en F7;
-- una vez existe un `finalized`, no se crean más contratos iniciales F7 para ese candidato.
-
-La finalización debe usar transacción y bloqueo de candidato (`SELECT ... FOR UPDATE` o equivalente simple) para evitar doble finalización concurrente.
+Finalización usa transacción y bloqueo de candidato (`SELECT ... FOR UPDATE` o equivalente simple) para evitar doble finalized concurrente.
 
 ---
 
-# 9. CICLO DE VIDA DEL CONTRATO
+# 9. CICLO DE VIDA
 
 Estados exactos:
 
@@ -375,56 +333,43 @@ Estados exactos:
 Transiciones:
 
 - creación → `draft`
-- `draft → draft` mediante guardado
+- `draft → draft`
 - `draft → generated`
 - `generated → finalized`
 - `finalized` terminal
 
-No:
+Nunca `generated → draft`, `finalized → generated` ni `finalized → draft`.
 
-- `generated → draft`;
-- `finalized → generated`;
-- `finalized → draft`;
-- edición de contenido después de `generated`.
-
-## 9.1 Semántica
-
-### `draft`
+## `draft`
 
 Editable:
 
-- template version;
-- canon final;
+- template version, siempre del mismo tipo documental;
+- canon;
 - administración;
-- fecha inicio;
-- duración;
+- start/end date;
+- duración textual;
 - variables manuales;
 - tareas;
 - anexos descriptivos.
 
-### `generated`
+## `generated`
 
-Congela de forma inmutable:
+Congela:
 
-- `document_type`;
-- `candidate_id`;
-- `unit_id`;
-- `template_version_id`;
+- document type;
+- candidate/unit/template version;
 - condiciones económicas;
-- fechas/duración;
+- start/end/duration;
 - variables resueltas;
-- anexos incluidos;
-- `snapshot_html`;
-- PDF;
-- SHA-256;
-- tamaño;
-- `generated_at`.
+- anexos;
+- snapshot HTML;
+- PDF/hash/tamaño;
+- generated_at.
 
-Solo el checklist `tasks_json` puede seguir actualizándose para completar pasos administrativos previos a finalización. Ese checklist no altera el snapshot ni el PDF.
+Solo `tasks_json` puede seguir actualizándose como checklist administrativo; nunca altera snapshot/PDF.
 
-### `finalized`
-
-Marca decisión administrativa final del documento.
+## `finalized`
 
 Solo agrega:
 
@@ -432,71 +377,55 @@ Solo agrega:
 - `finalized_at`;
 - `status = finalized`.
 
-No firma electrónicamente el archivo y no debe presentarse como firma digital.
+No implica firma digital/electrónica.
 
 ---
 
 # 10. PLANTILLAS Y VERSIONES
 
-## 10.1 Plantilla
+## Plantilla
 
-Una plantilla contiene identidad estable:
+Identidad estable: nombre, tipo, activo/inactivo.
 
-- nombre;
-- tipo documental;
-- activo/inactivo.
+Desactivar template **solo impide nuevos drafts**. Drafts ya existentes y documentos generated/finalized conservan y pueden usar su versión pinneada; la historia no se invalida retroactivamente.
 
-La edición de contenido nunca modifica una versión existente.
+## Nueva versión
 
-## 10.2 Nueva versión
+Modificar texto significa crear `version_number + 1`. Número server-side dentro de transacción. No editar ni borrar versiones existentes.
 
-Toda modificación de texto crea `version_number + 1`.
+## Cuerpo seguro
 
-No se permite elegir manualmente el número de versión.
+`body_template` = texto UTF-8 plano, no HTML.
 
-El servicio obtiene el último número dentro de transacción y crea el siguiente.
-
-## 10.3 Cuerpo seguro
-
-`body_template` es **texto UTF-8 plano**, no HTML.
-
-Ejemplo de placeholder permitido:
+Placeholder ejemplo:
 
 `{{candidate.full_name}}`
 
-El usuario administrativo no puede insertar:
+No permitir HTML, CSS, PHP, JavaScript, URL remota embebida ni expresiones ejecutables. Se escapa texto primero y luego código interno genera el HTML.
 
-- `<script>`;
-- HTML arbitrario;
-- CSS arbitrario;
-- PHP;
-- JavaScript;
-- URL remota embebida;
-- expresiones ejecutables.
+Las cláusulas viven en el texto versionado; no tabla `clauses`.
 
-Saltos de línea se convierten a HTML únicamente después de escapar contenido.
+## Contenido jurídico
 
-Cláusulas son secciones textuales dentro de `body_template`; no se crea tabla `clauses`.
+F7 no inventa ni precarga automáticamente cláusulas jurídicas como si fueran asesoría validada. El contenido contractual lo crea/revisa el administrador responsable. El sistema conserva versión, preview y snapshot, pero no decide suficiencia jurídica.
 
 ---
 
 # 11. VARIABLES
 
-## 11.1 Sintaxis
+## Sintaxis
 
-Sintaxis única:
+Única:
 
 `{{namespace.key}}`
 
-Regex conceptual:
+Patrón conceptual:
 
 `{{[a-z0-9_.]+}}`
 
-No funciones, filtros, loops, condicionales ni expresiones.
+Sin funciones, filtros, loops ni condicionales.
 
-## 11.2 Variables automáticas allowlisted F7
-
-Mínimo previsto:
+## Automáticas allowlisted
 
 ### Candidato
 
@@ -525,182 +454,147 @@ Mínimo previsto:
 - `contract.monthly_rent`
 - `contract.administration_fee`
 - `contract.start_date`
-- `contract.duration_months`
 - `contract.end_date`
+- `contract.duration`
 
-El servidor calcula `contract.end_date` desde `start_date + duration_months` con regla contractual de fin el día anterior al mismo día calendario del periodo siguiente.
+**No calcular automáticamente una fecha final jurídica desde “N meses”.** `start_date`, `end_date` y `duration_text` son datos explícitos confirmados por el administrador; se valida `end_date >= start_date`.
 
-## 11.3 Variables manuales
+## Manuales
 
-Una versión puede declarar variables manuales mediante `variables_json`.
-
-Formato lógico mínimo por entrada:
+Una versión declara manuales en `variables_json`:
 
 ```json
-{
-  "key": "custom.example",
-  "label": "Texto visible",
-  "required": true
-}
+{"key":"custom.example","label":"Texto visible","required":true}
 ```
 
 Reglas:
 
-- namespace manual obligatorio: `custom.`;
-- clave única dentro de la versión;
+- namespace `custom.` obligatorio;
+- clave única;
 - label obligatorio;
-- `required` boolean;
-- no HTML;
-- no secretos;
-- valor máximo por variable: 4000 caracteres;
-- máximo 50 variables manuales por versión.
-
-`variables_json` debe coincidir con placeholders `custom.*` presentes en `body_template`.
+- required boolean;
+- texto plano;
+- máximo 4000 caracteres por valor;
+- máximo 50 variables por versión;
+- cada `custom.*` del body debe estar declarado;
+- declaración no usada se rechaza como ruido.
 
 Placeholder desconocido = versión rechazada.
 
-## 11.4 Resolución
+## Resolución en generate
 
-Al generar:
-
-1. recargar candidato/unidad/propiedad/screening desde DB;
+1. recargar candidate/unit/property/screening;
 2. revalidar elegibilidad;
-3. obtener versión exacta;
+3. cargar versión exacta;
 4. resolver allowlist automática;
-5. validar manuales requeridas;
-6. escapar todos los valores;
-7. producir snapshot HTML interno;
-8. guardar `resolved_variables_json`.
+5. validar manuales;
+6. escapar valores;
+7. producir HTML interno;
+8. persistir `resolved_variables_json`.
 
-Nunca usar reflexión, `eval`, acceso dinámico SQL o nombres de columnas suministrados por plantilla.
+Nunca reflexión, `eval`, SQL dinámico ni columnas indicadas por template.
 
 ---
 
-# 12. CONDICIONES ECONÓMICAS Y FECHAS
+# 12. ECONOMÍA Y FECHAS
 
-## 12.1 Canon
-
-`monthly_rent`:
+## `monthly_rent`
 
 - requerido;
 - `> 0`;
-- máximo `9999999999.99` según `DECIMAL(12,2)`;
+- máximo compatible con `DECIMAL(12,2)`;
 - dos decimales normalizados.
 
-Al crear borrador, UI puede precargar desde `units.monthly_price`, pero el usuario con permiso manage confirma/edita el valor contractual.
+UI puede precargar `units.monthly_price`, pero el usuario manage confirma el canon contractual.
 
-## 12.2 Administración
-
-`administration_fee`:
+## `administration_fee`
 
 - opcional;
 - `>= 0`;
-- si no se suministra puede precargarse desde `units.administration_fee`;
-- queda congelada en generación.
+- puede precargarse desde `units.administration_fee`;
+- se congela en generate.
 
-## 12.3 Inicio y duración
+## Fechas/duración
 
-- `start_date`: requerido, fecha válida;
-- `duration_months`: entero entre 1 y 120;
-- `end_date`: derivada, no campo editable de DB.
+- `start_date`: fecha válida requerida;
+- `end_date`: fecha válida requerida, `>= start_date`;
+- `duration_text`: trim 1–120, requerido.
 
-No calcular reajustes futuros en F7.
+El software no reemplaza fechas confirmadas con inferencias calendáricas. No calcula reajustes futuros en F7.
 
 ---
 
 # 13. TAREAS Y ANEXOS — SIN TABLAS EXTRA
 
-## 13.1 `tasks_json`
+## `tasks_json`
 
-Checklist administrativo simple.
-
-Estructura lógica:
+Checklist simple:
 
 ```json
 [
-  {"label":"Revisar datos", "done":true},
-  {"label":"Firma física recibida", "done":false}
+  {"label":"Revisar datos","done":true},
+  {"label":"Firma física recibida","done":false}
 ]
 ```
 
-Reglas:
+- máximo 30;
+- label 1–190 texto plano;
+- done boolean;
+- sin responsable/fecha/comentario/prioridad/workflow propio.
 
-- máximo 30 tareas;
-- label texto plano, 1–190 caracteres;
-- `done` boolean;
-- no responsable, fecha, comentarios, prioridades ni workflow propio en F7.
+Si luego necesitan ciclo de vida independiente, una SPEC futura justificará tabla propia.
 
-Si luego requieren ciclo de vida independiente, una SPEC futura justificará tabla propia.
+## `annexes_json`
 
-## 13.2 `annexes_json`
-
-Metadatos descriptivos de anexos textuales del contrato.
-
-Estructura lógica:
+Metadatos descriptivos textuales:
 
 ```json
 [
-  {"title":"Anexo 1", "note":"Descripción"}
+  {"title":"Anexo 1","note":"Descripción"}
 ]
 ```
-
-Reglas:
 
 - máximo 20;
 - title 1–190;
-- note opcional, texto plano;
-- se incluyen como sección textual del snapshot/PDF;
-- no contienen rutas, IDs de archivos, URLs ni uploads.
+- note opcional texto plano;
+- se incluye como sección textual del snapshot/PDF;
+- sin rutas, IDs de archivos, URLs ni uploads.
 
-Los documentos privados/upload generales pertenecen a F18.
+Uploads/documentos privados generales pertenecen a F18.
 
 ---
 
-# 14. RENDERER PDF
+# 14. `ContractPdfRenderer`
 
-Única clase dedicada:
+Única clase PDF:
 
 `AlquilaPro\Contracts\ContractPdfRenderer`
 
 Responsabilidades:
 
-- recibir HTML interno ya construido/seguro;
+- recibir HTML interno seguro;
 - configurar Dompdf;
-- carta/portrait por defecto;
-- fuente Unicode segura (`DejaVu Sans`);
-- CSS interno fijo del sistema;
+- letter/portrait;
+- `DejaVu Sans`;
+- CSS interno fijo;
 - header/footer fijo;
-- numeración de páginas;
-- renderizar PDF;
-- devolver bytes.
+- numeración;
+- renderizar y devolver bytes.
 
-No responsabilidad de:
-
-- leer DB;
-- resolver permisos;
-- validar candidato;
-- descargar recursos remotos;
-- mutar contrato;
-- guardar archivos;
-- decidir estados.
-
-## 14.1 Seguridad Dompdf
+No lee DB, no resuelve permisos, no valida candidato, no descarga recursos, no guarda archivos ni decide estados.
 
 Config obligatoria:
 
 - `isRemoteEnabled = false`;
-- sin recursos HTTP/HTTPS;
-- sin HTML de usuario;
-- sin CSS de usuario;
-- sin rutas arbitrarias de usuario;
-- activos locales únicamente resueltos por servidor;
-- no binarios externos.
-
-El renderer no expone opciones Dompdf al request HTTP.
+- sin HTTP/HTTPS;
+- sin HTML/CSS del request;
+- sin rutas arbitrarias;
+- activos locales solo server-side;
+- sin binarios externos.
 
 ---
 
-# 15. SERVICIO DE DOMINIO
+# 15. `ContractService`
 
 Único servicio nuevo:
 
@@ -708,51 +602,48 @@ El renderer no expone opciones Dompdf al request HTTP.
 
 Responsabilidades:
 
-- listar/obtener templates;
-- crear template;
-- activar/desactivar template;
+- template list/get/create/toggle;
 - crear versión inmutable;
 - validar placeholders/variables;
-- listar/obtener contratos;
-- validar elegibilidad candidato/screening/unidad;
-- crear draft;
-- actualizar draft;
-- construir preview;
+- contract list/get;
+- elegibilidad candidate/screening/unit;
+- create/update draft;
+- preview;
 - resolver variables;
-- generar snapshot;
-- invocar `ContractPdfRenderer`;
-- persistir PDF privado + hash + tamaño;
-- actualizar checklist permitido;
-- finalizar con transacción;
-- servir metadatos necesarios a rutas/vistas.
+- snapshot;
+- invocar renderer;
+- persistir PDF/hash/tamaño;
+- update checklist permitido;
+- finalizar en transacción;
+- entregar datos a rutas/vistas.
 
-No crear `ContractRepository`, `TemplateService`, `VariableResolver`, `PdfService`, `ClauseService` ni capas equivalentes en F7.
+No crear `ContractRepository`, `TemplateService`, `VariableResolver`, `PdfService`, `ClauseService` ni equivalentes.
 
 ---
 
 # 16. SNAPSHOT E INMUTABILIDAD
 
-Al ejecutar `generate`:
+`generate`:
 
-1. validar estado `draft`;
-2. revalidar todas las fuentes;
-3. resolver variables;
-4. construir HTML interno;
-5. renderizar PDF;
-6. validar salida `%PDF-`;
-7. calcular SHA-256 sobre bytes exactos;
-8. escribir archivo privado con nombre aleatorio;
-9. guardar snapshot/hash/tamaño/fecha;
-10. transición atómica a `generated`.
+1. requiere `draft`;
+2. revalida fuentes;
+3. resuelve variables;
+4. crea HTML interno;
+5. renderiza PDF;
+6. valida `%PDF-`;
+7. SHA-256 sobre bytes exactos;
+8. escribe archivo privado aleatorio;
+9. guarda snapshot/hash/tamaño/generated_at;
+10. cambia atómicamente a `generated`.
 
-Si cualquiera falla:
+Ante fallo:
 
-- contrato permanece `draft`;
-- no se guarda estado parcial;
-- archivo parcial se elimina;
-- no se guarda hash falso.
+- sigue `draft`;
+- no estado parcial;
+- archivo parcial eliminado;
+- no hash falso.
 
-Después de `generated`, contenido/snapshot/PDF/hash no cambian.
+Después de generated, contenido/snapshot/PDF/hash son inmutables.
 
 ---
 
@@ -765,66 +656,44 @@ Directorio lógico:
 Reglas:
 
 - fuera del webroot;
-- nombre aleatorio server-side, por ejemplo 32 hex + `.pdf`;
-- DB guarda `pdf_stored_name`, no ruta pública;
-- no usar nombre del candidato en filename físico;
-- no aceptar path del request;
-- escritura atómica temp → rename cuando sea posible;
-- máximo de PDF generado F7: 10 MiB;
-- PDF se entrega únicamente por ruta autenticada/controlada.
-
-No symlinks públicos.
+- nombre random server-side, p. ej. 32 hex + `.pdf`;
+- DB guarda solo `pdf_stored_name`;
+- nombre físico sin datos del candidato;
+- jamás path desde request;
+- escritura temp → rename cuando sea posible;
+- PDF máximo 10 MiB;
+- entrega solo por ruta autorizada;
+- no symlink público.
 
 ---
 
 # 18. PERMISOS
 
-Exactamente 2 permisos nuevos:
+Exactamente:
 
 - `contracts.view`
 - `contracts.manage`
 
-Semántica:
+`contracts.view`: list/detail/templates/preview/pdf.  
+`contracts.manage`: templates/versions/draft/generate/tasks/finalize.
 
-### `contracts.view`
-
-- listar contratos;
-- ver contrato;
-- ver templates/versiones;
-- preview ya guardado;
-- descargar PDF privado.
-
-### `contracts.manage`
-
-- crear template;
-- activar/desactivar template;
-- crear nueva versión;
-- crear/editar draft;
-- generar;
-- modificar checklist permitido;
-- finalizar.
-
-Owner conserva bypass existente.
-
-No crear permisos por estado, por tipo documental o por acción individual.
+Owner conserva bypass. No permisos por estado/tipo/acción.
 
 ---
 
-# 19. RUTAS Y UI ADMINISTRATIVA
+# 19. RUTAS Y UI
 
-Nuevo módulo lógico:
+Nuevo módulo:
 
 `app/Contracts/`
 
-Nuevo route file único:
+Un solo nuevo route file:
 
 `app/Contracts/routes.php`
 
-No routes públicas F7.
+No rutas públicas F7.
 
-## 19.1 Rutas mínimas previstas
-
-### Contratos
+## Contratos
 
 - `GET /admin/contracts`
 - `POST /admin/contracts`
@@ -832,381 +701,275 @@ No routes públicas F7.
 - `POST /admin/contracts/{id}`
 - `GET /admin/contracts/{id}/pdf`
 
-`POST /admin/contracts/{id}` usa un `action` allowlisted:
+`POST /admin/contracts/{id}` action allowlist:
 
 - `save`
 - `generate`
 - `update_tasks`
 - `finalize`
 
-No crear una ruta POST diferente para cada acción mientras un único endpoint sea claro.
-
-### Plantillas
+## Templates
 
 - `GET /admin/contract-templates`
 - `POST /admin/contract-templates`
 - `GET /admin/contract-templates/{id}`
 - `POST /admin/contract-templates/{id}`
 
-Las mutaciones de template usan `action` allowlisted cuando corresponda.
+No endpoint POST por cada microacción si un action allowlisted es claro.
 
-## 19.2 Candidate detail
+## Candidate detail
 
-`GET /admin/candidates/{id}` puede mostrar sección contextual Contrato únicamente si el usuario puede ver contratos.
+`GET /admin/candidates/{id}` puede mostrar sección Contrato si usuario posee `contracts.view`/owner. Con screening approved y sin finalized, CTA real hacia creación/existente. No lógica contractual dentro de Candidates.
 
-Si screening está aprobado y no existe finalized:
+## UX
 
-- mostrar enlace/CTA real hacia creación/contrato existente;
-- no botón muerto.
-
-No mover lógica contractual al route file de Candidates.
-
-## 19.3 SSR
-
-- HTML server-side;
-- JS no obligatorio;
-- forms tradicionales;
-- reuse shell/layout/componentes CSS existentes;
-- sin modal/wizard complejo;
-- preview en la misma vista de detalle contractual.
+SSR, forms normales, JS no obligatorio, shell/CSS existente, sin modal/wizard complejo. Preview en detalle contractual.
 
 ---
 
 # 20. PREVIEW
 
-Preview no crea PDF ni cambia estado.
+En `draft`:
 
-En `draft`, la vista muestra HTML generado internamente con los datos guardados actuales.
-
-Reglas:
-
-- misma función de resolución usada por `generate`;
-- datos escapados;
-- sin raw template HTML;
-- watermark/texto visible `BORRADOR`;
-- preview no es evidencia final;
-- preview no tiene hash contractual.
-
-No endpoint público de preview.
+- no crea PDF;
+- no cambia estado;
+- usa la misma resolución base de `generate`;
+- escapa datos;
+- HTML solo interno;
+- muestra `BORRADOR` visible;
+- no tiene hash;
+- no endpoint público.
 
 ---
 
-# 21. DESCARGA PDF
+# 21. PDF DOWNLOAD
 
 `GET /admin/contracts/{id}/pdf`:
 
-- requiere auth;
-- forced password guard existente;
-- requiere `contracts.view` o owner bypass;
-- solo `generated|finalized`;
-- busca contrato por ID interno después de autorización;
-- usa filename físico server-side;
-- Content-Type `application/pdf`;
-- Content-Disposition attachment con nombre humano seguro generado por servidor;
-- no path traversal;
+- auth;
+- forced-password guard;
+- `contracts.view` o owner;
+- solo generated/finalized;
+- autorización antes de acceder al archivo;
+- filename físico server-side;
+- `Content-Type: application/pdf`;
+- attachment con nombre humano seguro server-side;
+- sin path traversal;
 - 404/403 fail closed;
-- no URL pública permanente.
+- sin URL pública permanente.
 
 ---
 
 # 22. SEGURIDAD
 
-## 22.1 Auth / CSRF / permisos
+## Auth / CSRF
 
-Reutilizar exactamente F2/F3:
+Reutilizar F2/F3: auth, SessionGuard, forced-password, CSRF, basePath y owner bypass. Sin auth contractual paralelo.
 
-- auth único;
-- SessionGuard;
-- forced-password;
-- CSRF;
-- basePath;
-- owner bypass.
+## XSS
 
-No auth contractual paralelo.
+Template/variables/tasks/annexes son texto plano. Todo valor se escapa. Snapshot HTML solo lo construye código interno.
 
-## 22.2 XSS
+## IDOR
 
-- template = texto plano;
-- valores = escape HTML;
-- manual vars = texto plano;
-- tareas/anexos = texto plano;
-- HTML del snapshot solo lo genera código interno.
+Sin rutas contractuales públicas. IDs solo admin autenticado con permiso. Candidate/unit/template IDs no son autoridad cuando pueden derivarse server-side.
 
-## 22.3 IDOR
+## PDF
 
-No existe ruta contractual pública.
+Remote off, no raw HTML, no file URLs de request, storage privado, hash post-render, cleanup parcial.
 
-IDs contractuales solo en admin autenticado con permiso.
+## Logs/errores
 
-No aceptar candidate/unit/template IDs ocultos como autoridad cuando pueden derivarse server-side.
-
-## 22.4 PDF
-
-- remote disabled;
-- no HTML arbitrario;
-- no file URLs suministradas por request;
-- storage privado;
-- hash después del render;
-- archivo parcial limpiado ante error.
-
-## 22.5 Logs/errores
-
-No loguear:
-
-- cuerpo completo contractual;
-- documento completo del candidato;
-- PDF bytes;
-- variables manuales sensibles;
-- filesystem path completo.
-
-Errores al usuario no exponen SQL, stack trace ni rutas internas.
+No loguear cuerpo contractual completo, documento completo del candidato, PDF bytes, variables manuales sensibles ni path filesystem completo. No SQL/stack trace/path en error visible.
 
 ---
 
 # 23. RUNTIME / COMPOSER / INSTALLER
 
-F7 añade una dependencia directa runtime:
+Dependencia directa nueva:
 
 `dompdf/dompdf:^3.1.6`
 
-Cambios obligatorios de runtime:
+Requisitos runtime F7:
 
-- agregar `ext-dom` como requisito;
-- conservar `ext-mbstring`;
-- agregar `ext-gd` como requisito F7;
-- conservar `fileinfo`;
-- PHP sigue `>=8.3 <8.6`.
+- `ext-dom` nuevo;
+- `ext-mbstring` existente;
+- `ext-gd` nuevo;
+- `fileinfo` existente;
+- PHP `>=8.3 <8.6`.
 
-`RuntimeRequirements` e installer deben fallar de forma clara si faltan `dom` o `gd`.
+`RuntimeRequirements` e installer fallan claramente si faltan dom/gd.
 
-CI debe solicitar explícitamente como mínimo:
+CI solicita explícitamente:
 
 `pdo, pdo_mysql, mbstring, dom, gd, fileinfo`.
 
-No agregar ext-imagick/gmagick/zip como requisitos F7 sin evidencia nueva.
-
-No agregar binarios.
+No imagick/gmagick/zip obligatorias sin evidencia. No binarios.
 
 ---
 
 # 24. LICENCIA / DISTRIBUCIÓN
 
-El spike observó Dompdf `v3.1.6` bajo `LGPL-2.1-only`.
+El spike observó Dompdf v3.1.6 bajo `LGPL-2.1-only`.
 
-F7:
+F7 usa Composer, no planea modificar Dompdf y preserva archivos/notices de vendor. F25 mantiene revisión de notices/licencias del paquete final.
 
-- consume la librería vía Composer;
-- no planea modificar su código fuente;
-- preserva archivos/licencias de vendor en el paquete final;
-- F25 debe conservar revisión de notices/licencias de dependencias.
-
-Esta sección es una decisión de distribución técnica, no una conclusión jurídica automatizada.
+Esto registra una decisión técnica de distribución; no automatiza una conclusión jurídica.
 
 ---
 
-# 25. VALIDACIONES DE TEMPLATE
+# 25. VALIDACIONES
+
+## Template/version
 
 - name trim 1–190;
-- document_type allowlist F7 exacta;
-- body_template requerido;
-- body_template máximo 250.000 caracteres;
-- UTF-8 válido;
-- placeholders con sintaxis válida;
-- placeholder automático solo allowlist;
-- placeholder manual `custom.*` declarado;
-- variable manual declarada debe aparecer en body o se rechaza como ruido;
-- máximo 50 manual variables;
-- template inactivo no crea nuevos drafts;
-- versiones nunca se editan/eliminan.
+- type allowlist exacta;
+- body requerido, UTF-8, máximo 250.000 caracteres;
+- placeholders válidos;
+- automáticos solo allowlist;
+- custom declarado;
+- declaración custom no usada = reject;
+- máximo 50 custom vars;
+- template inactivo bloquea **nuevo draft**, no historial/draft ya creado;
+- versiones nunca edit/delete.
 
----
+## Contract
 
-# 26. VALIDACIONES DE CONTRATO
-
-- candidate ID válido y elegible;
-- unit derivada del candidato;
-- screening aprobado;
-- tipo unidad ↔ tipo template compatible;
+- candidate elegible;
+- unit derivada del candidate;
+- screening approved;
+- unit/type compatible;
 - monthly_rent > 0;
-- administration_fee >= 0 si existe;
-- start_date válida;
-- duration_months 1–120;
-- manual vars requeridas completas;
-- tasks JSON válido y límites;
-- annexes JSON válido y límites;
-- template/version existentes;
+- administration_fee >= 0 o null;
+- start/end válidas y end >= start;
+- duration_text 1–120;
+- manual required completas;
+- tasks/annexes JSON válidos y límites;
+- template/version válidos;
 - estado/transición válidos;
-- generated/finalized no aceptan edición de contenido;
-- finalized único por candidato F7.
+- generated/finalized no edición de contenido;
+- finalized único por candidate F7.
 
 ---
 
-# 27. PRUEBAS OBLIGATORIAS
+# 26. PRUEBAS OBLIGATORIAS
 
-## 27.1 Schema
+## Schema
 
 - exactamente 3 tablas F7;
-- columnas/FKs/índices esperados;
-- template version UNIQUE;
-- no tabla clauses;
-- no tabla tasks;
-- no tabla annexes;
-- no lease/tenant;
-- no auth paralelo.
+- columnas/FKs/índices;
+- version UNIQUE;
+- no clauses/tasks/annex tables;
+- no lease/tenant/auth paralelo.
 
-## 27.2 Runtime/PDF
+## Runtime/PDF
 
-- Dompdf instalado en lock;
-- Composer strict PASS;
-- RuntimeRequirements exige dom/gd;
-- installer muestra fallo entendible si faltan;
+- Dompdf lock;
+- Composer strict;
+- runtime dom/gd;
+- installer fail claro;
 - PHP 8.3/8.4/8.5;
-- UTF-8;
-- CSS interno;
-- página múltiple;
-- header/footer;
-- numeración;
-- imagen local segura;
-- remote disabled;
-- output `%PDF-`;
-- SHA-256 exacto;
-- tamaño persistido;
+- UTF-8/CSS/header/footer/pages/image local;
+- remote off;
+- `%PDF-`;
+- SHA-256/tamaño exactos;
 - archivo privado.
 
-## 27.3 Templates
+## Templates
 
-- create template;
+- create;
 - duplicate name reject;
-- type inválido reject;
-- create v1;
-- create v2 incremental;
-- versión anterior inmutable;
-- placeholder inválido reject;
-- variable automática fuera allowlist reject;
-- custom no declarada reject;
-- variable declarada no usada reject;
-- template inactivo bloquea nuevo draft.
+- invalid type reject;
+- v1/v2 incremental;
+- old version immutable;
+- bad placeholder reject;
+- non-allowlisted auto reject;
+- undeclared custom reject;
+- unused custom reject;
+- inactive blocks new draft but not existing pinned draft.
 
-## 27.4 Elegibilidad
+## Elegibilidad
 
-- screening approved permite;
+- approved permite;
 - pending/in_progress/rejected bloquean;
-- candidate withdrawn bloquea;
-- unit incompatible bloquea;
-- unit maintenance/inactive/occupied bloquea;
+- withdrawn bloquea;
+- incompatible unit bloquea;
+- maintenance/inactive/occupied bloquean;
 - property inactive bloquea;
-- unit ID forjado ignorado/rechazado;
-- una draft activa por candidato.
+- forged unit ID reject/ignored;
+- una draft activa.
 
-## 27.5 Draft
+## Draft/preview
 
-- precarga económica desde unit solo como default;
-- valor contractual puede diferir;
-- no modifica units.monthly_price;
-- fechas/duración;
-- manual vars;
-- tasks;
-- annexes;
-- preview BORRADOR;
-- XSS escapado.
+- defaults económicos no son autoridad;
+- canon puede diferir sin tocar unit price;
+- start/end/duration explicit;
+- manual vars/tasks/annexes;
+- BORRADOR;
+- XSS escaped.
 
-## 27.6 Generate
+## Generate
 
 - draft→generated;
-- revalida fuentes;
-- resolved_variables snapshot;
-- HTML snapshot;
-- PDF privado;
-- hash correcto;
-- bytes/tamaño;
-- generated_at;
-- contenido queda inmutable;
-- fallo de render deja draft y limpia parcial;
-- segunda generación del mismo row bloqueada.
+- revalidación;
+- resolved vars + HTML snapshot;
+- private PDF/hash/size/generated_at;
+- immutable;
+- fallo deja draft y limpia parcial;
+- segunda generación mismo row bloqueada.
 
-## 27.7 Finalize
+## Finalize
 
 - generated→finalized;
 - draft→finalized bloqueado;
-- finalized terminal;
+- terminal;
 - actor/fecha;
-- doble finalized candidato bloqueado incluso bajo transacción;
-- no crea lease;
-- no crea tenant;
-- no cambia candidate.status;
-- no cambia unit.status.
+- doble finalized bloqueado bajo transacción;
+- no lease/tenant;
+- no candidate/unit status mutation.
 
-## 27.8 Permisos/rutas
+## Permisos/rutas
 
-- anonymous blocked;
-- forced-password blocked;
+- anonymous/forced-password;
 - view/manage split;
 - owner bypass;
-- CSRF mutaciones;
+- CSRF;
 - basePath/subfolder;
-- PDF download protegido;
+- protected PDF;
 - IDOR;
 - 404/403 fail closed.
 
-## 27.9 Regresión
+## Regresión
 
-Toda suite F1–F6 debe seguir GREEN en PHP 8.3/8.4/8.5.
+F1–F6 GREEN completo en PHP 8.3/8.4/8.5.
 
 ---
 
-# 28. MICROFASES PROPUESTAS
+# 27. MICROFASES
 
 ## F7.1 — Runtime + schema + permissions
 
-- Dompdf productivo;
-- ext-dom/ext-gd;
-- migration 007;
-- permisos;
-- schema/runtime tests.
+Dompdf productivo, ext-dom/ext-gd, migration 007, permisos, tests runtime/schema.
 
 ## F7.2 — Templates + versions
 
-- ContractService base;
-- template CRUD mínimo;
-- versiones inmutables;
-- placeholders/variables;
-- admin SSR.
+ContractService base, CRUD mínimo, versiones inmutables, placeholders/variables, SSR admin.
 
-## F7.3 — Draft contractual + preview
+## F7.3 — Draft + preview
 
-- elegibilidad candidato/screening/unidad;
-- draft;
-- economics/dates;
-- manual vars;
-- tasks/annexes;
-- preview seguro.
+Elegibilidad, draft, economics/dates, manual vars, tasks/annexes, preview seguro.
 
 ## F7.4 — Snapshot + PDF + hash
 
-- ContractPdfRenderer;
-- storage privado;
-- generation transaction;
-- SHA-256;
-- download privado;
-- immutability.
+ContractPdfRenderer, private storage, transaction, SHA-256, download, immutability.
 
-## F7.5 — Finalización + integración candidate detail
+## F7.5 — Finalization + candidate context
 
-- generated→finalized;
-- checklist;
-- CTA/contexto candidato;
-- finalized único;
-- confirmar 0 lease/tenant/unit mutation.
+Generated→finalized, checklist, CTA candidate, finalized único, confirmar 0 lease/tenant/unit mutation.
 
-## F7.6 — Security + visual + Cero Ruido + cierre
+## F7.6 — Security + visual + Cero Ruido + closure
 
-- IDOR/XSS/path traversal;
-- permissions/CSRF/basePath;
-- visual regression;
-- PHP 8.3/8.4/8.5;
-- full suite;
-- Two Laws gate;
-- checkpoint final.
+IDOR/XSS/path traversal, permissions/CSRF/basePath, visual regression, PHP matrix, full suite, Two Laws, checkpoint.
 
 Cada microfase:
 
@@ -1214,33 +977,32 @@ Cada microfase:
 
 ---
 
-# 29. BLOQUEADORES DE CIERRE
+# 28. BLOQUEADORES DE CIERRE
 
-F7 NO puede cerrar si existe cualquiera:
+No cerrar F7 si existe:
 
-- HTML arbitrario editable por usuario;
-- editor Word/WYSIWYG;
+- HTML arbitrario editable;
+- Word/WYSIWYG;
 - segunda auth;
 - tenant/lease adelantado;
-- cambio automático de candidate.status;
-- cambio automático de unit.status;
-- contrato sobre screening no aprobado;
-- contrato sobre candidate withdrawn;
-- raw remote resources habilitados en Dompdf;
-- PDF dentro del webroot;
-- path de PDF controlado por request;
+- candidate/unit status auto-mutado;
+- screening no approved;
+- withdrawn contractual;
+- remote resources Dompdf;
+- PDF webroot/path de request;
 - PDF sin hash;
-- snapshot mutable después de generated;
+- snapshot mutable post-generated;
 - template version mutable;
-- tabla clauses/tasks/annexes sin necesidad probada;
-- upload documental F18 adelantado;
-- dependencia runtime adicional no justificada;
-- fallo F1–F6;
-- PHP 8.3/8.4/8.5 no GREEN.
+- clauses/tasks/annex tables injustificadas;
+- upload F18 adelantado;
+- dependencia extra sin evidencia;
+- cálculo automático ambiguo de fechas contractuales;
+- regresión F1–F6;
+- matriz PHP no GREEN.
 
 ---
 
-# 30. TWO LAWS GATE F7
+# 29. TWO LAWS GATE
 
 ```text
 LEY_1_KISS: PASS|FAIL
@@ -1256,7 +1018,7 @@ PROOF:
 
 FAIL bloquea cierre/merge.
 
-Presupuesto esperado al cierre, salvo evidencia aprobada que obligue a cambiar esta SPEC:
+Presupuesto esperado:
 
 ```text
 NEW_TABLES: 3
@@ -1271,9 +1033,7 @@ NEW_LEASE/TENANT_TABLES: 0
 
 ---
 
-# 31. GATE DE APROBACIÓN
-
-Estado al escribir esta SPEC:
+# 30. GATE DE APROBACIÓN
 
 ```text
 F6: CLOSED / VERIFIED / MERGED
