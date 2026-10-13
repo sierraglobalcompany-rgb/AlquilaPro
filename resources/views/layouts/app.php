@@ -11,11 +11,13 @@ foreach (array_slice($nameParts, 0, 2) as $part) {
     }
 }
 $initials = $initials !== '' ? $initials : 'AP';
-$canViewUsers = \AlquilaPro\Auth\Permissions::allows($user, 'users.view');
-$canViewProperties = \AlquilaPro\Auth\Permissions::allows($user, 'properties.view');
-$canViewCandidates = \AlquilaPro\Auth\Permissions::allows($user, 'candidates.view');
-$canViewContracts = \AlquilaPro\Auth\Permissions::allows($user, 'contracts.view');
-$isOwner = ($user['role'] ?? null) === 'owner';
+$isTenant = ($user['role'] ?? null) === 'tenant';
+$homeHref = $isTenant ? '/tenant' : '/';
+$canViewUsers = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'users.view');
+$canViewProperties = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'properties.view');
+$canViewCandidates = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'candidates.view');
+$canViewContracts = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'contracts.view');
+$isOwner = !$isTenant && ($user['role'] ?? null) === 'owner';
 ?>
 <!doctype html>
 <html lang="es">
@@ -28,7 +30,7 @@ $isOwner = ($user['role'] ?? null) === 'owner';
 <body class="app-page" style="--brand-primary: <?= $escape($branding['primary_color']) ?>;">
 <div class="app-shell" data-f3-app-shell>
     <header class="topbar">
-        <a class="topbar__brand" href="<?= $escape($basePath) ?>/">
+        <a class="topbar__brand" href="<?= $escape($basePath . $homeHref) ?>">
             <?php if ($branding['logo_path'] !== null): ?>
                 <img class="topbar__logo" src="<?= $escape($basePath) ?>/brand/logo" alt="<?= $escape($branding['app_name']) ?>">
             <?php else: ?>
@@ -43,52 +45,56 @@ $isOwner = ($user['role'] ?? null) === 'owner';
     </main>
 
     <nav class="bottom-nav" aria-label="Navegación principal">
-        <a class="bottom-nav__item" href="<?= $escape($basePath) ?>/"<?= $activeNav === 'home' ? ' aria-current="page"' : '' ?>>Inicio</a>
-        <button class="bottom-nav__apps" type="button" data-apps-open aria-controls="apps-dialog" aria-haspopup="dialog"<?= $activeNav === 'apps' ? ' aria-current="page"' : '' ?>>Apps</button>
+        <a class="bottom-nav__item" href="<?= $escape($basePath . $homeHref) ?>"<?= $activeNav === 'home' ? ' aria-current="page"' : '' ?>>Inicio</a>
+        <?php if (!$isTenant): ?>
+            <button class="bottom-nav__apps" type="button" data-apps-open aria-controls="apps-dialog" aria-haspopup="dialog"<?= $activeNav === 'apps' ? ' aria-current="page"' : '' ?>>Apps</button>
+        <?php endif; ?>
         <a class="bottom-nav__item" href="<?= $escape($basePath) ?>/account"<?= $activeNav === 'account' ? ' aria-current="page"' : '' ?>>Cuenta</a>
     </nav>
 
-    <dialog class="apps-dialog" id="apps-dialog" aria-labelledby="apps-dialog-title">
-        <div class="apps-dialog__head">
-            <h2 id="apps-dialog-title">Apps</h2>
-            <form method="dialog"><button class="button button--quiet" type="submit">Cerrar</button></form>
-        </div>
-        <div class="apps-grid">
-            <?php if ($canViewUsers): ?>
-                <a class="app-card" href="<?= $escape($basePath) ?>/admin/users">
-                    <strong>Usuarios</strong>
-                    <span>Administración de accesos</span>
-                </a>
-            <?php endif; ?>
-            <?php if ($canViewProperties): ?>
-                <a class="app-card" href="<?= $escape($basePath) ?>/admin/properties">
-                    <strong>Propiedades</strong>
-                    <span>Inventario y publicación</span>
-                </a>
-            <?php endif; ?>
-            <?php if ($canViewCandidates): ?>
-                <a class="app-card" href="<?= $escape($basePath) ?>/admin/candidates">
-                    <strong>Candidatos</strong>
-                    <span>Candidaturas y documentación</span>
-                </a>
-            <?php endif; ?>
-            <?php if ($canViewContracts): ?>
-                <a class="app-card" href="<?= $escape($basePath) ?>/admin/contract-templates">
-                    <strong>Contratos</strong>
-                    <span>Plantillas y versiones</span>
-                </a>
-            <?php endif; ?>
-            <?php if ($isOwner): ?>
-                <a class="app-card" href="<?= $escape($basePath) ?>/admin/appearance">
-                    <strong>Apariencia</strong>
-                    <span>Nombre, color y logo</span>
-                </a>
-            <?php endif; ?>
-            <?php if (!$canViewUsers && !$canViewProperties && !$canViewCandidates && !$canViewContracts && !$isOwner): ?>
-                <p class="empty-state">No tienes aplicaciones disponibles.</p>
-            <?php endif; ?>
-        </div>
-    </dialog>
+    <?php if (!$isTenant): ?>
+        <dialog class="apps-dialog" id="apps-dialog" aria-labelledby="apps-dialog-title">
+            <div class="apps-dialog__head">
+                <h2 id="apps-dialog-title">Apps</h2>
+                <form method="dialog"><button class="button button--quiet" type="submit">Cerrar</button></form>
+            </div>
+            <div class="apps-grid">
+                <?php if ($canViewUsers): ?>
+                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/users">
+                        <strong>Usuarios</strong>
+                        <span>Administración de accesos</span>
+                    </a>
+                <?php endif; ?>
+                <?php if ($canViewProperties): ?>
+                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/properties">
+                        <strong>Propiedades</strong>
+                        <span>Inventario y publicación</span>
+                    </a>
+                <?php endif; ?>
+                <?php if ($canViewCandidates): ?>
+                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/candidates">
+                        <strong>Candidatos</strong>
+                        <span>Candidaturas y documentación</span>
+                    </a>
+                <?php endif; ?>
+                <?php if ($canViewContracts): ?>
+                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/contract-templates">
+                        <strong>Contratos</strong>
+                        <span>Plantillas y versiones</span>
+                    </a>
+                <?php endif; ?>
+                <?php if ($isOwner): ?>
+                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/appearance">
+                        <strong>Apariencia</strong>
+                        <span>Nombre, color y logo</span>
+                    </a>
+                <?php endif; ?>
+                <?php if (!$canViewUsers && !$canViewProperties && !$canViewCandidates && !$canViewContracts && !$isOwner): ?>
+                    <p class="empty-state">No tienes aplicaciones disponibles.</p>
+                <?php endif; ?>
+            </div>
+        </dialog>
+    <?php endif; ?>
 </div>
 <script src="<?= $escape($basePath) ?>/assets/app.js" defer></script>
 </body>
