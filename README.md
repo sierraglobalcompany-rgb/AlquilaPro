@@ -5,10 +5,11 @@ Aplicación web mobile-first y autoinstalable para administrar arrendamientos de
 **Dominio objetivo:** `https://alquilapro.sierraglobalcompany.com`  
 **Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + CSS/JS mínimo  
 **Destino:** Hostinger; subdominio o subcarpeta HTTPS.  
-**Estado actual:** F0–F6 CLOSED / VERIFIED / MERGED; **F7 CLOSED / VERIFIED / NOT MERGED**.  
-**F6 merge SHA:** `875c990a5a3c9fa7a2adba3edcad6a790703280e`.  
-**F7 final product HEAD:** `d10939aa2478a558fde0f104351c642ef23b91af`.  
-**F7 final product CI:** `38355249681` — PHP 8.3/8.4/8.5 PASS; PHP 8.3 `274 tests / 2214 assertions / 0 failures / 0 errors`.
+**Estado actual:** F0–F7 CLOSED / VERIFIED; **F1–F7 MERGED**.  
+**F7 merge SHA:** `b6ab43fefd7b4d2933e3e3adff0ac4c23efdf1b8`.  
+**F7 final product HEAD:** `829955f2b297959380df06a8c8cc3e3424115e74`.  
+**F7 final product CI:** `38360814842` — PHP 8.3/8.4/8.5 PASS.  
+**F7 exact closure CI:** `38361376137` — PHP 8.3/8.4/8.5 PASS; PHP 8.3 `277 tests / 2230 assertions / 0 failures / 0 errors`.
 
 ---
 
@@ -27,7 +28,8 @@ Antes de tocar código:
 
 Para F7 específicamente:
 
-- `docs/checkpoints/F7_CLOSED_2026-10-12.md` — autoridad técnica de cierre hasta merge;
+- `docs/checkpoints/F7_MERGED_2026-10-12.md` — autoridad de integración;
+- `docs/checkpoints/F7_CLOSED_2026-10-12.md` — autoridad técnica de cierre;
 - `docs/specs/F7_CONTRACT_ENGINE_SPEC.md`;
 - `docs/plans/F7_CONTRACT_ENGINE_IMPLEMENTATION_PLAN.md`.
 
@@ -111,20 +113,24 @@ F6_PR: #9 CLOSED / MERGED
 F6_MERGE_SHA: 875c990a5a3c9fa7a2adba3edcad6a790703280e
 F6_FINAL_CI: 38338228406 — PHP 8.3 / 8.4 / 8.5 PASS — 234 tests / 1672 assertions / 0 failures / 0 errors
 
-F7: CLOSED / VERIFIED / NOT MERGED
+F7: CLOSED / VERIFIED / MERGED
 F7_BRANCH: impl/f7-contracts-20261012
-F7_PR: #10 OPEN
+F7_PR: #10 CLOSED / MERGED
 F7_BASE_MAIN: 1b9ee85ebb224b310d4ab4f0c84a28628b86b747
-F7_FINAL_PRODUCT_HEAD: d10939aa2478a558fde0f104351c642ef23b91af
-F7_FINAL_PRODUCT_CI: 38355249681 — PHP 8.3 / 8.4 / 8.5 PASS
-F7_PHP83: 274 tests / 2214 assertions / 0 failures / 0 errors
+F7_FINAL_PRODUCT_HEAD: 829955f2b297959380df06a8c8cc3e3424115e74
+F7_CLOSURE_HEAD: 9e272a3b3b31aaa8f83f34298d1aa0c7ff16688c
+F7_MERGE_SHA: b6ab43fefd7b4d2933e3e3adff0ac4c23efdf1b8
+F7_FINAL_PRODUCT_CI: 38360814842 — PHP 8.3 / 8.4 / 8.5 PASS
+F7_CLOSURE_CI: 38361376137 — PHP 8.3 / 8.4 / 8.5 PASS
+F7_PHP83: 277 tests / 2230 assertions / 0 failures / 0 errors
 F7_SECURITY_QA: PASS
 F7_VISUAL_QA: PASS — one reproduced overflow fixed with 7 CSS lines
+F7_FORENSIC_REVIEW: PASS — concurrency, JSON capacity and runtime storage gaps closed by RED→GREEN before merge
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
 
-CURRENT_GATE: F7 FINAL PR REVIEW / READY FOR REVIEW
-NEXT: merge only on explicit project continuation authorization
+CURRENT_GATE: F7 INTEGRATED / DOCUMENTED
+NEXT: F8 SCOPE / PRE-KISS only on next explicit project continuation
 ```
 
 No reimplementar F1–F7. No reabrir una fase certificada sin evidencia de regresión o una nueva SPEC aprobada.
@@ -226,8 +232,10 @@ Reglas clave:
 
 - candidato debe seguir `pending_screening` con screening `approved` al crear/generar;
 - unidad y propiedad se releen antes de mutaciones críticas;
+- `generate()` bloquea el draft antes de resolver/renderizar la evidencia congelada;
 - template version es inmutable;
 - generated congela snapshot/PDF/hash/evidencia;
+- `manual_variables_json` y `annexes_json` usan capacidad `LONGTEXT`; `tasks_json` permanece `TEXT`;
 - `tasks_json` puede variar hasta finalized y no integra el snapshot contractual;
 - finalized es terminal F7;
 - F7 no crea tenant/lease, no ocupa la unidad y no representa firma digital;
@@ -239,6 +247,7 @@ PDF:
 - Dompdf `^3.1.6`;
 - remote resources off;
 - storage privado `storage/contracts/`;
+- todo `/storage/` queda fuera de Git;
 - nombre físico aleatorio sin PII;
 - validación `%PDF-` + tamaño + SHA-256 + realpath antes de servir.
 
@@ -327,9 +336,9 @@ Autoridad:
 
 # 8. RESULTADO F7
 
-F7 está **CLOSED / VERIFIED / NOT MERGED**.
+F7 está **CLOSED / VERIFIED / MERGED**.
 
-Resultado técnico:
+Resultado integrado:
 
 - exactamente 3 tablas contractuales;
 - exactamente 2 clases productivas F7;
@@ -341,24 +350,29 @@ Resultado técnico:
 - draft + preview seguro;
 - snapshot HTML interno escapado;
 - PDF privado con SHA-256/tamaño exactos;
+- generación protegida por lock antes de congelar evidencia;
+- capacidad JSON alineada con los límites funcionales aprobados;
+- `/storage/` completo excluido de Git;
 - finalización terminal;
 - candidate context delegado al ContractService;
 - 0 rutas públicas contractuales;
 - 0 tenant/lease/user/ocupación automática;
 - security regression PASS;
 - visual QA PASS después de corregir un overflow reproducido con 7 líneas CSS;
-- CI final de producto `38355249681` PASS en PHP 8.3/8.4/8.5;
-- PHP 8.3: 274 tests / 2214 assertions;
+- CI final de producto `38360814842` PASS en PHP 8.3/8.4/8.5;
+- CI exacto de cierre `38361376137` PASS en PHP 8.3/8.4/8.5;
+- PHP 8.3: 277 tests / 2230 assertions;
+- merge SHA `b6ab43fefd7b4d2933e3e3adff0ac4c23efdf1b8`;
 - LEY 1 KISS PASS;
 - LEY 2 CERO RUIDO PASS.
 
-Autoridad de cierre hasta integración:
-
-- `docs/checkpoints/F7_CLOSED_2026-10-12.md`.
-
-Después del merge verificado deberá existir:
+Autoridad de integración:
 
 - `docs/checkpoints/F7_MERGED_2026-10-12.md`.
+
+Autoridad técnica de cierre:
+
+- `docs/checkpoints/F7_CLOSED_2026-10-12.md`.
 
 ---
 
@@ -371,8 +385,8 @@ Después del merge verificado deberá existir:
 - F4 — Propiedades + unidades + landing + catálogo público ✅ CLOSED / VERIFIED / MERGED
 - F5 — Aplicaciones + candidatos + referencias ✅ CLOSED / VERIFIED / MERGED
 - F6 — Aseguradora/SURA ✅ CLOSED / VERIFIED / MERGED
-- **F7 — Contratos ✅ CLOSED / VERIFIED / NOT MERGED**
-- F8 — Inquilino + lease + portal usando auth único — bloqueado hasta merge F7 verificado
+- **F7 — Contratos ✅ CLOSED / VERIFIED / MERGED**
+- F8 — Inquilino + lease + portal usando auth único — siguiente fase; iniciar por SCOPE / PRE-KISS, no por implementación directa
 - F9 — Cargos + cartera
 - F10 — Medios de pago
 - F11 — Reporte + conciliación
@@ -396,37 +410,35 @@ Después del merge verificado deberá existir:
 
 # 10. PROTOCOLO DE RECUPERACIÓN
 
-Al retomar trabajo mientras F7 no esté mergeado:
+Al retomar trabajo después del merge F7:
 
 1. verificar `main` real;
-2. verificar branch `impl/f7-contracts-20261012` y PR #10;
-3. leer `docs/checkpoints/F7_CLOSED_2026-10-12.md`;
-4. no reabrir F7 sin evidencia de regresión o nueva SPEC;
-5. revisar CI exacto del HEAD vigente antes de integrar;
-6. no iniciar F8 antes de que F7 esté mergeado y el merge verificado;
+2. leer `docs/checkpoints/F7_MERGED_2026-10-12.md` y `F7_CLOSED_2026-10-12.md`;
+3. no reabrir F7 sin evidencia de regresión o nueva SPEC;
+4. verificar CI/evidencia exacta antes de cualquier cambio que toque autoridades F7;
+5. iniciar F8 únicamente por `SCOPE → PRE-KISS → SPEC/DESIGN → PLAN`;
+6. no crear segundo auth, inventario, candidato, contrato ni fuentes paralelas;
 7. mantener KISS + Cero Ruido + TDD por microfases.
 
-Después del merge F7, el checkpoint `F7_MERGED_2026-10-12.md` pasa a ser la autoridad de integración.
+El checkpoint `F7_MERGED_2026-10-12.md` es la autoridad de integración F7.
 
 ---
 
 # 11. GATE ACTUAL
 
 ```text
-LAST_MERGED_PHASE: F6 CLOSED / VERIFIED / MERGED
-F6_MERGE_SHA: 875c990a5a3c9fa7a2adba3edcad6a790703280e
-
-ACTIVE_CLOSED_PHASE: F7 CLOSED / VERIFIED / NOT MERGED
-F7_BRANCH: impl/f7-contracts-20261012
-F7_PR: #10
-F7_BASE_MAIN: 1b9ee85ebb224b310d4ab4f0c84a28628b86b747
-F7_FINAL_PRODUCT_HEAD: d10939aa2478a558fde0f104351c642ef23b91af
-F7_FINAL_PRODUCT_CI: 38355249681
-F7_TESTS_PHP83: 274 / 2214
+LAST_MERGED_PHASE: F7 CLOSED / VERIFIED / MERGED
+F7_PR: #10 CLOSED / MERGED
+F7_FINAL_PRODUCT_HEAD: 829955f2b297959380df06a8c8cc3e3424115e74
+F7_CLOSURE_HEAD: 9e272a3b3b31aaa8f83f34298d1aa0c7ff16688c
+F7_MERGE_SHA: b6ab43fefd7b4d2933e3e3adff0ac4c23efdf1b8
+F7_FINAL_PRODUCT_CI: 38360814842
+F7_CLOSURE_CI: 38361376137
+F7_TESTS_PHP83: 277 / 2230
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
 
-CURRENT_ACTION: FINAL PR REVIEW → READY FOR REVIEW IF CLEAN
-MERGE_ALLOWED: NO UNTIL NEXT EXPLICIT CONTINUA
-NEXT_PHASE_AFTER_MERGE: F8 — INQUILINO + LEASE + PORTAL
+F8_IMPLEMENTATION: NOT STARTED
+CURRENT_ACTION: F7 MERGED / DOCUMENTED
+NEXT: F8 SCOPE / PRE-KISS ON NEXT EXPLICIT CONTINUA
 ```
