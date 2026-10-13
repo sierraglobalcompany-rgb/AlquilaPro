@@ -1,14 +1,14 @@
 # F9 Preflight — Cargos + Cartera — 2026-10-13
 
 ```text
-F9_STATUS: PREFLIGHT COMPLETE / PRODUCT NOT STARTED
+F9_STATUS: PREFLIGHT BASELINE COMPLETE / SPEC STATUS CONVERGENCE PENDING / PRODUCT NOT STARTED
 REPOSITORY: sierraglobalcompany-rgb/AlquilaPro
 BRANCH: impl/f9-charges-portfolio-20261013
 F8_INTEGRATED_BASE_SHA: 89811cbba5ae922bab00b50dd02af08dbaa1cb8b
 F8_MERGE_SHA: a1b50f0d1c6556531626fd35cba0668bd5c4029f
 F8_STATUS: CLOSED / VERIFIED / MERGED
-F9_SPEC: APPROVED
-F9_PLAN: APPROVED
+F9_SPEC: APPROVED BY USER / IMPORTED FROM DESIGN BRANCH
+F9_PLAN: APPROVED BY USER / IMPORTED FROM DESIGN BRANCH
 F9_PRODUCT_IMPLEMENTATION: NOT STARTED
 MERGE_AUTHORIZED: NO
 ```
@@ -32,6 +32,8 @@ Only the approved F9 design documents were ported from the historical docs branc
 - `docs/superpowers/plans/2026-10-13-f9-charges-portfolio.md`
 
 No product commit from the historical F7-based docs branch was copied.
+
+The imported SPEC still contains its historical design-branch banner stating that implementation was blocked on F8. That text is now stale because F8 is merged. It MUST be converged on this implementation branch before the first F9 product RED. This is a documentation state transition only, not a design reopening.
 
 ## Architecture budget to preserve
 
@@ -62,6 +64,13 @@ PATCH_STACKING: NONE
 
 Codex Luna may now execute the approved F9 master prompt against `impl/f9-charges-portfolio-20261013`.
 
-Its first product gate is **Task 1 RED only**: create the focused schema test for the single `charges` table, verify the expected RED, checkpoint, and continue according to the approved autonomous Task-by-Task plan.
+First complete the remaining Task 0 documentation convergence:
+
+1. update the F9 SPEC banner/gate to `APPROVED / IMPLEMENTATION IN PROGRESS`;
+2. record `F8_INTEGRATED_BASE_SHA = 89811cbba5ae922bab00b50dd02af08dbaa1cb8b`;
+3. keep `MERGE_AUTHORIZED = NO`;
+4. commit that documentation-only state transition.
+
+Then open **Task 1 RED** for the single `charges` schema, verify the expected RED, checkpoint, and continue according to the approved autonomous plan.
 
 Do not start F10 product implementation. Do not merge F9 without a later explicit merge gate.
