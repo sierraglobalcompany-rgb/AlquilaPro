@@ -5,11 +5,11 @@ Aplicación web mobile-first y autoinstalable para administrar arrendamientos de
 **Dominio objetivo:** `https://alquilapro.sierraglobalcompany.com`  
 **Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + CSS/JS mínimo  
 **Destino:** Hostinger; subdominio o subcarpeta HTTPS.  
-**Estado actual:** F0–F5 CLOSED / VERIFIED / MERGED; F6 CLOSED / VERIFIED / NOT MERGED.  
+**Estado actual:** F0–F6 CLOSED / VERIFIED / MERGED.  
 **F5 merge SHA:** `8511f8f8eb0c086e84c1170940353ff5460da66b`.  
-**F6 functional product HEAD:** `0be1cef83276091be1f7dfb8399da057f6093e35`.  
-**F6 verified closure HEAD:** `4d2bd2ca6ad51d0af347121fe869cfe84a8c8ab6`.  
-**F6 verified closure CI:** `38337944987` — PHP 8.3/8.4/8.5 PASS; PHP 8.3 `234 tests / 1672 assertions`.
+**F6 final branch HEAD:** `7fccbba585c85988913f86cf140be59e8a3f6b20`.  
+**F6 merge SHA:** `875c990a5a3c9fa7a2adba3edcad6a790703280e`.  
+**F6 final CI:** `38338228406` — PHP 8.3/8.4/8.5 PASS; PHP 8.3 `234 tests / 1672 assertions / 0 failures / 0 errors`.
 
 ---
 
@@ -20,9 +20,9 @@ Antes de tocar código:
 1. `README.md`;
 2. `docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.2_AUDITADO.md`;
 3. `docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.2_AUDITADO.md`;
-4. `docs/checkpoints/F6_CLOSED_2026-10-12.md` como autoridad técnica F6 actual;
-5. `docs/specs/F6_INSURER_SCREENING_SPEC.md` y `docs/plans/F6_INSURER_SCREENING_IMPLEMENTATION_PLAN.md` cuando F6/F7 sea relevante;
-6. `docs/checkpoints/F5_MERGED_2026-10-12.md` como autoridad histórica de integración F5;
+4. `docs/checkpoints/F6_MERGED_2026-10-12.md` como autoridad de integración F6;
+5. `docs/checkpoints/F6_CLOSED_2026-10-12.md` como autoridad técnica F6;
+6. `docs/specs/F6_INSURER_SCREENING_SPEC.md` y `docs/plans/F6_INSURER_SCREENING_IMPLEMENTATION_PLAN.md` cuando F6/F7 sea relevante;
 7. tests y CI reales;
 8. código real del repositorio.
 
@@ -97,18 +97,20 @@ F5_PR: #8 CLOSED / MERGED
 F5_MERGE_SHA: 8511f8f8eb0c086e84c1170940353ff5460da66b
 F5_FINAL_CI: 38292601759 — PHP 8.3 / 8.4 / 8.5 PASS — 207 tests / 1465 assertions
 
-F6: CLOSED / VERIFIED / NOT MERGED
+F6: CLOSED / VERIFIED / MERGED
 F6_FUNCTIONAL_PRODUCT_HEAD: 0be1cef83276091be1f7dfb8399da057f6093e35
 F6_VERIFIED_CLOSURE_HEAD: 4d2bd2ca6ad51d0af347121fe869cfe84a8c8ab6
-F6_PR: #9 OPEN / DRAFT
-F6_VERIFIED_CLOSURE_CI: 38337944987 — PHP 8.3 / 8.4 / 8.5 PASS — 234 tests / 1672 assertions
+F6_FINAL_BRANCH_HEAD: 7fccbba585c85988913f86cf140be59e8a3f6b20
+F6_PR: #9 CLOSED / MERGED
+F6_MERGE_SHA: 875c990a5a3c9fa7a2adba3edcad6a790703280e
+F6_FINAL_CI: 38338228406 — PHP 8.3 / 8.4 / 8.5 PASS — 234 tests / 1672 assertions / 0 failures / 0 errors
 F6_SECURITY_QA: PASS
 F6_VISUAL_QA: PASS — CSS delta 0
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
 
-CURRENT_GATE: F6 FINAL DOCUMENT CONVERGENCE / PR REVIEW
-NEXT: F7 only after F6 final CI + review + merge
+CURRENT_GATE: F7 SCOPE / PRE-KISS / DESIGN
+NEXT: freeze F7 contract before SPEC/PLAN/implementation
 ```
 
 No reimplementar F1–F6. No reabrir una fase certificada sin evidencia de regresión o una nueva SPEC aprobada.
@@ -230,7 +232,9 @@ No reabrir F5 sin evidencia.
 
 # 7. RESULTADO F6
 
-F6 quedó implementada y verificada con:
+F6 está **CLOSED / VERIFIED / MERGED**.
+
+Resultado integrado:
 
 - +1 tabla exacta `screening_processes`;
 - +1 servicio exacto `ScreeningService`;
@@ -264,7 +268,10 @@ F6 quedó implementada y verificada con:
 - LEY 1 KISS PASS;
 - LEY 2 CERO RUIDO PASS.
 
-Checkpoint canónico: `docs/checkpoints/F6_CLOSED_2026-10-12.md`.
+Autoridad:
+
+- `docs/checkpoints/F6_CLOSED_2026-10-12.md`;
+- `docs/checkpoints/F6_MERGED_2026-10-12.md`.
 
 ---
 
@@ -276,8 +283,8 @@ Checkpoint canónico: `docs/checkpoints/F6_CLOSED_2026-10-12.md`.
 - F3 — Shell móvil + sistema visual ✅
 - F4 — Propiedades + unidades + landing + catálogo público ✅ CLOSED / VERIFIED / MERGED
 - F5 — Aplicaciones + candidatos + referencias ✅ CLOSED / VERIFIED / MERGED
-- F6 — Aseguradora/SURA ✅ **CLOSED / VERIFIED / NOT MERGED**
-- **F7 — Contratos — BLOCKED hasta merge de F6**
+- F6 — Aseguradora/SURA ✅ CLOSED / VERIFIED / MERGED
+- **F7 — Contratos — NEXT: SCOPE / PRE-KISS / DESIGN**
 - F8 — Inquilino + lease + portal usando auth único
 - F9 — Cargos + cartera
 - F10 — Medios de pago
@@ -304,24 +311,24 @@ Checkpoint canónico: `docs/checkpoints/F6_CLOSED_2026-10-12.md`.
 
 Al retomar trabajo:
 
-1. verificar `main`, HEAD y PR #9 reales;
-2. leer `docs/checkpoints/F6_CLOSED_2026-10-12.md`;
-3. confirmar la CI exacta del HEAD final de PR #9;
-4. no reabrir F6 sin evidencia de regresión o nueva SPEC;
-5. F7 puede usar candidato + screening aprobados, sin copiarlos a entidades paralelas;
-6. mantener KISS + Cero Ruido + TDD por microfases;
-7. no abrir implementación F7 antes de integrar F6.
+1. verificar `main` real;
+2. leer `docs/checkpoints/F6_MERGED_2026-10-12.md`;
+3. no reabrir F6 sin evidencia de regresión o nueva SPEC;
+4. F7 debe consumir candidato + screening + unidad ya existentes, sin entidades paralelas;
+5. mantener KISS + Cero Ruido + TDD por microfases;
+6. antes de implementar F7: SCOPE → PRE-KISS → diseño aprobado → SPEC → PLAN.
 
 ---
 
 # 10. GATE ACTUAL
 
 ```text
-LAST_PHASE: F6 CLOSED / VERIFIED / NOT MERGED
-F6_VERIFIED_CLOSURE_HEAD: 4d2bd2ca6ad51d0af347121fe869cfe84a8c8ab6
-F6_VERIFIED_CLOSURE_CI: 38337944987
-PR: #9 OPEN / DRAFT UNTIL FINAL REVIEW
+LAST_PHASE: F6 CLOSED / VERIFIED / MERGED
+F6_FINAL_BRANCH_HEAD: 7fccbba585c85988913f86cf140be59e8a3f6b20
+F6_FINAL_CI: 38338228406
+F6_MERGE_SHA: 875c990a5a3c9fa7a2adba3edcad6a790703280e
+PR: #9 CLOSED / MERGED
 NEXT_PHASE: F7 — CONTRATOS
-F7_STATUS: BLOCKED UNTIL F6 MERGE
-NEXT_ACTION: FINAL DOC CONVERGENCE → EXACT CI → FINAL PR REVIEW → READY FOR REVIEW → STOP BEFORE MERGE
+F7_STATUS: SCOPE / PRE-KISS / DESIGN
+NEXT_ACTION: READ MASTER CONTRACT SCOPE → AUDIT EXISTING MODEL → PROPOSE MINIMAL F7 DESIGN
 ```
