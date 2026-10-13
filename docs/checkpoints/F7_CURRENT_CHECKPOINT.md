@@ -3,8 +3,9 @@
 **Fecha:** 2026-10-12 (America/Bogota)  
 **Fase:** F7 — Motor de contratos  
 **Microfase:** F7.1 — Runtime + Schema + Permissions  
-**Estado:** **GREEN / VERIFIED — NO MERGE**  
-**Branch:** `impl/f7-contracts-20261012`
+**Estado:** **GREEN / VERIFIED — PAUSED — NO MERGE**  
+**Branch:** `impl/f7-contracts-20261012`  
+**Draft PR:** `#10` — `F7: Contract engine`
 
 ## Evidencia TDD
 
@@ -41,11 +42,13 @@
 - Route files F7: `0` en esta microfase.
 - Rutas públicas: `0`.
 - Tenant/lease: `0`.
-- Installer.php: sin cambios; RuntimeRequirements existente fue suficiente.
+- `Installer.php`: sin cambios; `RuntimeRequirements` existente fue suficiente.
 
 ## Cero Ruido / Convergencia
 
-Se usó un workflow temporal exclusivamente para producir `composer.lock` mediante Composer real porque el entorno de edición no ejecuta Composer. El workflow fue eliminado antes del GREEN final. El diff permanente desde RED contiene solo:
+Se usó un workflow temporal exclusivamente para producir `composer.lock` mediante Composer real porque el entorno de edición no ejecuta Composer. El workflow fue eliminado antes del GREEN final.
+
+El diff productivo permanente desde el RED contiene solo:
 
 - `.github/workflows/ci.yml`
 - `app/Auth/Permissions.php`
@@ -56,13 +59,27 @@ Se usó un workflow temporal exclusivamente para producir `composer.lock` median
 
 No quedaron scripts/bootstrap temporales ni capas auxiliares.
 
-## Gate
+## PR / pausa exacta
+
+- Draft PR abierto: `#10`.
+- PR state: OPEN / DRAFT / NOT MERGED.
+- PR base: `main`.
+- PR head branch: `impl/f7-contracts-20261012`.
+- Checkpoint previo HEAD: `89b8de7c0e426c071a10ff575c4e8ea4d9546488`.
+- CI disparada por ese checkpoint/PR: `38344848733`.
+- Al momento de ordenar la pausa, esa CI estaba **IN PROGRESS** en PHP 8.3 / 8.4 / 8.5; no se declara resultado final sin nueva verificación.
+- Este commit de checkpoint es el último cambio autorizado antes de detenerse.
+
+## Gate congelado al pausar
 
 ```text
 F7.1: GREEN / VERIFIED
+DRAFT PR #10: OPEN
+PR-CHECKPOINT CI 38344848733: IN PROGRESS AT PAUSE
 F7.2: NOT STARTED
 MERGE_ALLOWED: NO
-NEXT: F7.2 TEMPLATE/VERSION RED
+PROJECT STATE: PAUSED BY USER
+NEXT ON RESUME: verify latest branch HEAD + PR #10 + CI, then only if clean enter F7.2 TEMPLATE/VERSION RED
 ```
 
-No iniciar F7.2 mientras el Draft PR/CI del checkpoint no permanezca limpio.
+No iniciar F7.2, no marcar PR ready, no mergear y no modificar código hasta una nueva autorización explícita del usuario.
