@@ -22,6 +22,7 @@
 - No delete in normal operation. Retirement is `is_active = 0`.
 - Bre-B QR is uploaded from a legitimate external financial channel; AlquilaPro never generates an interoperable banking QR.
 - QR files: PNG/JPEG/WebP only, <=2 MiB, MIME by bytes, random name, outside webroot, restrictive permissions, SHA256/size/MIME verified on read.
+- Current official Bre-B key categories are frozen for this phase as `identity_document|mobile|email|alphanumeric|merchant_code`; this is a validation/display descriptor, not a bank credential. If the official scheme changes before implementation, update SPEC/PLAN explicitly rather than silently accepting arbitrary types.
 - No new CSS/JS unless a reproduced UI defect proves it necessary.
 - Every product task uses RED -> verify RED -> minimal GREEN -> focused GREEN -> checkpoint.
 - No F10 merge without explicit later authorization.
@@ -29,10 +30,10 @@
 ## Review Focus
 
 1. **Type changes must remove stale data:** changing `bank_account -> manual`, `breb_qr -> wallet`, etc. must clear fields/files that no longer apply; stale hidden banking data is forbidden.
-2. **QR replacement must not leave DB/file disagreement:** failed DB update cleans the new file; successful replacement switches metadata first and then removes the superseded file without reverting to a broken DB reference.
-3. **Tenant scope isolation:** global methods plus methods for the owned lease property only; property ID never comes from tenant input authority.
-4. **Inactive/foreign/tampered QR access:** all must fail closed; wrong lease, wrong property scope, wrong method type, missing/tampered bytes => 404.
-5. **F11 boundary:** no route, column, state or UI in F10 may imply that money was paid, reported, reconciled or allocated.
+2. **QR lifecycle must never produce an invalid active `breb_qr`:** creation requires a QR; removal while remaining `breb_qr` is rejected unless a replacement QR is supplied in the same update; changing to a non-QR type removes the superseded QR.
+3. **QR replacement must not leave DB/file disagreement:** failed DB update cleans the new file; successful replacement switches metadata first and then removes the superseded file without reverting to a broken DB reference.
+4. **Tenant scope isolation:** global methods plus methods for the owned lease property only; property ID never comes from tenant input authority.
+5. **Inactive/foreign/tampered QR and F11 boundary:** unauthorized/tampered QR fails closed, and no F10 surface may imply that money was paid, reported, reconciled or allocated.
 
 ---
 
@@ -83,10 +84,11 @@ Implementation MUST NOT start from this docs branch.
 - [ ] Record exact F9 merge SHA and current `main` SHA; they must identify the accepted integrated base.
 - [ ] Re-read F10 SPEC, this plan, F9 final checkpoint, actual `FinanceService`, finance routes/view, F8 lease ownership routes/views, `Permissions`, bootstrap, private-storage services and security tests.
 - [ ] Confirm `finance.view` and `finance.manage` exist exactly and tenant still fails closed for staff permissions.
+- [ ] Reconfirm the current official Bre-B key categories before implementation. If they differ from `identity_document|mobile|email|alphanumeric|merchant_code`, update the SPEC/PLAN documentation first; do not widen to arbitrary free text silently.
 - [ ] Confirm F9 final admin finance surface and decide route-file placement using the rule above.
 - [ ] Create `impl/f10-payment-methods-20261013` from the exact F9-integrated `main` SHA.
 - [ ] Bring only approved F10 SPEC/PLAN docs onto the implementation branch if needed.
-- [ ] Update F10 SPEC gate to `APPROVED / IMPLEMENTATION IN PROGRESS`, record the F9 base SHA, and keep merge unauthorized.
+- [ ] Update F10 SPEC gate to `APPROVED / IMPLEMENTATION IN PROGRESS`, record the F9 base SHA, converge the explicit Bre-B key-type allowlist into the SPEC if not already present, and keep merge unauthorized.
 - [ ] Commit only this state transition before Task 1.
 
 If F9 final interfaces differ only in paths/names, converge references without changing design. If the difference changes the approved F10 authority or permission model, STOP and reopen SPEC.
@@ -172,7 +174,9 @@ Checkpoint records exact one-table delta and Two Laws PASS.
 
 - [ ] **Step 1: Write non-QR validation RED tests**
 
-Pin exact type allowlist `bank_account|breb_key|breb_qr|wallet|manual`; required fields per non-QR type; trimmed non-empty label; property NULL/global or existing positive property; nonexistent property fails; `sort_order >= 1`; `is_active` normalized to 0/1; length limits enforced.
+Pin exact payment-method type allowlist `bank_account|breb_key|breb_qr|wallet|manual`; required fields per non-QR type; trimmed non-empty label; property NULL/global or existing positive property; nonexistent property fails; `sort_order >= 1`; `is_active` normalized to 0/1; length limits enforced.
+
+For `breb_key`, pin key-type allowlist `identity_document|mobile|email|alphanumeric|merchant_code`. Apply only minimal stable shape checks supported by the official Bre-B contract: mobile is national 10 digits beginning with `3`; email is a valid email; alphanumeric starts with `@` and contains the permitted alphanumeric body; merchant code follows the current official commerce-code shape; identity document rejects separators/whitespace inconsistent with the official key format. These are routing-data validations, not bank authentication.
 
 - [ ] **Step 2: Write stale-field convergence RED tests**
 
@@ -188,7 +192,7 @@ Run PaymentMethodServiceTest. Expected class/method missing failures.
 
 - [ ] **Step 5: Implement minimal service core**
 
-Centralize type normalization/validation in this service. Use prepared PDO only. Do not create per-type service/helper classes. For create/update without QR file changes, use the minimum transactionality the operation requires; do not add locks simply for caution.
+Centralize type/key normalization and validation in this service. Use prepared PDO only. Do not create per-type service/helper classes. For create/update without QR file changes, use the minimum transactionality the operation requires; do not add locks simply for caution.
 
 - [ ] **Step 6: Enforce no operational delete**
 
@@ -216,7 +220,7 @@ Commit: `feat(f10): add payment method configuration authority`.
 
 - [ ] **Step 1: Write upload RED tests**
 
-Accept only valid PNG/JPEG/WebP <=2 MiB by MIME bytes; reject SVG, spoofed extensions/MIME, empty and oversize uploads. Generated name must match `qr-[a-f0-9]{32}.(png|jpg|webp)` and live under the configured private QR directory.
+Accept only valid PNG/JPEG/WebP <=2 MiB by MIME bytes; reject SVG, spoofed extensions/MIME, empty and oversize uploads. Generated name must match `qr-[a-f0-9]{32}.(png|jpg|webp)` and live under the configured private QR directory. Creating `type=breb_qr` without a valid QR must fail closed.
 
 - [ ] **Step 2: Write metadata/integrity RED tests**
 
@@ -224,7 +228,7 @@ Persist `qr_stored_name`, real MIME, SHA256 and exact size. `privateQr()` verifi
 
 - [ ] **Step 3: Write replacement/removal/type-change RED tests**
 
-Replacement must store new bytes/metadata, then remove the superseded file after successful DB update. `removeQr=true` clears metadata and deletes superseded file. Changing away from `breb_qr` clears QR metadata/file automatically. No stale QR remains on another type.
+Replacement must store new bytes/metadata, then remove the superseded file after successful DB update. `removeQr=true` while the destination type remains `breb_qr` is invalid unless a valid replacement QR is supplied in the same update. Changing away from `breb_qr` clears QR metadata/file automatically. No stale QR remains on another type and no active `breb_qr` row may end the operation without intact QR metadata.
 
 - [ ] **Step 4: Write failure-cleanup RED test**
 
@@ -277,7 +281,7 @@ List renders escaped label/type/scope/receptor/institution/order/active/has-QR s
 
 - [ ] **Step 3: Write mutation RED tests**
 
-Create/update successes use PRG 303 back to `/admin/finance/payment-methods`; invalid domain input returns 422 without partial mutation. Multipart QR upload flows only through `breb_qr` validation. One update route handles fields, active flag, sort order, optional replacement and `remove_qr=1`.
+Create/update successes use PRG 303 back to `/admin/finance/payment-methods`; invalid domain input returns 422 without partial mutation. Multipart QR upload flows only through `breb_qr` validation. One update route handles fields, active flag, sort order, optional replacement and `remove_qr=1`; the route cannot bypass the service rule that a retained `breb_qr` requires an intact/replacement QR.
 
 - [ ] **Step 4: Wire one shared PaymentMethodService**
 
@@ -289,7 +293,7 @@ Do not create new auth/session/CSRF stack. Prefer extending F9 `app/Finance/rout
 
 - [ ] **Step 6: Implement one SSR list/form view**
 
-Keep create/edit simple; type-specific fields may be server-rendered together rather than requiring client-side dynamic forms. No wizard, SPA or mandatory JS.
+Keep create/edit simple; type-specific fields may be server-rendered together rather than requiring client-side dynamic forms. Bre-B key-type options use the canonical allowlist, not arbitrary text. No wizard, SPA or mandatory JS.
 
 - [ ] **Step 7: Verify GREEN**
 
@@ -382,7 +386,7 @@ Schema/source/views/logging surfaces must not introduce bank username/password/P
 
 - [ ] **Step 3: Freeze type/scope/data-cleanliness contracts**
 
-Exact allowlist, irrelevant fields NULL, type change removes stale fields/QR, tenant ownership precedes scope, global + matching property only, inactive excluded.
+Exact payment-method and Bre-B key-type allowlists, irrelevant fields NULL, type change removes stale fields/QR, retained `breb_qr` cannot exist without QR metadata, tenant ownership precedes scope, global + matching property only, inactive excluded.
 
 - [ ] **Step 4: Freeze F11 boundary**
 
@@ -430,7 +434,7 @@ CI green is not a substitute for diff review. Inspect migration, service, bootst
 
 - [ ] **Step 6: Converge closure documentation**
 
-Set SPEC to implemented/verified, README to `F10 CLOSED / VERIFIED / NOT MERGED`, create canonical F10 CLOSED checkpoint with F9 base SHA, schema, routes, scope rules, QR lifecycle/integrity, privacy boundary, RED/GREEN history, CI and Two Laws/antipatch verdict. Merge remains unauthorized.
+Set SPEC to implemented/verified, README to `F10 CLOSED / VERIFIED / NOT MERGED`, create canonical F10 CLOSED checkpoint with F9 base SHA, schema, routes, scope rules, Bre-B key-type allowlist/source date, QR lifecycle/integrity, privacy boundary, RED/GREEN history, CI and Two Laws/antipatch verdict. Merge remains unauthorized.
 
 - [ ] **Step 7: Commit closure docs and require fresh exact-HEAD CI**
 
@@ -444,14 +448,18 @@ PR head `impl/f10-payment-methods-20261013`, base `main`, title `F10: payment me
 
 ---
 
-## Self-Review Result
+## Self-Review Result — 10 passes
 
-1. **Spec coverage:** schema, 5 types, global/property scope, lifecycle, QR integrity/storage, finance permissions, admin UI, tenant visibility, private QR, F11 exclusion and closure all map to Tasks 1–7.
-2. **Step granularity:** every step has a checkable output; no executor must invent a table, permission, route, storage mechanism or scope model.
-3. **Type/interface consistency:** one `PaymentMethodService` API is preserved across all tasks; QR responsibility stays in the same service; tenant scope always derives from owned lease property.
-4. **Review Focus coverage:** stale fields, QR replacement atomicity, tenant scope, tamper/foreign access and F11 boundary each have explicit owning RED tests.
-5. **Proportion/KISS:** F10 adds one table and one service; default route architecture adds zero new route files by reusing the existing finance/lease composition.
-6. **Anti-patch audit:** no per-type routes/services, no table bridge for scope, no media table, no custom vault/encryption framework, no provider abstraction and no F11 placeholders.
+1. **Spec coverage:** schema, five payment-method types, global/property scope, lifecycle, QR integrity/storage, finance permissions, admin UI, tenant visibility, private QR, F11 exclusion and closure all map to Tasks 1–7 — PASS.
+2. **KISS:** one table + one service; route reuse is default and no new F10 route file is expected when F9 matches design — PASS.
+3. **Cero Ruido:** no scope bridge/media/provider/payment tables; stale type data is explicitly cleared — PASS.
+4. **Type/interface consistency:** one `PaymentMethodService` API across all tasks; QR responsibility never leaves it — PASS.
+5. **Bre-B consistency:** key type is no longer arbitrary free text; current official categories are frozen and preflight revalidates them before implementation — PASS.
+6. **QR lifecycle:** create requires QR, retained QR type cannot be emptied, replacement/removal/type change have explicit tests — PASS.
+7. **Tenant isolation:** ownership precedes property scope and QR delivery — PASS.
+8. **Security:** no banking authentication credentials, no public QR route, integrity checks and no physical filename leakage — PASS.
+9. **F11 boundary:** no paid/reported/reconciled/allocation behavior or UI is allowed — PASS.
+10. **Antipatches:** no per-type service/route, no custom vault, no provider abstraction, no future placeholders; defects return to owning Task with RED — PASS.
 
 ## Final Execution Contract
 
