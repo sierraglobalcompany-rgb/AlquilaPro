@@ -24,6 +24,10 @@ final class Permissions
             return true;
         }
 
+        if (($user['role'] ?? null) === 'tenant') {
+            return false;
+        }
+
         $permissions = is_array($user['permissions'] ?? null)
             ? self::sanitize($user['permissions'])
             : [];

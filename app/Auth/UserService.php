@@ -85,6 +85,47 @@ final readonly class UserService
         return (int) $this->pdo->lastInsertId();
     }
 
+    /** @return array{id:int,temporary_password:string} */
+    public function createTenantIdentity(string $name, string $email): array
+    {
+        $name = trim($name);
+        $email = strtolower(trim($email));
+
+        if ($name === '') {
+            throw new InvalidArgumentException('El nombre es obligatorio.');
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new InvalidArgumentException('El correo no es válido.');
+        }
+
+        $temporaryPassword = bin2hex(random_bytes(16));
+
+        try {
+            $statement = $this->pdo->prepare(
+                'INSERT INTO users '
+                . '(role, full_name, email, password_hash, is_active, permissions_json, must_change_password) '
+                . "VALUES ('tenant', :full_name, :email, :password_hash, 1, NULL, 1)",
+            );
+            $statement->execute([
+                'full_name' => $name,
+                'email' => $email,
+                'password_hash' => password_hash($temporaryPassword, PASSWORD_DEFAULT),
+            ]);
+        } catch (PDOException $exception) {
+            if ((string) $exception->getCode() === '23000') {
+                throw new RuntimeException('El correo ya está registrado.');
+            }
+
+            throw new RuntimeException('No fue posible crear el usuario.');
+        }
+
+        return [
+            'id' => (int) $this->pdo->lastInsertId(),
+            'temporary_password' => $temporaryPassword,
+        ];
+    }
+
     public function setActive(int $userId, bool $active): void
     {
         $statement = $this->pdo->prepare('SELECT role, is_active FROM users WHERE id = :id LIMIT 1');
@@ -120,11 +161,17 @@ final readonly class UserService
 
     public function setPermissions(int $userId, array $permissions): void
     {
-        $exists = $this->pdo->prepare('SELECT id FROM users WHERE id = :id LIMIT 1');
-        $exists->execute(['id' => $userId]);
+        $statement = $this->pdo->prepare('SELECT role FROM users WHERE id = :id LIMIT 1');
+        $statement->execute(['id' => $userId]);
+        $role = $statement->fetchColumn();
 
-        if ($exists->fetchColumn() === false) {
+        if (!is_string($role)) {
             throw new RuntimeException('El usuario no existe.');
+        }
+
+        $sanitizedPermissions = Permissions::sanitize($permissions);
+        if ($role === 'tenant' && $sanitizedPermissions !== []) {
+            throw new RuntimeException('El inquilino no puede recibir permisos administrativos.');
         }
 
         $update = $this->pdo->prepare(
@@ -132,7 +179,7 @@ final readonly class UserService
         );
         $update->execute([
             'id' => $userId,
-            'permissions_json' => $this->encodePermissions(Permissions::sanitize($permissions)),
+            'permissions_json' => $this->encodePermissions($sanitizedPermissions),
         ]);
     }
 

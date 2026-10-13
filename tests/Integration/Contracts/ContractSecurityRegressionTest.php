@@ -43,17 +43,21 @@ final class ContractSecurityRegressionTest extends TestCase
             'F7 must not grow a second runtime stack beyond Dompdf.',
         );
 
-        $contractPhp = implode("\n", [
-            $this->file('app/Contracts/ContractService.php'),
-            $this->file('app/Contracts/ContractPdfRenderer.php'),
-            $routes,
-        ]);
+        $contractService = $this->file('app/Contracts/ContractService.php');
+        $contractRenderer = $this->file('app/Contracts/ContractPdfRenderer.php');
+        $contractCore = implode("\n", [$contractService, $contractRenderer]);
+        self::assertStringNotContainsString(
+            'LeaseService',
+            $contractCore,
+            'F7 core must not absorb F8 lease domain logic.',
+        );
+
+        $contractPhp = implode("\n", [$contractCore, $routes]);
         foreach ([
             'ContractRepository',
             'TemplateService',
             'VariableResolver',
             'StorageService',
-            'LeaseService',
             'TenantService',
             'Twig',
             'Mustache',

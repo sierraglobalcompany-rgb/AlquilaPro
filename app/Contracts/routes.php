@@ -6,6 +6,7 @@ use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Contracts\ContractService;
+use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -14,6 +15,8 @@ use Slim\App;
 return static function (App $app, array $deps): void {
     /** @var ContractService $contracts */
     $contracts = $deps['contracts'];
+    /** @var LeaseService $leases */
+    $leases = $deps['leases'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -160,7 +163,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($adminGuard, $contracts, $view, $csrf, $versionOptions): ResponseInterface {
+    ) use ($adminGuard, $contracts, $leases, $view, $csrf, $versionOptions): ResponseInterface {
         $user = $adminGuard($response, 'contracts.view');
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -182,6 +185,7 @@ return static function (App $app, array $deps): void {
             'activeNav' => 'apps',
             'csrfToken' => $csrf->token(),
             'contract' => $contract,
+            'lease' => $leases->findByContract((int) $contract['id']),
             'previewHtml' => $previewHtml,
             'versionOptions' => $versionOptions((string) $contract['document_type']),
             'canManage' => Permissions::allows($user, 'contracts.manage'),

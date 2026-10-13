@@ -9,6 +9,7 @@ $annexesJson = $contract['annexes_json'] ?? '[]';
 $status = (string) $contract['status'];
 $isDraft = $status === 'draft';
 $isGenerated = $status === 'generated';
+$isFinalized = $status === 'finalized';
 $hasPdf = in_array($status, ['generated', 'finalized'], true);
 ?>
 <section class="surface">
@@ -40,6 +41,36 @@ $hasPdf = in_array($status, ['generated', 'finalized'], true);
         </article>
     </div>
 </section>
+
+<?php if ($isFinalized): ?>
+    <section class="surface">
+        <h2>Arrendamiento</h2>
+        <?php if ($lease === null): ?>
+            <p class="hint">El contrato está finalizado y todavía no tiene arrendamiento activo.</p>
+            <?php if ($canManage): ?>
+                <form method="post" action="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($contract['id']) ?>/lease">
+                    <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                    <button class="button" type="submit">Activar arrendamiento</button>
+                </form>
+            <?php endif; ?>
+        <?php else: ?>
+            <div>Inquilino: <?= $escape($lease['tenant_name']) ?></div>
+            <div>Correo: <?= $escape($lease['tenant_email']) ?></div>
+            <div>Activado: <?= $escape($lease['activated_at']) ?></div>
+            <?php if ($lease['is_active']): ?>
+                <p class="hint">Arrendamiento activo.</p>
+                <?php if ($canManage): ?>
+                    <form method="post" action="<?= $escape($basePath) ?>/admin/leases/<?= $escape($lease['id']) ?>/end">
+                        <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                        <button class="button" type="submit">Finalizar arrendamiento</button>
+                    </form>
+                <?php endif; ?>
+            <?php else: ?>
+                <p class="hint">Arrendamiento finalizado</p>
+            <?php endif; ?>
+        <?php endif; ?>
+    </section>
+<?php endif; ?>
 
 <?php if ($previewHtml !== null): ?>
     <section class="surface">

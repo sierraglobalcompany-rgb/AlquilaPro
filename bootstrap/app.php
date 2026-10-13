@@ -15,6 +15,7 @@ use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
 use AlquilaPro\Foundation\Installer;
 use AlquilaPro\Foundation\RuntimeRequirements;
+use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\Properties\PropertyService;
 use AlquilaPro\Properties\UnitMediaService;
 use AlquilaPro\UI\Branding;
@@ -151,6 +152,8 @@ return static function (array $settings): App {
             $candidates = new CandidateService($pdo, candidateDocumentService: $candidateDocuments);
             $screening = new ScreeningService($pdo, $candidates);
             $contracts = new ContractService($pdo, $candidates, $screening, $properties, $contractDirectory);
+            $users = new UserService($pdo);
+            $leases = new LeaseService($pdo, $users);
 
             $currentUser = static function () use ($session, $auth): ?array {
                 $userId = $session->userId(time());
@@ -179,7 +182,7 @@ return static function (array $settings): App {
             ];
 
             $authRoutes = require dirname(__DIR__) . '/app/Auth/routes.php';
-            $authRoutes($app, $shared + ['users' => new UserService($pdo)]);
+            $authRoutes($app, $shared + ['users' => $users]);
 
             $uiRoutes = require dirname(__DIR__) . '/app/UI/routes.php';
             $uiRoutes($app, $shared);
@@ -201,7 +204,16 @@ return static function (array $settings): App {
             ]);
 
             $contractRoutes = require dirname(__DIR__) . '/app/Contracts/routes.php';
-            $contractRoutes($app, $shared + ['contracts' => $contracts]);
+            $contractRoutes($app, $shared + [
+                'contracts' => $contracts,
+                'leases' => $leases,
+            ]);
+
+            $leaseRoutes = require dirname(__DIR__) . '/app/Leases/routes.php';
+            $leaseRoutes($app, $shared + [
+                'leases' => $leases,
+                'contracts' => $contracts,
+            ]);
         }
     }
 
