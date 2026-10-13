@@ -121,7 +121,7 @@ return static function (App $app, array $deps): void {
         string $token,
         ?string $error = null,
         int $status = 200,
-    ) use ($view, $csrf, $path, $properties, $candidateDocuments): ResponseInterface {
+    ) use ($view, $csrf, $path, $properties, $candidateDocuments, $screening): ResponseInterface {
         $continuePath = '/apply/continue/' . $token;
         $documentsByRequirement = [];
         foreach ($candidateDocuments->listDocumentsForCandidate((int) $candidate['id']) as $document) {
@@ -141,6 +141,7 @@ return static function (App $app, array $deps): void {
             'applicationRequirements' => $candidateDocuments->listRequirementsForUnit((int) $candidate['unit_id'], true),
             'documentsByRequirement' => $documentsByRequirement,
             'availableUnits' => $properties->listPublicUnits(null, null, null),
+            'screening' => $screening->publicForCandidate((int) $candidate['id']),
             'csrfToken' => $csrf->token(),
             'error' => $error,
         ]));
