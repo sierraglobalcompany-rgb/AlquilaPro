@@ -28,15 +28,15 @@
 - No new tenant route is planned: F9 extends existing `GET /tenant/leases/{id}`.
 - F9 adds zero public routes.
 - No delete/edit-in-place for an existing charge; correction is `void + create correct charge`.
-- All product tasks follow RED -> verify RED -> minimal GREEN -> focused GREEN -> commit/checkpoint.
+- Every product task follows RED -> verify RED -> minimal GREEN -> focused GREEN -> commit/checkpoint.
 - No F9 merge without explicit later authorization.
 
 ## Review Focus
 
-1. **Duplicate monthly charge under concurrency:** two attempts for the same lease/type/period must leave only one active rent and one active administration charge, using the canonical lease lock rather than a speculative dedupe table/key.
+1. **Duplicate monthly charge under concurrency:** two attempts for the same lease/type/period must never create a second active rent or administration charge; the canonical lease lock is the serialization authority, not a speculative dedupe table/key.
 2. **Money input boundary:** reject malformed, zero/negative, >2-decimal and out-of-range values; keep monetary authority as normalized decimal strings/DECIMAL rather than PHP float.
 3. **Calendar boundary:** `period_month` must be strict `YYYY-MM-01`; rent/admin period must fall between the first day of the contract start month and first day of the contract end month inclusive; overdue calculations use an injected/testable `today`.
-4. **Voided correction:** voiding removes a charge from current balance/overdue but preserves history; a voided monthly charge may be recreated for the same lease/type/period while a non-voided duplicate remains forbidden.
+4. **Partial monthly correction:** if one expected monthly type remains active and the other was voided/missing, regeneration creates only the missing/voided type; if every expected type is already active, the operation fails as a duplicate/no-op. This avoids forcing an unrelated valid charge to be voided.
 5. **Tenant isolation/XSS:** tenant detail may show only charges for the already-owned lease; manual `description` is escaped and staff-only void actor/reason metadata is not exposed.
 
 ---
@@ -126,7 +126,7 @@ Expected: FAIL only because migration/table `charges` is absent; pre-F9 schema t
 
 - [ ] **Step 3: Implement migration 009 only**
 
-Use `DECIMAL(12,2)` for `amount`, `DATE` for period/due dates, `DATETIME` actors/time fields, `VARCHAR(32)` type, `VARCHAR(500)` description/reason. No CHECK/enum/status/history table unless the existing migration style already has an approved equivalent and it does not create a second authority; service allowlists remain canonical validation.
+Use `DECIMAL(12,2)` for `amount`, `DATE` for period/due dates, `DATETIME` actor/time fields, `VARCHAR(32)` type, `VARCHAR(500)` description/reason. No CHECK/enum/status/history table unless the existing migration style already has an approved equivalent and it does not create a second authority; service allowlists remain canonical validation.
 
 - [ ] **Step 4: Verify GREEN**
 
@@ -169,11 +169,11 @@ Run `FinanceServiceTest` only. Expected: class/method missing failures.
 
 - [ ] **Step 4: Implement the minimal FinanceService boundary**
 
-Use prepared PDO only. Normalize money/date/period inside this one authority; manual creation uses a transaction and locks the target `lease FOR UPDATE` before inserting. Keep normalization helpers private—do not create Money/Date/Repository classes.
+Use prepared PDO only. Normalize money/date/period inside this one authority; manual creation validates the canonical lease exists and performs one INSERT. Do **not** lock the lease or open an otherwise-unnecessary transaction for a single manual INSERT: FK integrity plus the existing no-delete operational model is sufficient. Keep normalization helpers private—do not create Money/Date/Repository classes.
 
 - [ ] **Step 5: Implement canonical lease read projection**
 
-`listForLease()` queries only the supplied lease, orders current history deterministically (recommended `due_date ASC, id ASC` for tenant readability), derives state and days-overdue from the passed `today`, and returns no actor/reason fields in a tenant-safe projection helper later used by routes/views. Internal/admin projection may retain actor metadata, but do not duplicate SQL authorities.
+`listForLease()` queries only the supplied lease, orders history deterministically (recommended `due_date ASC, id ASC`), derives state and days-overdue from the passed `today`, and returns no staff-only void actor/reason fields to tenant composition. Include `id` because staff void forms need the charge identity; tenant views need not render it. Do not duplicate admin and tenant balance algorithms.
 
 - [ ] **Step 6: Verify GREEN**
 
@@ -199,15 +199,24 @@ Checkpoint records interface signatures and decimal/date boundary.
 
 - [ ] **Step 1: Write monthly RED tests**
 
-Assert `rent` amount comes exactly from contract `monthly_rent`; administration is created only when non-null and >0; both use one explicit period/due date; persisted amounts remain unchanged if source data is altered in a test fixture after creation; period must be `YYYY-MM-01`; the accepted monthly range is first day of `start_date` month through first day of `end_date` month inclusive; out-of-range period fails without rows.
+Assert `rent` amount comes exactly from contract `monthly_rent`; administration is expected only when non-null and >0; both use one explicit period/due date; persisted amounts remain unchanged if source data is altered in a test fixture after creation; period must be `YYYY-MM-01`; the accepted monthly range is first day of `start_date` month through first day of `end_date` month inclusive; out-of-range period fails without rows.
 
 - [ ] **Step 2: Write duplicate/correction RED tests**
 
-Assert a non-voided same `lease + type + period` duplicate fails; if the prior charge is voided, monthly generation can create the corrected active charge; a failed administration insert/validation rolls back the rent created in the same operation.
+Pin per-type behavior under the same lease lock:
+
+- when all expected monthly types for the period are already active, the operation fails as duplicate/no-op and creates nothing;
+- when rent is active but administration is missing/voided, preserve rent and create only administration if the contract expects it;
+- when administration is active but rent is missing/voided, preserve administration and create only rent;
+- when both are missing/voided, create both expected types;
+- a voided prior row never counts as an active duplicate;
+- if any new INSERT in the operation fails, roll back every new row created by that invocation while preserving pre-existing active rows.
+
+This is the minimal correction model: never duplicate a valid active charge and never force an unrelated valid counterpart to be voided.
 
 - [ ] **Step 3: Pin lock ordering structurally**
 
-Regression assertion verifies monthly generation begins a transaction and locks the canonical `lease FOR UPDATE` before any duplicate query/INSERT. Do not add a `dedupe_key`, unique-period table, or second lock authority.
+Regression assertion verifies monthly generation begins a transaction and locks the canonical `lease FOR UPDATE` before active-duplicate queries/INSERTs. Do not add a `dedupe_key`, unique-period table, or second lock authority.
 
 - [ ] **Step 4: Verify RED**
 
@@ -215,7 +224,7 @@ Run focused FinanceService monthly tests. Expected missing method/behavior failu
 
 - [ ] **Step 5: Implement minimal monthly transaction**
 
-Exact order: `BEGIN -> lease FOR UPDATE -> read contract -> normalize/range-check period and due date -> query non-voided rent/admin duplicates -> INSERT rent -> INSERT administration if fee > 0 -> COMMIT`. Any throwable rolls back all F9 writes.
+Exact order: `BEGIN -> lease FOR UPDATE -> read contract -> normalize/range-check period and due date -> read active rent/admin rows for this period -> determine only missing expected types -> if none missing then fail duplicate/no-op -> INSERT missing rent/admin rows -> COMMIT`. Any throwable rolls back only this invocation's new F9 writes.
 
 - [ ] **Step 6: Verify concurrency contract**
 
@@ -252,7 +261,7 @@ For controlled `today`, assert outstanding sums only non-voided charges; overdue
 
 - [ ] **Step 3: Write portfolio RED tests**
 
-Assert portfolio uses canonical joins `charges -> leases -> contracts -> users/units/properties`, aggregates one row per lease with history, excludes voided amounts from current totals but keeps the lease visible if it has only historical voided charges when that history is operationally useful, and never exposes a tenant/user outside the canonical lease relation.
+Assert portfolio uses canonical joins `charges -> leases -> contracts -> users/units/properties`, aggregates one row per lease with history, excludes voided amounts from current totals but keeps the lease visible if it has historical charge rows, and never associates a tenant/user outside the canonical lease relation.
 
 - [ ] **Step 4: Verify RED**
 
@@ -311,7 +320,7 @@ Monthly/manual/void successful POSTs return 303 to the owning existing contract 
 
 - [ ] **Step 4: Add exactly two permissions**
 
-Extend catalog with `finance.view`, `finance.manage`; preserve tenant fail-closed behavior and owner bypass. Update `UserServiceTest`/permission expectations accordingly—do not create per-charge permissions.
+Extend catalog with `finance.view`, `finance.manage`; preserve tenant fail-closed behavior and owner bypass. Update `UserServiceTest`/permission expectations accordingly—do not create per-charge permissions or implicit role-specific permission stacks.
 
 - [ ] **Step 5: Wire one shared FinanceService and one route file**
 
@@ -323,7 +332,7 @@ Follow existing local route style: current user -> forced-password -> permission
 
 - [ ] **Step 7: Add one staff Finance launcher card**
 
-Existing shared layout: `finance.view` shows `Cartera`/Finance card to `/admin/finance`; tenant branch remains Apps-free even with polluted permissions; empty-state condition includes finance permission. No new nav system or CSS.
+Existing shared layout: `finance.view` shows a `Cartera` card linking `/admin/finance`; tenant branch remains Apps-free even with polluted permissions; empty-state condition includes finance permission. No new nav system or CSS.
 
 - [ ] **Step 8: Verify GREEN**
 
@@ -357,7 +366,7 @@ Add/adjust regression assertion: `ContractService` + `ContractPdfRenderer` must 
 
 - [ ] **Step 3: Implement minimal route composition**
 
-Existing contract GET obtains existing lease projection first; if lease exists and current staff user can `finance.view`, pass `financeSummary` + `charges`; pass `canManageFinance` independently from `canManage` contracts. No finance mutation logic belongs in Contract routes.
+Existing contract GET obtains the existing lease projection first; if lease exists and current staff user can `finance.view`, pass `financeSummary` + `charges`; pass `canManageFinance` independently from contract-management permission. No finance mutation logic belongs in Contract routes.
 
 - [ ] **Step 4: Extend existing `contract_detail.php` only**
 
@@ -391,11 +400,11 @@ Owned lease detail displays outstanding, overdue, period, due date, amount, tena
 
 - [ ] **Step 2: Write privacy/XSS RED tests**
 
-Manual description containing HTML is escaped; tenant output omits `created_by_user_id`, `voided_by_user_id`, `void_reason`, other lease IDs/data, SQL/storage metadata and any staff mutation form.
+Manual description containing HTML is escaped; tenant output omits `created_by_user_id`, `voided_by_user_id`, `void_reason`, other lease data, SQL/storage metadata and all staff mutation forms.
 
 - [ ] **Step 3: Implement ownership-first composition**
 
-Keep F8 tenant guard unchanged. After `findForUser()` succeeds, pass FinanceService summary/list using the canonical lease ID. Do not move tenant ownership into FinanceService or accept user ID from request parameters.
+Keep F8 tenant guard unchanged. After `findForUser()` succeeds, pass FinanceService summary/list using the canonical owned lease ID. Do not move tenant ownership into FinanceService or accept user ID from request parameters.
 
 - [ ] **Step 4: Extend the existing tenant detail view**
 
@@ -481,6 +490,15 @@ Push exact closure HEAD and require a fresh PHP 8.3/8.4/8.5 PASS. If closure CI 
 PR base must be current accepted `main`; body includes architecture budget, F8 base, product + closure CI, changed-file audit, security/privacy, Two Laws PASS and `MERGE NOT AUTHORIZED`. Do not auto-merge, merge, start F10, or add optional improvements.
 
 ---
+
+## Self-Review Result
+
+1. **Spec coverage:** every F9 SPEC requirement maps to Tasks 1–8; F10/F11/F12/F14/F16/F20 surfaces remain explicitly excluded.
+2. **Step granularity:** each implementation step has one checkable output; no task requires an executor to invent a table/class/route/state outside the plan.
+3. **Type consistency:** FinanceService signatures are stable across tasks; `periodMonth` is nullable only for manual charges and strict first-of-month for recurrent charges; all monetary values are decimal strings.
+4. **Review Focus coverage:** concurrency, money/date boundaries, partial correction and tenant isolation each have owning RED tests.
+5. **Proportion/KISS:** plan defines decisions/interfaces/tests but does not transcribe method bodies; no second financial authority or future payment scaffold was introduced.
+6. **Anti-patch audit:** manual charge path no longer takes an unnecessary lease lock/transaction; monthly correction handles only missing expected types instead of forcing an unrelated valid counterpart to be voided.
 
 ## Final Execution Contract
 
