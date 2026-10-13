@@ -210,7 +210,10 @@ return static function (array $settings): App {
             ]);
 
             $leaseRoutes = require dirname(__DIR__) . '/app/Leases/routes.php';
-            $leaseRoutes($app, $shared + ['leases' => $leases]);
+            $leaseRoutes($app, $shared + [
+                'leases' => $leases,
+                'contracts' => $contracts,
+            ]);
         }
     }
 
