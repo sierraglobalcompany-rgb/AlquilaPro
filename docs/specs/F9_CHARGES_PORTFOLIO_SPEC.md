@@ -37,7 +37,9 @@ La implementación productiva F9 queda bloqueada hasta que:
 3. se fije el SHA base exacto de implementación F9;
 4. no existan bloqueos F8 que cambien `leases`, ownership tenant o portal.
 
-Esta SPEC puede diseñarse en paralelo, pero **no debe escribir producto F9 sobre una base F8 no auditada**.
+Esta rama de SPEC parte de `main` F7 únicamente para aislar documentación. **No es base autorizada de implementación F9**.
+
+La implementación F9 debe partir del F8 finalmente auditado/aceptado.
 
 ---
 
@@ -66,6 +68,14 @@ Orden obligatorio:
 F9 no debe crear por anticipado piezas pertenecientes a F10/F11/F12/F13/F16/F20.
 
 No se aceptan tablas vacías, tipos futuros, rutas futuras, estados de pago ficticios ni compatibilidad especulativa.
+
+## 3.1 Supersesiones ya demostradas
+
+La lista maestra V1.2 contiene candidatos históricos de persistencia como `tenants` y `lease_units`. F8 ya demostró que esos conceptos no requieren tablas propias: tenant = `users.role=tenant` y lease deriva la unidad mediante el contrato.
+
+Por lo tanto F9 **no puede resucitar `tenants`, `lease_units`, `tenant_users` ni `tenant_sessions`** por el solo hecho de aparecer como candidatos antiguos en la SPEC maestra.
+
+La implementación real más reciente y los checkpoints F8 prevalecen para esas decisiones ya convergidas.
 
 ---
 
@@ -134,11 +144,9 @@ Proyección F9:
 - `overdue` si no anulado y `due_date < today`;
 - `pending` en los demás casos.
 
-Los estados de la SPEC maestra que dependen de pagos/reportes (`partial`, `reported`, `proof_received`, `paid`) pertenecen a F11 y se derivarán de payments/reports/allocations.
+Los estados de la SPEC maestra que dependen de pagos/reportes (`partial`, `reported`, `proof_received`, `paid`) pertenecen a F11 y se derivarán de payments/reports/allocations cuando esas fuentes existan.
 
 `in_claim` pertenece a la futura integración de pólizas/reclamaciones y no se precrea en F9.
-
-Así se mantiene una única evolución del motor financiero sin estados imposibles antes de que existan sus fuentes.
 
 ## 4.5 Mora operativa, no interés legal
 
@@ -157,13 +165,11 @@ F9 no calcula:
 - honorarios;
 - penalidades legales.
 
-Cualquier cargo adicional de multa debe ser una acción administrativa explícita y justificable, nunca una consecuencia automática del reloj.
+Una multa es siempre una acción administrativa explícita y justificable, nunca una consecuencia automática del reloj.
 
 ---
 
 # 5. PRESUPUESTO ARQUITECTÓNICO F9
-
-Resultado esperado:
 
 ```text
 NEW_TABLES: 1
@@ -189,9 +195,9 @@ NEW_BALANCE_TABLES: 0
 NEW_STATUS_HISTORY_TABLES: 0
 ```
 
-`finance.view/manage` se justifican porque cartera/pagos constituyen una autoridad operativa distinta de contratos y serán reutilizados por F10/F11. No debe reutilizarse `contracts.manage` para autorizar movimientos financieros.
+`finance.view/manage` se justifican porque cartera/pagos constituyen una autoridad operativa distinta de contratos y serán reutilizados por F10/F11. No debe usarse `contracts.manage` como permiso financiero genérico.
 
-Owner conserva bypass según el sistema de permisos existente.
+Owner conserva bypass según el sistema existente.
 
 ---
 
@@ -208,25 +214,32 @@ due_date DATE NOT NULL
 amount DECIMAL(12,2) NOT NULL
 description VARCHAR(500) NULL
 created_by_user_id BIGINT UNSIGNED NULL
-created_at DATETIME NOT NULL
+created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 voided_by_user_id BIGINT UNSIGNED NULL
 voided_at DATETIME NULL
 void_reason VARCHAR(500) NULL
 ```
 
+No añadir columna `currency` en F9: los contratos F7 actuales tampoco modelan multi-moneda y V1 opera bajo una única moneda funcional. Multi-moneda requeriría una SPEC futura real, no una columna especulativa.
+
 ## 6.1 FK e índices
+
+FK:
 
 - `lease_id → leases.id ON DELETE RESTRICT`;
 - `created_by_user_id → users.id ON DELETE SET NULL`;
 - `voided_by_user_id → users.id ON DELETE SET NULL`.
 
-Índices mínimos:
+Índices aprobados:
 
-- `lease_id`;
-- `due_date`;
-- `type`;
-- `period_month`;
-- `voided_at` si el query plan real demuestra utilidad; evitar índices decorativos.
+```text
+KEY charges_lease_due_index (lease_id, due_date)
+KEY charges_lease_period_type_index (lease_id, period_month, type)
+KEY charges_created_by_user_index (created_by_user_id)
+KEY charges_voided_by_user_index (voided_by_user_id)
+```
+
+No crear índices separados de `type`, `period_month` o `voided_at` sin una consulta demostrada que los necesite.
 
 No cascade de cargos al borrar lease.
 
@@ -243,42 +256,48 @@ repair
 other
 ```
 
-No añadir `membership` todavía: la membresía entra en F20 y en ese momento se extiende la allowlist del mismo motor.
+No añadir `membership` todavía: la membresía entra en F20 y entonces extiende la allowlist del mismo motor.
 
-No añadir tipos específicos de servicios públicos; F12 puede llamar posteriormente al mismo motor con `service` y descripción/source contextual sin duplicar un motor.
+No añadir tipos específicos de servicios públicos: F12 podrá usar `service` con contexto/descripcion sin duplicar el motor financiero.
 
 ## 6.3 Reglas de monto
 
 - `amount > 0`;
 - máximo compatible con `DECIMAL(12,2)`;
-- 2 decimales normalizados en boundary de dominio;
-- no aceptar float como autoridad matemática si el proyecto puede conservar decimal/string seguro;
+- máximo 2 decimales;
+- boundary de dominio trabaja con decimal/string normalizado, no `float` como autoridad monetaria;
 - un cargo creado no se edita destructivamente.
 
-Si un cargo es incorrecto:
+Cargo incorrecto:
 
 `anular + crear cargo correcto`
 
-Esto conserva trazabilidad y evita una tabla de historial de ediciones.
+Esto conserva trazabilidad sin tabla de historial de ediciones.
 
-## 6.4 Período
+## 6.4 `description`
 
-`period_month` representa el primer día del mes del período (`YYYY-MM-01`).
+`description` es **concepto financiero visible al tenant**, no campo de notas internas.
 
-Reglas:
+Para `service|fine|repair|other` es obligatorio y debe explicar de manera breve el concepto cobrado sin PII innecesaria ni diagnóstico/nota interna sensible.
+
+Si un módulo futuro necesita evidencias o notas privadas, debe conservarlas en su propia autoridad y referenciar/generar el cargo de forma explícita; no sobrecargar `charges.description` como expediente.
+
+## 6.5 Período
+
+`period_month` representa el primer día del mes (`YYYY-MM-01`).
 
 - obligatorio para `rent|administration`;
 - opcional para `service|fine|repair|other`;
-- no existe `period_end` porque es derivable para visualización;
+- no existe `period_end` porque es derivable;
 - no existe tabla de períodos.
 
-## 6.5 Vencimiento
+## 6.6 Vencimiento
 
 `due_date` es explícito por cargo/período.
 
 F9 no infiere por ley ni por cron una fecha de vencimiento “correcta”.
 
-La UI puede reutilizar la última fecha elegida como comodidad visual solo si no se convierte en autoridad persistida paralela; la operación siempre confirma el vencimiento explícito.
+No persistir una segunda regla global de vencimiento en F9.
 
 ---
 
@@ -291,51 +310,53 @@ El contrato F7 ya congela:
 - `start_date`;
 - `end_date`.
 
-F9 debe leer estos valores a través del `lease → contract` canónico.
+F9 lee estos valores mediante `lease → contract`.
 
 ## 7.1 Operación mensual
 
-`FinanceService` expone una operación conceptual del tipo:
+Operación conceptual:
 
-`createMonthlyCharges(leaseId, periodMonth, dueDate, actorUserId)`
+`FinanceService::createMonthlyCharges(leaseId, periodMonth, dueDate, actorUserId)`
 
-Comportamiento:
+Orden mínimo:
 
 1. BEGIN;
-2. lock `lease` `FOR UPDATE`;
+2. `lease FOR UPDATE`;
 3. leer contrato asociado;
-4. validar `period_month` dentro del rango mensual del contrato;
-5. rechazar cargo `rent` no anulado duplicado para mismo lease/período;
+4. validar `period_month` dentro del rango mensual contractual;
+5. rechazar `rent` activo duplicado del mismo lease/período;
 6. crear `rent` por `contracts.monthly_rent`;
 7. si `administration_fee` es no-null y > 0, rechazar duplicado y crear `administration`;
 8. COMMIT;
 9. devolver cargos creados.
 
-No copiar a otra tabla los valores contractuales antes de crear el cargo.
+No copiar valores contractuales a otra autoridad antes de crear el cargo.
 
-El valor de cada cargo sí es snapshot financiero histórico: una vez creado, su `amount` no cambia aunque una fuente futura cambie.
+El `amount` del cargo creado sí es snapshot financiero histórico y no cambia después.
 
 ## 7.2 Duplicados y concurrencia
 
-No crear una columna artificial `dedupe_key` solo para facilitar este caso.
+No crear `dedupe_key` ni tabla de períodos.
 
-La regla de duplicado recurrente se resuelve dentro de la misma transacción, serializando por `lease FOR UPDATE` y consultando cargos `rent|administration` no anulados del mismo período.
+Serializar por `lease FOR UPDATE`, luego consultar cargos `rent|administration` no anulados del mismo `period_month`.
 
-Debe existir prueba de concurrencia/serialización suficiente para demostrar que dos intentos no generan dos cánones activos para el mismo lease/período.
+Dos intentos concurrentes no pueden producir dos cánones activos para el mismo lease/período.
 
-## 7.3 Arrendamiento terminado
+Debe probarse.
 
-F9 puede registrar cargos históricos/finales sobre un lease terminado.
+## 7.3 Lease terminado
 
-Para `rent|administration`, el período debe permanecer dentro de `contracts.start_date/end_date`.
+Se pueden registrar cargos históricos/finales sobre un lease terminado.
 
-F9 no infiere prorrateo por `ended_at` ni prohíbe retroactivamente completar un período contractual faltante. Esa decisión sigue siendo humana.
+Para `rent|administration`, el período debe estar dentro de `contracts.start_date/end_date`.
+
+F9 no infiere prorrateo a partir de `ended_at` ni bloquea completar retroactivamente un período contractual faltante.
 
 ---
 
 # 8. CARGOS MANUALES
 
-Tipos manuales F9:
+Tipos manuales:
 
 ```text
 service
@@ -346,78 +367,79 @@ other
 
 Operación conceptual:
 
-`createManualCharge(leaseId, type, amount, dueDate, description, periodMonth?, actorUserId)`
+`FinanceService::createManualCharge(leaseId, type, amount, dueDate, description, periodMonth?, actorUserId)`
 
 Reglas:
 
-- `finance.manage`;
-- lease debe existir;
-- type dentro de allowlist manual;
+- lease existente;
+- type en allowlist manual;
 - amount > 0;
-- `description` obligatoria y trim no vacío;
-- `period_month` opcional;
-- no modifica contrato, lease, candidate, screening ni unit status;
-- no crea pagos ni reportes;
-- no se genera automáticamente desde módulos futuros.
+- description obligatoria;
+- period opcional;
+- no modifica contract/lease/candidate/screening/unit status;
+- no crea pagos/reportes;
+- no se dispara automáticamente desde módulos futuros.
 
-F12/F14/F20 podrán llamar al mismo motor explícitamente en el futuro, pero F9 no crea esas integraciones todavía.
+`rent|administration` no entran por este camino, para no eludir reglas de snapshot/período/duplicado.
+
+F12/F14/F20 podrán invocar explícitamente este mismo motor en fases futuras; F9 no crea esas integraciones.
 
 ---
 
 # 9. ANULACIÓN
 
-No existe DELETE operativo de cargos.
+No existe DELETE operativo.
 
 Operación conceptual:
 
-`voidCharge(chargeId, actorUserId, reason, now)`
+`FinanceService::voidCharge(chargeId, actorUserId, reason, now)`
 
 Reglas:
 
 1. transaction;
-2. charge `FOR UPDATE`;
+2. `charge FOR UPDATE`;
 3. require `voided_at IS NULL`;
 4. reason obligatoria;
-5. guardar `voided_by_user_id`, `voided_at`, `void_reason` una sola vez;
-6. segundo intento falla cerrado y conserva actor/fecha/razón originales;
-7. no eliminar fila;
-8. no crear cargo sustituto automáticamente.
+5. guardar actor/time/reason una vez;
+6. segundo intento falla cerrado y preserva originales;
+7. no eliminar;
+8. no reemplazar automáticamente.
 
-Los cargos anulados:
+Cargo anulado:
 
-- quedan visibles como histórico;
-- no suman al saldo;
-- no suman a mora;
-- no pueden recibir pagos cuando F11 exista.
+- permanece en histórico;
+- no suma saldo;
+- no suma mora;
+- F11 no podrá aplicarle pagos.
+
+`void_reason` es administrativo; no se expone al tenant por defecto.
 
 ---
 
 # 10. SALDO Y CARTERA
 
-## 10.1 Saldo por lease en F9
+## 10.1 Saldo F9
 
 ```text
 outstanding = SUM(amount WHERE voided_at IS NULL)
 overdue = SUM(amount WHERE voided_at IS NULL AND due_date < today)
 ```
 
-F9 no guarda estas sumas.
+No persistir estas sumas.
 
-## 10.2 Días de mora
-
-Por cargo:
+## 10.2 Días vencidos
 
 ```text
 max(0, today - due_date)
 ```
 
-Para un cargo no vencido o anulado: `0`.
+Cargo anulado/no vencido: `0`.
 
 No persistir `days_overdue`.
 
 ## 10.3 Fecha actual
 
-La lógica de dominio que depende de “hoy” debe recibir el tiempo/fecha desde boundary testeable cuando sea necesario; evitar dependencias difíciles de probar a reloj global dentro de queries críticas.
+La lógica que depende de “hoy” debe recibir fecha/clock testeable desde su boundary en vez de esconder dependencias temporales dentro de queries imposibles de fijar en pruebas.
 
 ---
 
@@ -425,285 +447,264 @@ La lógica de dominio que depende de “hoy” debe recibir el tiempo/fecha desd
 
 ## 11.1 Cartera central
 
-Nueva ruta privada mínima:
+Ruta privada mínima:
 
 `GET /admin/finance`
 
 Requiere `finance.view`.
 
-Muestra una cartera operativa simple, no dashboard decorativo.
-
-Cada fila/agrupación debe permitir comprender como mínimo:
+Debe mostrar cartera operativa, no dashboard decorativo:
 
 - inquilino;
 - propiedad/unidad;
 - lease;
 - saldo total;
 - saldo vencido;
-- fecha del vencimiento más antiguo pendiente si existe;
-- acceso al contexto contractual/arrendamiento existente.
+- vencimiento pendiente más antiguo si existe;
+- acceso al contexto existente.
 
-Filtros mínimos solo si aportan valor real:
+Filtros solo si aportan valor real:
 
 - con mora / sin mora;
-- búsqueda simple por inquilino o unidad.
+- búsqueda simple inquilino/unidad.
 
-No crear charts, KPIs o analytics en F9.
+Sin charts/KPIs en F9.
 
-## 11.2 Contexto del lease/contract
+## 11.2 Contexto existente
 
-Reutilizar el detalle administrativo existente de F8/F7 para:
+Reutilizar detalle administrativo F8/F7 para:
 
-- mostrar cargos del lease;
-- generar canon/administración del período;
+- listar cargos del lease;
+- generar canon/administración;
 - crear cargo manual;
 - anular cargo.
 
-No crear CRUD separado de `charges` si el contexto existente resuelve la operación.
+No crear CRUD separado de charges si el contexto existente resuelve la operación.
 
-## 11.3 Mutaciones F9
-
-Rutas conceptuales máximas:
+## 11.3 Rutas F9
 
 ```text
+GET  /admin/finance
 POST /admin/leases/{id}/charges/monthly
 POST /admin/leases/{id}/charges
 POST /admin/charges/{id}/void
 ```
 
-Más:
+Total esperado: **4 rutas privadas**.
 
-`GET /admin/finance`
-
-Total F9 esperado: **4 rutas privadas**.
-
-No rutas públicas.
-
-Todas las mutaciones:
+Mutaciones:
 
 - auth existente;
 - forced-password gate;
 - `finance.manage`;
-- CSRF global;
+- global CSRF;
 - basePath;
-- PRG 303 cuando no haya secreto efímero.
+- PRG 303.
+
+0 rutas públicas.
 
 ---
 
-# 12. PORTAL DEL INQUILINO
+# 12. PORTAL TENANT
 
-No crear nuevas rutas tenant salvo que una prueba de UX demuestre necesidad.
+Preferencia KISS: **0 rutas tenant nuevas**.
 
-Preferencia F9:
-
-modificar el detalle existente:
+Extender:
 
 `GET /tenant/leases/{id}`
 
-para incluir:
+con:
 
 - saldo actual;
 - saldo vencido;
-- lista de cargos;
+- cargos;
 - período;
 - vencimiento;
 - monto;
-- estado derivado F9.
+- estado derivado.
 
-Ownership sigue siendo la misma autoridad F8:
+Ownership sigue siendo F8:
 
 `leases.user_id = session user.id`
 
-La capa financiera no recibe `user_id` del navegador como ownership.
+FinanceService no acepta `user_id` del navegador como autoridad de ownership.
 
-Los cargos de otro lease/tenant nunca deben filtrarse lateralmente.
-
-No crear `/tenant/payments` en F9.
+No `/tenant/payments` en F9.
 
 ---
 
 # 13. PROYECCIÓN Y PRIVACIDAD
 
-Proyección tenant de cargos debe incluir solo campos necesarios:
+Proyección tenant mínima:
 
-- charge id si la ruta/vista privada realmente lo requiere;
 - type traducible;
 - period_month;
 - due_date;
 - amount;
-- description pública/operativa;
-- estado derivado;
+- description;
+- derived state;
 - days_overdue.
+
+Incluir `charge.id` solo si la vista/ruta privada realmente lo necesita.
 
 No exponer:
 
-- actores internos;
-- IDs administrativos innecesarios;
-- razones internas sensibles si se decide mantener `void_reason` solo admin;
-- query SQL/raw metadata.
+- created/void actor IDs;
+- `void_reason` por defecto;
+- metadata interna;
+- SQL;
+- campos de otros leases.
 
-Toda salida HTML escapada.
+HTML siempre escapado.
 
 ---
 
 # 14. PERMISOS
-
-Nuevos permisos F9:
 
 ```text
 finance.view
 finance.manage
 ```
 
-Reglas:
-
 - owner bypass existente;
-- `finance.manage` no implica crear usuarios ni contratos;
-- viewer puede leer cartera/cargos pero no mutar;
-- tenant no obtiene estos permisos y accede solo a su proyección ownership-first;
-- no crear permisos por tipo de cargo.
+- viewer lee cartera/cargos pero no muta;
+- tenant no recibe permisos financieros staff;
+- tenant accede solo por ownership F8;
+- no permisos por tipo de cargo.
 
 ---
 
 # 15. INTEGRIDAD Y TRANSACCIONES
 
-Transacción obligatoria en:
+Transacciones obligatorias en:
 
-- generación mensual;
-- creación manual si existen validaciones de concurrencia que dependan del lease;
-- anulación.
+- monthly generation;
+- manual creation cuando usa lock/validación de lease;
+- void.
 
-Lock mínimo propietario:
+Locks mínimos:
 
-- monthly generation: `lease FOR UPDATE`;
+- monthly/manual: `lease FOR UPDATE` cuando la integridad dependa de ese lease;
 - void: `charge FOR UPDATE`.
 
-No lockear tablas enteras.
+No locks de tabla completa.
 
-No mantener transacciones abiertas durante render o IO externo.
+No transacciones durante render ni IO externo.
 
 F9 no hace IO externo.
 
 ---
 
-# 16. NO AUTOMATIZACIÓN TEMPORAL EN F9
+# 16. NO AUTOMATIZACIÓN TEMPORAL
 
-F9 no genera automáticamente cargos al cambiar de mes.
+F9 no genera cargos automáticamente al cambiar de mes.
 
 No cron.
 
 No scheduler.
 
-No background worker.
+No worker.
 
-No “catch up” automático.
+No catch-up automático.
 
-Generación mensual es una acción explícita del administrador.
+La generación mensual es acción explícita del administrador.
 
-F16 podrá automatizar invocaciones idempotentes al mismo motor si luego se aprueba.
-
-Esto evita crear en F9 un segundo motor de recordatorios/cron antes de su fase.
+F16 podrá automatizar invocaciones idempotentes al mismo motor si se aprueba posteriormente.
 
 ---
 
 # 17. NO INCLUIDO
 
-F9 excluye explícitamente:
+F9 excluye:
 
 - medios de pago (F10);
-- pagos (F11);
-- allocations (F11);
-- reporte de pago/comprobante (F11);
-- conciliación (F11);
-- detección de duplicado de pagos (F11);
-- servicios estructurados/utility periods (F12);
-- reclamaciones de póliza (F13);
-- tickets que generen cargo automáticamente (F14);
-- recordatorios/cron/email (F16);
-- membresía (F20);
-- bono (F21);
-- liquidación de terminación (F21/F22 según roadmap vigente);
+- payments/allocations/reportes/conciliación (F11);
+- utility periods/servicios estructurados (F12);
+- claims (F13);
+- auto-charge desde tickets (F14);
+- cron/reminders/email (F16);
+- membership (F20);
+- bono/liquidación (fases posteriores);
 - interés moratorio automático;
 - contabilidad/facturación electrónica;
 - exportaciones;
-- dashboards analíticos.
+- analytics decorativa.
 
 ---
 
-# 18. PRUEBAS OBLIGATORIAS — CONTRATO TDD
+# 18. PRUEBAS OBLIGATORIAS — TDD
 
-## 18.1 Schema
+## Schema
 
-- F9 crea exactamente `charges`;
+- exactamente `charges` como nueva tabla F9;
 - columnas exactas;
 - FK lease RESTRICT;
 - actors SET NULL;
-- no payment/allocations/balance/status-history tables;
-- no status column;
-- no paid/outstanding columns.
+- índices exactos aprobados;
+- no payments/allocations/balance/status-history tables;
+- no status/paid/outstanding columns.
 
-## 18.2 FinanceService — monthly
+## Monthly
 
-- crea rent desde `contracts.monthly_rent`;
-- crea administration solo si `administration_fee > 0`;
-- snapshot de amount queda inmutable;
-- period obligatorio y normalizado;
-- period fuera de contract start/end falla;
-- same lease/type/period no duplica cargo activo;
-- cargo previamente voided permite corrección/recreación;
-- serialización por lease evita doble canon concurrente;
-- no muta contract/lease/unit/candidate/screening.
+- rent desde contract monthly_rent;
+- administration solo si >0;
+- snapshot inmutable;
+- period obligatorio/normalizado;
+- fuera de rango contractual falla;
+- duplicate activo same lease/type/period falla;
+- voided permite corrección/recreación;
+- concurrencia no duplica canon;
+- no side effects en contract/lease/unit/candidate/screening.
 
-## 18.3 Manual charge
+## Manual
 
 - allowlist exacta;
-- rent/admin no entran por camino manual genérico si eso elude reglas recurrentes;
-- amount <=0 falla;
-- description faltante falla;
+- rent/admin rechazados por camino manual;
+- amount inválido falla;
+- description requerida;
 - optional period válido;
 - ended lease permite cargos finales/manuales;
-- no side effects externos.
+- no future side effects.
 
-## 18.4 Void
+## Void
 
 - primer void guarda actor/time/reason;
 - segundo falla cerrado;
-- originales se preservan;
-- row no se elimina;
-- void deja saldo/mora fuera;
-- no auto-replacement.
+- originales preservados;
+- row permanece;
+- sale de saldo/mora;
+- no replacement automático.
 
-## 18.5 Balance/overdue
+## Portfolio
 
-- saldo suma solo no anulados;
-- overdue usa due_date y fecha inyectada/controlada;
-- days_overdue exacto;
-- no se persiste balance;
-- no se persiste overdue/status.
+- saldo solo no anulados;
+- overdue por due date/clock controlado;
+- days overdue exactos;
+- no persistencia de balance/status.
 
-## 18.6 Admin routes
+## Admin routes
 
 - auth;
-- password gate;
-- finance.view/manage;
+- forced password;
+- finance permissions;
 - owner bypass;
 - CSRF;
 - basePath;
 - viewer no muta;
-- monthly/manual/void PRG correcto;
-- cartera no contiene módulos futuros.
+- PRG;
+- no future UI.
 
-## 18.7 Tenant
+## Tenant
 
-- solo owned lease;
+- owned lease only;
 - IDOR fail closed;
-- saldo/cargos propios visibles;
-- cargo de otro tenant ausente;
-- voided histórico no suma balance;
-- HTML escapado;
-- no payment UI futura.
+- propios cargos/saldo visibles;
+- foreign absent;
+- voided no suma;
+- XSS escaped;
+- no payment UI.
 
-## 18.8 Security/architecture regression
+## Security/architecture regression
 
 Congelar:
 
@@ -712,12 +713,13 @@ Congelar:
 1 FinanceService
 1 Finance route file max
 2 finance permissions
-4 private routes max
+4 private F9 routes max
 0 public routes
-0 payments tables
+0 payment tables
 0 direct dependencies
 0 cron
 0 future module UI
+0 tenant/lease duplicate tables
 ```
 
 ---
@@ -739,56 +741,54 @@ Congelar:
 
 - `app/Auth/Permissions.php`
 - `bootstrap/app.php`
-- contexto admin F8/F7 que muestre el lease/cargos;
-- `resources/views/contract_detail.php` o la autoridad administrativa exacta que quede tras F8 final;
+- autoridad administrativa exacta que quede tras F8 final;
+- `resources/views/contract_detail.php` o vista equivalente real de contexto lease;
 - `resources/views/tenant_lease_detail.php`;
-- tests de shell/launcher solo si se añade launcher Finance real;
-- `README.md` y checkpoints al cierre.
+- shell/launcher tests solo si se publica launcher Finance real;
+- README/checkpoints al cierre.
 
-El mapa final debe contrastarse contra el F8 cerrado antes de congelar PLAN.
+Este mapa es provisional hasta contrastarlo con el F8 final auditado.
 
 ---
 
 # 20. UX KISS
 
-F9 debe ser mobile-first reutilizando componentes existentes.
+Mobile-first y componentes existentes.
 
 No CSS nuevo salvo defecto reproducido.
 
-Preferencias:
+Preferir:
 
-- tarjetas/listas ya existentes;
-- formularios SSR;
+- cards/lists actuales;
+- SSR forms;
 - HTML nativo;
-- `input type=date`;
-- `input type=month` si el soporte actual y pruebas lo permiten, normalizando server-side;
+- date/month inputs con normalización server-side;
 - confirmación explícita para anular;
-- sin modales/JS nuevos si una página/form normal resuelve.
+- sin modal/JS nuevo si un form normal resuelve.
 
 ---
 
 # 21. GATE ANTIPARCHES
 
-Toda corrección durante F9 sigue:
+Toda reparación F9:
 
 `REPRODUCE → ROOT CAUSE → OWNING AUTHORITY → CONVERGE/SIMPLIFY → MINIMAL GREEN → REMOVE SUPERSEDED LOGIC → REGRESSION`
 
 No aceptar:
 
-- `if` lateral para esconder un estado inválido;
-- segunda query que contradiga la autoridad de FinanceService;
-- balance calculado distinto en admin y tenant;
-- lógica de overdue duplicada en views;
-- tipo de cargo inventado solo para un formulario;
-- columnas cacheadas para evitar una query pequeña.
+- if lateral para esconder estado inválido;
+- balance calculado diferente en admin/tenant;
+- overdue duplicado en views;
+- segunda autoridad SQL contradictoria;
+- tipos inventados por UI;
+- campos cacheados para evitar queries simples;
+- guards relajados globalmente para hacer pasar F9.
 
-Las views reciben proyecciones ya coherentes; no deciden reglas financieras.
+Views presentan; FinanceService/domain authority decide.
 
 ---
 
 # 22. GATE DE CIERRE F9
-
-Antes de declarar F9 CLOSED:
 
 ```text
 LEY_1_KISS: PASS
@@ -806,54 +806,72 @@ NEW_CRON_JOBS: 0
 
 Además:
 
-- focused F9 suite PASS;
+- focused F9 PASS;
 - full suite PASS;
 - Composer validate PASS;
 - CI PHP 8.3/8.4/8.5 PASS;
-- diff completo auditado;
+- product diff completo auditado;
 - tenant ownership/IDOR PASS;
-- no future-module leakage;
-- documentación convergida;
-- merge separado y no automático.
+- no future leakage;
+- docs convergidas;
+- merge separado/no automático.
 
 ---
 
-# 23. DECISIONES CONGELADAS POR ESTA SPEC
+# 23. DECISIONES CONGELADAS
 
 1. F9 = cargos + cartera, no pagos.
-2. Una sola tabla nueva: `charges`.
-3. Una sola clase financiera: `FinanceService`.
-4. Los saldos son derivados.
-5. `charges.status` no existe.
-6. F9 solo proyecta `pending|overdue|voided`.
-7. Estados de pago se incorporan cuando existan las fuentes F11.
-8. Mora F9 no calcula intereses.
-9. Canon/administración toman snapshot desde contrato F7 al crear el cargo.
-10. Generación mensual es manual/expresa en F9.
+2. Una tabla nueva: `charges`.
+3. Una clase financiera: `FinanceService`.
+4. Saldos derivados.
+5. Sin `charges.status`.
+6. F9 proyecta `pending|overdue|voided`.
+7. Estados de pago esperan F11.
+8. Mora no calcula intereses.
+9. Rent/admin snapshot desde contrato F7 al crear cargo.
+10. Generación mensual manual en F9.
 11. No cron antes de F16.
-12. Anulación, no delete/edit destructivo.
-13. Tenant reutiliza rutas/portal F8; no segundo portal financiero.
-14. `finance.view/manage` son la autoridad staff para F9–F11.
-15. F9 no precrea membresía, payment methods, payments ni allocations.
-16. La implementación debe partir del F8 finalmente auditado, no del branch de diseño F9 basado en F7.
+12. Anular, no delete/edit destructivo.
+13. Tenant reutiliza portal F8.
+14. `finance.view/manage` son autoridad staff F9–F11.
+15. Sin membership/payment methods/payments/allocations anticipados.
+16. Sin `tenants/lease_units` reintroducidos.
+17. La implementación parte del F8 finalmente auditado, no de esta rama docs basada en F7.
 
 ---
 
-# 24. GATE DE APROBACIÓN
+# 24. AUTOAUDITORÍA DE DISEÑO — 10 PASADAS
+
+1. **Scope:** F9 queda limitada a cargos/cartera; PASS.
+2. **KISS:** 1 tabla + 1 clase + 1 route file; PASS.
+3. **Cero Ruido:** no pagos/allocations/membership/cron adelantados; PASS.
+4. **Autoridades:** lease/contract/user reutilizados; PASS.
+5. **Estado:** saldo/status/overdue derivados, no duplicados; PASS.
+6. **Concurrencia:** lease lock para recurrentes, charge lock para void; PASS.
+7. **Seguridad:** auth/CSRF/permissions/basePath/tenant ownership heredados; PASS.
+8. **UX:** contexto existente + una cartera central, sin CRUD paralelo; PASS.
+9. **Evolución:** F10/F11 extienden el mismo motor sin tablas placeholder; PASS.
+10. **Antiparches:** repair protocol y authority-first congelados; PASS.
+
+No se encontró motivo demostrado para una segunda tabla F9, segunda clase de dominio, status persistido o automatización cron.
+
+---
+
+# 25. GATE DE APROBACIÓN
 
 ```text
-F9_PRE_KISS: PROPOSED
+F9_PRE_KISS: READY FOR USER REVIEW
 F9_SPEC: DRAFT / USER REVIEW REQUIRED
 F9_PLAN: NOT AUTHORIZED YET
 F9_IMPLEMENTATION: BLOCKED
 F8_DEPENDENCY: WAITING FINAL AUDIT
 ```
 
-Siguiente paso después de aprobación explícita de esta SPEC:
+Después de aprobación explícita de esta SPEC:
 
 1. contrastar contra F8 final auditado;
-2. ajustar mapa de archivos si la autoridad real cambió;
+2. ajustar mapa de archivos a la autoridad real;
 3. escribir PLAN F9 task-by-task;
 4. auditar PLAN bajo KISS/Cero Ruido/Antiparches;
-5. generar prompt maestro Markdown para Codex Luna;
-6. solo entonces abrir implementación F9.
+5. generar prompt maestro Markdown descargable para Codex Luna;
+6. abrir implementación F9 solo sobre base F8 autorizada.
