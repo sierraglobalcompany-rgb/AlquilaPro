@@ -7,6 +7,7 @@ use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Candidates\CandidateDocumentService;
 use AlquilaPro\Candidates\CandidateService;
+use AlquilaPro\Candidates\ScreeningService;
 use AlquilaPro\Properties\PropertyService;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
@@ -19,6 +20,8 @@ return static function (App $app, array $deps): void {
     $candidates = $deps['candidates'];
     /** @var CandidateDocumentService $candidateDocuments */
     $candidateDocuments = $deps['candidate_documents'];
+    /** @var ScreeningService $screening */
+    $screening = $deps['screening'];
     /** @var PropertyService $properties */
     $properties = $deps['properties'];
     /** @var View $view */
@@ -118,7 +121,7 @@ return static function (App $app, array $deps): void {
         string $token,
         ?string $error = null,
         int $status = 200,
-    ) use ($view, $csrf, $path, $properties, $candidateDocuments): ResponseInterface {
+    ) use ($view, $csrf, $path, $properties, $candidateDocuments, $screening): ResponseInterface {
         $continuePath = '/apply/continue/' . $token;
         $documentsByRequirement = [];
         foreach ($candidateDocuments->listDocumentsForCandidate((int) $candidate['id']) as $document) {
@@ -138,6 +141,7 @@ return static function (App $app, array $deps): void {
             'applicationRequirements' => $candidateDocuments->listRequirementsForUnit((int) $candidate['unit_id'], true),
             'documentsByRequirement' => $documentsByRequirement,
             'availableUnits' => $properties->listPublicUnits(null, null, null),
+            'screening' => $screening->publicForCandidate((int) $candidate['id']),
             'csrfToken' => $csrf->token(),
             'error' => $error,
         ]));
@@ -240,7 +244,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($adminGuard, $candidates, $candidateDocuments, $view, $csrf): ResponseInterface {
+    ) use ($adminGuard, $candidates, $candidateDocuments, $screening, $view, $csrf): ResponseInterface {
         $user = $adminGuard($response, 'candidates.view');
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -258,10 +262,43 @@ return static function (App $app, array $deps): void {
             'csrfToken' => $csrf->token(),
             'candidate' => $candidate,
             'documents' => $candidateDocuments->listDocumentsForCandidate((int) $candidate['id']),
+            'screening' => $screening->findForCandidate((int) $candidate['id']),
             'canManageCandidates' => Permissions::allows($user, 'candidates.manage'),
         ]));
 
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    });
+
+    $app->post('/admin/candidates/{id:[0-9]+}/screening', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminGuard, $candidates, $screening, $path): ResponseInterface {
+        $user = $adminGuard($response, 'candidates.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $candidateId = (int) $args['id'];
+        if ($candidates->findCandidate($candidateId) === null) {
+            return $response->withStatus(404);
+        }
+
+        $body = (array) ($request->getParsedBody() ?? []);
+        unset($body['csrf_token']);
+
+        try {
+            if ($screening->findForCandidate($candidateId) === null) {
+                $screening->createForCandidate($candidateId, (int) $user['id'], $body, time());
+            } else {
+                $screening->updateForCandidate($candidateId, $body, time());
+            }
+        } catch (RuntimeException $exception) {
+            $response->getBody()->write($exception->getMessage());
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+
+        return $response->withHeader('Location', $path('/admin/candidates/' . $candidateId))->withStatus(303);
     });
 
     $app->post('/admin/candidates/{id:[0-9]+}/status', static function (

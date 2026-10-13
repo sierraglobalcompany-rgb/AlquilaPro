@@ -13,9 +13,17 @@ $applicationRequirements = is_array($applicationRequirements ?? null) ? array_va
 $documentsByRequirement = is_array($documentsByRequirement ?? null) ? $documentsByRequirement : [];
 $availableUnits = is_array($availableUnits ?? null) ? $availableUnits : [];
 $references = is_array($candidate['references'] ?? null) ? array_values($candidate['references']) : [];
+$screening = is_array($screening ?? null) ? $screening : null;
 $csrfToken = (string) ($csrfToken ?? '');
 $error = is_string($error ?? null) ? $error : null;
 $editable = in_array((string) ($candidate['status'] ?? ''), ['new', 'incomplete'], true);
+$screeningStatusLabel = match ((string) ($screening['status'] ?? '')) {
+    'pending' => 'Pendiente',
+    'in_progress' => 'En estudio',
+    'approved' => 'Aprobado',
+    'rejected' => 'No aprobado',
+    default => (string) ($screening['status'] ?? ''),
+};
 ?>
 <section>
     <p class="eyebrow">Solicitud de arrendamiento</p>
@@ -221,6 +229,37 @@ $editable = in_array((string) ($candidate['status'] ?? ''), ['new', 'incomplete'
         </section>
     <?php else: ?>
         <p>Esta solicitud ya no admite edición pública.</p>
+    <?php endif; ?>
+
+    <?php if ($screening !== null): ?>
+        <section>
+            <h2>Estudio de aseguradora</h2>
+            <dl>
+                <dt>Proveedor</dt><dd><?= $escape($screening['provider'] ?? '') ?></dd>
+                <?php if (($screening['product'] ?? null) !== null): ?>
+                    <dt>Producto</dt><dd><?= $escape($screening['product']) ?></dd>
+                <?php endif; ?>
+                <dt>Estado</dt><dd><?= $escape($screeningStatusLabel) ?></dd>
+                <?php if (($screening['contact_email'] ?? null) !== null): ?>
+                    <dt>Contacto</dt><dd><?= $escape($screening['contact_email']) ?></dd>
+                <?php endif; ?>
+                <?php if (($screening['started_at'] ?? null) !== null): ?>
+                    <dt>Inicio</dt><dd><?= $escape($screening['started_at']) ?></dd>
+                <?php endif; ?>
+                <?php if (($screening['result'] ?? null) !== null): ?>
+                    <dt>Resultado</dt><dd><?= $escape($screening['result']) ?></dd>
+                <?php endif; ?>
+                <?php if (($screening['result_at'] ?? null) !== null): ?>
+                    <dt>Fecha de resultado</dt><dd><?= $escape($screening['result_at']) ?></dd>
+                <?php endif; ?>
+            </dl>
+
+            <?php if (($screening['portal_url'] ?? null) !== null): ?>
+                <p><a class="button button--quiet" href="<?= $escape($screening['portal_url']) ?>" target="_blank" rel="noopener noreferrer">Abrir estudio</a></p>
+            <?php elseif (in_array((string) ($screening['status'] ?? ''), ['pending', 'in_progress'], true)): ?>
+                <p class="hint">No hay enlace externo disponible para este estudio.</p>
+            <?php endif; ?>
+        </section>
     <?php endif; ?>
 
     <p><a href="<?= $escape($basePath) ?>/catalog">Volver al catálogo</a></p>

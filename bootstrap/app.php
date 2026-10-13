@@ -8,6 +8,7 @@ use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Auth\UserService;
 use AlquilaPro\Candidates\CandidateDocumentService;
 use AlquilaPro\Candidates\CandidateService;
+use AlquilaPro\Candidates\ScreeningService;
 use AlquilaPro\Foundation\DatabaseConfig;
 use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
@@ -146,6 +147,7 @@ return static function (array $settings): App {
             $unitMedia = new UnitMediaService($pdo, $unitMediaDirectory);
             $candidateDocuments = new CandidateDocumentService($pdo, $candidateDocumentDirectory);
             $candidates = new CandidateService($pdo, candidateDocumentService: $candidateDocuments);
+            $screening = new ScreeningService($pdo, $candidates);
 
             $currentUser = static function () use ($session, $auth): ?array {
                 $userId = $session->userId(time());
@@ -191,6 +193,7 @@ return static function (array $settings): App {
                 'candidates' => $candidates,
                 'candidate_documents' => $candidateDocuments,
                 'properties' => $properties,
+                'screening' => $screening,
             ]);
         }
     }

@@ -1,0 +1,22 @@
+CREATE TABLE screening_processes (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    candidate_id BIGINT UNSIGNED NOT NULL,
+    provider VARCHAR(120) NOT NULL,
+    product VARCHAR(190) NULL,
+    status VARCHAR(32) NOT NULL,
+    contact_email VARCHAR(190) NULL,
+    portal_url VARCHAR(2048) NULL,
+    result TEXT NULL,
+    notes TEXT NULL,
+    support_reference VARCHAR(255) NULL,
+    responsible_user_id BIGINT UNSIGNED NULL,
+    started_at DATETIME NULL,
+    result_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY screening_processes_candidate_unique (candidate_id),
+    KEY screening_processes_responsible_user_index (responsible_user_id),
+    CONSTRAINT screening_processes_candidate_fk FOREIGN KEY (candidate_id) REFERENCES candidates (id) ON DELETE CASCADE,
+    CONSTRAINT screening_processes_responsible_user_fk FOREIGN KEY (responsible_user_id) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

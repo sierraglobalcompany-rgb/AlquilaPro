@@ -10,6 +10,17 @@ $allowedTransitions = match ((string) $candidate['status']) {
     'pending_screening' => ['withdrawn'],
     default => [],
 };
+$screening = is_array($screening ?? null) ? $screening : null;
+$screeningStatus = (string) ($screening['status'] ?? '');
+$screeningTerminal = in_array($screeningStatus, ['approved', 'rejected'], true);
+$screeningEditable = $canManageCandidates
+    && (string) $candidate['status'] === 'pending_screening'
+    && !$screeningTerminal;
+$screeningTransitions = match ($screeningStatus) {
+    'pending' => ['pending', 'in_progress', 'approved', 'rejected'],
+    'in_progress' => ['in_progress', 'approved', 'rejected'],
+    default => [],
+};
 ?>
 <section class="surface">
     <p class="eyebrow"><a href="<?= $escape($basePath) ?>/admin/candidates">Candidatos</a></p>
@@ -84,6 +95,86 @@ $allowedTransitions = match ((string) $candidate['status']) {
                 <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/documents/<?= $escape($document['id']) ?>">Abrir documento</a>
             </article>
         <?php endforeach; ?>
+    <?php endif; ?>
+</section>
+
+<section class="surface">
+    <h2>Estudio de aseguradora</h2>
+    <?php if ($screening === null): ?>
+        <?php if ($screeningEditable): ?>
+            <form method="post" action="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/screening">
+                <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                <label>Proveedor
+                    <input type="text" name="provider" value="SURA" maxlength="120" required>
+                </label>
+                <label>Producto
+                    <input type="text" name="product" maxlength="190">
+                </label>
+                <label>Correo de contacto
+                    <input type="email" name="contact_email" maxlength="190">
+                </label>
+                <label>URL del estudio
+                    <input type="url" name="portal_url" maxlength="2048">
+                </label>
+                <label>Notas internas
+                    <textarea name="notes"></textarea>
+                </label>
+                <label>Soporte / radicado
+                    <input type="text" name="support_reference" maxlength="255">
+                </label>
+                <button type="submit">Crear estudio</button>
+            </form>
+        <?php else: ?>
+            <p class="empty-state">No hay estudio de aseguradora registrado.</p>
+        <?php endif; ?>
+    <?php elseif ($screeningEditable): ?>
+        <form method="post" action="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/screening">
+            <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+            <label>Proveedor
+                <input type="text" name="provider" value="<?= $escape($screening['provider']) ?>" maxlength="120" required>
+            </label>
+            <label>Producto
+                <input type="text" name="product" value="<?= $escape($screening['product'] ?? '') ?>" maxlength="190">
+            </label>
+            <label>Estado
+                <select name="status" required>
+                    <?php foreach ($screeningTransitions as $status): ?>
+                        <option value="<?= $escape($status) ?>"<?= $status === $screeningStatus ? ' selected' : '' ?>><?= $escape($status) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>Correo de contacto
+                <input type="email" name="contact_email" value="<?= $escape($screening['contact_email'] ?? '') ?>" maxlength="190">
+            </label>
+            <label>URL del estudio
+                <input type="url" name="portal_url" value="<?= $escape($screening['portal_url'] ?? '') ?>" maxlength="2048">
+            </label>
+            <label>Resultado
+                <textarea name="result"><?= $escape($screening['result'] ?? '') ?></textarea>
+            </label>
+            <label>Notas internas
+                <textarea name="notes"><?= $escape($screening['notes'] ?? '') ?></textarea>
+            </label>
+            <label>Soporte / radicado
+                <input type="text" name="support_reference" value="<?= $escape($screening['support_reference'] ?? '') ?>" maxlength="255">
+            </label>
+            <button type="submit">Actualizar estudio</button>
+        </form>
+    <?php else: ?>
+        <dl>
+            <dt>Proveedor</dt><dd><?= $escape($screening['provider']) ?></dd>
+            <dt>Producto</dt><dd><?= $escape($screening['product'] ?? '') ?></dd>
+            <dt>Estado</dt><dd><?= $escape($screening['status']) ?></dd>
+            <dt>Correo de contacto</dt><dd><?= $escape($screening['contact_email'] ?? '') ?></dd>
+            <dt>URL</dt><dd><?= $escape($screening['portal_url'] ?? '') ?></dd>
+            <dt>Resultado</dt><dd><?= $escape($screening['result'] ?? '') ?></dd>
+            <dt>Notas</dt><dd><?= $escape($screening['notes'] ?? '') ?></dd>
+            <dt>Soporte / radicado</dt><dd><?= $escape($screening['support_reference'] ?? '') ?></dd>
+            <dt>Inicio</dt><dd><?= $escape($screening['started_at'] ?? '') ?></dd>
+            <dt>Resultado registrado</dt><dd><?= $escape($screening['result_at'] ?? '') ?></dd>
+            <dt>Creado</dt><dd><?= $escape($screening['created_at'] ?? '') ?></dd>
+            <dt>Actualizado</dt><dd><?= $escape($screening['updated_at'] ?? '') ?></dd>
+        </dl>
     <?php endif; ?>
 </section>
 
