@@ -146,6 +146,13 @@ final class ContractSchemaTest extends TestCase
         self::assertSame('contracts.finalized_by_user_id->users.id:SET NULL', $this->foreignKey('contracts', 'finalized_by_user_id'));
     }
 
+    public function testContractJsonCapacityMatchesApprovedInputBounds(): void
+    {
+        self::assertSame('longtext', $this->columnType('contracts', 'manual_variables_json'));
+        self::assertSame('text', $this->columnType('contracts', 'tasks_json'));
+        self::assertSame('longtext', $this->columnType('contracts', 'annexes_json'));
+    }
+
     public function testDompdfIsDirectRuntimeDependencyAndCiRequestsRequiredExtensions(): void
     {
         $root = dirname(__DIR__, 3);
@@ -187,6 +194,17 @@ final class ContractSchemaTest extends TestCase
         $statement->execute(['table' => $table]);
 
         return array_values(array_map('strval', $statement->fetchAll(PDO::FETCH_COLUMN)));
+    }
+
+    private function columnType(string $table, string $column): string
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT data_type FROM information_schema.columns '
+            . 'WHERE table_schema = DATABASE() AND table_name = :table AND column_name = :column LIMIT 1',
+        );
+        $statement->execute(['table' => $table, 'column' => $column]);
+
+        return (string) $statement->fetchColumn();
     }
 
     /** @return list<string> */
