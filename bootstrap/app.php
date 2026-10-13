@@ -15,6 +15,7 @@ use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
 use AlquilaPro\Foundation\Installer;
 use AlquilaPro\Foundation\RuntimeRequirements;
+use AlquilaPro\Finance\FinanceService;
 use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\Properties\PropertyService;
 use AlquilaPro\Properties\UnitMediaService;
@@ -154,6 +155,7 @@ return static function (array $settings): App {
             $contracts = new ContractService($pdo, $candidates, $screening, $properties, $contractDirectory);
             $users = new UserService($pdo);
             $leases = new LeaseService($pdo, $users);
+            $finance = new FinanceService($pdo);
 
             $currentUser = static function () use ($session, $auth): ?array {
                 $userId = $session->userId(time());
@@ -179,6 +181,7 @@ return static function (array $settings): App {
                 'branding' => $branding,
                 'view' => $view,
                 'current_user' => $currentUser,
+                'finance' => $finance,
             ];
 
             $authRoutes = require dirname(__DIR__) . '/app/Auth/routes.php';
@@ -214,6 +217,9 @@ return static function (array $settings): App {
                 'leases' => $leases,
                 'contracts' => $contracts,
             ]);
+
+            $financeRoutes = require dirname(__DIR__) . '/app/Finance/routes.php';
+            $financeRoutes($app, $shared);
         }
     }
 

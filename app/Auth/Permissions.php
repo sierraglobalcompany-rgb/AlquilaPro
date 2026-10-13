@@ -16,6 +16,8 @@ final class Permissions
         'candidates.manage',
         'contracts.view',
         'contracts.manage',
+        'finance.view',
+        'finance.manage',
     ];
 
     public static function allows(array $user, string $permission): bool

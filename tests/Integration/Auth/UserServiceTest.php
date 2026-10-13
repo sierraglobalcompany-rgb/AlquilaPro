@@ -91,6 +91,36 @@ final class UserServiceTest extends TestCase
         ));
     }
 
+    public function testFinancePermissionsAreKnownIndependentAndTenantStillFailsClosed(): void
+    {
+        $permissions = $this->permissions();
+        self::assertSame(
+            ['finance.view', 'finance.manage'],
+            $permissions::sanitize(['finance.view', 'finance.manage', 'finance.delete', 'finance.view']),
+        );
+        self::assertTrue($permissions::allows(
+            ['role' => 'gestor', 'permissions' => ['finance.view']],
+            'finance.view',
+        ));
+        self::assertFalse($permissions::allows(
+            ['role' => 'gestor', 'permissions' => ['finance.view']],
+            'finance.manage',
+        ));
+        self::assertTrue($permissions::allows(['role' => 'owner', 'permissions' => []], 'finance.manage'));
+        self::assertFalse($permissions::allows(
+            ['role' => 'tenant', 'permissions' => ['finance.view', 'finance.manage']],
+            'finance.view',
+        ));
+
+        $service = $this->service();
+        $userId = $service->create('Finance Viewer', 'finance-viewer@example.com', 'gestor', 'TemporaryPass123', []);
+        $service->setPermissions($userId, ['finance.view', 'finance.manage']);
+        self::assertSame(
+            ['finance.view', 'finance.manage'],
+            $service->listUsers()[0]['permissions'],
+        );
+    }
+
     public function testCreatesManagedUserWithTemporaryPasswordAndNormalizedUniqueEmail(): void
     {
         $service = $this->service();
