@@ -256,6 +256,14 @@ return static function (App $app, array $deps): void {
                 $contracts->updateDraft($contractId, $input, time());
             } elseif ($action === 'generate') {
                 $contracts->generate($contractId, time());
+            } elseif ($action === 'update_tasks') {
+                $contracts->updateTasks(
+                    $contractId,
+                    $jsonField($body, 'tasks_json', '[]', true),
+                    time(),
+                );
+            } elseif ($action === 'finalize') {
+                $contracts->finalize($contractId, (int) $user['id'], time());
             } else {
                 throw new RuntimeException('La acción contractual no es válida.');
             }

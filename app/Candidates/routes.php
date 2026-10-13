@@ -8,6 +8,7 @@ use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Candidates\CandidateDocumentService;
 use AlquilaPro\Candidates\CandidateService;
 use AlquilaPro\Candidates\ScreeningService;
+use AlquilaPro\Contracts\ContractService;
 use AlquilaPro\Properties\PropertyService;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
@@ -24,6 +25,8 @@ return static function (App $app, array $deps): void {
     $screening = $deps['screening'];
     /** @var PropertyService $properties */
     $properties = $deps['properties'];
+    /** @var ContractService $contracts */
+    $contracts = $deps['contracts'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -244,7 +247,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($adminGuard, $candidates, $candidateDocuments, $screening, $view, $csrf): ResponseInterface {
+    ) use ($adminGuard, $candidates, $candidateDocuments, $screening, $contracts, $view, $csrf): ResponseInterface {
         $user = $adminGuard($response, 'candidates.view');
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -255,14 +258,24 @@ return static function (App $app, array $deps): void {
             return $response->withStatus(404);
         }
 
+        $candidateId = (int) $candidate['id'];
+        $contractContext = null;
+        if (Permissions::allows($user, 'contracts.view')) {
+            $contractContext = [
+                'contracts' => $contracts->listForCandidate($candidateId),
+                'can_create' => $contracts->canCreateDraftForCandidate($candidateId),
+            ];
+        }
+
         $response->getBody()->write($view->renderApp('candidate_detail', [
             'pageTitle' => 'Candidato',
             'user' => $user,
             'activeNav' => 'apps',
             'csrfToken' => $csrf->token(),
             'candidate' => $candidate,
-            'documents' => $candidateDocuments->listDocumentsForCandidate((int) $candidate['id']),
-            'screening' => $screening->findForCandidate((int) $candidate['id']),
+            'documents' => $candidateDocuments->listDocumentsForCandidate($candidateId),
+            'screening' => $screening->findForCandidate($candidateId),
+            'contractContext' => $contractContext,
             'canManageCandidates' => Permissions::allows($user, 'candidates.manage'),
         ]));
 

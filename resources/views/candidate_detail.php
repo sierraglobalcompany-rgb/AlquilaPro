@@ -21,6 +21,11 @@ $screeningTransitions = match ($screeningStatus) {
     'in_progress' => ['in_progress', 'approved', 'rejected'],
     default => [],
 };
+$contractContext = is_array($contractContext ?? null) ? $contractContext : null;
+$contractRows = $contractContext === null || !is_array($contractContext['contracts'] ?? null)
+    ? []
+    : $contractContext['contracts'];
+$canCreateContract = $contractContext !== null && (bool) ($contractContext['can_create'] ?? false);
 ?>
 <section class="surface">
     <p class="eyebrow"><a href="<?= $escape($basePath) ?>/admin/candidates">Candidatos</a></p>
@@ -177,6 +182,32 @@ $screeningTransitions = match ($screeningStatus) {
         </dl>
     <?php endif; ?>
 </section>
+
+<?php if ($contractContext !== null): ?>
+    <section class="surface" data-contract-context>
+        <h2>Contratos</h2>
+        <?php if ($contractRows === []): ?>
+            <p class="empty-state">No hay contratos registrados para este candidato.</p>
+        <?php else: ?>
+            <div class="users-grid">
+                <?php foreach ($contractRows as $contractRow): ?>
+                    <article class="user-card">
+                        <div class="user-card__head">
+                            <strong>Contrato #<?= $escape($contractRow['id']) ?></strong>
+                            <span class="status-pill"><?= $escape($contractRow['status']) ?></span>
+                        </div>
+                        <div><?= $escape($contractRow['template_name'] ?? '') ?> · <?= $escape($contractRow['unit_code'] ?? '') ?></div>
+                        <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($contractRow['id']) ?>">Abrir contrato</a>
+                    </article>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($canCreateContract): ?>
+            <a class="button" href="<?= $escape($basePath) ?>/admin/contracts">Crear contrato</a>
+        <?php endif; ?>
+    </section>
+<?php endif; ?>
 
 <?php if ($canManageCandidates): ?>
     <section class="surface">

@@ -6,12 +6,19 @@ $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, 
 $manualJson = $contract['manual_variables_json'] ?? '{}';
 $tasksJson = $contract['tasks_json'] ?? '[]';
 $annexesJson = $contract['annexes_json'] ?? '[]';
+$status = (string) $contract['status'];
+$isDraft = $status === 'draft';
+$isGenerated = $status === 'generated';
+$hasPdf = in_array($status, ['generated', 'finalized'], true);
 ?>
 <section class="surface">
     <p class="eyebrow">Contratos</p>
     <h1>Contrato #<?= $escape($contract['id']) ?></h1>
-    <p class="hint">Estado: <?= $escape($contract['status']) ?></p>
+    <p class="hint">Estado: <?= $escape($status) ?></p>
     <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/contracts">Volver a contratos</a>
+    <?php if ($hasPdf): ?>
+        <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($contract['id']) ?>/pdf">Descargar PDF</a>
+    <?php endif; ?>
 </section>
 
 <section class="surface">
@@ -20,7 +27,7 @@ $annexesJson = $contract['annexes_json'] ?? '[]';
         <article class="user-card">
             <div class="user-card__head">
                 <strong><?= $escape($contract['candidate_name'] ?? '') ?></strong>
-                <span class="status-pill"><?= $escape($contract['status']) ?></span>
+                <span class="status-pill"><?= $escape($status) ?></span>
             </div>
             <div>Unidad: <?= $escape($contract['unit_code'] ?? '') ?></div>
             <div>Tipo: <?= $escape($contract['document_type']) ?></div>
@@ -42,7 +49,7 @@ $annexesJson = $contract['annexes_json'] ?? '[]';
     </section>
 <?php endif; ?>
 
-<?php if ($canManage && $contract['status'] === 'draft'): ?>
+<?php if ($canManage && $isDraft): ?>
     <section class="surface">
         <h2>Editar borrador</h2>
         <form method="post" action="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($contract['id']) ?>" class="settings-form">
@@ -93,6 +100,41 @@ $annexesJson = $contract['annexes_json'] ?? '[]';
                 <textarea name="annexes_json" rows="4"><?= $escape($annexesJson) ?></textarea>
             </label>
             <button class="button" type="submit">Guardar borrador</button>
+        </form>
+    </section>
+
+    <section class="surface">
+        <h2>Generar evidencia</h2>
+        <p class="hint">Generar congela contenido, valores, anexos y PDF. Después solo podrán actualizarse las tareas hasta finalizar.</p>
+        <form method="post" action="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($contract['id']) ?>">
+            <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+            <input type="hidden" name="action" value="generate">
+            <button class="button" type="submit">Generar contrato</button>
+        </form>
+    </section>
+<?php endif; ?>
+
+<?php if ($canManage && $isGenerated): ?>
+    <section class="surface">
+        <h2>Tareas</h2>
+        <form method="post" action="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($contract['id']) ?>" class="settings-form">
+            <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+            <input type="hidden" name="action" value="update_tasks">
+            <label class="field">
+                <span>Tareas JSON</span>
+                <textarea name="tasks_json" rows="4"><?= $escape($tasksJson) ?></textarea>
+            </label>
+            <button class="button" type="submit">Actualizar tareas</button>
+        </form>
+    </section>
+
+    <section class="surface">
+        <h2>Finalizar</h2>
+        <p class="hint">Finalizar cierra el flujo F7. No crea arrendamiento ni representa firma electrónica.</p>
+        <form method="post" action="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($contract['id']) ?>">
+            <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+            <input type="hidden" name="action" value="finalize">
+            <button class="button" type="submit">Finalizar contrato</button>
         </form>
     </section>
 <?php endif; ?>

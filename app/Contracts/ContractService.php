@@ -270,6 +270,22 @@ final class ContractService
             return false;
         }
 
+        try {
+            $documentType = $this->documentTypeForUnit((string) $unit['type']);
+        } catch (RuntimeException) {
+            return false;
+        }
+
+        $template = $this->pdo->prepare(
+            'SELECT 1 FROM contract_templates t '
+            . 'INNER JOIN contract_template_versions v ON v.template_id = t.id '
+            . 'WHERE t.is_active = 1 AND t.document_type = :document_type LIMIT 1',
+        );
+        $template->execute(['document_type' => $documentType]);
+        if ($template->fetchColumn() === false) {
+            return false;
+        }
+
         $statement = $this->pdo->prepare(
             "SELECT 1 FROM contracts WHERE candidate_id = :candidate_id AND status IN ('draft', 'finalized') LIMIT 1",
         );

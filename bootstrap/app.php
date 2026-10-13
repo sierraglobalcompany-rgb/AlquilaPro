@@ -197,6 +197,7 @@ return static function (array $settings): App {
                 'candidate_documents' => $candidateDocuments,
                 'properties' => $properties,
                 'screening' => $screening,
+                'contracts' => $contracts,
             ]);
 
             $contractRoutes = require dirname(__DIR__) . '/app/Contracts/routes.php';
