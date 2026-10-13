@@ -5,10 +5,11 @@ Aplicación web mobile-first y autoinstalable para administrar arrendamientos de
 **Dominio objetivo:** `https://alquilapro.sierraglobalcompany.com`  
 **Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + CSS/JS mínimo  
 **Destino:** Hostinger; subdominio o subcarpeta HTTPS.  
-**Estado actual:** F0–F8 CLOSED / VERIFIED; **F1–F8 MERGED**.  
+**Estado actual:** F0–F9 CLOSED / VERIFIED; **F1–F8 MERGED**; F9 permanece sin merge.
 **F8 merge SHA:** `a1b50f0d1c6556531626fd35cba0668bd5c4029f`.  
 **F8 final audited closure HEAD:** `f258cd48f6a2c301b38e6a85683e5f30b8368770`.  
 **F8 final audit CI:** `38443826390` — PHP 8.3/8.4/8.5 PASS; PHP 8.3 `310 tests / 2611 assertions / 0 failures / 0 errors`.  
+**F9:** `CLOSED / VERIFIED / NOT MERGED` sobre `impl/f9-charges-portfolio-20261013`; base F8 `89811cbba5ae922bab00b50dd02af08dbaa1cb8b`. Product HEAD `225648a21fdf5dc50cd5c397f4dbbe13c234d9e4`; CI `38482891971` — PHP 8.3/8.4/8.5 PASS, cada matriz `340 tests / 2990 assertions / 0 failures / 0 errors`. El cierre documental y su CI exacto se registran en el checkpoint F9 y en el PR.
 **F7 merge SHA:** `b6ab43fefd7b4d2933e3e3adff0ac4c23efdf1b8`.  
 **F7 final product HEAD:** `829955f2b297959380df06a8c8cc3e3424115e74`.  
 **F7 final product CI:** `38360814842` — PHP 8.3/8.4/8.5 PASS.  
@@ -76,7 +77,7 @@ Ciclo:
 
 `SCOPE → PRE-KISS → SPEC/DESIGN → PLAN → RED → VERIFY RED → MINIMAL GREEN → VERIFY GREEN → CONVERGE → QA → TWO LAWS GATE → CHECKPOINT → REVIEW → MERGE`.
 
-No merge sin aprobación del usuario. Regla operativa vigente: cuando el usuario diga **“continua”**, autoriza ejecutar el siguiente gate previsto; si la fase ya está CLOSED / VERIFIED / READY, esa continuidad incluye el merge correspondiente.
+No merge sin aprobación del usuario. En general, **“continua”** autoriza el siguiente gate previsto. Para F9, el prompt de ejecución exige detenerse antes del merge; un nuevo **“continua”** después de presentar el PR review-ready autoriza continuar con ese gate.
 
 ---
 
@@ -146,8 +147,14 @@ F8_FORENSIC_REVIEW: PASS — unit-edit/lease-activation TOCTOU race closed by se
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
 
-CURRENT_GATE: F8 CLOSED / VERIFIED / MERGED
-NEXT: F9 SCOPE / PRE-KISS
+CURRENT_GATE: F9 CLOSED / VERIFIED / NOT MERGED
+F9_BRANCH: impl/f9-charges-portfolio-20261013
+F9_BASE: 89811cbba5ae922bab00b50dd02af08dbaa1cb8b
+F9_PRODUCT_HEAD: 225648a21fdf5dc50cd5c397f4dbbe13c234d9e4
+F9_PRODUCT_CI: 38482891971 — PHP 8.3 / 8.4 / 8.5 PASS — each 340 tests / 2990 assertions
+F9_CLOSURE_HEAD: exact commit containing this checkpoint; see branch and CI evidence
+MERGE_AUTHORIZED: NO
+NEXT: CLOSURE CI, THEN REVIEW-READY PR; STOP BEFORE MERGE
 ```
 
 No reimplementar F1–F8. No reabrir una fase certificada sin evidencia de regresión o una nueva SPEC aprobada.
@@ -427,15 +434,7 @@ Autoridad técnica de cierre:
 
 # 10. PROTOCOLO DE RECUPERACIÓN
 
-Al retomar trabajo para F9:
-
-1. verificar `main` real;
-2. leer `docs/checkpoints/F8_MERGED_2026-10-13.md` y `F8_CLOSED_2026-10-13.md`;
-3. no reabrir F8 sin evidencia de regresión o nueva SPEC aprobada;
-4. conservar las autoridades únicas de auth, unidades, candidatos, screening, contratos y leases;
-5. iniciar F9 por `SCOPE → PRE-KISS` antes de diseñar tablas, estados o rutas;
-6. no adelantar F10+ ni crear fuentes paralelas;
-7. mantener KISS + Cero Ruido y TDD por gate.
+Para continuar desde el cierre F9, leer `docs/checkpoints/F9_CLOSED_2026-10-13.md` y revisar el PR/CI exactos. F9 queda sin merge hasta una autorización posterior explícita. No iniciar F10 ni reabrir F8/F9 sin el gate aprobado y evidencia correspondiente.
 
 El checkpoint `F8_MERGED_2026-10-13.md` es la autoridad de integración F8.
 
@@ -457,6 +456,12 @@ F8_TESTS_PHP83: 310 / 2611
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
 MERGE_AUTHORIZED: YES / EXECUTED 2026-10-13
-CURRENT_ACTION: F8 MERGED CHECKPOINT
-NEXT: F9 SCOPE / PRE-KISS
+F9_STATUS: CLOSED / VERIFIED / NOT MERGED
+F9_BRANCH: impl/f9-charges-portfolio-20261013
+F9_PRODUCT_HEAD: 225648a21fdf5dc50cd5c397f4dbbe13c234d9e4
+F9_PRODUCT_CI: 38482891971 — PHP 8.3 / 8.4 / 8.5 PASS
+F9_CLOSURE_HEAD: exact commit containing this checkpoint; see branch and CI evidence
+MERGE_AUTHORIZED: NO
+CURRENT_ACTION: F9 DOCUMENTATION CLOSURE
+NEXT: EXACT CLOSURE CI, THEN REVIEW-READY PR; STOP BEFORE MERGE
 ```
