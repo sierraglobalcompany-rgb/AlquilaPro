@@ -1,30 +1,30 @@
 # F9 Luna Execution Checkpoint — 2026-10-13
 
 ```text
-TASK: 6 — FINANCE INTEGRATION IN EXISTING CONTRACT DETAIL
+TASK: 7 — OWNED CHARGE PORTFOLIO IN EXISTING TENANT DETAIL
 TASK_STATUS: COMPLETE
 BRANCH: impl/f9-charges-portfolio-20261013
 F8_INTEGRATED_BASE_SHA: 89811cbba5ae922bab00b50dd02af08dbaa1cb8b
 START_HEAD: 96e2f34d61aea41e518c5e3abdfdb606dd106dbd
-CURRENT_HEAD: 55fa6e47e467c3c70205a098bb4780dbf927818b (Task 6 product head; this checkpoint metadata commit follows)
-LAST_PRODUCT_COMMIT: 55fa6e47e467c3c70205a098bb4780dbf927818b — feat(f9): integrate charges in lease administration context
-LAST_GOOD_FOCUSED: FinanceRoutes + ContractAdminRoutes + ContractFinalizationRoutes + ContractSecurityRegression — 18 tests / 261 assertions
+CURRENT_HEAD: 35287335be0b2d8bc918157730862365869b713e (Task 7 product head; this checkpoint metadata commit follows)
+LAST_PRODUCT_COMMIT: 35287335be0b2d8bc918157730862365869b713e — feat(f9): show owned charges in tenant portal
+LAST_GOOD_FOCUSED: TenantPortalRoutes + FinanceSecurityRegression + ShellRoutes + LeaseSecurityRegression — 21 tests / 267 assertions
 LAST_GOOD_FULL: F8 baseline — 310 tests / 2611 assertions / 0 failures / 0 errors (PHP 8.3)
 LAST_GOOD_CI: 38443826390 — F8 final audit CI, PHP 8.3/8.4/8.5 PASS
-RED_EVIDENCE: Task 1 — focused schema test failed only because `charges` was absent. Task 2 — FinanceServiceTest produced 8 expected errors, all `Class "AlquilaPro\Finance\FinanceService" not found`. Task 3 — monthly FinanceService tests produced 6 expected missing-method errors before implementation. Task 4 — void, summary, and portfolio focused tests produced only expected missing-method errors before implementation. Task 5 — finance route tests reached NotFound before route registration; permission sanitizer rejected new permissions; authorized shell viewer had no finance launcher. Task 6 — existing contract detail lacked the finance summary/history and permission-gated controls.
-GREEN_EVIDENCE: Task 3 monthly-focused run — PASS, 6 tests / 26 assertions; Task 3 regression command — PASS, 35 tests / 382 assertions. Task 4 FinanceService suite — PASS, 18 tests / 121 assertions. Task 5 private route/permissions/shell/CSRF — PASS, 31 tests / 216 assertions. Task 6 FinanceRoutes + ContractAdminRoutes + ContractFinalizationRoutes + ContractSecurityRegression — PASS, 18 tests / 261 assertions.
-TESTS: Task 1 schema + F7/F8 schema regression PASS (9/87); Task 2 manual/read projection + F8 lifecycle/activation PASS (20/199); Task 3 monthly generation + contract/lease regression PASS (35/382); Task 4 FinanceService PASS (18/121); Task 5 private route/permissions/shell/CSRF PASS (31/216); Task 6 existing admin contract context and F7 guardrail PASS (18/261).
-ASSERTIONS: Last Task 6 admin context regression set: 261.
+RED_EVIDENCE: Task 1 — focused schema test failed only because `charges` was absent. Task 2 — FinanceServiceTest produced 8 expected errors, all `Class "AlquilaPro\Finance\FinanceService" not found`. Task 3 — monthly FinanceService tests produced 6 expected missing-method errors before implementation. Task 4 — void, summary, and portfolio focused tests produced only expected missing-method errors before implementation. Task 5 — finance route tests reached NotFound before route registration; permission sanitizer rejected new permissions; authorized shell viewer had no finance launcher. Task 6 — existing contract detail lacked the finance summary/history and permission-gated controls. Task 7 — existing tenant detail rendered without the required `Cartera` section.
+GREEN_EVIDENCE: Task 3 monthly-focused run — PASS, 6 tests / 26 assertions; Task 3 regression command — PASS, 35 tests / 382 assertions. Task 4 FinanceService suite — PASS, 18 tests / 121 assertions. Task 5 private route/permissions/shell/CSRF — PASS, 31 tests / 216 assertions. Task 6 FinanceRoutes + ContractAdminRoutes + ContractFinalizationRoutes + ContractSecurityRegression — PASS, 18 tests / 261 assertions. Task 7 TenantPortalRoutes + FinanceSecurityRegression + ShellRoutes + LeaseSecurityRegression — PASS, 21 tests / 267 assertions, 0 warnings.
+TESTS: Task 1 schema + F7/F8 schema regression PASS (9/87); Task 2 manual/read projection + F8 lifecycle/activation PASS (20/199); Task 3 monthly generation + contract/lease regression PASS (35/382); Task 4 FinanceService PASS (18/121); Task 5 private route/permissions/shell/CSRF PASS (31/216); Task 6 existing admin contract context and F7 guardrail PASS (18/261); Task 7 tenant-owned portfolio, IDOR order, XSS/privacy, shell and F8 lease architecture PASS (21/267).
+ASSERTIONS: Last Task 7 focused regression set: 267.
 FILES_CHANGED: docs/specs/F9_CHARGES_PORTFOLIO_SPEC.md; database/migrations/009_create_charges.sql; app/Finance/FinanceService.php; tests/Integration/Finance/ChargeSchemaTest.php; tests/Integration/Finance/FinanceServiceTest.php; docs/checkpoints/F9_LUNA_EXECUTION_CHECKPOINT_2026-10-13.md
-ROOT_CAUSE_FINDINGS: Task 1 RED confirmed the expected missing `charges` table. Task 2 RED confirmed the expected missing `FinanceService`. Task 3 RED confirmed the monthly method was absent; monthly generation now locks the lease before contract and active-charge reads and rolls back the full insertion unit on failure. Task 4 RED confirmed void and balance/portfolio projections were absent; those remain derived from canonical charge rows and voiding locks the charge before its one-time update. Task 5 RED confirmed the private route file, permissions and authorized launcher were absent. Task 6 RED confirmed finance had not been composed into the existing contract detail.
-NOISE_FOUND: No extra schema, permission, persistence or service authority introduced in Tasks 1–6; the one finance route file registers only the four approved private routes and contract detail remains on its existing GET.
-NOISE_CONVERGED: Task 0 updated only the SPEC state; Task 1 added exactly one table; Task 2 added exactly one `FinanceService`; Tasks 3–4 extended that same service; Task 5 creates it once in bootstrap, shares it with route composition, adds exactly two finance permissions and one private portfolio surface; Task 6 composes finance reads/forms at the existing contract route/view boundary.
-PATCHES_AVOIDED: No float-based money, no second balance/status authority, no additional class/table/dependency, no F7 core mutation, and no public finance route. Monthly generation and voiding are atomic; partial correction preserves active counterparts; summaries use one canonical aggregation expression and do not persist derived values. ContractService and ContractPdfRenderer remain finance-agnostic.
+ROOT_CAUSE_FINDINGS: Task 1 RED confirmed the expected missing `charges` table. Task 2 RED confirmed the expected missing `FinanceService`. Task 3 RED confirmed the monthly method was absent; monthly generation now locks the lease before contract and active-charge reads and rolls back the full insertion unit on failure. Task 4 RED confirmed void and balance/portfolio projections were absent; those remain derived from canonical charge rows and voiding locks the charge before its one-time update. Task 5 RED confirmed the private route file, permissions and authorized launcher were absent. Task 6 RED confirmed finance had not been composed into the existing contract detail. Task 7 RED confirmed the existing tenant lease detail lacked its charge portfolio; the route now proves F8 ownership before FinanceService reads.
+NOISE_FOUND: No extra schema, permission, persistence or service authority introduced in Tasks 1–7; the one finance route file registers only the four approved private routes, and tenant portfolio composes in the existing detail GET.
+NOISE_CONVERGED: Task 0 updated only the SPEC state; Task 1 added exactly one table; Task 2 added exactly one `FinanceService`; Tasks 3–4 extended that same service; Task 5 creates it once in bootstrap, shares it with route composition, adds exactly two finance permissions and one private portfolio surface; Tasks 6–7 compose reads at existing contract and tenant route/view boundaries.
+PATCHES_AVOIDED: No float-based money, no second balance/status authority, no additional class/table/dependency, no F7 core mutation, and no public finance route. Monthly generation and voiding are atomic; partial correction preserves active counterparts; summaries use one canonical aggregation expression and do not persist derived values. ContractService and ContractPdfRenderer remain finance-agnostic. Tenant view escapes descriptions and omits actor/reason data and mutation forms.
 KISS_STATUS: PASS — exactly one F9 table and one F9 domain class.
 ZERO_NOISE_STATUS: PASS
 PATCH_STACKING: NONE
 BLOCKERS: NONE
-NEXT_EXACT_ACTION: Task 7 RED — cover tenant-owned lease charge history, exact balances, IDOR-before-finance and XSS/privacy behavior before extending only the existing tenant lease route and view.
+NEXT_EXACT_ACTION: Task 8 — freeze security/architecture guardrails; run focused F9/F8 QA, composer validation and full PHPUnit; perform Two Laws, patch-smell and product diff reviews; collect exact PRODUCT_HEAD CI; write closure report; collect fresh exact CLOSURE_HEAD CI; open review-ready PR; stop before merge.
 MERGE_STATUS: NOT MERGED; MERGE_AUTHORIZED=NO
 ```
 
@@ -84,3 +84,12 @@ MERGE_STATUS: NOT MERGED; MERGE_AUTHORIZED=NO
 - The existing contract GET finds its lease first, then calls `summaryForLease()` and `listForLease()` only when `finance.view` is allowed. It passes `canManageFinance` separately from `contracts.manage`.
 - `contract_detail.php` now renders escaped charge history/totals and CSRF-protected monthly, manual and void forms using only the existing finance POST routes. Manual options exclude rent/administration; voided charges cannot be voided again.
 - The F7 regression test confirms `ContractService` and `ContractPdfRenderer` contain no FinanceService dependency. Views use existing user-card primitives; no new CSS or detail route was added.
+
+## Task 7 evidence
+
+- RED: focused tenant detail integration failed because the existing owned lease view had no `Cartera` section.
+- GREEN: `vendor/bin/phpunit --display-warnings --testdox tests/Integration/Leases/TenantPortalRoutesTest.php tests/Integration/Finance/FinanceSecurityRegressionTest.php tests/Integration/UI/ShellRoutesTest.php tests/Integration/Leases/LeaseSecurityRegressionTest.php` — PASS, 21 tests / 267 assertions, 0 failures/errors/warnings.
+- Product commit: `35287335be0b2d8bc918157730862365869b713e` (`feat(f9): show owned charges in tenant portal`).
+- Existing tenant detail resolves `LeaseService::findForUser()` and returns 404 before FinanceService; traced-PDO integration assertions prove foreign and missing leases make no `charges` query. Ended owned leases retain readable history.
+- The view displays canonical summary/list projections, localized pending/overdue/voided states, period, due date, amount, description and overdue days. Description is escaped; void reason and actor metadata are absent; no staff forms, payment UI, new route or CSS was added.
+- Added `FinanceSecurityRegressionTest` for exact route inventory, ownership-before-finance order, shared FinanceService composition, and tenant-safe read fields. Updated the F8 future-module guardrail so `Cartera` is permitted only in tenant lease detail.
