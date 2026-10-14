@@ -18,6 +18,20 @@ $chargeTypeLabels = [
     'repair' => 'Reparación',
     'other' => 'Otro',
 ];
+$paymentMethodTypeLabels = [
+    'bank_account' => 'Cuenta bancaria',
+    'breb_key' => 'Llave Bre-B',
+    'breb_qr' => 'Código QR Bre-B',
+    'wallet' => 'Billetera digital',
+    'manual' => 'Instrucciones manuales',
+];
+$brebKeyTypeLabels = [
+    'identity_document' => 'Documento de identidad',
+    'mobile' => 'Número celular',
+    'email' => 'Correo electrónico',
+    'alphanumeric' => 'Llave alfanumérica',
+    'merchant_code' => 'Código de comercio',
+];
 ?>
 <section class="surface">
     <p class="eyebrow">Portal del inquilino</p>
@@ -58,6 +72,53 @@ $chargeTypeLabels = [
                     <div>Valor: $<?= $escape($charge['amount']) ?></div>
                     <?php if ($charge['days_overdue'] > 0): ?>
                         <div>Días vencidos: <?= $escape($charge['days_overdue']) ?></div>
+                    <?php endif; ?>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</section>
+
+<section class="surface">
+    <h2>Cómo pagar</h2>
+    <?php if ($paymentMethods === []): ?>
+        <p class="empty-state">No hay medios de pago disponibles para esta propiedad.</p>
+    <?php else: ?>
+        <div class="users-grid">
+            <?php foreach ($paymentMethods as $method): ?>
+                <article class="user-card">
+                    <div class="user-card__head">
+                        <strong><?= $escape($method['label']) ?></strong>
+                        <span class="status-pill"><?= $escape($paymentMethodTypeLabels[$method['type']] ?? 'Medio de pago') ?></span>
+                    </div>
+                    <?php if (is_string($method['recipient_name']) && $method['recipient_name'] !== ''): ?>
+                        <div>Titular: <?= $escape($method['recipient_name']) ?></div>
+                    <?php endif; ?>
+                    <?php if (is_string($method['institution_name']) && $method['institution_name'] !== ''): ?>
+                        <div>Entidad: <?= $escape($method['institution_name']) ?></div>
+                    <?php endif; ?>
+                    <?php if (is_string($method['account_type']) && $method['account_type'] !== ''): ?>
+                        <div>Tipo de cuenta: <?= $escape($method['account_type']) ?></div>
+                    <?php endif; ?>
+                    <?php if (is_string($method['account_number']) && $method['account_number'] !== ''): ?>
+                        <div>Número de cuenta: <?= $escape($method['account_number']) ?></div>
+                    <?php endif; ?>
+                    <?php if (is_string($method['breb_key_type']) && $method['breb_key_type'] !== ''): ?>
+                        <div>Tipo de llave: <?= $escape($brebKeyTypeLabels[$method['breb_key_type']] ?? '') ?></div>
+                    <?php endif; ?>
+                    <?php if (is_string($method['breb_key_value']) && $method['breb_key_value'] !== ''): ?>
+                        <div>Llave: <?= $escape($method['breb_key_value']) ?></div>
+                    <?php endif; ?>
+                    <?php if (is_string($method['wallet_identifier']) && $method['wallet_identifier'] !== ''): ?>
+                        <div>Identificador: <?= $escape($method['wallet_identifier']) ?></div>
+                    <?php endif; ?>
+                    <?php if (is_string($method['instructions']) && $method['instructions'] !== ''): ?>
+                        <div><?= nl2br($escape($method['instructions'])) ?></div>
+                    <?php endif; ?>
+                    <?php if ($method['type'] === 'breb_qr' && $method['qr_url'] !== null): ?>
+                        <img src="<?= $escape($method['qr_url']) ?>" alt="Código QR de <?= $escape($method['label']) ?>" loading="lazy">
+                    <?php elseif ($method['type'] === 'breb_qr'): ?>
+                        <p class="hint">El código QR no está disponible.</p>
                     <?php endif; ?>
                 </article>
             <?php endforeach; ?>

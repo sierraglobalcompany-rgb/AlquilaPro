@@ -7,6 +7,7 @@ use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Contracts\ContractService;
 use AlquilaPro\Finance\FinanceService;
+use AlquilaPro\Finance\PaymentMethodService;
 use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
@@ -20,6 +21,8 @@ return static function (App $app, array $deps): void {
     $contracts = $deps['contracts'];
     /** @var FinanceService $finance */
     $finance = $deps['finance'];
+    /** @var PaymentMethodService $paymentMethods */
+    $paymentMethods = $deps['payment_methods'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -142,7 +145,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($tenantGuard, $leases, $finance, $view, $csrf, $todayProvider): ResponseInterface {
+    ) use ($tenantGuard, $leases, $finance, $paymentMethods, $view, $csrf, $todayProvider, $path): ResponseInterface {
         $user = $tenantGuard($response);
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -156,6 +159,29 @@ return static function (App $app, array $deps): void {
         $today = $todayProvider();
         $financeSummary = $finance->summaryForLease((int) $lease['id'], $today);
         $charges = $finance->listForLease((int) $lease['id'], $today);
+        $tenantPaymentMethods = array_map(static function (array $method) use ($paymentMethods, $lease, $path): array {
+            $qrUrl = null;
+            if ($method['type'] === 'breb_qr' && $paymentMethods->privateQr((int) $method['id']) !== null) {
+                $qrUrl = $path(
+                    '/tenant/leases/' . (int) $lease['id'] . '/payment-methods/' . (int) $method['id'] . '/qr',
+                );
+            }
+
+            return [
+                'id' => (int) $method['id'],
+                'type' => (string) $method['type'],
+                'label' => (string) $method['label'],
+                'recipient_name' => $method['recipient_name'],
+                'institution_name' => $method['institution_name'],
+                'account_type' => $method['account_type'],
+                'account_number' => $method['account_number'],
+                'breb_key_type' => $method['breb_key_type'],
+                'breb_key_value' => $method['breb_key_value'],
+                'wallet_identifier' => $method['wallet_identifier'],
+                'instructions' => $method['instructions'],
+                'qr_url' => $qrUrl,
+            ];
+        }, $paymentMethods->listForProperty((int) $lease['property_id']));
 
         $response->getBody()->write($view->renderApp('tenant_lease_detail', [
             'pageTitle' => 'Arrendamiento #' . (int) $lease['id'],
@@ -165,9 +191,58 @@ return static function (App $app, array $deps): void {
             'lease' => $lease,
             'financeSummary' => $financeSummary,
             'charges' => $charges,
+            'paymentMethods' => $tenantPaymentMethods,
         ]));
 
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    });
+
+    $app->get('/tenant/leases/{leaseId:[0-9]+}/payment-methods/{methodId:[0-9]+}/qr', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($tenantGuard, $leases, $paymentMethods): ResponseInterface {
+        $user = $tenantGuard($response);
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $lease = $leases->findForUser((int) $args['leaseId'], (int) $user['id']);
+        if ($lease === null) {
+            return $response->withStatus(404);
+        }
+
+        $methodId = (int) $args['methodId'];
+        $applicableMethod = null;
+        foreach ($paymentMethods->listForProperty((int) $lease['property_id']) as $method) {
+            if ((int) $method['id'] === $methodId && $method['type'] === 'breb_qr') {
+                $applicableMethod = $method;
+                break;
+            }
+        }
+        if ($applicableMethod === null) {
+            return $response->withStatus(404);
+        }
+
+        $privateQr = $paymentMethods->privateQr($methodId);
+        $bytes = $privateQr === null ? false : @file_get_contents($privateQr['path']);
+        $actualMime = is_string($bytes) ? (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes) : false;
+        if (!is_string($bytes)
+            || strlen($bytes) !== $privateQr['size_bytes']
+            || $actualMime !== $privateQr['mime']
+            || !is_string($applicableMethod['qr_sha256'])
+            || !hash_equals($applicableMethod['qr_sha256'], hash('sha256', $bytes))
+        ) {
+            return $response->withStatus(404);
+        }
+
+        $response->getBody()->write($bytes);
+
+        return $response
+            ->withHeader('Content-Type', $privateQr['mime'])
+            ->withHeader('Content-Length', (string) strlen($bytes))
+            ->withHeader('Cache-Control', 'private, no-store')
+            ->withHeader('X-Content-Type-Options', 'nosniff');
     });
 
     $app->get('/tenant/leases/{id:[0-9]+}/contract', static function (

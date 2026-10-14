@@ -6,6 +6,7 @@ namespace AlquilaPro\Tests\Integration\Leases;
 
 use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Finance\FinanceService;
+use AlquilaPro\Finance\PaymentMethodService;
 use AlquilaPro\Foundation\DatabaseConfig;
 use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
@@ -16,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
 use Slim\App;
 use Slim\Psr7\Factory\ServerRequestFactory;
+use Slim\Psr7\UploadedFile;
 
 final class TenantPortalRoutesTest extends TestCase
 {
@@ -23,6 +25,8 @@ final class TenantPortalRoutesTest extends TestCase
     private string $directory;
     private string $lockPath;
     private string $contractDirectory;
+    private string $qrDirectory;
+    private array $temporaryUploads = [];
 
     protected function setUp(): void
     {
@@ -38,6 +42,7 @@ final class TenantPortalRoutesTest extends TestCase
 
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
         foreach ([
+            'payment_methods',
             'charges',
             'leases',
             'contracts',
@@ -62,6 +67,7 @@ final class TenantPortalRoutesTest extends TestCase
         mkdir($this->directory, 0700, true);
         $this->contractDirectory = $this->directory . '/contracts';
         mkdir($this->contractDirectory, 0700, true);
+        $this->qrDirectory = $this->directory . '/payment-method-qrs';
         $this->lockPath = $this->directory . '/installed.lock';
         (new InstallationLock($this->lockPath))->write([
             'schema_version' => '1',
@@ -75,12 +81,19 @@ final class TenantPortalRoutesTest extends TestCase
         foreach (glob($this->contractDirectory . '/*') ?: [] as $file) {
             @unlink($file);
         }
+        foreach ($this->temporaryUploads as $file) {
+            @unlink($file);
+        }
+        foreach (glob($this->qrDirectory . '/*') ?: [] as $file) {
+            @unlink($file);
+        }
         @unlink($this->lockPath);
         @unlink($this->lockPath . '.tmp');
         @rmdir($this->directory . '/branding');
         @rmdir($this->directory . '/unit-media');
         @rmdir($this->directory . '/candidate-documents');
         @rmdir($this->contractDirectory);
+        @rmdir($this->qrDirectory);
         @rmdir($this->directory);
     }
 
@@ -281,6 +294,175 @@ final class TenantPortalRoutesTest extends TestCase
         )), 'Missing lease must be rejected before FinanceService is queried.');
     }
 
+    public function testTenantLeaseDetailShowsOnlyActiveGlobalAndOwnedPropertyPaymentMethods(): void
+    {
+        $tenantId = $this->insertUser('payment-method-owner@example.com', 'TenantPassword123', 'tenant');
+        $foreignId = $this->insertUser('payment-method-foreign@example.com', 'TenantPassword123', 'tenant');
+        $owned = $this->createLease($tenantId, [
+            'type' => 'apartment',
+            'property_name' => 'Propiedad propia',
+            'unit_code' => 'APT-PAYMENT-OWNER',
+        ]);
+        $ended = $this->createLease($tenantId, [
+            'type' => 'parking',
+            'property_name' => 'Propiedad histórica',
+            'unit_code' => 'PARK-PAYMENT-ENDED',
+            'ended_at' => '2026-10-12 12:00:00',
+        ]);
+        $foreign = $this->createLease($foreignId, [
+            'type' => 'apartment',
+            'property_name' => 'Propiedad ajena',
+            'unit_code' => 'APT-PAYMENT-FOREIGN',
+        ]);
+
+        $globalManual = $this->createPaymentMethod('manual', [
+            'label' => 'Global <strong>instrucciones</strong>',
+            'instructions' => 'Referencia & cuenta general',
+            'sort_order' => 2,
+        ]);
+        $propertyBank = $this->createPaymentMethod('bank_account', [
+            'property_id' => $owned['property_id'],
+            'label' => 'Cuenta de propiedad',
+            'sort_order' => 1,
+        ]);
+        $propertyQr = $this->createPaymentMethod('breb_qr', [
+            'property_id' => $owned['property_id'],
+            'label' => 'QR de propiedad',
+            'sort_order' => 3,
+        ], $this->qrUpload());
+        $globalQr = $this->createPaymentMethod('breb_qr', [
+            'label' => 'QR global',
+            'sort_order' => 4,
+        ], $this->qrUpload());
+        $foreignMethod = $this->createPaymentMethod('wallet', [
+            'property_id' => $foreign['property_id'],
+            'label' => 'Billetera de otra propiedad',
+            'institution_name' => 'Billetera',
+            'wallet_identifier' => '3001234567',
+        ]);
+        $inactiveQr = $this->createPaymentMethod('breb_qr', [
+            'property_id' => $owned['property_id'],
+            'label' => 'QR inactivo',
+            'is_active' => 0,
+        ], $this->qrUpload());
+
+        $app = $this->app('/sub');
+        $this->login($app, 'payment-method-owner@example.com', 'TenantPassword123', '/sub');
+        $response = $this->request(
+            $app,
+            'GET',
+            '/sub/tenant/leases/' . $owned['lease_id'] . '?property_id=' . $foreign['property_id'],
+        );
+        self::assertSame(200, $response->getStatusCode());
+        $html = (string) $response->getBody();
+        self::assertStringContainsString('Cómo pagar', $html);
+        self::assertStringContainsString('Global &lt;strong&gt;instrucciones&lt;/strong&gt;', $html);
+        self::assertStringContainsString('Referencia &amp; cuenta general', $html);
+        self::assertStringContainsString('Cuenta de propiedad', $html);
+        self::assertStringContainsString('QR de propiedad', $html);
+        self::assertStringContainsString('QR global', $html);
+        self::assertStringNotContainsString('Billetera de otra propiedad', $html);
+        self::assertStringNotContainsString('QR inactivo', $html);
+        self::assertStringNotContainsString($propertyQr['qr_stored_name'], $html);
+        self::assertStringNotContainsString($globalQr['qr_stored_name'], $html);
+        self::assertStringNotContainsString($this->qrDirectory, $html);
+        self::assertStringNotContainsString($propertyQr['qr_sha256'], $html);
+        self::assertStringContainsString(
+            '/sub/tenant/leases/' . $owned['lease_id'] . '/payment-methods/' . $propertyQr['id'] . '/qr',
+            $html,
+        );
+        self::assertStringContainsString(
+            '/sub/tenant/leases/' . $owned['lease_id'] . '/payment-methods/' . $globalQr['id'] . '/qr',
+            $html,
+        );
+        $orderedLabels = ['Cuenta de propiedad', 'Global &lt;strong&gt;instrucciones', 'QR de propiedad', 'QR global'];
+        $lastPosition = -1;
+        foreach ($orderedLabels as $orderedLabel) {
+            $position = strpos($html, $orderedLabel);
+            self::assertNotFalse($position, $orderedLabel);
+            self::assertGreaterThan($lastPosition, $position, 'Applicable methods must retain stable configured order.');
+            $lastPosition = $position;
+        }
+        foreach (['Ya pagué', 'reportar pago', 'reconciliación', 'allocation', 'proof_received'] as $futureControl) {
+            self::assertStringNotContainsString(strtolower($futureControl), strtolower($html));
+        }
+
+        $endedResponse = $this->request($app, 'GET', '/sub/tenant/leases/' . $ended['lease_id']);
+        self::assertSame(200, $endedResponse->getStatusCode());
+        self::assertStringContainsString('Global &lt;strong&gt;instrucciones&lt;/strong&gt;', (string) $endedResponse->getBody());
+        self::assertSame(404, $this->request($app, 'GET', '/sub/tenant/leases/' . $foreign['lease_id'])->getStatusCode());
+    }
+
+    public function testTenantPrivateQrRequiresOwnedLeaseApplicableActiveMethodAndIntactFile(): void
+    {
+        $tenantId = $this->insertUser('private-qr-owner@example.com', 'TenantPassword123', 'tenant');
+        $foreignId = $this->insertUser('private-qr-foreign@example.com', 'TenantPassword123', 'tenant');
+        $owned = $this->createLease($tenantId, ['unit_code' => 'APT-QR-OWNER']);
+        $foreign = $this->createLease($foreignId, ['unit_code' => 'APT-QR-FOREIGN']);
+        $ownedQr = $this->createPaymentMethod('breb_qr', [
+            'property_id' => $owned['property_id'],
+            'label' => 'QR autorizado',
+        ], $this->qrUpload());
+        $globalQr = $this->createPaymentMethod('breb_qr', ['label' => 'QR global'], $this->qrUpload());
+        $foreignQr = $this->createPaymentMethod('breb_qr', [
+            'property_id' => $foreign['property_id'],
+            'label' => 'QR extranjero',
+        ], $this->qrUpload());
+        $inactiveQr = $this->createPaymentMethod('breb_qr', [
+            'property_id' => $owned['property_id'],
+            'label' => 'QR apagado',
+            'is_active' => 0,
+        ], $this->qrUpload());
+        $manual = $this->createPaymentMethod('manual', ['label' => 'No es QR']);
+        $service = new PaymentMethodService($this->pdo, $this->qrDirectory);
+        $tamperedQr = $this->createPaymentMethod('breb_qr', ['label' => 'QR alterado'], $this->qrUpload());
+        $tamperedFile = $service->privateQr((int) $tamperedQr['id']);
+        self::assertNotNull($tamperedFile);
+        file_put_contents($tamperedFile['path'], 'not-an-image');
+        $missingQr = $this->createPaymentMethod('breb_qr', ['label' => 'QR ausente'], $this->qrUpload());
+        $missingFile = $service->privateQr((int) $missingQr['id']);
+        self::assertNotNull($missingFile);
+        @unlink($missingFile['path']);
+
+        $tracedPdo = $this->tracedPdo();
+        $app = $this->app('/sub', $tracedPdo);
+        $this->login($app, 'private-qr-owner@example.com', 'TenantPassword123', '/sub');
+        $path = '/sub/tenant/leases/' . $owned['lease_id'] . '/payment-methods/' . $ownedQr['id'] . '/qr';
+        $response = $this->request($app, 'GET', $path);
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('image/png', $response->getHeaderLine('Content-Type'));
+        self::assertSame((string) strlen($this->pngBytes()), $response->getHeaderLine('Content-Length'));
+        self::assertSame('private, no-store', $response->getHeaderLine('Cache-Control'));
+        self::assertSame('nosniff', $response->getHeaderLine('X-Content-Type-Options'));
+        self::assertSame($this->pngBytes(), (string) $response->getBody());
+        self::assertStringNotContainsString($ownedQr['qr_stored_name'], (string) $response->getBody());
+        self::assertStringNotContainsString($ownedQr['qr_stored_name'], $response->getHeaderLine('Content-Disposition'));
+        self::assertSame(200, $this->request(
+            $app,
+            'GET',
+            '/sub/tenant/leases/' . $owned['lease_id'] . '/payment-methods/' . $globalQr['id'] . '/qr',
+        )->getStatusCode());
+
+        foreach ([
+            '/sub/tenant/leases/' . $owned['lease_id'] . '/payment-methods/' . $foreignQr['id'] . '/qr',
+            '/sub/tenant/leases/' . $owned['lease_id'] . '/payment-methods/' . $inactiveQr['id'] . '/qr',
+            '/sub/tenant/leases/' . $owned['lease_id'] . '/payment-methods/' . $manual['id'] . '/qr',
+            '/sub/tenant/leases/' . $owned['lease_id'] . '/payment-methods/' . $tamperedQr['id'] . '/qr',
+            '/sub/tenant/leases/' . $owned['lease_id'] . '/payment-methods/' . $missingQr['id'] . '/qr',
+            '/sub/tenant/leases/' . $foreign['lease_id'] . '/payment-methods/' . $globalQr['id'] . '/qr',
+            '/sub/tenant/leases/999999/payment-methods/' . $globalQr['id'] . '/qr',
+        ] as $deniedPath) {
+            $tracedPdo->preparedSql = [];
+            self::assertSame(404, $this->request($app, 'GET', $deniedPath)->getStatusCode(), $deniedPath);
+            if (str_contains($deniedPath, '/leases/' . $foreign['lease_id'] . '/')) {
+                self::assertSame([], array_values(array_filter(
+                    $tracedPdo->preparedSql,
+                    static fn (string $sql): bool => str_contains(strtolower($sql), 'from payment_methods'),
+                )), 'Foreign lease must fail before payment-method lookup.');
+            }
+        }
+    }
+
     public function testOwnedContractPdfKeepsPrivateIntegrityAndForeignLeaseIs404(): void
     {
         $tenantId = $this->insertUser('pdf-owner@example.com', 'TenantPassword123', 'tenant');
@@ -351,6 +533,7 @@ final class TenantPortalRoutesTest extends TestCase
             'unit_media_directory' => $this->directory . '/unit-media',
             'candidate_document_directory' => $this->directory . '/candidate-documents',
             'contract_directory' => $this->contractDirectory,
+            'payment_method_qr_directory' => $this->qrDirectory,
             'pdo' => $pdo ?? $this->pdo,
             'today' => $today,
         ]);
@@ -472,7 +655,7 @@ final class TenantPortalRoutesTest extends TestCase
         ]);
     }
 
-    /** @return array{lease_id:int,contract_id:int,pdf_name:string,pdf_bytes:string} */
+    /** @return array{lease_id:int,contract_id:int,property_id:int,pdf_name:string,pdf_bytes:string} */
     private function createLease(int $userId, array $options = []): array
     {
         $type = (string) ($options['type'] ?? 'apartment');
@@ -615,8 +798,52 @@ final class TenantPortalRoutesTest extends TestCase
         return [
             'lease_id' => (int) $this->pdo->lastInsertId(),
             'contract_id' => $contractId,
+            'property_id' => $propertyId,
             'pdf_name' => $pdfName,
             'pdf_bytes' => $pdfBytes,
         ];
+    }
+
+    private function createPaymentMethod(string $type, array $overrides = [], ?UploadedFile $qr = null): array
+    {
+        $input = array_replace([
+            'property_id' => null,
+            'type' => $type,
+            'label' => 'Medio de pago',
+            'recipient_name' => 'Titular',
+            'institution_name' => 'Banco',
+            'account_type' => 'savings',
+            'account_number' => '001234567890',
+            'breb_key_type' => 'mobile',
+            'breb_key_value' => '3001234567',
+            'wallet_identifier' => '3001234567',
+            'instructions' => 'Indique el número de contrato.',
+            'sort_order' => 1,
+            'is_active' => 1,
+        ], $overrides);
+
+        return (new PaymentMethodService($this->pdo, $this->qrDirectory))->create($input, $qr);
+    }
+
+    private function qrUpload(): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'alquila_tenant_qr_');
+        if ($path === false || file_put_contents($path, $this->pngBytes()) === false) {
+            self::fail('Unable to create tenant QR fixture.');
+        }
+        $this->temporaryUploads[] = $path;
+
+        return new UploadedFile($path, 'bank-qr.png', 'image/png', strlen($this->pngBytes()), UPLOAD_ERR_OK, false);
+    }
+
+    private function pngBytes(): string
+    {
+        $bytes = base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+            true,
+        );
+        self::assertIsString($bytes);
+
+        return $bytes;
     }
 }
