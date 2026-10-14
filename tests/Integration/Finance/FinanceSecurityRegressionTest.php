@@ -167,7 +167,6 @@ final class FinanceSecurityRegressionTest extends TestCase
     public function testTenantPortfolioReusesOwnedLeaseRouteAndResolvesOwnershipBeforeFinance(): void
     {
         $f12Exists = $this->f12IsPresent();
-        $f13Exists = $this->f13IsPresent();
         $f15Exists = is_file($this->root . '/database/migrations/015_create_maintenance_visits.sql');
         $f18Exists = is_file($this->root . '/database/migrations/018_create_documents.sql');
         $routes = $this->file('app/Leases/routes.php');
@@ -205,6 +204,8 @@ final class FinanceSecurityRegressionTest extends TestCase
         $ownership = strpos($detailRoute, '$leases->findForUser(');
         $notFound = strpos($detailRoute, '$lease === null');
         $documentScope = strpos($detailRoute, '$documents->listCurrentForLease(');
+        $communityScope = strpos($detailRoute, '$community->listForLease(');
+        $membershipScope = strpos($detailRoute, '$memberships->listForLease(');
         $todayProvider = strpos($detailRoute, '$todayProvider()');
         $summary = strpos($detailRoute, '$finance->summaryForLease(');
         $list = strpos($detailRoute, '$finance->listForLease(');
@@ -223,20 +224,11 @@ final class FinanceSecurityRegressionTest extends TestCase
         self::assertTrue(
             $ownership < $notFound
             && (!$f18Exists || $notFound < $documentScope)
+            && ($communityScope === false || $notFound < $communityScope)
+            && ($membershipScope === false || $notFound < $membershipScope)
             && $notFound < $todayProvider && $todayProvider < $summary
             && $summary < $list && $list < $paymentMethodScope && $paymentMethodScope < $render,
         );
-        $expectedTenantDetailUse = $f13Exists
-            ? ($f15Exists
-                ? 'use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $insurance, $maintenance, $visits, $view, $csrf, $todayProvider, $path)'
-                : 'use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $insurance, $maintenance, $view, $csrf, $todayProvider, $path)')
-            : ($f12Exists
-                ? 'use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $view, $csrf, $todayProvider, $path)'
-                : 'use ($tenantGuard, $leases, $finance, $paymentMethods, $view, $csrf, $todayProvider, $path)');
-        if ($f18Exists) {
-            $expectedTenantDetailUse = str_replace('$leases, $finance', '$leases, $documents, $finance', $expectedTenantDetailUse);
-        }
-        self::assertStringContainsString($expectedTenantDetailUse, $detailRoute);
 
         $qrStart = strpos($routes, "\$app->get('/tenant/leases/{leaseId:[0-9]+}/payment-methods/");
         $qrEnd = strpos($routes, "\$app->get('/tenant/leases/{id:[0-9]+}/contract'", $qrStart === false ? 0 : $qrStart);

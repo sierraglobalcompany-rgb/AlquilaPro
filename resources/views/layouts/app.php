@@ -22,6 +22,7 @@ $canViewInsurance = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'i
 $canViewMaintenance = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'maintenance.view');
 $canUseWhatsApp = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'whatsapp.use');
 $canViewDocuments = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'documents.view');
+$canViewCommunity = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'community.view');
 $isOwner = !$isTenant && ($user['role'] ?? null) === 'owner';
 ?>
 <!doctype html>
@@ -118,13 +119,19 @@ $isOwner = !$isTenant && ($user['role'] ?? null) === 'owner';
                         <span>Archivos privados, manuales e inventarios</span>
                     </a>
                 <?php endif; ?>
+                <?php if ($canViewCommunity): ?>
+                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/community">
+                        <strong>Convivencia y avisos legales</strong>
+                        <span>Incidentes y avisos vigentes de propiedades</span>
+                    </a>
+                <?php endif; ?>
                 <?php if ($isOwner): ?>
                     <a class="app-card" href="<?= $escape($basePath) ?>/admin/appearance">
                         <strong>Apariencia</strong>
                         <span>Nombre, color y logo</span>
                     </a>
                 <?php endif; ?>
-                <?php if (!$canViewUsers && !$canViewProperties && !$canViewCandidates && !$canViewContracts && !$canViewFinance && !$canViewInsurance && !$canViewMaintenance && !$canUseWhatsApp && !$canViewDocuments && !$isOwner): ?>
+                <?php if (!$canViewUsers && !$canViewProperties && !$canViewCandidates && !$canViewContracts && !$canViewFinance && !$canViewInsurance && !$canViewMaintenance && !$canUseWhatsApp && !$canViewDocuments && !$canViewCommunity && !$isOwner): ?>
                     <p class="empty-state">No tienes aplicaciones disponibles.</p>
                 <?php endif; ?>
             </div>

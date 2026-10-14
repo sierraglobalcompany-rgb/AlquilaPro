@@ -9,6 +9,7 @@ use AlquilaPro\Auth\UserService;
 use AlquilaPro\Candidates\CandidateDocumentService;
 use AlquilaPro\Candidates\CandidateService;
 use AlquilaPro\Candidates\ScreeningService;
+use AlquilaPro\Community\CommunityService;
 use AlquilaPro\Contracts\ContractService;
 use AlquilaPro\Documents\DocumentService;
 use AlquilaPro\Foundation\DatabaseConfig;
@@ -249,6 +250,7 @@ return static function (array $settings): App {
             $users = new UserService($pdo);
             $leases = new LeaseService($pdo, $users);
             $documents = new DocumentService($pdo, $documentDirectory);
+            $community = new CommunityService($pdo);
             $paymentMethods = new PaymentMethodService($pdo, $paymentMethodQrDirectory);
             $finance = new FinanceService($pdo, $paymentMethods, $paymentReceiptDirectory);
             $obligations = new ObligationService($pdo, $finance, $obligationSupportDirectory);
@@ -323,12 +325,19 @@ return static function (array $settings): App {
                 'leases' => $leases,
                 'contracts' => $contracts,
                 'documents' => $documents,
+                'community' => $community,
             ]);
 
             $documentRoutes = require dirname(__DIR__) . '/app/Documents/routes.php';
             $documentRoutes($app, $shared + [
                 'documents' => $documents,
                 'leases' => $leases,
+            ]);
+
+            $communityRoutes = require dirname(__DIR__) . '/app/Community/routes.php';
+            $communityRoutes($app, $shared + [
+                'community' => $community,
+                'documents' => $documents,
             ]);
 
             $financeRoutes = require dirname(__DIR__) . '/app/Finance/routes.php';

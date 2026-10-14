@@ -319,11 +319,20 @@ final class ShellRoutesTest extends TestCase
         $ownerBody = (string) $this->request($app, 'GET', '/')->getBody();
         self::assertStringContainsString('/admin/users', $ownerBody);
         self::assertStringContainsString('Usuarios', $ownerBody);
+        self::assertStringContainsString('/admin/community', $ownerBody);
+        self::assertStringContainsString('Convivencia y avisos legales', $ownerBody);
         self::assertStringContainsString('/admin/appearance', $ownerBody);
         self::assertStringContainsString('Apariencia', $ownerBody);
 
         $_SESSION = [];
-        $this->insertUser('viewer@example.com', 'ViewerPassword123', 'admin', ['users.view', 'finance.view'], false, 'Viewer');
+        $this->insertUser(
+            'viewer@example.com',
+            'ViewerPassword123',
+            'admin',
+            ['users.view', 'finance.view', 'community.view'],
+            false,
+            'Viewer',
+        );
         $viewerApp = $this->app();
         $this->login($viewerApp, 'viewer@example.com', 'ViewerPassword123');
         $viewerBody = (string) $this->request($viewerApp, 'GET', '/')->getBody();
@@ -332,6 +341,8 @@ final class ShellRoutesTest extends TestCase
         self::assertStringContainsString('Usuarios', $viewerBody);
         self::assertStringContainsString('/admin/finance', $viewerBody);
         self::assertStringContainsString('Cartera', $viewerBody);
+        self::assertStringContainsString('/admin/community', $viewerBody);
+        self::assertStringContainsString('Convivencia y avisos legales', $viewerBody);
         self::assertStringNotContainsString('/admin/appearance', $viewerBody);
         self::assertStringNotContainsString('Apariencia', $viewerBody);
     }
@@ -351,6 +362,7 @@ final class ShellRoutesTest extends TestCase
         self::assertStringNotContainsString('Cartera', $body);
         self::assertStringNotContainsString('Solicitudes', $body);
         self::assertStringNotContainsString('Propiedades', $body);
+        self::assertStringNotContainsString('/admin/community', $body);
     }
 
     public function testUserAdministrationUsesAppShellCardsAndManagePermissionShowsCreateForm(): void

@@ -6,6 +6,7 @@ use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Contracts\ContractService;
+use AlquilaPro\Community\CommunityService;
 use AlquilaPro\Documents\DocumentService;
 use AlquilaPro\Finance\FinanceService;
 use AlquilaPro\Finance\ObligationService;
@@ -38,6 +39,8 @@ return static function (App $app, array $deps): void {
     $visits = $deps['visits'];
     /** @var DocumentService $documents */
     $documents = $deps['documents'];
+    /** @var CommunityService $community */
+    $community = $deps['community'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -205,7 +208,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($tenantGuard, $leases, $documents, $finance, $obligations, $paymentMethods, $insurance, $maintenance, $visits, $view, $csrf, $todayProvider, $path): ResponseInterface {
+    ) use ($tenantGuard, $leases, $documents, $community, $finance, $obligations, $paymentMethods, $insurance, $maintenance, $visits, $view, $csrf, $todayProvider, $path): ResponseInterface {
         $user = $tenantGuard($response);
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -214,6 +217,22 @@ return static function (App $app, array $deps): void {
         $lease = $leases->findForUser((int) $args['id'], (int) $user['id']);
         if ($lease === null) {
             return $response->withStatus(404);
+        }
+
+        $communityIncidents = [];
+        foreach ($community->listForLease((int) $lease['id']) as $incident) {
+            if ($incident['status'] === 'voided') {
+                continue;
+            }
+            $communityIncidents[] = [
+                'category' => (string) $incident['category'],
+                'occurred_on' => (string) $incident['occurred_on'],
+                'description' => (string) $incident['description'],
+                'status' => (string) $incident['status'],
+                'resolution_notes' => $incident['status'] === 'closed'
+                    ? (string) $incident['resolution_notes']
+                    : null,
+            ];
         }
 
         $leaseDocuments = [];
@@ -233,16 +252,28 @@ return static function (App $app, array $deps): void {
             ];
         }
         $propertyManuals = [];
+        $propertyLegalNotices = [];
         foreach ($documents->listCurrentForProperty((int) $lease['property_id']) as $document) {
-            if ($document['type'] !== 'manual_convivencia' || !is_array($document['content_json'] ?? null)) {
+            if (!is_array($document['content_json'] ?? null)) {
                 continue;
             }
-            $propertyManuals[] = [
-                'id' => (int) $document['id'],
-                'title' => (string) $document['title'],
-                'created_at' => (string) $document['created_at'],
-                'content_json' => $document['content_json'],
-            ];
+            if ($document['type'] === 'manual_convivencia') {
+                $propertyManuals[] = [
+                    'id' => (int) $document['id'],
+                    'title' => (string) $document['title'],
+                    'created_at' => (string) $document['created_at'],
+                    'content_json' => $document['content_json'],
+                ];
+            } elseif ($document['type'] === 'legal_notice') {
+                $propertyLegalNotices[] = [
+                    'title' => (string) $document['title'],
+                    'created_at' => (string) $document['created_at'],
+                    'source_label' => (string) $document['content_json']['source_label'],
+                    'source_url' => $document['content_json']['source_url'],
+                    'effective_on' => $document['content_json']['effective_on'],
+                    'notice_text' => (string) $document['content_json']['notice_text'],
+                ];
+            }
         }
 
         $today = $todayProvider();
@@ -351,6 +382,8 @@ return static function (App $app, array $deps): void {
             'maintenanceRequests' => $maintenanceRequests,
             'leaseDocuments' => $leaseDocuments,
             'propertyManuals' => $propertyManuals,
+            'communityIncidents' => $communityIncidents,
+            'propertyLegalNotices' => $propertyLegalNotices,
             'today' => $today,
         ]));
 
