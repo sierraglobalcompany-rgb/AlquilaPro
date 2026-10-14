@@ -5,12 +5,12 @@ PREPACKAGE_BASE: 37350105ac8c1806ae69194082098dbe230e5838
 MAIN_START: ddb24048326e3fd67df919f1bd829fac939d8861
 MAIN_START_AUDIT: PASS — descendant of PREPACKAGE_BASE; only the V4 master and design checkpoint changed
 CURRENT_PHASE: F19
-CURRENT_TASK: F19 local certification complete; prepare Product Head and docs-only Closure Head
+CURRENT_TASK: F19 Product Head fixed; docs-only Closure Head prepared
 BRANCH: impl/f19-community-legal-20261014
 BASE: 24f2da7dcf043ff4750434e18dcca66dfd37aab1 (F18 CLOSURE_HEAD)
-CURRENT_HEAD: 0f9ad3d (F19 product commit; closure pending)
+CURRENT_HEAD: 5fe11b3 (F19 product head; closure pending)
 WORKTREE: C:\Users\felip\.codex\worktrees\f15-f20-batch\AlquilaPro
-WORKTREE_STATUS: F18 product complete with PR #21 (mergeable; CI intentionally unpolled); F19 Tasks 1–4 plus review repair locally certified; product amend and docs-only closure next; generated .phpunit.cache/ and app/graphify-out/ remain untracked
+WORKTREE_STATUS: F18 product complete with PR #21 (mergeable; CI intentionally unpolled); F19 product head 5fe11b3 locally certified; README/SPEC/checkpoint closure docs pending; generated .phpunit.cache/ and app/graphify-out/ remain untracked
 F15_STATUS: LOCAL CERTIFIED / PR OPEN / MERGEABILITY CONFLICTING
 F15_BRANCH: impl/f15-agenda-visits-20261014
 F15_BASE: ddb24048326e3fd67df919f1bd829fac939d8861
@@ -55,6 +55,8 @@ F19_TASK1_RED: CommunitySchemaTest found no community_incidents; MigrationRunner
 F19_TASK1_GREEN: migration 019 + CommunityService lifecycle (row-locked forward transitions, bounded inputs, normalized staff records); MigrationRunner + Community schema/service focused set: 5 tests / 75 assertions PASS.
 F19_TASK1_RULING: close allowed from open/reviewed; void allowed from any nonvoided state, including closed, as auditable terminal correction. Cost if wrong: closed records may be voided though policy intended immutable closure.
 F19_TASK1_PRODUCT_HEAD: 4e35bf2e1fe01bc4364f2200106510c132ce75b0
+F19_PRODUCT_HEAD: 5fe11b32a674b277b05bd9f33d3a72a2a7df9550
+F19_PR_BASE: impl/f18-documents-inventories-20261014@24f2da7dcf043ff4750434e18dcca66dfd37aab1
 F19_TASK2_RED: DocumentSchemaTest found missing community_incident_id; CommunityDocumentsTest reached undefined createIncidentFileVersion and rejected legal_notice type.
 F19_TASK2_GREEN: migration 019 extends the one documents table to an exact property/lease/incident scope; DocumentService reuses private file integrity and version lineage, adds current incident evidence and validates property legal notices. F18/F19 document + migration regression set: 19 tests / 209 assertions PASS, 1 Windows symlink skip.
 F19_TASK2_RULING: legal_notice requires source_label and notice_text; optional source_url is limited to valid HTTP(S), effective_on is strict ISO date; text caps are label 190, URL 2048, notice 10000. Spec requires validation but leaves limits open; cost if wrong: long but valid notices or non-HTTP sources may be rejected.
@@ -98,7 +100,7 @@ F20: PENDING
 LOCAL_FULL_SUITE_RUNS: 0
 REMOTE_CI_RUNS: 4 (F15–F18 PRs triggered; final check pending)
 FRESH_REVIEWS: 5 (F19 review was author self-review; no independent reviewer dispatched)
-PRODUCTIVE_COMMITS: 8
+PRODUCTIVE_COMMITS: 10
 DOC_COMMITS: 4
 LOOP_ESCAPES: 0
 CI_REPAIRS: 0
