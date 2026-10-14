@@ -5,14 +5,20 @@ declare(strict_types=1);
 namespace AlquilaPro\Finance;
 
 use PDO;
-use PDOException;
 use RuntimeException;
 use Psr\Http\Message\UploadedFileInterface;
+use Throwable;
 
 final class PaymentMethodService
 {
     private const TYPES = ['bank_account', 'breb_key', 'breb_qr', 'wallet', 'manual'];
     private const BREB_KEY_TYPES = ['identity_document', 'mobile', 'email', 'alphanumeric', 'merchant_code'];
+    private const MAX_QR_BYTES = 2 * 1024 * 1024;
+    private const QR_MIME_EXTENSIONS = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+    ];
 
     public function __construct(
         private readonly PDO $pdo,
@@ -23,21 +29,34 @@ final class PaymentMethodService
     public function create(array $input, ?UploadedFileInterface $qr): array
     {
         $data = $this->normalizeInput($input);
-        if ($data['type'] === 'breb_qr' || $qr !== null) {
+        if ($data['type'] !== 'breb_qr' && $qr !== null) {
             throw new RuntimeException('No fue posible guardar el medio de pago.');
         }
 
-        $statement = $this->pdo->prepare(
-            'INSERT INTO payment_methods '
-            . '(property_id, type, label, recipient_name, institution_name, account_type, account_number, '
-            . 'breb_key_type, breb_key_value, wallet_identifier, instructions, sort_order, is_active) '
-            . 'VALUES (:property_id, :type, :label, :recipient_name, :institution_name, :account_type, :account_number, '
-            . ':breb_key_type, :breb_key_value, :wallet_identifier, :instructions, :sort_order, :is_active)',
-        );
+        $storedQr = null;
+        if ($data['type'] === 'breb_qr') {
+            if ($qr === null) {
+                throw new RuntimeException('No fue posible guardar el medio de pago.');
+            }
+            $storedQr = $this->storeQrUpload($qr);
+            $data = array_replace($data, $storedQr['metadata']);
+        }
 
         try {
+            $statement = $this->pdo->prepare(
+                'INSERT INTO payment_methods '
+                . '(property_id, type, label, recipient_name, institution_name, account_type, account_number, '
+                . 'breb_key_type, breb_key_value, wallet_identifier, instructions, qr_stored_name, qr_mime_type, '
+                . 'qr_sha256, qr_size_bytes, sort_order, is_active) '
+                . 'VALUES (:property_id, :type, :label, :recipient_name, :institution_name, :account_type, :account_number, '
+                . ':breb_key_type, :breb_key_value, :wallet_identifier, :instructions, :qr_stored_name, :qr_mime_type, '
+                . ':qr_sha256, :qr_size_bytes, :sort_order, :is_active)',
+            );
             $statement->execute($data);
-        } catch (PDOException $exception) {
+        } catch (Throwable $exception) {
+            if ($storedQr !== null) {
+                $this->removeQrFile($storedQr['stored_name']);
+            }
             throw new RuntimeException('No fue posible guardar el medio de pago.', 0, $exception);
         }
 
@@ -51,28 +70,56 @@ final class PaymentMethodService
 
     public function update(int $id, array $input, ?UploadedFileInterface $qr, bool $removeQr): array
     {
-        if ($id <= 0 || $this->find($id) === null) {
+        $current = $this->find($id);
+        if ($id <= 0 || $current === null) {
             throw new RuntimeException('No fue posible guardar el medio de pago.');
         }
 
         $data = $this->normalizeInput($input);
-        if ($data['type'] === 'breb_qr' || $qr !== null) {
+        if ($data['type'] !== 'breb_qr' && $qr !== null) {
             throw new RuntimeException('No fue posible guardar el medio de pago.');
         }
 
-        $statement = $this->pdo->prepare(
-            'UPDATE payment_methods SET '
-            . 'property_id = :property_id, type = :type, label = :label, recipient_name = :recipient_name, '
-            . 'institution_name = :institution_name, account_type = :account_type, account_number = :account_number, '
-            . 'breb_key_type = :breb_key_type, breb_key_value = :breb_key_value, wallet_identifier = :wallet_identifier, '
-            . 'instructions = :instructions, sort_order = :sort_order, is_active = :is_active, updated_at = CURRENT_TIMESTAMP '
-            . 'WHERE id = :id',
-        );
+        $oldStoredName = is_string($current['qr_stored_name']) ? $current['qr_stored_name'] : null;
+        $storedQr = null;
+        if ($data['type'] === 'breb_qr') {
+            if ($qr !== null) {
+                $storedQr = $this->storeQrUpload($qr);
+                $data = array_replace($data, $storedQr['metadata']);
+            } elseif ($removeQr) {
+                throw new RuntimeException('No fue posible guardar el medio de pago.');
+            } else {
+                if ($this->privateQr($id) === null) {
+                    throw new RuntimeException('No fue posible guardar el medio de pago.');
+                }
+                $data['qr_stored_name'] = $current['qr_stored_name'];
+                $data['qr_mime_type'] = $current['qr_mime_type'];
+                $data['qr_sha256'] = $current['qr_sha256'];
+                $data['qr_size_bytes'] = (int) $current['qr_size_bytes'];
+            }
+        }
 
         try {
+            $statement = $this->pdo->prepare(
+                'UPDATE payment_methods SET '
+                . 'property_id = :property_id, type = :type, label = :label, recipient_name = :recipient_name, '
+                . 'institution_name = :institution_name, account_type = :account_type, account_number = :account_number, '
+                . 'breb_key_type = :breb_key_type, breb_key_value = :breb_key_value, wallet_identifier = :wallet_identifier, '
+                . 'instructions = :instructions, qr_stored_name = :qr_stored_name, qr_mime_type = :qr_mime_type, '
+                . 'qr_sha256 = :qr_sha256, qr_size_bytes = :qr_size_bytes, sort_order = :sort_order, is_active = :is_active, '
+                . 'updated_at = CURRENT_TIMESTAMP WHERE id = :id',
+            );
             $statement->execute($data + ['id' => $id]);
-        } catch (PDOException $exception) {
+        } catch (Throwable $exception) {
+            if ($storedQr !== null) {
+                $this->removeQrFile($storedQr['stored_name']);
+            }
             throw new RuntimeException('No fue posible guardar el medio de pago.', 0, $exception);
+        }
+
+        $newStoredName = $data['qr_stored_name'];
+        if ($oldStoredName !== null && $oldStoredName !== $newStoredName) {
+            $this->removeQrFile($oldStoredName);
         }
 
         $method = $this->find($id);
@@ -121,6 +168,56 @@ final class PaymentMethodService
         return is_array($row) ? $this->normalizeRow($row) : null;
     }
 
+    /** @return array{path:string,mime:string,size_bytes:int}|null */
+    public function privateQr(int $id): ?array
+    {
+        try {
+            $method = $this->find($id);
+        } catch (Throwable) {
+            return null;
+        }
+        if ($method === null || $method['type'] !== 'breb_qr') {
+            return null;
+        }
+
+        $storedName = $method['qr_stored_name'];
+        $storedMime = $method['qr_mime_type'];
+        $storedHash = $method['qr_sha256'];
+        $storedSize = $method['qr_size_bytes'];
+        if (!is_string($storedName)
+            || !is_string($storedMime)
+            || !is_string($storedHash)
+            || !is_int($storedSize)
+            || !isset(self::QR_MIME_EXTENSIONS[$storedMime])
+            || preg_match('/^[a-f0-9]{64}$/i', $storedHash) !== 1
+        ) {
+            return null;
+        }
+
+        $path = $this->qrPath($storedName, true);
+        if ($path === null) {
+            return null;
+        }
+
+        $size = @filesize($path);
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($path);
+        $hash = @hash_file('sha256', $path);
+        if (!is_int($size)
+            || $size < 1
+            || $size > self::MAX_QR_BYTES
+            || $size !== $storedSize
+            || !is_string($mime)
+            || $mime !== $storedMime
+            || pathinfo($storedName, PATHINFO_EXTENSION) !== self::QR_MIME_EXTENSIONS[$mime]
+            || !is_string($hash)
+            || !hash_equals(strtolower($storedHash), $hash)
+        ) {
+            return null;
+        }
+
+        return ['path' => $path, 'mime' => $mime, 'size_bytes' => $size];
+    }
+
     private function normalizeInput(array $input): array
     {
         $type = $this->requiredText($input, 'type', 32);
@@ -144,6 +241,10 @@ final class PaymentMethodService
             'breb_key_value' => $type === 'breb_key' ? $this->optionalText($input, 'breb_key_value', 190) : null,
             'wallet_identifier' => $type === 'wallet' ? $this->optionalText($input, 'wallet_identifier', 190) : null,
             'instructions' => $this->optionalText($input, 'instructions', 1000),
+            'qr_stored_name' => null,
+            'qr_mime_type' => null,
+            'qr_sha256' => null,
+            'qr_size_bytes' => null,
             'sort_order' => $this->normalizeUnsignedInteger($input['sort_order'] ?? 1, 4_294_967_295),
             'is_active' => $this->normalizeActive($input['is_active'] ?? 1),
         ];
@@ -300,5 +401,133 @@ final class PaymentMethodService
         $row['qr_size_bytes'] = $row['qr_size_bytes'] === null ? null : (int) $row['qr_size_bytes'];
 
         return $row;
+    }
+
+    /** @return array{stored_name:string,path:string,metadata:array{qr_stored_name:string,qr_mime_type:string,qr_sha256:string,qr_size_bytes:int}} */
+    private function storeQrUpload(UploadedFileInterface $upload): array
+    {
+        $validated = $this->validateQrUpload($upload);
+        $this->ensureQrDirectory();
+
+        $storedName = 'qr-' . bin2hex(random_bytes(16)) . '.' . self::QR_MIME_EXTENSIONS[$validated['mime']];
+        $path = $this->qrPath($storedName, false);
+        if ($path === null) {
+            throw new RuntimeException('No fue posible guardar el medio de pago.');
+        }
+
+        try {
+            $upload->moveTo($path);
+            @chmod($path, 0600);
+            clearstatcache(true, $path);
+            $storedSize = @filesize($path);
+            $storedMime = (new \finfo(FILEINFO_MIME_TYPE))->file($path);
+            $storedHash = @hash_file('sha256', $path);
+            if (!is_int($storedSize)
+                || $storedSize !== $validated['size_bytes']
+                || $storedMime !== $validated['mime']
+                || !is_string($storedHash)
+                || !hash_equals($validated['sha256'], $storedHash)
+            ) {
+                throw new RuntimeException('No fue posible guardar el medio de pago.');
+            }
+        } catch (Throwable $exception) {
+            if (is_file($path)) {
+                @unlink($path);
+            }
+            throw new RuntimeException('No fue posible guardar el medio de pago.', 0, $exception);
+        }
+
+        return [
+            'stored_name' => $storedName,
+            'path' => $path,
+            'metadata' => [
+                'qr_stored_name' => $storedName,
+                'qr_mime_type' => $validated['mime'],
+                'qr_sha256' => $validated['sha256'],
+                'qr_size_bytes' => $validated['size_bytes'],
+            ],
+        ];
+    }
+
+    /** @return array{mime:string,size_bytes:int,sha256:string} */
+    private function validateQrUpload(UploadedFileInterface $upload): array
+    {
+        try {
+            if ($upload->getError() !== UPLOAD_ERR_OK) {
+                throw new RuntimeException('No fue posible guardar el medio de pago.');
+            }
+
+            $stream = $upload->getStream();
+            $reportedSize = $stream->getSize();
+            if (!is_int($reportedSize) || $reportedSize < 1 || $reportedSize > self::MAX_QR_BYTES) {
+                throw new RuntimeException('No fue posible guardar el medio de pago.');
+            }
+            $stream->rewind();
+            $bytes = $stream->getContents();
+        } catch (Throwable $exception) {
+            throw new RuntimeException('No fue posible guardar el medio de pago.', 0, $exception);
+        }
+
+        $size = strlen($bytes);
+        if ($size !== $reportedSize || $size < 1 || $size > self::MAX_QR_BYTES) {
+            throw new RuntimeException('No fue posible guardar el medio de pago.');
+        }
+
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+        if (!is_string($mime) || !isset(self::QR_MIME_EXTENSIONS[$mime])) {
+            throw new RuntimeException('No fue posible guardar el medio de pago.');
+        }
+
+        return ['mime' => $mime, 'size_bytes' => $size, 'sha256' => hash('sha256', $bytes)];
+    }
+
+    private function ensureQrDirectory(): void
+    {
+        if (!is_dir($this->qrDirectory)
+            && !@mkdir($this->qrDirectory, 0700, true)
+            && !is_dir($this->qrDirectory)
+        ) {
+            throw new RuntimeException('No fue posible guardar el medio de pago.');
+        }
+        @chmod($this->qrDirectory, 0700);
+    }
+
+    private function qrPath(string $storedName, bool $mustExist): ?string
+    {
+        if (preg_match('/^qr-[a-f0-9]{32}\.(?:jpg|png|webp)$/', $storedName) !== 1) {
+            return null;
+        }
+
+        $directory = realpath($this->qrDirectory);
+        if (!is_string($directory)) {
+            return null;
+        }
+
+        $candidate = rtrim($directory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $storedName;
+        if (!$mustExist) {
+            return file_exists($candidate) ? null : $candidate;
+        }
+        if (is_link($candidate) || !is_file($candidate)) {
+            return null;
+        }
+
+        $resolved = realpath($candidate);
+        if (!is_string($resolved)) {
+            return null;
+        }
+        $directoryPrefix = rtrim($directory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        if (!str_starts_with(strtolower($resolved), strtolower($directoryPrefix))) {
+            return null;
+        }
+
+        return $resolved;
+    }
+
+    private function removeQrFile(string $storedName): void
+    {
+        $path = $this->qrPath($storedName, true);
+        if ($path !== null && !@unlink($path)) {
+            error_log('Payment method QR cleanup failed.');
+        }
     }
 }

@@ -76,7 +76,9 @@ final class UnitMediaServiceTest extends TestCase
         self::assertNotNull($private);
         self::assertSame('image/png', $private['mime']);
         self::assertSame($media['stored_name'], $private['stored_name']);
-        self::assertSame($this->mediaDirectory . '/' . $media['stored_name'], $private['path']);
+        $expectedPath = realpath($this->mediaDirectory . DIRECTORY_SEPARATOR . $media['stored_name']);
+        self::assertIsString($expectedPath);
+        self::assertSame($expectedPath, realpath($private['path']));
     }
 
     public function testPublicPhotoDisappearsWhenPublishedUnitLosesCompleteness(): void

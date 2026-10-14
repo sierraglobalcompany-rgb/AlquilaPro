@@ -11,11 +11,15 @@ use AlquilaPro\Foundation\MigrationRunner;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Slim\Psr7\UploadedFile;
 
 final class PaymentMethodServiceTest extends TestCase
 {
+    private const MAX_QR_BYTES = 2 * 1024 * 1024;
+
     private PDO $pdo;
     private string $qrDirectory;
+    private array $temporaryFiles = [];
 
     protected function setUp(): void
     {
@@ -36,6 +40,17 @@ final class PaymentMethodServiceTest extends TestCase
 
         MigrationRunner::migrate($this->pdo, dirname(__DIR__, 3) . '/database/migrations');
         $this->qrDirectory = sys_get_temp_dir() . '/alquilapro-payment-methods-' . bin2hex(random_bytes(8));
+    }
+
+    protected function tearDown(): void
+    {
+        foreach ($this->temporaryFiles as $file) {
+            @unlink($file);
+        }
+        foreach (glob($this->qrDirectory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+            @unlink($file);
+        }
+        @rmdir($this->qrDirectory);
     }
 
     public function testCreatesEachSupportedNonQrTypeAndClearsIrrelevantFields(): void
@@ -291,6 +306,179 @@ final class PaymentMethodServiceTest extends TestCase
         self::assertNull($this->service()->find(999999));
     }
 
+    public function testAcceptsPngJpegAndWebpByBytesAndStoresPrivateRandomNames(): void
+    {
+        $fixtures = [
+            ['image/png', 'png', $this->pngBytes(), '../../public.svg', 'image/svg+xml'],
+            ['image/jpeg', 'jpg', $this->jpegBytes(), 'client.png', 'image/png'],
+            ['image/webp', 'webp', $this->webpBytes(), 'client.jpg', 'image/jpeg'],
+        ];
+
+        foreach ($fixtures as [$mime, $extension, $bytes, $clientName, $clientMime]) {
+            $method = $this->service()->create(
+                $this->payload('breb_qr'),
+                $this->upload($bytes, $clientName, $clientMime),
+            );
+
+            self::assertSame($mime, $method['qr_mime_type']);
+            self::assertSame(strlen($bytes), $method['qr_size_bytes']);
+            self::assertSame(hash('sha256', $bytes), $method['qr_sha256']);
+            self::assertMatchesRegularExpression('/^qr-[a-f0-9]{32}\.' . $extension . '$/', $method['qr_stored_name']);
+            self::assertStringNotContainsString('client', $method['qr_stored_name']);
+            self::assertSame(1, count($this->storedQrFiles()));
+
+            $private = $this->service()->privateQr((int) $method['id']);
+            self::assertSame([
+                'path' => $this->privateQrPath($method['qr_stored_name']),
+                'mime' => $mime,
+                'size_bytes' => strlen($bytes),
+            ], $private);
+            self::assertFileExists($private['path']);
+            self::assertSame($bytes, file_get_contents($private['path']));
+            self::assertArrayNotHasKey('stored_name', $private);
+            self::assertArrayNotHasKey('qr_stored_name', $private);
+
+            $this->service()->update((int) $method['id'], $this->payload('manual'), null, false);
+        }
+    }
+
+    public function testRejectsEmptySvgSpoofedAndOversizedQrUploadsWithoutRowsOrFiles(): void
+    {
+        $invalidUploads = [
+            $this->upload('', 'empty.png', 'image/png', UPLOAD_ERR_NO_FILE),
+            $this->upload('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', 'qr.png', 'image/png'),
+            $this->upload('<?php echo "not an image"; ?>', 'qr.jpg', 'image/jpeg'),
+            $this->upload($this->pngBytes() . str_repeat('x', self::MAX_QR_BYTES), 'large.png', 'image/png'),
+        ];
+
+        foreach ($invalidUploads as $upload) {
+            $this->assertRejected(fn () => $this->service()->create($this->payload('breb_qr'), $upload));
+        }
+
+        self::assertSame(0, $this->methodCount());
+        self::assertSame([], $this->storedQrFiles());
+    }
+
+    public function testPrivateQrFailsClosedForMissingTamperedAndMismatchedMetadata(): void
+    {
+        $bytes = $this->pngBytes();
+        $method = $this->service()->create(
+            $this->payload('breb_qr'),
+            $this->upload($bytes, 'valid.png', 'image/png'),
+        );
+        $path = $this->privateQrPath($method['qr_stored_name']);
+        self::assertNotNull($this->service()->privateQr((int) $method['id']));
+
+        file_put_contents($path, 'tampered');
+        self::assertNull($this->service()->privateQr((int) $method['id']));
+        file_put_contents($path, $bytes);
+
+        $update = $this->pdo->prepare('UPDATE payment_methods SET qr_sha256 = :value WHERE id = :id');
+        $update->execute(['value' => str_repeat('a', 64), 'id' => $method['id']]);
+        self::assertNull($this->service()->privateQr((int) $method['id']));
+        $update->execute(['value' => hash('sha256', $bytes), 'id' => $method['id']]);
+
+        $update = $this->pdo->prepare('UPDATE payment_methods SET qr_size_bytes = :value WHERE id = :id');
+        $update->execute(['value' => strlen($bytes) + 1, 'id' => $method['id']]);
+        self::assertNull($this->service()->privateQr((int) $method['id']));
+        $update->execute(['value' => strlen($bytes), 'id' => $method['id']]);
+
+        $update = $this->pdo->prepare('UPDATE payment_methods SET qr_mime_type = :value WHERE id = :id');
+        $update->execute(['value' => 'image/jpeg', 'id' => $method['id']]);
+        self::assertNull($this->service()->privateQr((int) $method['id']));
+        $update->execute(['value' => 'image/png', 'id' => $method['id']]);
+
+        $update = $this->pdo->prepare('UPDATE payment_methods SET qr_stored_name = :value WHERE id = :id');
+        $update->execute(['value' => '../../outside.png', 'id' => $method['id']]);
+        self::assertNull($this->service()->privateQr((int) $method['id']));
+        $update->execute(['value' => $method['qr_stored_name'], 'id' => $method['id']]);
+
+        self::assertTrue(unlink($path));
+        self::assertNull($this->service()->privateQr((int) $method['id']));
+    }
+
+    public function testReplacementRemovesSupersededQrOnlyAfterNewQrIsSaved(): void
+    {
+        $firstBytes = $this->pngBytes();
+        $method = $this->service()->create(
+            $this->payload('breb_qr'),
+            $this->upload($firstBytes, 'first.png', 'image/png'),
+        );
+        $oldPath = $this->privateQrPath($method['qr_stored_name']);
+        self::assertFileExists($oldPath);
+
+        $newBytes = $this->jpegBytes();
+        $replaced = $this->service()->update(
+            (int) $method['id'],
+            $this->payload('breb_qr'),
+            $this->upload($newBytes, 'replacement.jpg', 'image/jpeg'),
+            false,
+        );
+        $newPath = $this->privateQrPath($replaced['qr_stored_name']);
+
+        self::assertNotSame($method['qr_stored_name'], $replaced['qr_stored_name']);
+        self::assertFileExists($newPath);
+        self::assertFileDoesNotExist($oldPath);
+        self::assertSame(hash('sha256', $newBytes), $replaced['qr_sha256']);
+        self::assertSame('image/jpeg', $replaced['qr_mime_type']);
+        self::assertSame($newPath, $this->service()->privateQr((int) $method['id'])['path']);
+    }
+
+    public function testQrCannotBeRemovedWhileRetainedAndTypeChangeClearsQrFileAndMetadata(): void
+    {
+        $method = $this->service()->create(
+            $this->payload('breb_qr'),
+            $this->upload($this->pngBytes(), 'qr.png', 'image/png'),
+        );
+        $path = $this->privateQrPath($method['qr_stored_name']);
+
+        $this->assertRejected(fn () => $this->service()->update(
+            (int) $method['id'],
+            $this->payload('breb_qr'),
+            null,
+            true,
+        ));
+        self::assertFileExists($path);
+        self::assertNotNull($this->service()->privateQr((int) $method['id']));
+
+        $manual = $this->service()->update((int) $method['id'], $this->payload('manual'), null, false);
+        self::assertSame('manual', $manual['type']);
+        foreach (['qr_stored_name', 'qr_mime_type', 'qr_sha256', 'qr_size_bytes'] as $field) {
+            self::assertNull($manual[$field]);
+        }
+        self::assertFileDoesNotExist($path);
+        self::assertNull($this->service()->privateQr((int) $method['id']));
+    }
+
+    public function testDatabaseUpdateFailureDeletesNewQrAndKeepsPreviousAuthorityIntact(): void
+    {
+        $oldBytes = $this->pngBytes();
+        $method = $this->service()->create(
+            $this->payload('breb_qr'),
+            $this->upload($oldBytes, 'old.png', 'image/png'),
+        );
+        $oldPath = $this->privateQrPath($method['qr_stored_name']);
+        $this->pdo->exec(
+            "CREATE TRIGGER payment_methods_force_update_failure BEFORE UPDATE ON payment_methods "
+            . "FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced test failure'",
+        );
+
+        $this->assertRejected(fn () => $this->service()->update(
+            (int) $method['id'],
+            $this->payload('breb_qr'),
+            $this->upload($this->webpBytes(), 'new.webp', 'image/webp'),
+            false,
+        ));
+
+        $current = $this->service()->find((int) $method['id']);
+        self::assertSame($method['qr_stored_name'], $current['qr_stored_name']);
+        self::assertSame(hash('sha256', $oldBytes), $current['qr_sha256']);
+        self::assertFileExists($oldPath);
+        self::assertSame($oldBytes, file_get_contents($oldPath));
+        self::assertSame(1, count($this->storedQrFiles()));
+        self::assertSame($oldPath, $this->service()->privateQr((int) $method['id'])['path']);
+    }
+
     private function service(): PaymentMethodService
     {
         return new PaymentMethodService($this->pdo, $this->qrDirectory);
@@ -364,5 +552,64 @@ final class PaymentMethodServiceTest extends TestCase
         }
 
         self::fail('Invalid payment method input must be rejected.');
+    }
+
+    private function upload(string $bytes, string $clientName, string $clientMime, int $error = UPLOAD_ERR_OK): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'alquila_payment_qr_');
+        if ($path === false || file_put_contents($path, $bytes) === false) {
+            self::fail('Unable to create QR upload fixture.');
+        }
+        $this->temporaryFiles[] = $path;
+
+        return new UploadedFile($path, $clientName, $clientMime, strlen($bytes), $error, false);
+    }
+
+    private function storedQrFiles(): array
+    {
+        return array_values(glob($this->qrDirectory . DIRECTORY_SEPARATOR . '*') ?: []);
+    }
+
+    private function privateQrPath(string $storedName): string
+    {
+        $path = realpath($this->qrDirectory . DIRECTORY_SEPARATOR . $storedName);
+        if (!is_string($path)) {
+            self::fail('Expected a QR file inside the private test directory.');
+        }
+
+        return $path;
+    }
+
+    private function pngBytes(): string
+    {
+        $bytes = base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+            true,
+        );
+        self::assertIsString($bytes);
+
+        return $bytes;
+    }
+
+    private function jpegBytes(): string
+    {
+        $bytes = base64_decode(
+            '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAf/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/ANF//9k=',
+            true,
+        );
+        self::assertIsString($bytes);
+
+        return $bytes;
+    }
+
+    private function webpBytes(): string
+    {
+        $bytes = base64_decode(
+            'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEAAUAmJaQAA3AA/v89WAAAAA==',
+            true,
+        );
+        self::assertIsString($bytes);
+
+        return $bytes;
     }
 }
