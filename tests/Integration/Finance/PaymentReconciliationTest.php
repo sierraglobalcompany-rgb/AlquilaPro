@@ -258,7 +258,11 @@ final class PaymentReconciliationTest extends TestCase
                 return parent::commit();
             }
         };
-        $service = new FinanceService($pdo, new PaymentMethodService($pdo, sys_get_temp_dir()));
+        $service = new FinanceService(
+            $pdo,
+            new PaymentMethodService($pdo, sys_get_temp_dir()),
+            $this->receiptDirectory,
+        );
         $service->reconcilePayment(
             (int) $payment['id'], [
                 ['charge_id' => $secondCharge, 'amount' => '10'],
@@ -570,7 +574,11 @@ file_put_contents($ready, 'ready');
 $deadline = microtime(true) + 10;
 while (!is_file($go) && microtime(true) < $deadline) { usleep(1000); }
 try {
-    $service = new \AlquilaPro\Finance\FinanceService($pdo);
+    $service = new \AlquilaPro\Finance\FinanceService(
+        $pdo,
+        new \AlquilaPro\Finance\PaymentMethodService($pdo, sys_get_temp_dir()),
+        sys_get_temp_dir(),
+    );
     if ($action === 'reject') {
         $service->rejectPayment($paymentId, (string) $argv[10], $actorId, $now);
     } else {

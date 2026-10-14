@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace AlquilaPro\Tests\Integration\Finance;
 
+use AlquilaPro\Finance\FinanceService;
+use AlquilaPro\Finance\PaymentMethodService;
 use PHPUnit\Framework\TestCase;
 
 final class FinanceSecurityRegressionTest extends TestCase
@@ -13,6 +15,21 @@ final class FinanceSecurityRegressionTest extends TestCase
     protected function setUp(): void
     {
         $this->root = dirname(__DIR__, 3);
+    }
+
+    public function testFinanceServiceRequiresExplicitPaymentCollaborators(): void
+    {
+        $constructor = (new \ReflectionClass(FinanceService::class))->getConstructor();
+        self::assertNotNull($constructor);
+
+        $parameters = $constructor->getParameters();
+        self::assertCount(3, $parameters);
+        self::assertSame(3, $constructor->getNumberOfRequiredParameters());
+        self::assertSame(PaymentMethodService::class, $parameters[1]->getType()?->getName());
+        self::assertFalse($parameters[1]->allowsNull());
+        self::assertFalse($parameters[1]->isDefaultValueAvailable());
+        self::assertFalse($parameters[2]->allowsNull());
+        self::assertFalse($parameters[2]->isDefaultValueAvailable());
     }
 
     public function testF9ArchitectureRemainsWithinTheApprovedBudget(): void

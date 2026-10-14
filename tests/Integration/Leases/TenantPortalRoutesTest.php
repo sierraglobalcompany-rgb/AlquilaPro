@@ -207,7 +207,11 @@ final class TenantPortalRoutesTest extends TestCase
         ]);
 
         $tracedPdo = $this->tracedPdo();
-        $monthlyCharges = (new FinanceService($tracedPdo))->createMonthlyCharges(
+        $monthlyCharges = (new FinanceService(
+            $tracedPdo,
+            new PaymentMethodService($tracedPdo, $this->qrDirectory),
+            $this->directory . '/payment-receipts',
+        ))->createMonthlyCharges(
             $apartment['lease_id'], '2026-10-01', '2026-10-12', $tenantId,
         );
         self::assertSame(['rent', 'administration'], array_column($monthlyCharges, 'type'));

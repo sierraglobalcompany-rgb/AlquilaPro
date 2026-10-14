@@ -35,15 +35,11 @@ final readonly class FinanceService
         'application/pdf' => 'pdf',
     ];
 
-    private PaymentMethodService $paymentMethods;
-
     public function __construct(
         private PDO $pdo,
-        ?PaymentMethodService $paymentMethods = null,
-        private string $receiptDirectory = '',
-    ) {
-        $this->paymentMethods = $paymentMethods ?? new PaymentMethodService($pdo, '');
-    }
+        private PaymentMethodService $paymentMethods,
+        private string $receiptDirectory,
+    ) {}
 
     /** @return array{id:int,lease_id:int,type:string,period_month:?string,due_date:string,amount:string,description:string,created_by_user_id:int} */
     public function createManualCharge(
