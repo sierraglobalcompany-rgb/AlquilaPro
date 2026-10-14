@@ -46,10 +46,18 @@ final class PaymentMethodSecurityRegressionTest extends TestCase
         $financeServices = glob($this->root . '/app/Finance/*Service.php') ?: [];
         $financeServices = array_map(static fn (string $path): string => str_replace('\\', '/', $path), $financeServices);
         sort($financeServices);
-        self::assertSame([
+        $expectedFinanceServices = [
             str_replace('\\', '/', $this->root) . '/app/Finance/FinanceService.php',
             str_replace('\\', '/', $this->root) . '/app/Finance/PaymentMethodService.php',
-        ], $financeServices);
+        ];
+        $f12Migration = $this->root . '/database/migrations/012_create_lease_obligations.sql';
+        if (is_file($f12Migration)
+            && preg_match('/CREATE TABLE\\s+lease_obligations\\b/i', (string) file_get_contents($f12Migration)) === 1
+        ) {
+            $expectedFinanceServices[] = str_replace('\\', '/', $this->root) . '/app/Finance/ObligationService.php';
+        }
+        sort($expectedFinanceServices);
+        self::assertSame($expectedFinanceServices, $financeServices);
         $paymentMethodClassFiles = [];
         $appFiles = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($this->root . '/app', \FilesystemIterator::SKIP_DOTS),
