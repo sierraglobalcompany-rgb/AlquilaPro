@@ -8,6 +8,7 @@ $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, 
     <p class="eyebrow">Administración</p>
     <h1>Cartera</h1>
     <p class="hint">Cargos y saldos pendientes por arrendamiento.</p>
+    <p><a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/finance/payment-methods">Configurar medios de pago</a></p>
 
     <?php if ($portfolio === []): ?>
         <p class="empty-state">No hay cargos registrados.</p>
