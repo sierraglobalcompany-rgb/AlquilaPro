@@ -61,11 +61,11 @@ inventory_final
 other
 ```
 
-- [ ] RED schema: property XOR lease, self-FK supersedes, minimal indexes, no status/history/type/item tables.
-- [ ] GREEN migration.
-- [ ] RED type/scope/title/version lineage validation.
-- [ ] GREEN immutable rows and current-leaf queries.
-- [ ] Run schema/core focused tests.
+- [x] RED schema: property XOR lease, self-FK supersedes, minimal indexes, no status/history/type/item tables.
+- [x] GREEN migration.
+- [x] RED type/scope/title/version lineage validation.
+- [x] GREEN immutable rows and current-leaf queries.
+- [x] Run schema/core focused tests.
 
 ### Task 2: Private files + inventory snapshots
 
