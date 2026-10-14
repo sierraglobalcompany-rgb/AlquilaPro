@@ -31,3 +31,15 @@ CREATE TABLE community_incidents (
     CONSTRAINT community_incidents_closed_by_user_fk FOREIGN KEY (closed_by_user_id) REFERENCES users (id) ON DELETE RESTRICT,
     CONSTRAINT community_incidents_voided_by_user_fk FOREIGN KEY (voided_by_user_id) REFERENCES users (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE documents
+    ADD COLUMN community_incident_id BIGINT UNSIGNED NULL AFTER lease_id,
+    ADD KEY documents_incident_current_index (community_incident_id, type, id),
+    DROP CONSTRAINT documents_scope_xor_check,
+    ADD CONSTRAINT documents_scope_xor_check CHECK (
+        (property_id IS NOT NULL AND lease_id IS NULL AND community_incident_id IS NULL)
+        OR (property_id IS NULL AND lease_id IS NOT NULL AND community_incident_id IS NULL)
+        OR (property_id IS NULL AND lease_id IS NULL AND community_incident_id IS NOT NULL)
+    ),
+    ADD CONSTRAINT documents_community_incident_fk
+        FOREIGN KEY (community_incident_id) REFERENCES community_incidents (id) ON DELETE RESTRICT;

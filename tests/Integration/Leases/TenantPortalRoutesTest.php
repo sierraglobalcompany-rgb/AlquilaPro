@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AlquilaPro\Tests\Integration\Leases;
 
 use AlquilaPro\Auth\Csrf;
+use AlquilaPro\Community\CommunityService;
 use AlquilaPro\Documents\DocumentService;
 use AlquilaPro\Finance\FinanceService;
 use AlquilaPro\Finance\PaymentMethodService;
@@ -49,6 +50,7 @@ final class TenantPortalRoutesTest extends TestCase
             'payments',
             'payment_methods',
             'charges',
+            'community_incidents',
             'documents',
             'leases',
             'contracts',
@@ -447,6 +449,106 @@ final class TenantPortalRoutesTest extends TestCase
         self::assertIsInt($documentLookup);
         self::assertLessThan($documentLookup, $leaseLookup);
         self::assertSame('private, no-store', $download->getHeaderLine('Cache-Control'));
+    }
+
+    public function testTenantCommunityAndLegalProjectionIsSafeAndOwnershipPrecedesLookups(): void
+    {
+        $tenantId = $this->insertUser('community-projection@example.com', 'TenantPassword123', 'tenant');
+        $foreignTenantId = $this->insertUser('community-foreign@example.com', 'TenantPassword123', 'tenant');
+        $owned = $this->createLease($tenantId, ['property_name' => 'Comunidad propia']);
+        $foreign = $this->createLease($foreignTenantId, ['property_name' => 'Comunidad ajena']);
+        $community = new CommunityService($this->pdo);
+
+        $open = $community->create(
+            $owned['lease_id'], 'Ruido', '2026-10-13', 'Incidente abierto visible.', $tenantId, 1_800_000_000,
+        );
+        $reviewed = $community->create(
+            $owned['lease_id'], 'Mascotas', '2026-10-12', 'Incidente revisado visible.', $tenantId, 1_800_000_001,
+        );
+        $community->markReviewed((int) $reviewed['id'], $tenantId, 1_800_000_002);
+        $closed = $community->create(
+            $owned['lease_id'], 'Acceso', '2026-10-11', 'Incidente cerrado visible.', $tenantId, 1_800_000_003,
+        );
+        $community->close((int) $closed['id'], 'Resolución visible tras cierre.', $tenantId, 1_800_000_004);
+        $voided = $community->create(
+            $owned['lease_id'], 'Registro', '2026-10-10', 'INCIDENTE_VOIDED_SECRET', $tenantId, 1_800_000_005,
+        );
+        $community->void((int) $voided['id'], 'MOTIVO_VOIDED_PRIVADO', $tenantId, 1_800_000_006);
+        $community->create(
+            $foreign['lease_id'], 'Privado', '2026-10-09', 'INCIDENTE_AJENO_SECRET', $foreignTenantId, 1_800_000_007,
+        );
+
+        $documents = new DocumentService($this->pdo, $this->directory . '/documents');
+        $oldNotice = $documents->createContentVersion(
+            $owned['property_id'], null, 'legal_notice', 'Aviso legal anterior',
+            ['source_label' => 'Fuente anterior', 'notice_text' => 'AVISO_ANTERIOR_SECRET'],
+            null, $tenantId, 1_800_000_008,
+        );
+        $documents->createContentVersion(
+            $owned['property_id'], null, 'legal_notice', 'Aviso legal vigente',
+            [
+                'source_label' => 'Alcaldía local',
+                'source_url' => 'https://example.test/current',
+                'effective_on' => '2026-10-14',
+                'notice_text' => 'Aviso legal aplicable vigente.',
+            ],
+            (int) $oldNotice['id'], $tenantId, 1_800_000_009,
+        );
+
+        $tracedPdo = $this->tracedPdo();
+        $app = $this->app('/sub', $tracedPdo, static fn (): string => '2026-10-14');
+        $this->login($app, 'community-projection@example.com', 'TenantPassword123', '/sub');
+        $tracedPdo->preparedSql = [];
+        $detail = $this->request($app, 'GET', '/sub/tenant/leases/' . $owned['lease_id']);
+        self::assertSame(200, $detail->getStatusCode());
+        $html = (string) $detail->getBody();
+        self::assertStringContainsString('Incidente abierto visible.', $html);
+        self::assertStringContainsString('Incidente revisado visible.', $html);
+        self::assertStringContainsString('Incidente cerrado visible.', $html);
+        self::assertStringContainsString('Resolución visible tras cierre.', $html);
+        self::assertStringNotContainsString('INCIDENTE_VOIDED_SECRET', $html);
+        self::assertStringNotContainsString('MOTIVO_VOIDED_PRIVADO', $html);
+        self::assertStringNotContainsString('INCIDENTE_AJENO_SECRET', $html);
+        self::assertStringContainsString('Aviso legal vigente', $html);
+        self::assertStringContainsString('Alcaldía local', $html);
+        self::assertStringContainsString('https://example.test/current', $html);
+        self::assertStringContainsString('Aviso legal aplicable vigente.', $html);
+        self::assertStringNotContainsString('AVISO_ANTERIOR_SECRET', $html);
+        foreach (['created_by_user_id', 'closed_by_user_id', 'voided_by_user_id', 'void_reason', 'stored_name', 'sha256'] as $privateField) {
+            self::assertStringNotContainsString($privateField, $html);
+        }
+
+        $queries = array_map('strtolower', $tracedPdo->preparedSql);
+        $leaseLookup = array_search(true, array_map(
+            static fn (string $sql): bool => str_contains($sql, 'from leases l'),
+            $queries,
+        ), true);
+        $incidentLookup = array_search(true, array_map(
+            static fn (string $sql): bool => str_contains($sql, 'from community_incidents'),
+            $queries,
+        ), true);
+        $documentLookup = array_search(true, array_map(
+            static fn (string $sql): bool => str_contains($sql, 'from documents'),
+            $queries,
+        ), true);
+        self::assertIsInt($leaseLookup);
+        self::assertIsInt($incidentLookup);
+        self::assertIsInt($documentLookup);
+        self::assertLessThan($incidentLookup, $leaseLookup);
+        self::assertLessThan($documentLookup, $leaseLookup);
+
+        $tracedPdo->preparedSql = [];
+        self::assertSame(404, $this->request(
+            $app,
+            'GET',
+            '/sub/tenant/leases/' . $foreign['lease_id'],
+        )->getStatusCode());
+        $foreignQueries = array_map('strtolower', $tracedPdo->preparedSql);
+        self::assertSame([], array_values(array_filter(
+            $foreignQueries,
+            static fn (string $sql): bool => str_contains($sql, 'from community_incidents')
+                || str_contains($sql, 'from documents'),
+        )));
     }
 
     public function testTenantLeaseDetailShowsOnlyActiveGlobalAndOwnedPropertyPaymentMethods(): void

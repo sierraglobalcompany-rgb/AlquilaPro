@@ -41,7 +41,7 @@ final class DocumentSecurityRegressionTest extends TestCase
             . "AND table_name = 'documents' ORDER BY ordinal_position",
         )->fetchAll(PDO::FETCH_COLUMN);
         self::assertSame([
-            'id', 'property_id', 'lease_id', 'type', 'title', 'content_json', 'stored_name', 'mime_type', 'sha256',
+            'id', 'property_id', 'lease_id', 'community_incident_id', 'type', 'title', 'content_json', 'stored_name', 'mime_type', 'sha256',
             'size_bytes', 'supersedes_document_id', 'created_by_user_id', 'created_at',
         ], $columns);
 

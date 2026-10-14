@@ -5,12 +5,12 @@ PREPACKAGE_BASE: 37350105ac8c1806ae69194082098dbe230e5838
 MAIN_START: ddb24048326e3fd67df919f1bd829fac939d8861
 MAIN_START_AUDIT: PASS — descendant of PREPACKAGE_BASE; only the V4 master and design checkpoint changed
 CURRENT_PHASE: F19
-CURRENT_TASK: F19 Task 1 complete — incident schema + lifecycle; next T19.2
+CURRENT_TASK: F19 local certification complete; prepare Product Head and docs-only Closure Head
 BRANCH: impl/f19-community-legal-20261014
 BASE: 24f2da7dcf043ff4750434e18dcca66dfd37aab1 (F18 CLOSURE_HEAD)
-CURRENT_HEAD: 24f2da7dcf043ff4750434e18dcca66dfd37aab1
+CURRENT_HEAD: 0f9ad3d (F19 product commit; closure pending)
 WORKTREE: C:\Users\felip\.codex\worktrees\f15-f20-batch\AlquilaPro
-WORKTREE_STATUS: F18 product complete with PR #21 (mergeable; CI intentionally unpolled); F19 Task 1 complete from exact F18 Closure Head; generated .phpunit.cache/ and app/graphify-out/ remain untracked
+WORKTREE_STATUS: F18 product complete with PR #21 (mergeable; CI intentionally unpolled); F19 Tasks 1–4 plus review repair locally certified; product amend and docs-only closure next; generated .phpunit.cache/ and app/graphify-out/ remain untracked
 F15_STATUS: LOCAL CERTIFIED / PR OPEN / MERGEABILITY CONFLICTING
 F15_BRANCH: impl/f15-agenda-visits-20261014
 F15_BASE: ddb24048326e3fd67df919f1bd829fac939d8861
@@ -54,7 +54,17 @@ F19_BASE: 24f2da7dcf043ff4750434e18dcca66dfd37aab1 (F18 CLOSURE_HEAD)
 F19_TASK1_RED: CommunitySchemaTest found no community_incidents; MigrationRunnerTest expected 19 migrations and found 18; CommunityServiceTest setup failed because its table was absent.
 F19_TASK1_GREEN: migration 019 + CommunityService lifecycle (row-locked forward transitions, bounded inputs, normalized staff records); MigrationRunner + Community schema/service focused set: 5 tests / 75 assertions PASS.
 F19_TASK1_RULING: close allowed from open/reviewed; void allowed from any nonvoided state, including closed, as auditable terminal correction. Cost if wrong: closed records may be voided though policy intended immutable closure.
-F19_TASK1_PRODUCT_HEAD: pending first natural product commit
+F19_TASK1_PRODUCT_HEAD: 4e35bf2e1fe01bc4364f2200106510c132ce75b0
+F19_TASK2_RED: DocumentSchemaTest found missing community_incident_id; CommunityDocumentsTest reached undefined createIncidentFileVersion and rejected legal_notice type.
+F19_TASK2_GREEN: migration 019 extends the one documents table to an exact property/lease/incident scope; DocumentService reuses private file integrity and version lineage, adds current incident evidence and validates property legal notices. F18/F19 document + migration regression set: 19 tests / 209 assertions PASS, 1 Windows symlink skip.
+F19_TASK2_RULING: legal_notice requires source_label and notice_text; optional source_url is limited to valid HTTP(S), effective_on is strict ISO date; text caps are label 190, URL 2048, notice 10000. Spec requires validation but leaves limits open; cost if wrong: long but valid notices or non-HTTP sources may be rejected.
+F19_TASK3_RED: CommunityRoutesTest rejected missing permission catalog/routing; tenant projection test did not find the incident data in its own lease page.
+F19_TASK3_GREEN: one `app/Community/routes.php`; exactly community.view/manage; staff incident lifecycle, evidence upload/download and legal notice versioning use CommunityService/DocumentService with CSRF+PRG. Tenant sees only nonvoided own-lease incidents, resolution after close, current property legal notices; traced ownership precedes incident/document SQL. Focused F18/F19/lease/auth: 47 tests / 629 assertions PASS, 1 Windows symlink skip.
+F19_TASK4_FREEZE_LOCAL: CommunitySecurityRegressionTest passes: 1 test / 10 assertions; freezes one incident table/service, two permissions, eight registered staff routes and DocumentService as the sole document/file authority.
+F19_TASK4_FOCUSED: F18/F19/MigrationRunner/tenant/auth focal suite: 48 tests / 639 assertions PASS; 1 Windows symlink skip. Task 4 ledger records commits 4e35bf2..0f9ad3d.
+F19_REVIEW: author self-review of whole-phase package 24f2da7..0f9ad3d; 0 Critical, 1 Important fixed, 1 Minor deferred. Important: F19 was absent from the permission-filtered Apps launcher; added community.view-gated card. Minor: staff list caps at 200 without paging; older incidents remain in storage but are not reachable from this list.
+F19_REPAIR_RED_GREEN: ShellRoutesTest authorization assertions failed before the launcher change; after adding the authorized Convivencia card and restricted-user exclusion, ShellRoutesTest passes 15 tests / 131 assertions.
+F19_FINAL_LOCAL_QA: after review repair, combined MigrationRunner/F18 Documents/F19 Community/Tenant/Auth/UI Shell focal set: 63 tests / 770 assertions PASS, 1 Windows symlink skip. composer validate --strict PASS; git diff --check PASS; PHP 8.5 lint of all changed PHP files PASS. No full suite.
 F16_BRANCH: impl/f16-reminders-email-20261014
 F16_BASE: c40cd33321739effdce0253f67dc372e412dccde
 F16_PRODUCT_HEAD: 7b5118bc6b6ec29ceab8cfe3e2eb0901aafa3f7d
@@ -76,19 +86,19 @@ F16_TASK4: Architecture freeze and candidate-route transport proof PASS. Focused
 DONE: F15 locally certified, PR #18 open. F16 product head 7b5118b and docs-only closure commit complete; remote submission pending. PHPMailer ^7.1 resolves to 7.1.1.
 RULING/FINDING: (1) F15 F14 schema wildcard narrowed to maintenance_requests; F15 plan-named MaintenanceRoutesTest.php was absent, so a focused file was created. (2) F15 staff may reprogram proposed/scheduled visit slots, with only current slots selectable. (3) F15 fresh review found 4 Important, all fixed; reviewer declined no behavior. (4) F16 SMTP errors are reduced to generic keys; attempt increments only at actual send; stale exhausted claims fail closed. (5) Reminder cadence follows the F16 choices above; candidate mail is only for created/submitted. (6) F16 minor review findings on pagination and recipient retention are recorded for follow-up, not required by the phase Critical/Important repair gate.
 ENVIRONMENT: PHP 8.5.8; pdo_mysql/mbstring/dom/fileinfo present; gd absent; test DB connects.
-NEXT_EXACT_ACTION: T19.2 — write focused RED regressions for the three-way document scope, incident evidence ownership/versioning, and legal notice content; then extend existing migration 019 and DocumentService only.
+NEXT_EXACT_ACTION: finish separate whole-phase review of 24f2da7..0f9ad3d against the approved F19 spec; then only Critical/Important repairs, composer strict, diff check, and docs-only phase closure.
 
 F15: LOCAL CERTIFIED / PR CI PENDING RECONCILIATION
 F16: PRODUCT COMPLETE / PR OPEN / REMOTE CI PENDING FINAL CHECK
 F17: PRODUCT COMPLETE / PR #20 OPEN / REMOTE CI PENDING FINAL CHECK
 F18: PRODUCT COMPLETE / PR #21 OPEN / MERGEABLE / CI PENDING FINAL CHECK
-F19: TASK 1 COMPLETE / TASK 2 PENDING
+F19: LOCALLY CERTIFIED / STACKED PR PENDING
 F20: PENDING
 
 LOCAL_FULL_SUITE_RUNS: 0
 REMOTE_CI_RUNS: 4 (F15–F18 PRs triggered; final check pending)
-FRESH_REVIEWS: 4
-PRODUCTIVE_COMMITS: 7
+FRESH_REVIEWS: 5 (F19 review was author self-review; no independent reviewer dispatched)
+PRODUCTIVE_COMMITS: 8
 DOC_COMMITS: 4
 LOOP_ESCAPES: 0
 CI_REPAIRS: 0

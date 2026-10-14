@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace AlquilaPro\Documents;
 
 use JsonException;
+use DateTimeImmutable;
+use DateTimeZone;
 use PDO;
 use Psr\Http\Message\UploadedFileInterface;
 use RuntimeException;
@@ -20,10 +22,12 @@ final class DocumentService
         'manual_convivencia' => 'property',
         'inventory_initial' => 'lease',
         'inventory_final' => 'lease',
-        'other' => 'either',
+        'incident_evidence' => 'incident',
+        'legal_notice' => 'property',
+        'other' => 'property_or_lease',
     ];
-    private const FILE_TYPES = ['property_document', 'lease_document', 'other'];
-    private const CONTENT_TYPES = ['manual_convivencia', 'inventory_initial', 'inventory_final', 'other'];
+    private const FILE_TYPES = ['property_document', 'lease_document', 'incident_evidence', 'other'];
+    private const CONTENT_TYPES = ['manual_convivencia', 'inventory_initial', 'inventory_final', 'legal_notice', 'other'];
     private const MIME_EXTENSIONS = [
         'application/pdf' => 'pdf',
         'image/jpeg' => 'jpg',
@@ -48,7 +52,63 @@ final class DocumentService
         int $actorUserId,
         int $now,
     ): array {
-        $input = $this->validateInput($propertyId, $leaseId, $type, $title, $supersedesDocumentId, $actorUserId, $now);
+        return $this->createFileVersionForScope(
+            $propertyId,
+            $leaseId,
+            null,
+            $type,
+            $title,
+            $file,
+            $supersedesDocumentId,
+            $actorUserId,
+            $now,
+        );
+    }
+
+    /** @return array<string,mixed> */
+    public function createIncidentFileVersion(
+        int $incidentId,
+        string $title,
+        UploadedFileInterface $file,
+        ?int $supersedesDocumentId,
+        int $actorUserId,
+        int $now,
+    ): array {
+        return $this->createFileVersionForScope(
+            null,
+            null,
+            $incidentId,
+            'incident_evidence',
+            $title,
+            $file,
+            $supersedesDocumentId,
+            $actorUserId,
+            $now,
+        );
+    }
+
+    /** @return array<string,mixed> */
+    private function createFileVersionForScope(
+        ?int $propertyId,
+        ?int $leaseId,
+        ?int $incidentId,
+        string $type,
+        string $title,
+        UploadedFileInterface $file,
+        ?int $supersedesDocumentId,
+        int $actorUserId,
+        int $now,
+    ): array {
+        $input = $this->validateInput(
+            $propertyId,
+            $leaseId,
+            $type,
+            $title,
+            $supersedesDocumentId,
+            $actorUserId,
+            $now,
+            $incidentId,
+        );
         $title = trim($title);
         if (!in_array($type, self::FILE_TYPES, true)) {
             throw $this->failure('El tipo de documento requiere contenido estructurado.');
@@ -101,6 +161,8 @@ final class DocumentService
         }
         if (in_array($type, ['inventory_initial', 'inventory_final'], true)) {
             $content = $this->normalizeInventory($content);
+        } elseif ($type === 'legal_notice') {
+            $content = $this->normalizeLegalNotice($content);
         }
 
         try {
@@ -174,6 +236,23 @@ final class DocumentService
     }
 
     /** @return list<array<string,mixed>> */
+    public function listCurrentForIncident(int $incidentId): array
+    {
+        if ($incidentId <= 0) {
+            return [];
+        }
+        $statement = $this->pdo->prepare(
+            'SELECT document.* FROM documents document '
+            . 'WHERE document.community_incident_id = :incident_id AND NOT EXISTS ('
+            . 'SELECT 1 FROM documents child WHERE child.supersedes_document_id = document.id '
+            . 'AND child.community_incident_id = document.community_incident_id AND child.type = document.type) '
+            . 'ORDER BY document.type ASC, document.created_at DESC, document.id DESC',
+        );
+        $statement->execute(['incident_id' => $incidentId]);
+        return $this->normalizeRows($statement->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    /** @return list<array<string,mixed>> */
     public function history(int $documentId): array
     {
         $target = $this->find($documentId);
@@ -209,6 +288,7 @@ final class DocumentService
             $statement = $this->pdo->prepare(
                 'SELECT * FROM documents WHERE supersedes_document_id = :parent_id '
                 . 'AND type = :type AND property_id <=> :property_id AND lease_id <=> :lease_id '
+                . 'AND community_incident_id <=> :incident_id '
                 . 'ORDER BY id ASC LIMIT 2',
             );
             $statement->execute([
@@ -216,6 +296,7 @@ final class DocumentService
                 'type' => $target['type'],
                 'property_id' => $scope['property_id'],
                 'lease_id' => $scope['lease_id'],
+                'incident_id' => $scope['community_incident_id'],
             ]);
             $children = $statement->fetchAll(PDO::FETCH_ASSOC);
             if ($children === []) {
@@ -318,14 +399,15 @@ final class DocumentService
             $this->assertCanSupersede($supersedesDocumentId, $input, $type);
             $statement = $this->pdo->prepare(
                 'INSERT INTO documents '
-                . '(property_id, lease_id, type, title, content_json, stored_name, mime_type, sha256, size_bytes, '
+                . '(property_id, lease_id, community_incident_id, type, title, content_json, stored_name, mime_type, sha256, size_bytes, '
                 . 'supersedes_document_id, created_by_user_id, created_at) '
-                . 'VALUES (:property_id, :lease_id, :type, :title, :content_json, :stored_name, :mime_type, :sha256, '
+                . 'VALUES (:property_id, :lease_id, :incident_id, :type, :title, :content_json, :stored_name, :mime_type, :sha256, '
                 . ':size_bytes, :supersedes_document_id, :actor_id, :created_at)',
             );
             $statement->execute([
                 'property_id' => $input['property_id'],
                 'lease_id' => $input['lease_id'],
+                'incident_id' => $input['community_incident_id'],
                 'type' => $type,
                 'title' => $title,
                 'content_json' => $contentJson,
@@ -355,7 +437,7 @@ final class DocumentService
         }
     }
 
-    /** @return array{property_id:?int,lease_id:?int} */
+    /** @return array{property_id:?int,lease_id:?int,community_incident_id:?int} */
     private function validateInput(
         ?int $propertyId,
         ?int $leaseId,
@@ -364,6 +446,7 @@ final class DocumentService
         ?int $supersedesDocumentId,
         int $actorUserId,
         int $now,
+        ?int $incidentId = null,
     ): array {
         $scopeType = self::TYPE_SCOPE[$type] ?? null;
         $title = trim($title);
@@ -371,22 +454,34 @@ final class DocumentService
             || preg_match('/[\x00-\x1F\x7F]/', $title) === 1
             || $actorUserId <= 0 || $now < 0
             || ($supersedesDocumentId !== null && $supersedesDocumentId <= 0)
-            || (($propertyId === null) === ($leaseId === null))
+            || (($propertyId !== null ? 1 : 0) + ($leaseId !== null ? 1 : 0) + ($incidentId !== null ? 1 : 0) !== 1)
             || ($propertyId !== null && $propertyId <= 0)
             || ($leaseId !== null && $leaseId <= 0)
+            || ($incidentId !== null && $incidentId <= 0)
             || ($scopeType === 'property' && ($propertyId === null || $leaseId !== null))
             || ($scopeType === 'lease' && ($leaseId === null || $propertyId !== null))
+            || ($scopeType === 'incident' && ($incidentId === null || $propertyId !== null || $leaseId !== null))
+            || ($scopeType === 'property_or_lease' && $incidentId !== null)
         ) {
             throw $this->failure('El tipo, alcance, título o auditoría del documento no es válido.');
         }
-        return ['property_id' => $propertyId, 'lease_id' => $leaseId];
+        return [
+            'property_id' => $propertyId,
+            'lease_id' => $leaseId,
+            'community_incident_id' => $incidentId,
+        ];
     }
 
-    /** @param array{property_id:?int,lease_id:?int} $scope */
+    /** @param array{property_id:?int,lease_id:?int,community_incident_id:?int} $scope */
     private function assertScopeExists(array $scope): void
     {
-        $table = $scope['property_id'] !== null ? 'properties' : 'leases';
-        $id = $scope['property_id'] ?? $scope['lease_id'];
+        if ($scope['community_incident_id'] !== null) {
+            $table = 'community_incidents';
+            $id = $scope['community_incident_id'];
+        } else {
+            $table = $scope['property_id'] !== null ? 'properties' : 'leases';
+            $id = $scope['property_id'] ?? $scope['lease_id'];
+        }
         $statement = $this->pdo->prepare('SELECT id FROM ' . $table . ' WHERE id = :id LIMIT 1');
         $statement->execute(['id' => $id]);
         if ($statement->fetchColumn() === false) {
@@ -394,14 +489,14 @@ final class DocumentService
         }
     }
 
-    /** @param array{property_id:?int,lease_id:?int} $scope */
+    /** @param array{property_id:?int,lease_id:?int,community_incident_id:?int} $scope */
     private function assertCanSupersede(?int $documentId, array $scope, string $type): void
     {
         if ($documentId === null) {
             return;
         }
         $statement = $this->pdo->prepare(
-            'SELECT id, property_id, lease_id, type, supersedes_document_id '
+            'SELECT id, property_id, lease_id, community_incident_id, type, supersedes_document_id '
             . 'FROM documents WHERE id = :id LIMIT 1 FOR UPDATE',
         );
         $statement->execute(['id' => $documentId]);
@@ -432,7 +527,7 @@ final class DocumentService
                 break;
             }
             $ancestorStatement = $this->pdo->prepare(
-                'SELECT id, property_id, lease_id, type, supersedes_document_id '
+                'SELECT id, property_id, lease_id, community_incident_id, type, supersedes_document_id '
                 . 'FROM documents WHERE id = :id LIMIT 1',
             );
             $ancestorStatement->execute(['id' => (int) $cursor['supersedes_document_id']]);
@@ -445,13 +540,14 @@ final class DocumentService
     }
 
     /** @param array<string,mixed> $row
-     *  @return array{property_id:?int,lease_id:?int}
+     *  @return array{property_id:?int,lease_id:?int,community_incident_id:?int}
      */
     private function rowScope(array $row): array
     {
         return [
             'property_id' => $row['property_id'] === null ? null : (int) $row['property_id'],
             'lease_id' => $row['lease_id'] === null ? null : (int) $row['lease_id'],
+            'community_incident_id' => $row['community_incident_id'] === null ? null : (int) $row['community_incident_id'],
         ];
     }
 
@@ -620,6 +716,69 @@ final class DocumentService
         return $value;
     }
 
+    /** @param array<string,mixed> $content @return array{source_label:string,source_url:?string,effective_on:?string,notice_text:string} */
+    private function normalizeLegalNotice(array $content): array
+    {
+        $allowedKeys = ['effective_on', 'notice_text', 'source_label', 'source_url'];
+        if (array_diff(array_keys($content), $allowedKeys) !== []
+            || !array_key_exists('source_label', $content)
+            || !array_key_exists('notice_text', $content)
+        ) {
+            throw $this->failure('El aviso legal no tiene una estructura válida.');
+        }
+
+        $sourceLabel = is_string($content['source_label']) ? trim($content['source_label']) : '';
+        $noticeText = is_string($content['notice_text']) ? trim($content['notice_text']) : '';
+        if ($sourceLabel === '' || mb_strlen($sourceLabel, 'UTF-8') > 190
+            || preg_match('/[\x00-\x1F\x7F]/', $sourceLabel) === 1
+            || $noticeText === '' || mb_strlen($noticeText, 'UTF-8') > 10000
+            || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $noticeText) === 1
+        ) {
+            throw $this->failure('El aviso legal tiene texto vacío o fuera de límite.');
+        }
+
+        $sourceUrl = $content['source_url'] ?? null;
+        if ($sourceUrl !== null) {
+            if (!is_string($sourceUrl)) {
+                throw $this->failure('La fuente del aviso legal no es válida.');
+            }
+            $sourceUrl = trim($sourceUrl);
+            if ($sourceUrl === '') {
+                $sourceUrl = null;
+            } elseif (mb_strlen($sourceUrl, 'UTF-8') > 2048
+                || preg_match('/[\x00-\x20\x7F]/', $sourceUrl) === 1
+                || filter_var($sourceUrl, FILTER_VALIDATE_URL) === false
+                || !in_array(strtolower((string) parse_url($sourceUrl, PHP_URL_SCHEME)), ['http', 'https'], true)
+            ) {
+                throw $this->failure('La fuente del aviso legal no es válida.');
+            }
+        }
+
+        $effectiveOn = $content['effective_on'] ?? null;
+        if ($effectiveOn !== null && (!$this->isValidDate($effectiveOn))) {
+            throw $this->failure('La fecha de vigencia del aviso legal no es válida.');
+        }
+
+        return [
+            'source_label' => $sourceLabel,
+            'source_url' => $sourceUrl,
+            'effective_on' => $effectiveOn,
+            'notice_text' => $noticeText,
+        ];
+    }
+
+    private function isValidDate(mixed $date): bool
+    {
+        if (!is_string($date)) {
+            return false;
+        }
+        $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $date, new DateTimeZone('UTC'));
+        $errors = DateTimeImmutable::getLastErrors();
+        return $parsed !== false
+            && ($errors === false || ($errors['warning_count'] === 0 && $errors['error_count'] === 0))
+            && $parsed->format('Y-m-d') === $date;
+    }
+
     private function documentPath(string $storedName): ?string
     {
         if (preg_match('/\Adocument-[a-f0-9]{32}\.(?:pdf|jpg|png|webp)\z/', $storedName) !== 1
@@ -645,7 +804,7 @@ final class DocumentService
     /** @return array<string,mixed> */
     private function normalizeRow(array $row): array
     {
-        foreach (['id', 'property_id', 'lease_id', 'size_bytes', 'supersedes_document_id', 'created_by_user_id'] as $key) {
+        foreach (['id', 'property_id', 'lease_id', 'community_incident_id', 'size_bytes', 'supersedes_document_id', 'created_by_user_id'] as $key) {
             $row[$key] = $row[$key] === null ? null : (int) $row[$key];
         }
         foreach (['type', 'title', 'stored_name', 'mime_type', 'sha256', 'created_at'] as $key) {
@@ -659,6 +818,13 @@ final class DocumentService
             }
             if (!is_array($content)) {
                 return [];
+            }
+            if ($row['type'] === 'legal_notice') {
+                try {
+                    $content = $this->normalizeLegalNotice($content);
+                } catch (RuntimeException) {
+                    return [];
+                }
             }
             $row['content_json'] = $content;
         }

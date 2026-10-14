@@ -8,6 +8,8 @@ $insurancePolicies = $insurancePolicies ?? [];
 $maintenanceRequests = $maintenanceRequests ?? [];
 $leaseDocuments = $leaseDocuments ?? [];
 $propertyManuals = $propertyManuals ?? [];
+$communityIncidents = $communityIncidents ?? [];
+$propertyLegalNotices = $propertyLegalNotices ?? [];
 $isApartment = (string) $lease['unit_type'] === 'apartment';
 $isParking = (string) $lease['unit_type'] === 'parking';
 $chargeStateLabels = [
@@ -96,6 +98,54 @@ $visitStatusLabels = [
         </div>
     <?php endif; ?>
 </section>
+
+<section class="surface">
+    <h2>Convivencia</h2>
+    <?php if ($communityIncidents === []): ?>
+        <p class="empty-state">No hay reportes de convivencia para este arrendamiento.</p>
+    <?php else: ?>
+        <div class="users-grid">
+            <?php foreach ($communityIncidents as $incident): ?>
+                <article class="user-card">
+                    <div class="user-card__head">
+                        <strong><?= $escape($incident['category']) ?> · <?= $escape($incident['occurred_on']) ?></strong>
+                        <span class="status-pill"><?= $escape([
+                            'open' => 'Abierto', 'reviewed' => 'En revisión', 'closed' => 'Cerrado',
+                        ][$incident['status']] ?? $incident['status']) ?></span>
+                    </div>
+                    <p><?= nl2br($escape($incident['description'])) ?></p>
+                    <?php if ($incident['status'] === 'closed' && is_string($incident['resolution_notes'])): ?>
+                        <div>Resolución: <?= nl2br($escape($incident['resolution_notes'])) ?></div>
+                    <?php endif; ?>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</section>
+
+<?php if ($propertyLegalNotices !== []): ?>
+    <section class="surface">
+        <h2>Avisos legales de la propiedad</h2>
+        <div class="users-grid">
+            <?php foreach ($propertyLegalNotices as $notice): ?>
+                <article class="user-card">
+                    <div class="user-card__head">
+                        <strong><?= $escape($notice['title']) ?></strong>
+                        <span class="status-pill"><?= $escape($notice['source_label']) ?></span>
+                    </div>
+                    <div>Publicado: <?= $escape($notice['created_at']) ?></div>
+                    <?php if (is_string($notice['effective_on'])): ?>
+                        <div>Vigente desde: <?= $escape($notice['effective_on']) ?></div>
+                    <?php endif; ?>
+                    <p><?= nl2br($escape($notice['notice_text'])) ?></p>
+                    <?php if (is_string($notice['source_url'])): ?>
+                        <a class="button button--quiet" href="<?= $escape($notice['source_url']) ?>" target="_blank" rel="noopener noreferrer">Consultar fuente</a>
+                    <?php endif; ?>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    </section>
+<?php endif; ?>
 
 <?php if ($propertyManuals !== []): ?>
     <section class="surface">

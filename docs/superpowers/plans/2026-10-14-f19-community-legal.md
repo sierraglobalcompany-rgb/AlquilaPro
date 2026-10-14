@@ -108,11 +108,13 @@ effective_on nullable
 notice_text
 ```
 
-- [ ] RED 3-way exclusive scope and no cross-scope supersedes.
-- [ ] RED incident evidence private-file integrity uses F18 bounded-read contract.
-- [ ] RED legal notice content/version validation.
-- [ ] GREEN minimal DocumentService extension; no new storage class/table.
-- [ ] Run F18 + F19 document regressions.
+- [x] RED 3-way exclusive scope and no cross-scope supersedes.
+- [x] RED incident evidence private-file integrity uses F18 bounded-read contract.
+- [x] RED legal notice content/version validation.
+- [x] GREEN minimal DocumentService extension; no new storage class/table.
+- [x] Run F18 + F19 document regressions.
+
+Task 2 result: RED exposed the missing incident scope, API, and legal notice type. The existing `DocumentService` now owns incident file versions and property legal notices; no new storage authority or table was added. Focused F18/F19 set passed 19 tests / 209 assertions, with the Windows symlink case skipped.
 
 ### Task 3: Permissions + staff/tenant surfaces
 
@@ -125,22 +127,24 @@ notice_text
 - Create: `tests/Integration/Community/CommunityRoutesTest.php`
 - Modify: `tests/Integration/Leases/TenantPortalRoutesTest.php`
 
-- [ ] RED `community.view/manage`, owner bypass, tenant deny for staff routes.
-- [ ] Staff CRUD workflow uses PRG/CSRF and F18 document routes/service for evidence/legal content.
-- [ ] Tenant own-lease projection: non-voided incidents with safe fields; resolution notes only after `closed`.
-- [ ] Tenant sees current property `legal_notice` version(s) with source label/url; no internal actor metadata.
-- [ ] Ownership via `LeaseService::findForUser()` before incident/document lookup.
-- [ ] Run routes/permissions/F18 ownership focused tests.
+- [x] RED `community.view/manage`, owner bypass, tenant deny for staff routes.
+- [x] Staff CRUD workflow uses PRG/CSRF and F18 document routes/service for evidence/legal content.
+- [x] Tenant own-lease projection: non-voided incidents with safe fields; resolution notes only after `closed`.
+- [x] Tenant sees current property `legal_notice` version(s) with source label/url; no internal actor metadata.
+- [x] Ownership via `LeaseService::findForUser()` before incident/document lookup.
+- [x] Run routes/permissions/F18 ownership focused tests.
+
+Task 3 result: the RED run found missing permission catalog entries/routes (POST returned 404) and the tenant page lacked incident projections. GREEN adds one staff route file, permission-gated PRG/CSRF workflows, safe tenant projections, and an ownership-order trace. Focused F18/F19/lease/auth set passed 47 tests / 629 assertions with one Windows symlink skip.
 
 ### Task 4: Architecture freeze + certification
 
 **Files:**
 - Create: `tests/Integration/Community/CommunitySecurityRegressionTest.php`
 
-- [ ] Freeze 1 new table / 1 service / 2 permissions / 0 legal/support/history tables.
-- [ ] Freeze reuse of `DocumentService`; no duplicate file-read/storage logic in `CommunityService`.
-- [ ] Fresh review before remote CI; repair only Critical/Important.
-- [ ] `composer validate --strict`, `git diff --check`, affected F18/F19/lease/auth focused tests.
+- [x] Freeze 1 new table / 1 service / 2 permissions / 0 legal/support/history tables.
+- [x] Freeze reuse of `DocumentService`; no duplicate file-read/storage logic in `CommunityService`.
+- [x] Fresh whole-phase review before remote CI; repaired the one Important finding only.
+- [x] `composer validate --strict`, `git diff --check`, affected F18/F19/lease/auth/UI focused tests.
 - [ ] Product Head → docs-only Closure Head.
 - [ ] One push; stacked PR against F18 closure branch; one PHP 8.3/8.4/8.5 PR CI.
 - [ ] Stop without merge/F20 on failure.

@@ -25,6 +25,8 @@ final class Permissions
         'whatsapp.use',
         'documents.view',
         'documents.manage',
+        'community.view',
+        'community.manage',
     ];
 
     public static function allows(array $user, string $permission): bool
