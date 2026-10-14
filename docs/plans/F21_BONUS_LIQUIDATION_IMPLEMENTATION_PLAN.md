@@ -4,7 +4,7 @@
 
 **Goal:** Add the good-conduct bonus and immutable lease liquidation without creating a second ledger, a second lease-ending workflow, or a second document/inventory authority.
 
-**Architecture:** `LeaseService` remains the only lease lifecycle writer; `FinanceService`, `DocumentService`, `InsuranceService`, `CommunityService`, `ObligationService`, and the final F20 `MembershipService` remain their domain authorities. F21 adds one composition service, `AlquilaPro\Leases\TerminationService`, plus two tables: one optional terminal bonus decision and one append-once liquidation snapshot per lease.
+**Architecture:** `LeaseService` remains the only lease lifecycle writer; `FinanceService`, `DocumentService`, `InsuranceService`, `CommunityService`, `ObligationService`, and the certified F20 `MembershipService` remain their domain authorities. F21 adds one composition service, `AlquilaPro\Leases\TerminationService`, plus two tables: one optional terminal bonus decision and one append-once liquidation snapshot per lease.
 
 **Tech Stack:** PHP >=8.3 <8.6, Slim 4, PDO/MySQL, PHPUnit 11.5, existing SSR views and migrations.
 
@@ -22,22 +22,23 @@
 - Bonus feature is disabled by default via `ALQUILAPRO_GOOD_CONDUCT_BONUS_ENABLED=false`.
 - No draft liquidation table, item table, status-history table, payout provider, accounting journal or second scheduler.
 - Tenant ownership must be resolved with `LeaseService::findForUser()` before liquidation lookup.
-- No implementation starts until the F20 remote contract gate below passes.
+- F21 must not add a second F20 read API: membership blockers are derived from the canonical `MembershipService::listForLease()` projection.
+- No implementation starts until F15→F20 are converged, audited and integrated sequentially under explicit merge authorization.
 
-## Pre-Execution Gate — F20 certified remote contract
+## Pre-Execution Gate — certified F20 remote contract
 
-- [ ] Fetch the final F20 remote branch/PR after Codex finishes and record product SHA, closure SHA and CI matrix result.
-- [ ] Read final `app/Memberships/MembershipService.php`, F20 migration, routes and tests.
-- [ ] Confirm or add exactly one read projection equivalent to `listForLease(int $leaseId): array`; reuse an existing equivalent if already present.
-- [ ] Confirm or add exactly one predicate equivalent to `hasPendingPaidChargeDecision(int $leaseId): bool`; reuse an existing equivalent if already present.
-- [ ] Confirm ended leases cannot accept or renew memberships; if F20 violates this, repair F20 before starting F21.
-- [ ] Update only method names in this plan if the certified F20 names differ; do not redesign F20 from F21.
+- [x] Final F20 product contract re-read from the remote PR: Product Head `5f46c63f82672e6d34566284051a5f62e1db56db`; docs closure `5d2488286ce8370402544eaf4276a34a8d83a40d`; later test-only convergence does not change product behavior.
+- [x] Final `app/Memberships/MembershipService.php`, migration 020, routes and concurrency/security tests reviewed.
+- [x] Canonical read projection exists: `MembershipService::listForLease(int $leaseId): array`.
+- [x] Pending paid charge decision is already exposed by each normalized membership as `charge_decision_required`; F21 derives the blocker by filtering `listForLease()` and **must not add** `hasPendingPaidChargeDecision()` or an equivalent duplicate predicate.
+- [x] Acceptance and renewal lock an active tenant lease and reject an ended lease (`ended_at IS NULL`).
+- [ ] Before Task 1, re-read the final integrated F20 branch after sequential F15→F20 merges only to confirm method names/fields are unchanged; if a material product contract changed during integration, stop and repair the owning phase rather than patching F21.
 
 ## Review Focus
 
 1. Active lease passed to finalization must fail before any liquidation row is inserted — covered by Task 4.
 2. Pending payment reconciliation must block finalization while an ordinary outstanding balance must not — covered by Task 3/4.
-3. Paid F20 membership with unresolved CREATE/SKIP must block finalization — covered by Task 3/4.
+3. Paid F20 membership with unresolved CREATE/SKIP must block finalization — derive from `listForLease()` + `charge_decision_required`; covered by Task 3/4.
 4. Initial inventory without final inventory must block finalization — covered by Task 3/4.
 5. Tenant requesting another tenant's liquidation must receive 404 and no child lookup before ownership — covered by Task 5.
 
@@ -86,19 +87,19 @@
 
 **Files:**
 - Modify: `app/Leases/TerminationService.php`
-- Modify only if the final F20 lacks the required read projections: `app/Memberships/MembershipService.php`
 - Create: `tests/Integration/Leases/TerminationPreviewTest.php`
 
 **Interfaces:**
 - Produces: `preview(int $leaseId, string $today, array $handover = []): array`.
 - `handover` accepts only `property_returned` boolean, `keys_returned_count` integer `0..100`, and optional trimmed `notes <= 2000`.
 - Preview returns canonical sections: `lease`, `contract`, `handover`, `finance`, `obligations`, `claims`, `inventories`, `current_documents`, `community`, `memberships`, `bonus`, `blockers`.
+- F20 membership blocker source is fixed: `$memberships->listForLease($leaseId)` and any row with `charge_decision_required === true` blocks finalization.
 
 - [ ] **Step 1: Write RED tests** proving preview persists nothing and derives data from existing authorities.
 - [ ] **Step 2: Add RED blockers** for pending payment report, pending paid membership charge decision, pending bonus, and initial inventory without final inventory.
 - [ ] **Step 3: Add RED non-blockers** proving outstanding balance, open community incident and open insurance claim are included but do not alone block finalization.
 - [ ] **Step 4: Run RED** with `vendor/bin/phpunit tests/Integration/Leases/TerminationPreviewTest.php`.
-- [ ] **Step 5: Implement minimal preview** using existing public service APIs; if one required read projection is missing, add only that projection to its owning service instead of querying its tables from the route.
+- [ ] **Step 5: Implement minimal preview** using existing public service APIs. Do not modify F20 or add a convenience predicate for membership decisions. If a real authority gap is proven, stop and repair the owning phase separately.
 - [ ] **Step 6: Ensure deterministic ordering** by stable id/date ordering before snapshot assembly; do not add a canonicalization framework.
 - [ ] **Step 7: Run GREEN** for preview plus focal Finance/Documents/Insurance/Community/Memberships tests.
 - [ ] **Step 8: Commit** `feat(f21): derive liquidation preview from canonical authorities`.
@@ -168,8 +169,8 @@
 
 - Spec coverage: PASS — schema, bonus, preview, blockers, immutable finalization, routes/security, concurrency and gates all map to tasks.
 - Step scan: PASS — no implementation body transcript; each step has one checkable outcome.
-- Type consistency: PASS — one `TerminationService`; `LeaseService::find()` is the only new lease read interface; F20 read API is reconciled in the mandatory pre-execution gate.
+- Type consistency: PASS — one `TerminationService`; `LeaseService::find()` is the only new lease read interface; F20 is consumed through existing `listForLease()` with no new predicate.
 - Review Focus: PASS — all five high-risk conditions have owning tests.
 - Proportion: PASS — plan stays implementation-oriented and smaller than a code transcript.
 
-**Execution status:** `PLAN WRITTEN / USER REVIEW REQUIRED / F20 REMOTE REVALIDATION REQUIRED / IMPLEMENTATION NOT AUTHORIZED / MERGE NOT AUTHORIZED`.
+**Execution status:** `PLAN UPDATED / F20 PRODUCT CONTRACT REVALIDATED / F15→F20 INTEGRATION STILL REQUIRED / IMPLEMENTATION NOT AUTHORIZED / MERGE NOT AUTHORIZED`.
