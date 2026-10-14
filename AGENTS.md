@@ -8,25 +8,23 @@ Antes de actuar:
 
 1. `README.md`;
 2. último `docs/checkpoints/ALQUILAPRO_HANDOFF_FORENSIC_*`;
-3. `docs/specs/ALQUILA_PRO_SPEC_MAESTRO_V1.2_AUDITADO.md`;
-4. `docs/plans/ALQUILA_PRO_PLAN_DESARROLLO_V1.2_AUDITADO.md`;
-5. último checkpoint `*_MERGED_*`;
-6. checkpoint/spec/plan de la fase activa;
-7. GitHub real: branch, PR, diff, CI, código.
-
-Regla:
+3. SPEC/PLAN maestro;
+4. último checkpoint `*_MERGED_*`;
+5. checkpoint/spec/plan de la fase activa;
+6. GitHub real: branch, PR, diff, CI y código.
 
 ```text
 GitHub/code/tests/CI = estado factual
-SPEC/PLAN/checkpoints = intención y contrato
-chat/memoria = contexto auxiliar
+checkpoint activo      = continuidad operativa
+SPEC/PLAN              = intención/contrato
+chat/memoria           = contexto auxiliar
 ```
 
-Si contradicen el estado real, no inventar: verificar y registrar el ruling.
+Si existe contradicción, verificar y registrar ruling. No asumir que una frase histórica invalida evidencia posterior.
 
-## 2. Ley 1 — KISS
+## 2. Ley 1 — KISS / arquitectura simple
 
-La solución correcta debe ser:
+La solución debe ser:
 
 ```text
 simple
@@ -37,7 +35,7 @@ auditable
 mantenible
 ```
 
-Con el mínimo razonable de:
+Usar el mínimo razonable de:
 
 ```text
 tablas
@@ -63,7 +61,7 @@ ELIMINAR
 → AGREGAR
 ```
 
-Antes de eliminar demostrar:
+Antes de eliminar:
 
 ```text
 REFERENCIAS
@@ -71,16 +69,10 @@ REFERENCIAS
 → REEMPLAZO
 → TEST
 → ELIMINAR
-→ REGRESIÓN/CI
+→ REGRESIÓN / CI
 ```
 
-No arrastrar:
-- código muerto;
-- duplicados;
-- fuentes paralelas;
-- branches/checkpoints/reportes redundantes sin utilidad;
-- dependencias no usadas;
-- módulos futuros.
+No arrastrar código muerto, duplicados, fuentes paralelas, módulos futuros, branches/checkpoints/reportes redundantes o dependencias no usadas.
 
 ## 4. Ley 3 — Antiparches
 
@@ -101,12 +93,14 @@ Pregunta obligatoria:
 
 > ¿Dónde debería vivir esta regla si el sistema hubiese sido diseñado correctamente desde cero?
 
-Prohibido:
+Prohibido salvo prueba de necesidad:
+
 - compatibility fallback para conservar callers viejos;
 - optional dependency injection solo para tests;
 - segundo writer financiero/documental/notificaciones;
-- special-case lateral si el owner real puede corregirse;
-- parche sobre parche.
+- special-case lateral cuando puede corregirse el owner;
+- parche encima de parche;
+- state duplicado para ocultar inconsistencia.
 
 ## 5. Proceso obligatorio
 
@@ -130,46 +124,49 @@ SCOPE
 → MERGE AUTORIZADO
 ```
 
-No merge sin autorización del usuario.
+Cada gate debe cubrir un riesgo diferente. No duplicar verificaciones por ritual.
 
-## 6. Preferencias de trabajo del usuario
+## 6. Preferencias del usuario
 
-- respuestas operativas resumidas y directas;
-- no repetir preguntas ya resueltas;
-- priorizar velocidad sin perder trazabilidad;
-- evitar loops y verificaciones equivalentes;
-- no crear arquitectura grande;
-- GitHub debe quedar como fuente de continuidad entre chats;
-- checkpoints deben permitir retomar exactamente sin repetir trabajo.
+- respuestas operativas directas;
+- no pedir información ya resuelta;
+- velocidad sin perder trazabilidad;
+- evitar loops;
+- no arquitectura grande;
+- GitHub debe permitir recuperación entre chats;
+- checkpoints deben permitir retomar sin repetir trabajo;
+- antes de implementar: revisar, diseñar, planificar, auditar 10 pasadas y verificar las tres leyes.
 
 ### Codex
 
-Cuando se necesite Codex:
+Cuando se use Codex:
 
-- entregar al usuario **un archivo Markdown descargable**;
-- no pegar en el chat un prompt Codex enorme como salida principal;
-- prompt específico, guiado, autónomo y con hard stops;
-- permitir decisiones locales seguras para evitar bloqueos;
-- presupuesto arquitectónico explícito;
+- entregar al usuario **un Markdown descargable**;
+- no pegar como salida principal el prompt grande en el chat;
+- un contrato claro, específico, optimizado y con hard stops;
+- suficiente autonomía local para no bloquearse;
+- budget arquitectónico explícito;
 - TDD focal;
-- checkpoint recuperable;
+- checkpoint recuperable después de Tasks/gates relevantes;
 - informe final detallado en Markdown;
 - no merge por Codex salvo autorización inequívoca;
-- no pedirle que relea todo el repositorio si la fase ya tiene SPEC/PLAN/checkpoint.
+- no releer todo el repo si SPEC/PLAN/checkpoint ya fijan la fase;
+- no esperar CI cuando puede avanzar de forma segura y recertificar al final;
+- no full suites locales repetitivas sin riesgo distinto.
 
-### ChatGPT/Sol
+### ChatGPT / Sol
 
-Antes de implementar/diseñar:
-- revisar GitHub y documentación canónica;
-- diseñar/planificar;
-- auditar diez pasadas;
-- comprobar KISS, Cero Ruido y Antiparches;
-- buscar huecos, duplicaciones y trabajo incompleto;
-- después ejecutar o preparar Codex.
+Debe:
 
-## 7. QA eficiente
+- contrastar GitHub real y documentación canónica;
+- buscar huecos/faltantes/ruido;
+- diseñar y planificar;
+- auditar 10 pasadas;
+- verificar KISS, Cero Ruido y Antiparches;
+- implementar o preparar Codex solo después;
+- auditar el resultado de Codex contra GitHub antes del merge.
 
-Cada verificación debe cubrir un riesgo distinto.
+## 7. QA eficiente / anti-bucles
 
 Preferir:
 
@@ -182,9 +179,7 @@ focused RED/GREEN
 → one PR CI matrix
 ```
 
-No repetir full suites o CI si el árbol y riesgo probado son equivalentes.
-
-Máximo 3 hipótesis razonadas ante el mismo fallo antes de reevaluar owner/arquitectura.
+No repetir full suite o CI si el árbol/riesgo probado es demostrablemente equivalente.
 
 Nunca:
 
@@ -192,49 +187,133 @@ Nunca:
 same test + same code + same environment = rerun
 ```
 
-## 8. Riesgos críticos ya aprendidos
+Máximo 3 hipótesis razonadas sobre el mismo fallo antes de reevaluar root cause/owner/arquitectura.
+
+## 8. Riesgos críticos aprendidos
 
 Tratar con especial cuidado:
 
 - TOCTOU/concurrencia: lock sobre autoridad canónica;
-- private storage: tamaño físico antes de lectura, bounded read, MIME/SHA/tamaño, symlink/tamper fail-closed;
+- private storage: safe path + no symlink + size cap antes de read + bounded read + MIME/SHA/tamaño + fail-closed;
 - tenant IDOR: ownership antes de lookup lateral;
-- FinanceService como único charge writer;
+- `FinanceService` como único charge writer;
 - auth/session/CSRF únicos;
-- PR CI usa synthetic merge-ref: no confundir con PR HEAD;
+- CI de PR suele probar synthetic merge-ref, no PR HEAD;
 - Product Head vs docs-only Closure Head;
 - no optional/fallback constructor para evitar actualizar callers;
 - no duplicar documents/notifications/media/status authority;
-- no inferir delivery/read de WhatsApp;
-- no crear cargo F20 automáticamente al aceptar servicio.
+- F16 es el único motor automático de notificaciones;
+- F17 no infiere sent/delivered/read de WhatsApp;
+- F18 es la única autoridad documental genérica;
+- F20 no crea cargo automáticamente al aceptar un servicio;
+- installer wizard, candidate wizard y tenant lifecycle son tres responsabilidades distintas;
+- F23 debe corregir el shell en su owner real, no parchear desktop con media queries aisladas.
 
-## 9. Estado actual
+## 9. Estado activo F15→F20
 
-F0–F14 están cerradas/verificadas; F1–F14 mergeadas.
+F0–F14 cerradas/verificadas; F1–F14 mergeadas.
 
-Bloque siguiente: F15→F20.
+Estado remoto conocido:
+
+```text
+F15 PR #18 OPEN — local certified; README conflict con main documental pendiente de reconciliación
+F16 PR #19 OPEN — stacked on F15; product complete
+F17 PR #20 OPEN — stacked on F16; product complete + closure
+F18–F20 — Codex todavía trabajando/no visibles remotamente en último corte
+MERGES — NONE
+```
 
 Autoridades:
 
 ```text
 docs/checkpoints/F15_F20_DESIGN_CHECKPOINT_2026-10-14.md
 docs/superpowers/plans/2026-10-14-f15-f20-codex-master.md
+docs/checkpoints/F15_F20_BATCH_CHECKPOINT_2026-10-14.md  # en rama activa
 ```
 
-Codex puede estar ejecutándolo localmente. Verificar GitHub antes de asumir progreso.
+Mientras Codex trabaja F15→F20, no abrir implementación paralela sobre ese scope.
 
-## 10. Recovery
+## 10. Futuro F21→F26
 
-Si el contexto se pierde:
+No existe F27 en el roadmap canónico.
+
+```text
+F21 Bono + liquidación
+F22 Seguridad + privacidad + audit log
+F23 Dashboard + Adaptive UX Final
+F24 Release Readiness + installer/candidate wizard + QA
+F25 SERVER_READY ZIP + local exact-artifact rehearsal
+F26 Manual Hostinger Deploy + smoke
+```
+
+### F23 UX congelada
+
+- mobile/tablet = touch shell + launcher inferior;
+- PC = sidebar persistente + topbar;
+- una sola definición PHP de navegación;
+- no SPA/frontend framework por rediseño;
+- UI-UX Pro Max es referencia, no dependencia runtime;
+- targets mínimos 375/768/1024/1440;
+- Modern SaaS / Corporate Minimal Fresh.
+
+### F24 wizards
+
+Installer mejora el existente:
+
+```text
+requirements
+→ DB credentials + Test connection
+→ company/settings
+→ owner
+→ summary
+→ install/migrate
+→ success/login
+```
+
+No `companies` table V1; no tenant/candidate/lease/sample property durante instalación.
+
+Candidate wizard mejora el candidate/token existente:
+
+```text
+context/privacy
+→ personal/contact
+→ work/income
+→ occupants/pets
+→ references
+→ documents
+→ review/submit
+```
+
+No wizard/session/progress tables.
+
+### F25/F26
+
+F25 certifica el ZIP exacto en local limpio + BD vacía antes de etiquetarlo SERVER_READY.
+
+F26 es subida manual del ZIP a Hostinger + mismo installer + smoke. No bot/SSH/API de despliegue obligatorio.
+
+Autoridades:
+
+```text
+docs/specs/F23_F26_UX_RELEASE_SPEC_V1_2026-10-14.md
+docs/checkpoints/F23_F26_UX_RELEASE_DECISION_2026-10-14.md
+```
+
+F21/F22 todavía necesitan SPEC/PLAN final antes de un master Codex F21→F26.
+
+## 11. Recovery
 
 ```text
 README
 → AGENTS
 → último handoff forense
-→ último merged checkpoint
-→ checkpoint de fase activa
-→ GitHub real
+→ F14_MERGED
+→ F15_F20 design checkpoint
+→ F15_F20 Codex master V4
+→ live F15_F20 batch checkpoint en rama más avanzada
+→ F23_F26 UX/release checkpoint
+→ GitHub main/PR/CI real
 → continuar NEXT_EXACT_ACTION
 ```
 
-No reimplementar trabajo certificado sin evidencia real de regresión.
+No reimplementar trabajo certificado sin evidencia real de regresión o nueva SPEC aprobada.
