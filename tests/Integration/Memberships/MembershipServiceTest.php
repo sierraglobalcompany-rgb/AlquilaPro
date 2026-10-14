@@ -126,8 +126,8 @@ final class MembershipServiceTest extends TestCase
         );
         $chargeCount = (int) $this->pdo->query('SELECT COUNT(*) FROM charges')->fetchColumn();
 
-        $paid = $service->accept((int) $paidService['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_010);
-        $free = $service->accept((int) $freeService['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_011);
+        $paid = $this->acceptWithCurrentOffer($service, (int) $paidService['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_010);
+        $free = $this->acceptWithCurrentOffer($service, (int) $freeService['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_011);
 
         self::assertSame('45.50', $paid['price_snapshot']);
         self::assertSame(10, $paid['duration_days_snapshot']);
@@ -149,7 +149,7 @@ final class MembershipServiceTest extends TestCase
         );
         self::assertSame('45.50', $service->findMembership((int) $paid['id'])['price_snapshot']);
         self::assertSame(10, $service->findMembership((int) $paid['id'])['duration_days_snapshot']);
-        $this->assertRejected(fn () => $service->accept(
+        $this->assertRejected(fn () => $this->acceptWithCurrentOffer($service,
             (int) $paidService['id'], $leaseId, $this->actorId, '2026-10-14', 1_800_000_021,
         ));
         self::assertSame(2, (int) $this->pdo->query('SELECT COUNT(*) FROM service_memberships')->fetchColumn());
@@ -162,12 +162,12 @@ final class MembershipServiceTest extends TestCase
         $catalogService = $service->createService(
             'Almacenamiento', 'Espacio adicional', '12.00', 3, $this->actorId, 1_800_000_000,
         );
-        $first = $service->accept((int) $catalogService['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_010);
+        $first = $this->acceptWithCurrentOffer($service, (int) $catalogService['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_010);
         $service->updateService(
             (int) $catalogService['id'], 'Almacenamiento Plus', 'Más espacio', '20.00', 5, true, $this->actorId, 1_800_000_020,
         );
 
-        $renewed = $service->renew((int) $first['id'], $tenantId, '2026-10-14', 1_800_000_030);
+        $renewed = $this->renewWithCurrentOffer($service, (int) $first['id'], $tenantId, '2026-10-14', 1_800_000_030);
 
         self::assertNotSame($first['id'], $renewed['id']);
         self::assertSame($first['id'], $renewed['renews_membership_id']);
@@ -176,7 +176,7 @@ final class MembershipServiceTest extends TestCase
         self::assertSame('2026-10-21', $renewed['ends_on']);
         self::assertSame('20.00', $renewed['price_snapshot']);
         self::assertSame(5, $renewed['duration_days_snapshot']);
-        $this->assertRejected(fn () => $service->renew((int) $first['id'], $tenantId, '2026-10-14', 1_800_000_031));
+        $this->assertRejected(fn () => $this->renewWithCurrentOffer($service, (int) $first['id'], $tenantId, '2026-10-14', 1_800_000_031));
         self::assertSame(2, (int) $this->pdo->query('SELECT COUNT(*) FROM service_memberships')->fetchColumn());
     }
 
@@ -185,7 +185,7 @@ final class MembershipServiceTest extends TestCase
         $service = $this->service();
         [$tenantId, $leaseId] = $this->createTenantLease();
         $catalog = $service->createService('Acceso', 'Acceso digital', '5.00', 30, $this->actorId, 1_800_000_000);
-        $membership = $service->accept((int) $catalog['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_010);
+        $membership = $this->acceptWithCurrentOffer($service, (int) $catalog['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_010);
 
         $ended = $service->end((int) $membership['id'], $this->actorId, 1_800_000_020);
         self::assertSame('2027-01-15 08:00:20', $ended['ended_at']);
@@ -193,7 +193,7 @@ final class MembershipServiceTest extends TestCase
         self::assertSame($membership['starts_on'], $ended['starts_on']);
         $this->assertRejected(fn () => $service->end((int) $membership['id'], $this->actorId, 1_800_000_021));
 
-        $replacement = $service->accept((int) $catalog['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_030);
+        $replacement = $this->acceptWithCurrentOffer($service, (int) $catalog['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_030);
         self::assertNotSame($membership['id'], $replacement['id']);
         self::assertNull($replacement['ended_at']);
         self::assertSame(2, (int) $this->pdo->query('SELECT COUNT(*) FROM service_memberships')->fetchColumn());
@@ -204,15 +204,15 @@ final class MembershipServiceTest extends TestCase
         $service = $this->service();
         [$tenantId, $leaseId] = $this->createTenantLease();
         $catalog = $service->createService('Protección', 'Soporte', '5.00', 30, $this->actorId, 1_800_000_000);
-        $service->accept((int) $catalog['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_010);
+        $this->acceptWithCurrentOffer($service, (int) $catalog['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_010);
 
-        $this->assertRejected(fn () => $service->accept(
+        $this->assertRejected(fn () => $this->acceptWithCurrentOffer($service,
             (int) $catalog['id'], $leaseId, $tenantId, '2026-10-20', 1_800_000_020,
         ));
-        $this->assertRejected(fn () => $service->accept(
+        $this->assertRejected(fn () => $this->acceptWithCurrentOffer($service,
             (int) $catalog['id'], $leaseId, $tenantId, '2026-02-30', 1_800_000_030,
         ));
-        $this->assertRejected(fn () => $service->accept(
+        $this->assertRejected(fn () => $this->acceptWithCurrentOffer($service,
             (int) $catalog['id'], $leaseId, $tenantId, '0999-12-31', 1_800_000_031,
         ));
         self::assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM service_memberships')->fetchColumn());
@@ -223,7 +223,7 @@ final class MembershipServiceTest extends TestCase
         $service = $this->service();
         [$tenantId, $leaseId] = $this->createTenantLease();
         $catalog = $service->createService('Asistencia', 'Soporte digital', '30.25', 10, $this->actorId, 1_800_000_000);
-        $membership = $service->accept((int) $catalog['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_010);
+        $membership = $this->acceptWithCurrentOffer($service, (int) $catalog['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_010);
         $service->updateService((int) $catalog['id'], 'Asistencia Plus', 'Soporte ampliado', '90', 30, true, $this->actorId, 1_800_000_020);
 
         $decided = $service->decideCharge(
@@ -258,8 +258,8 @@ final class MembershipServiceTest extends TestCase
         [$tenantId, $leaseId] = $this->createTenantLease();
         $paidCatalog = $service->createService('Asistencia', 'Soporte digital', '15', 10, $this->actorId, 1_800_000_000);
         $freeCatalog = $service->createService('Guía', 'Guía básica', '0', 10, $this->actorId, 1_800_000_001);
-        $paid = $service->accept((int) $paidCatalog['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_010);
-        $free = $service->accept((int) $freeCatalog['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_011);
+        $paid = $this->acceptWithCurrentOffer($service, (int) $paidCatalog['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_010);
+        $free = $this->acceptWithCurrentOffer($service, (int) $freeCatalog['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_011);
 
         $this->assertRejected(fn () => $service->decideCharge(
             (int) $free['id'], 'skip', null, null, $this->actorId, 1_800_000_020,
@@ -282,7 +282,7 @@ final class MembershipServiceTest extends TestCase
         $service = $this->service();
         [$tenantId, $leaseId] = $this->createTenantLease();
         $catalog = $service->createService('Asistencia', 'Soporte digital', '15', 10, $this->actorId, 1_800_000_000);
-        $membership = $service->accept((int) $catalog['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_010);
+        $membership = $this->acceptWithCurrentOffer($service, (int) $catalog['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_010);
 
         foreach ([
             [null, 'Servicio'],
@@ -304,7 +304,7 @@ final class MembershipServiceTest extends TestCase
         $service = $this->service();
         [$tenantId, $leaseId] = $this->createTenantLease();
         $catalog = $service->createService('Asistencia', 'Soporte digital', '15', 10, $this->actorId, 1_800_000_000);
-        $membership = $service->accept((int) $catalog['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_010);
+        $membership = $this->acceptWithCurrentOffer($service, (int) $catalog['id'], $leaseId, $tenantId, '2026-10-14', 1_800_000_010);
         $this->pdo->exec(
             "CREATE TRIGGER membership_force_decision_failure BEFORE UPDATE ON service_memberships "
             . "FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced F20 link failure'",
@@ -324,6 +324,48 @@ final class MembershipServiceTest extends TestCase
         self::assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM charges')->fetchColumn());
         self::assertNull($service->findMembership((int) $membership['id'])['charge_decision']);
         self::assertNull($service->findMembership((int) $membership['id'])['charge_id']);
+    }
+
+    private function acceptWithCurrentOffer(
+        MembershipService $service,
+        int $serviceId,
+        int $leaseId,
+        int $tenantId,
+        string $today,
+        int $now,
+    ): array {
+        $offer = $service->findService($serviceId);
+        self::assertIsArray($offer);
+        return $service->accept(
+            $serviceId,
+            $leaseId,
+            $tenantId,
+            (string) $offer['current_price'],
+            (int) $offer['duration_days'],
+            $today,
+            $now,
+        );
+    }
+
+    private function renewWithCurrentOffer(
+        MembershipService $service,
+        int $membershipId,
+        int $tenantId,
+        string $today,
+        int $now,
+    ): array {
+        $membership = $service->findMembership($membershipId);
+        self::assertIsArray($membership);
+        $offer = $service->findService((int) $membership['service_id']);
+        self::assertIsArray($offer);
+        return $service->renew(
+            $membershipId,
+            $tenantId,
+            (string) $offer['current_price'],
+            (int) $offer['duration_days'],
+            $today,
+            $now,
+        );
     }
 
     private function service(): MembershipService

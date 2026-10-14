@@ -627,7 +627,11 @@ final class TenantPortalRoutesTest extends TestCase
             $app,
             'POST',
             '/sub/tenant/leases/' . $owned['lease_id'] . '/memberships',
-            ['service_id' => (string) $catalog['id']],
+            [
+                'service_id' => (string) $catalog['id'],
+                'expected_price' => '28.50',
+                'expected_duration_days' => '10',
+            ],
         )->getStatusCode());
         $membershipId = (int) $this->pdo->query('SELECT MAX(id) FROM service_memberships')->fetchColumn();
         self::assertGreaterThan(0, $membershipId);
@@ -660,6 +664,7 @@ final class TenantPortalRoutesTest extends TestCase
             $app,
             'POST',
             '/sub/tenant/leases/' . $owned['lease_id'] . '/memberships/' . $membershipId . '/renew',
+            ['expected_price' => '28.50', 'expected_duration_days' => '10'],
         );
         self::assertSame(303, $renewResponse->getStatusCode());
         $renewQueries = array_map('strtolower', $tracedPdo->preparedSql);
@@ -686,6 +691,84 @@ final class TenantPortalRoutesTest extends TestCase
         foreach (['accepted_by_user_id', 'charge_decided_by_user_id', 'charge_id'] as $privateField) {
             self::assertStringNotContainsString($privateField, $historyHtml);
         }
+    }
+
+    public function testTenantConfirmsDisplayedMembershipTermsAndRejectsStaleOffers(): void
+    {
+        $tenantId = $this->insertUser('membership-offer@example.com', 'TenantPassword123', 'tenant');
+        $owned = $this->createLease($tenantId, ['unit_code' => 'APT-MEMBERSHIP-OFFER']);
+        $membershipService = new MembershipService(
+            $this->pdo,
+            new FinanceService($this->pdo, new PaymentMethodService($this->pdo, $this->qrDirectory), $this->directory . '/receipts'),
+        );
+        $catalog = $membershipService->createService(
+            'Conectividad', 'Acceso digital', '12.00', 3, $tenantId, 1_800_000_000,
+        );
+        $serviceId = (int) $catalog['id'];
+        $app = $this->app('/sub', $this->pdo, static fn (): string => '2026-10-14');
+        $this->login($app, 'membership-offer@example.com', 'TenantPassword123', '/sub');
+
+        $initialOffer = $this->request($app, 'GET', '/sub/tenant/leases/' . $owned['lease_id']);
+        self::assertSame(200, $initialOffer->getStatusCode());
+        self::assertStringContainsString('12.00', (string) $initialOffer->getBody());
+        self::assertStringContainsString('3 días', (string) $initialOffer->getBody());
+        self::assertStringContainsString('2026-10-14', (string) $initialOffer->getBody());
+        self::assertStringContainsString('2026-10-16', (string) $initialOffer->getBody());
+        self::assertStringContainsString('name="expected_price" value="12.00"', (string) $initialOffer->getBody());
+
+        $membershipService->updateService(
+            $serviceId, 'Conectividad', 'Acceso digital', '18.00', 5, true, $tenantId, 1_800_000_010,
+        );
+        $staleAcceptance = $this->request(
+            $app,
+            'POST',
+            '/sub/tenant/leases/' . $owned['lease_id'] . '/memberships',
+            ['service_id' => $serviceId, 'expected_price' => '12.00', 'expected_duration_days' => '3'],
+        );
+        self::assertSame(409, $staleAcceptance->getStatusCode());
+        self::assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM service_memberships')->fetchColumn());
+
+        $currentOffer = $this->request($app, 'GET', '/sub/tenant/leases/' . $owned['lease_id']);
+        self::assertStringContainsString('18.00', (string) $currentOffer->getBody());
+        self::assertStringContainsString('5 días', (string) $currentOffer->getBody());
+        self::assertSame(303, $this->request(
+            $app,
+            'POST',
+            '/sub/tenant/leases/' . $owned['lease_id'] . '/memberships',
+            ['service_id' => $serviceId, 'expected_price' => '18.00', 'expected_duration_days' => '5'],
+        )->getStatusCode());
+        $membershipId = (int) $this->pdo->query('SELECT MAX(id) FROM service_memberships')->fetchColumn();
+
+        $membershipService->updateService(
+            $serviceId, 'Conectividad', 'Acceso digital', '24.00', 7, true, $tenantId, 1_800_000_020,
+        );
+        $renewalOffer = $this->request($app, 'GET', '/sub/tenant/leases/' . $owned['lease_id']);
+        $renewalHtml = (string) $renewalOffer->getBody();
+        self::assertStringContainsString('24.00', $renewalHtml);
+        self::assertStringContainsString('7 días', $renewalHtml);
+        self::assertStringContainsString('Vigencia propuesta: 2026-10-19 a 2026-10-25', $renewalHtml);
+
+        $staleRenewal = $this->request(
+            $app,
+            'POST',
+            '/sub/tenant/leases/' . $owned['lease_id'] . '/memberships/' . $membershipId . '/renew',
+            ['expected_price' => '18.00', 'expected_duration_days' => '5'],
+        );
+        self::assertSame(409, $staleRenewal->getStatusCode());
+        self::assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM service_memberships')->fetchColumn());
+
+        self::assertSame(303, $this->request(
+            $app,
+            'POST',
+            '/sub/tenant/leases/' . $owned['lease_id'] . '/memberships/' . $membershipId . '/renew',
+            ['expected_price' => '24.00', 'expected_duration_days' => '7'],
+        )->getStatusCode());
+        self::assertSame('24.00', $this->pdo->query(
+            'SELECT price_snapshot FROM service_memberships WHERE renews_membership_id = ' . $membershipId,
+        )->fetchColumn());
+        self::assertSame(7, (int) $this->pdo->query(
+            'SELECT duration_days_snapshot FROM service_memberships WHERE renews_membership_id = ' . $membershipId,
+        )->fetchColumn());
     }
 
     public function testTenantLeaseDetailShowsOnlyActiveGlobalAndOwnedPropertyPaymentMethods(): void

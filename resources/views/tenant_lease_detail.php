@@ -84,12 +84,19 @@ $visitStatusLabels = [
                 <article class="user-card">
                     <strong><?= $escape($service['name']) ?></strong>
                     <p><?= nl2br($escape($service['description'])) ?></p>
-                    <div><?= $escape($service['current_price']) ?> · <?= $escape($service['duration_days']) ?> días</div>
-                    <form method="post" action="<?= $escape($basePath) ?>/tenant/leases/<?= $escape($lease['id']) ?>/memberships">
-                        <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
-                        <input type="hidden" name="service_id" value="<?= $escape($service['id']) ?>">
-                        <button class="button" type="submit">Aceptar servicio</button>
-                    </form>
+                    <div>Precio del servicio: <?= $escape($service['current_price']) ?> · <?= $escape($service['duration_days']) ?> días</div>
+                    <?php if (is_string($service['offer_ends_on'] ?? null)): ?>
+                        <div>Vigencia propuesta: <?= $escape($service['offer_starts_on']) ?> a <?= $escape($service['offer_ends_on']) ?></div>
+                        <form method="post" action="<?= $escape($basePath) ?>/tenant/leases/<?= $escape($lease['id']) ?>/memberships">
+                            <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                            <input type="hidden" name="service_id" value="<?= $escape($service['id']) ?>">
+                            <input type="hidden" name="expected_price" value="<?= $escape($service['current_price']) ?>">
+                            <input type="hidden" name="expected_duration_days" value="<?= $escape($service['duration_days']) ?>">
+                            <button class="button" type="submit">Aceptar servicio</button>
+                        </form>
+                    <?php else: ?>
+                        <p class="empty-state">No es posible calcular la vigencia de este servicio en este momento.</p>
+                    <?php endif; ?>
                 </article>
             <?php endforeach; ?>
         </div>
@@ -114,8 +121,13 @@ $visitStatusLabels = [
                     <div>Precio aceptado: <?= $escape($membership['price_snapshot']) ?></div>
                     <div><?= $escape($membership['charge_outcome_label']) ?></div>
                     <?php if ($lease['is_active'] && $membership['can_renew']): ?>
+                        <?php $renewalOffer = $membership['renewal_offer']; ?>
+                        <div>Renovación: <?= $escape($renewalOffer['current_price']) ?> · <?= $escape($renewalOffer['duration_days']) ?> días</div>
+                        <div>Vigencia propuesta: <?= $escape($renewalOffer['starts_on']) ?> a <?= $escape($renewalOffer['ends_on']) ?></div>
                         <form method="post" action="<?= $escape($basePath) ?>/tenant/leases/<?= $escape($lease['id']) ?>/memberships/<?= $escape($membership['id']) ?>/renew">
                             <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                            <input type="hidden" name="expected_price" value="<?= $escape($renewalOffer['current_price']) ?>">
+                            <input type="hidden" name="expected_duration_days" value="<?= $escape($renewalOffer['duration_days']) ?>">
                             <button class="button button--quiet" type="submit">Renovar servicio</button>
                         </form>
                     <?php endif; ?>

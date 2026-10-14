@@ -29,9 +29,14 @@ try {
     file_put_contents($readyFile, 'ready');
 
     if ($action === 'accept') {
-        $service->accept((int) $argv[2], (int) $argv[3], (int) $argv[4], (string) $argv[5], (int) $argv[6]);
+        $service->accept(
+            (int) $argv[2], (int) $argv[3], (int) $argv[4], (string) $argv[5], (int) $argv[6],
+            (string) $argv[7], (int) $argv[8],
+        );
     } elseif ($action === 'renew') {
-        $service->renew((int) $argv[2], (int) $argv[3], (string) $argv[4], (int) $argv[5]);
+        $service->renew(
+            (int) $argv[2], (int) $argv[3], (string) $argv[4], (int) $argv[5], (string) $argv[6], (int) $argv[7],
+        );
     } elseif ($action === 'decide') {
         $service->decideCharge(
             (int) $argv[2],

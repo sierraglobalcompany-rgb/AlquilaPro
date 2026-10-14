@@ -190,8 +190,24 @@ return static function (App $app, array $deps): void {
         if (!is_int($serviceId) || $serviceId <= 0) {
             return $response->withStatus(422);
         }
+        $expectedPrice = is_string($body['expected_price'] ?? null) ? $body['expected_price'] : '';
+        $expectedDurationDays = filter_var($body['expected_duration_days'] ?? null, FILTER_VALIDATE_INT);
+        if (!is_int($expectedDurationDays)) {
+            return $response->withStatus(422);
+        }
         try {
-            $memberships->accept($serviceId, $leaseId, (int) $user['id'], $todayProvider(), time());
+            $memberships->accept(
+                $serviceId,
+                $leaseId,
+                (int) $user['id'],
+                $expectedPrice,
+                $expectedDurationDays,
+                $todayProvider(),
+                time(),
+            );
+        } catch (\DomainException $error) {
+            $response->getBody()->write($error->getMessage());
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(409);
         } catch (Throwable) {
             return $response->withStatus(422);
         }
@@ -220,8 +236,24 @@ return static function (App $app, array $deps): void {
         if ($membership === null || $membership['lease_id'] !== $leaseId) {
             return $response->withStatus(404);
         }
+        $body = (array) ($request->getParsedBody() ?? []);
+        $expectedPrice = is_string($body['expected_price'] ?? null) ? $body['expected_price'] : '';
+        $expectedDurationDays = filter_var($body['expected_duration_days'] ?? null, FILTER_VALIDATE_INT);
+        if (!is_int($expectedDurationDays)) {
+            return $response->withStatus(422);
+        }
         try {
-            $memberships->renew($membershipId, (int) $user['id'], $todayProvider(), time());
+            $memberships->renew(
+                $membershipId,
+                (int) $user['id'],
+                $expectedPrice,
+                $expectedDurationDays,
+                $todayProvider(),
+                time(),
+            );
+        } catch (\DomainException $error) {
+            $response->getBody()->write($error->getMessage());
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(409);
         } catch (Throwable) {
             return $response->withStatus(422);
         }

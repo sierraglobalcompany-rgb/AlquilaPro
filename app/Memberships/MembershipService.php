@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AlquilaPro\Memberships;
 
 use AlquilaPro\Finance\FinanceService;
+use DomainException;
 use PDO;
 use RuntimeException;
 use Throwable;
@@ -120,12 +121,29 @@ final readonly class MembershipService
     }
 
     /** @return array<string,mixed> */
-    public function accept(int $serviceId, int $leaseId, int $tenantUserId, string $today, int $now): array
+    public function accept(
+        int $serviceId,
+        int $leaseId,
+        int $tenantUserId,
+        string $expectedPrice,
+        int $expectedDurationDays,
+        string $today,
+        int $now,
+    ): array
     {
         $this->validateMembershipRequest($serviceId, $leaseId, $tenantUserId, $today, $now);
-        return $this->inMembershipTransaction(function () use ($serviceId, $leaseId, $tenantUserId, $today, $now): array {
+        return $this->inMembershipTransaction(function () use (
+            $serviceId,
+            $leaseId,
+            $tenantUserId,
+            $expectedPrice,
+            $expectedDurationDays,
+            $today,
+            $now,
+        ): array {
             $this->lockTenantLease($leaseId, $tenantUserId);
             $service = $this->lockActiveService($serviceId);
+            $this->assertOfferMatches($service, $expectedPrice, $expectedDurationDays);
             $endsOn = $this->endDate($today, (int) $service['duration_days']);
             $this->assertNoOverlap($serviceId, $leaseId, $today, $endsOn);
 
@@ -149,7 +167,14 @@ final readonly class MembershipService
     }
 
     /** @return array<string,mixed> */
-    public function renew(int $membershipId, int $tenantUserId, string $today, int $now): array
+    public function renew(
+        int $membershipId,
+        int $tenantUserId,
+        string $expectedPrice,
+        int $expectedDurationDays,
+        string $today,
+        int $now,
+    ): array
     {
         $this->validateDate($today);
         if ($membershipId <= 0 || $tenantUserId <= 0 || $now <= 0) {
@@ -163,7 +188,15 @@ final readonly class MembershipService
         }
         $leaseId = (int) $leaseId;
 
-        return $this->inMembershipTransaction(function () use ($membershipId, $tenantUserId, $today, $now, $leaseId): array {
+        return $this->inMembershipTransaction(function () use (
+            $membershipId,
+            $tenantUserId,
+            $expectedPrice,
+            $expectedDurationDays,
+            $today,
+            $now,
+            $leaseId,
+        ): array {
             $this->lockTenantLease($leaseId, $tenantUserId);
             $sourceStatement = $this->pdo->prepare(
                 'SELECT * FROM service_memberships WHERE id = :id AND lease_id = :lease_id LIMIT 1 FOR UPDATE',
@@ -184,6 +217,7 @@ final readonly class MembershipService
 
             $serviceId = (int) $source['service_id'];
             $service = $this->lockActiveService($serviceId);
+            $this->assertOfferMatches($service, $expectedPrice, $expectedDurationDays);
             $stillActive = $source['ended_at'] === null && (string) $source['ends_on'] >= $today;
             $startsOn = $stillActive ? $this->endDate((string) $source['ends_on'], 2) : $today;
             $endsOn = $this->endDate($startsOn, (int) $service['duration_days']);
@@ -327,16 +361,33 @@ final readonly class MembershipService
         }
 
         try {
+            $lookup = $this->pdo->prepare('SELECT lease_id FROM service_memberships WHERE id = :id LIMIT 1');
+            $lookup->execute(['id' => $membershipId]);
+            $leaseId = $lookup->fetchColumn();
+            if ($leaseId === false) {
+                throw new RuntimeException('La membresía no requiere una decisión o ya fue procesada.');
+            }
+            $leaseId = (int) $leaseId;
+
             return $this->inMembershipTransaction(function () use (
                 $membershipId,
+                $leaseId,
                 $decision,
                 $dueDate,
                 $description,
                 $actorUserId,
                 $now,
             ): array {
-                $statement = $this->pdo->prepare('SELECT * FROM service_memberships WHERE id = :id LIMIT 1 FOR UPDATE');
-                $statement->execute(['id' => $membershipId]);
+                $leaseLock = $this->pdo->prepare('SELECT id FROM leases WHERE id = :lease_id LIMIT 1 FOR UPDATE');
+                $leaseLock->execute(['lease_id' => $leaseId]);
+                if ($leaseLock->fetchColumn() === false) {
+                    throw new RuntimeException('La membresía no requiere una decisión o ya fue procesada.');
+                }
+
+                $statement = $this->pdo->prepare(
+                    'SELECT * FROM service_memberships WHERE id = :id AND lease_id = :lease_id LIMIT 1 FOR UPDATE',
+                );
+                $statement->execute(['id' => $membershipId, 'lease_id' => $leaseId]);
                 $membership = $statement->fetch(PDO::FETCH_ASSOC);
                 if (!is_array($membership) || (string) $membership['price_snapshot'] === '0.00'
                     || $membership['charge_decision'] !== null || $membership['charge_id'] !== null
@@ -421,6 +472,22 @@ final readonly class MembershipService
             throw new RuntimeException('El servicio no está disponible.');
         }
         return $this->normalizeService($row);
+    }
+
+    /** @param array<string,mixed> $service */
+    private function assertOfferMatches(array $service, string $expectedPrice, int $expectedDurationDays): void
+    {
+        try {
+            $expectedPrice = $this->normalizePrice($expectedPrice);
+        } catch (RuntimeException) {
+            throw new DomainException('Las condiciones del servicio cambiaron; recarga la página antes de continuar.');
+        }
+        if ($expectedDurationDays <= 0
+            || $expectedPrice !== $service['current_price']
+            || $expectedDurationDays !== (int) $service['duration_days']
+        ) {
+            throw new DomainException('Las condiciones del servicio cambiaron; recarga la página antes de continuar.');
+        }
     }
 
     private function assertNoOverlap(int $serviceId, int $leaseId, string $startsOn, string $endsOn): void

@@ -161,7 +161,9 @@ final class MembershipRoutesTest extends TestCase
             'name' => 'Bloqueado', 'description' => 'Tenant', 'current_price' => '1', 'duration_days' => '1',
         ])->getStatusCode());
 
-        $membership = $this->service()->accept($serviceId, $this->leaseId, $this->tenantId, '2026-10-14', 1_800_000_010);
+        $membership = $this->service()->accept(
+            $serviceId, $this->leaseId, $this->tenantId, '35.50', 10, '2026-10-14', 1_800_000_010,
+        );
         $_SESSION = [];
         $ownerApp = $this->app('/sub');
         $this->login($ownerApp, 'membership-owner@example.test', 'MembershipPassword123');

@@ -67,8 +67,8 @@ final class MembershipConcurrencyTest extends TestCase
             self::markTestSkipped('Concurrent membership test requires proc_open.');
         }
         $results = $this->runWithLeaseLocked([
-            ['accept', $this->serviceId, $this->leaseId, $this->tenantId, '2026-10-14', 1_800_000_010],
-            ['accept', $this->serviceId, $this->leaseId, $this->tenantId, '2026-10-14', 1_800_000_011],
+            ['accept', $this->serviceId, $this->leaseId, $this->tenantId, '25.00', 10, '2026-10-14', 1_800_000_010],
+            ['accept', $this->serviceId, $this->leaseId, $this->tenantId, '25.00', 10, '2026-10-14', 1_800_000_011],
         ]);
         self::assertCount(1, array_filter($results, static fn (array $result): bool => $result['ok']));
         self::assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM service_memberships')->fetchColumn());
@@ -81,11 +81,11 @@ final class MembershipConcurrencyTest extends TestCase
             self::markTestSkipped('Concurrent membership test requires proc_open.');
         }
         $first = $this->service()->accept(
-            $this->serviceId, $this->leaseId, $this->tenantId, '2026-10-14', 1_800_000_010,
+            $this->serviceId, $this->leaseId, $this->tenantId, '25.00', 10, '2026-10-14', 1_800_000_010,
         );
         $results = $this->runWithLeaseLocked([
-            ['renew', (int) $first['id'], $this->tenantId, '2026-10-14', 1_800_000_020],
-            ['renew', (int) $first['id'], $this->tenantId, '2026-10-14', 1_800_000_021],
+            ['renew', (int) $first['id'], $this->tenantId, '25.00', 10, '2026-10-14', 1_800_000_020],
+            ['renew', (int) $first['id'], $this->tenantId, '25.00', 10, '2026-10-14', 1_800_000_021],
         ]);
         self::assertCount(1, array_filter($results, static fn (array $result): bool => $result['ok']));
         self::assertSame(2, (int) $this->pdo->query('SELECT COUNT(*) FROM service_memberships')->fetchColumn());
@@ -146,6 +146,49 @@ final class MembershipConcurrencyTest extends TestCase
         self::assertSame('skip', $stored['charge_decision']);
         self::assertNull($stored['charge_id']);
         self::assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM charges')->fetchColumn());
+    }
+
+    public function testConcurrentCreateDecisionAndRenewalDoNotDeadlock(): void
+    {
+        if (!function_exists('proc_open')) {
+            self::markTestSkipped('Concurrent membership test requires proc_open.');
+        }
+        $membership = $this->paidMembership();
+        $this->pdo->exec(
+            'CREATE TRIGGER membership_pause_charge BEFORE INSERT ON charges FOR EACH ROW DO SLEEP(10)',
+        );
+        $workers = [];
+        try {
+            $workers[] = $this->startWorker([
+                'decide', (int) $membership['id'], 'create', '2026-10-20', 'Servicio digital', $this->actorId, 1_800_000_030,
+            ]);
+            $this->waitForPausedChargeInsert($workers[0]);
+            $workers[] = $this->startWorker([
+                'renew', (int) $membership['id'], $this->tenantId, '25.00', 10, '2026-10-14', 1_800_000_031,
+            ]);
+
+            $results = array_map(fn (array $worker): array => $this->finishWorker($worker), $workers);
+            self::assertSame([true, true], array_column($results, 'ok'), json_encode($results));
+            self::assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM charges')->fetchColumn());
+            self::assertSame('create', $this->service()->findMembership((int) $membership['id'])['charge_decision']);
+            self::assertSame(1, (int) $this->pdo->query(
+                'SELECT COUNT(*) FROM service_memberships WHERE renews_membership_id = ' . (int) $membership['id'],
+            )->fetchColumn());
+        } finally {
+            $this->pdo->exec('DROP TRIGGER IF EXISTS membership_pause_charge');
+            foreach ($workers as $worker) {
+                if (is_resource($worker['process'])) {
+                    @proc_terminate($worker['process']);
+                    foreach ([1, 2] as $pipeNumber) {
+                        if (isset($worker['pipes'][$pipeNumber]) && is_resource($worker['pipes'][$pipeNumber])) {
+                            fclose($worker['pipes'][$pipeNumber]);
+                        }
+                    }
+                    @proc_close($worker['process']);
+                }
+                @unlink($worker['ready']);
+            }
+        }
     }
 
     /** @param list<list<int|string>> $operations @return list<array{ok:bool}> */
@@ -223,13 +266,72 @@ final class MembershipConcurrencyTest extends TestCase
         );
     }
 
+    /** @param list<int|string> $operation @return array{process:resource|false,pipes:array<int,resource>,ready:string} */
+    private function startWorker(array $operation): array
+    {
+        $workerPath = dirname(__DIR__, 2) . '/Support/MembershipConcurrencyWorker.php';
+        $ready = $this->directory . '/worker-' . bin2hex(random_bytes(6)) . '.ready';
+        $command = array_merge([PHP_BINARY, $workerPath], array_map('strval', $operation), [$ready]);
+        $pipes = [];
+        $process = proc_open(
+            $command,
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            dirname(__DIR__, 3),
+        );
+        self::assertIsResource($process, 'Unable to start membership concurrency worker.');
+        fclose($pipes[0]);
+        return ['process' => $process, 'pipes' => $pipes, 'ready' => $ready];
+    }
+
+    /** @param array{process:resource|false,pipes:array<int,resource>,ready:string} $worker @return array{ok:bool} */
+    private function finishWorker(array $worker): array
+    {
+        $stdout = stream_get_contents($worker['pipes'][1]);
+        $stderr = stream_get_contents($worker['pipes'][2]);
+        fclose($worker['pipes'][1]);
+        fclose($worker['pipes'][2]);
+        self::assertSame(0, proc_close($worker['process']), 'Membership worker failed: ' . (string) $stderr);
+        $result = json_decode((string) $stdout, true);
+        self::assertIsArray($result, 'Membership worker returned invalid JSON.');
+        return $result;
+    }
+
+    /** @param array{process:resource|false,pipes:array<int,resource>,ready:string} $worker */
+    private function waitForPausedChargeInsert(array $worker): void
+    {
+        $deadline = microtime(true) + 8;
+        $lastProcessList = [];
+        do {
+            if (is_file($worker['ready'])) {
+                $status = proc_get_status($worker['process']);
+                if (!$status['running']) {
+                    $stdout = stream_get_contents($worker['pipes'][1]);
+                    $stderr = stream_get_contents($worker['pipes'][2]);
+                    self::fail('Charge worker exited before the barrier: ' . (string) $stdout . ' ' . (string) $stderr);
+                }
+                $lastProcessList = $this->pdo->query('SHOW FULL PROCESSLIST')->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($lastProcessList as $process) {
+                    if (($process['State'] ?? null) === 'User sleep'
+                        && str_contains((string) ($process['Info'] ?? ''), 'SLEEP(10)')
+                    ) {
+                        return;
+                    }
+                }
+            }
+            usleep(20_000);
+        } while (microtime(true) < $deadline);
+        self::fail('Charge insert did not reach the concurrency barrier: ' . json_encode($lastProcessList));
+    }
+
     /** @return array<string,mixed> */
     private function paidMembership(): array
     {
         $membershipService = $this->service();
         $catalog = $membershipService->createService('Servicio de prueba', 'Servicio para concurrencia', '25.00', 10, $this->actorId, 1_800_000_000);
         return $membershipService->accept(
-            (int) $catalog['id'], $this->leaseId, $this->tenantId, '2026-10-14', 1_800_000_010,
+            (int) $catalog['id'], $this->leaseId, $this->tenantId,
+            (string) $catalog['current_price'], (int) $catalog['duration_days'], '2026-10-14', 1_800_000_010,
         );
     }
 

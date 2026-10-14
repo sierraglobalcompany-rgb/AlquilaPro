@@ -223,6 +223,17 @@ return static function (App $app, array $deps): void {
         }
 
         $today = $todayProvider();
+        $membershipEndDate = static function (string $startsOn, int $durationDays): ?string {
+            try {
+                $endDate = (new DateTimeImmutable($startsOn))->modify('+' . ($durationDays - 1) . ' days');
+            } catch (Throwable) {
+                return null;
+            }
+            if ($endDate === false || $endDate->format('Y-m-d') < $startsOn) {
+                return null;
+            }
+            return $endDate->format('Y-m-d');
+        };
         $membershipHistory = $memberships->listForLease((int) $lease['id']);
         $availableServices = $lease['is_active'] ? $memberships->listServices(true) : [];
         $serviceById = [];
@@ -243,10 +254,16 @@ return static function (App $app, array $deps): void {
             $availableServices,
             static fn (array $service): bool => !isset($occupiedServiceIds[(int) $service['id']]),
         ));
+        $availableServices = array_map(static function (array $service) use ($today, $membershipEndDate): array {
+            $service['offer_starts_on'] = $today;
+            $service['offer_ends_on'] = $membershipEndDate($today, (int) $service['duration_days']);
+            return $service;
+        }, $availableServices);
         $tenantMemberships = array_map(static function (array $membership) use (
             $today,
             $serviceById,
             $renewedMembershipIds,
+            $membershipEndDate,
         ): array {
             $service = $serviceById[(int) $membership['service_id']] ?? null;
             $outcomeLabel = match ($membership['charge_outcome']) {
@@ -260,6 +277,21 @@ return static function (App $app, array $deps): void {
                 : (($membership['ends_on'] < $today)
                     ? 'Vencido'
                     : (($membership['starts_on'] > $today) ? 'Programado' : 'Activo'));
+            $renewalStartsOn = $membership['ended_at'] === null && $membership['ends_on'] >= $today
+                ? $membershipEndDate((string) $membership['ends_on'], 2)
+                : $today;
+            $renewalEndsOn = is_array($service) && $service['active'] && $renewalStartsOn !== null
+                ? $membershipEndDate($renewalStartsOn, (int) $service['duration_days'])
+                : null;
+            $renewalOffer = is_array($service) && $service['active']
+                && $renewalStartsOn !== null && $renewalEndsOn !== null
+                ? [
+                    'current_price' => (string) $service['current_price'],
+                    'duration_days' => (int) $service['duration_days'],
+                    'starts_on' => $renewalStartsOn,
+                    'ends_on' => $renewalEndsOn,
+                ]
+                : null;
             return [
                 'id' => (int) $membership['id'],
                 'service_name' => (string) ($membership['service_name'] ?? $service['name'] ?? 'Servicio'),
@@ -268,8 +300,9 @@ return static function (App $app, array $deps): void {
                 'ends_on' => (string) $membership['ends_on'],
                 'status' => $status,
                 'charge_outcome_label' => $outcomeLabel,
-                'can_renew' => is_array($service) && $service['active']
+                'can_renew' => $renewalOffer !== null
                     && !isset($renewedMembershipIds[(int) $membership['id']]),
+                'renewal_offer' => $renewalOffer,
             ];
         }, $membershipHistory);
 
