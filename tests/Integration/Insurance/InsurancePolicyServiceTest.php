@@ -196,6 +196,48 @@ final class InsurancePolicyServiceTest extends TestCase
         )['bytes']);
     }
 
+    public function testOversizedStoredDocumentIsRejectedByBoundedReadBoundary(): void
+    {
+        $lease = $this->createLease();
+        $service = $this->service();
+        $policy = $service->createPolicy($lease['lease_id'], $this->policyInput(), $lease['actor_id'], 1791980000);
+        $withDocument = $service->addPolicyDocument(
+            $policy['id'], 'Documento de prueba', $this->upload($this->pdfBytes(), 'policy.pdf', 'application/pdf'), 1791980001,
+        );
+        $document = $withDocument['documents'][0];
+        $stored = json_decode((string) $this->policyRow($policy['id'])['documents_json'], true, 512, JSON_THROW_ON_ERROR);
+        $path = $this->documentDirectory . DIRECTORY_SEPARATOR . $stored[0]['stored_name'];
+        $oversizedBytes = $this->pdfBytes() . str_repeat('x', 5 * 1024 * 1024 + 1);
+        self::assertSame(strlen($oversizedBytes), file_put_contents($path, $oversizedBytes));
+        self::assertNull($service->readPolicyDocument($policy['id'], $document['document_id']));
+
+        $source = file_get_contents(dirname(__DIR__, 3) . '/app/Insurance/InsuranceService.php');
+        self::assertIsString($source);
+        $methodStart = strpos($source, 'private function readStoredDocument(');
+        self::assertNotFalse($methodStart);
+        $methodEnd = strpos($source, "\n    private function normalizePositiveAmount(", $methodStart);
+        self::assertNotFalse($methodEnd);
+        $method = substr($source, $methodStart, $methodEnd - $methodStart);
+        $sizeCapPosition = strpos($method, '$size > self::MAX_DOCUMENT_BYTES');
+        $openPosition = strpos($method, 'fopen(');
+        $openedSizePosition = strpos($method, 'fstat($handle)');
+        $openedSizeCapPosition = strpos($method, '$openedSize > self::MAX_DOCUMENT_BYTES');
+        $boundedReadPosition = strpos($method, 'stream_get_contents(');
+        self::assertIsInt($sizeCapPosition, 'Physical size must be capped before opening the stored file.');
+        self::assertIsInt($openPosition);
+        self::assertIsInt($openedSizePosition);
+        self::assertIsInt($openedSizeCapPosition);
+        self::assertIsInt($boundedReadPosition);
+        self::assertTrue($sizeCapPosition < $openPosition);
+        self::assertTrue($openPosition < $openedSizePosition);
+        self::assertTrue($openedSizePosition < $openedSizeCapPosition);
+        self::assertTrue($openedSizeCapPosition < $boundedReadPosition);
+        self::assertStringContainsString('self::MAX_DOCUMENT_BYTES + 1', $method);
+        self::assertStringNotContainsString('file_get_contents(', $method);
+        self::assertStringNotContainsString('hash_file(', $method);
+        self::assertStringNotContainsString('->file($path)', $method);
+    }
+
     public function testPolicyDocumentRejectsInvalidLabelsMimeAndOversizedBytes(): void
     {
         $lease = $this->createLease();
