@@ -34,6 +34,7 @@ final class MigrationRunnerTest extends TestCase
             'migration_probe',
             'insurance_claims',
             'insurance_policies',
+            'maintenance_requests',
             'lease_obligations',
             'payment_allocations',
             'payments',
@@ -85,6 +86,7 @@ final class MigrationRunnerTest extends TestCase
                 '011_create_payments.sql',
                 '012_create_lease_obligations.sql',
                 '013_create_insurance_policies_and_claims.sql',
+                '014_create_maintenance_requests.sql',
         ];
         self::assertSame(count($expectedMigrations), $first['applied']);
         self::assertSame($expectedMigrations, $first['migrations']);
@@ -112,6 +114,7 @@ final class MigrationRunnerTest extends TestCase
         self::assertSame(1, $this->tableExists('lease_obligations'));
         self::assertSame(1, $this->tableExists('insurance_policies'));
         self::assertSame(1, $this->tableExists('insurance_claims'));
+        self::assertSame(1, $this->tableExists('maintenance_requests'));
     }
 
     public function testFailedMigrationIsNotRecordedAsApplied(): void

@@ -11,6 +11,7 @@ use AlquilaPro\Foundation\DatabaseConfig;
 use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
 use AlquilaPro\Foundation\MigrationRunner;
+use AlquilaPro\Maintenance\MaintenanceService;
 use PDO;
 use PDOStatement;
 use PHPUnit\Framework\TestCase;
@@ -89,6 +90,9 @@ final class TenantPortalRoutesTest extends TestCase
         foreach (glob($this->qrDirectory . '/*') ?: [] as $file) {
             @unlink($file);
         }
+        foreach (glob($this->directory . '/maintenance-photos/*') ?: [] as $file) {
+            @unlink($file);
+        }
         @unlink($this->lockPath);
         @unlink($this->lockPath . '.tmp');
         @rmdir($this->directory . '/branding');
@@ -96,6 +100,8 @@ final class TenantPortalRoutesTest extends TestCase
         @rmdir($this->directory . '/candidate-documents');
         @rmdir($this->contractDirectory);
         @rmdir($this->qrDirectory);
+        @rmdir($this->directory . '/maintenance-photos');
+        @rmdir($this->directory . '/maintenance-receipts');
         @rmdir($this->directory);
     }
 
@@ -257,7 +263,8 @@ final class TenantPortalRoutesTest extends TestCase
         self::assertStringNotContainsString('created_by_user_id', $apartmentHtml);
         self::assertStringNotContainsString('voided_by_user_id', $apartmentHtml);
         self::assertStringNotContainsString('void_reason', $apartmentHtml);
-        self::assertStringNotContainsString('name="csrf_token"', $apartmentHtml);
+        self::assertStringContainsString('name="csrf_token"', $apartmentHtml);
+        self::assertStringContainsString('/tenant-base/tenant/leases/' . $apartment['lease_id'] . '/maintenance', $apartmentHtml);
         self::assertStringNotContainsString('/admin/charges/', $apartmentHtml);
         self::assertStringNotContainsString('/tenant/payments', $apartmentHtml);
         self::assertStringContainsString(
@@ -525,6 +532,137 @@ final class TenantPortalRoutesTest extends TestCase
         );
     }
 
+    public function testTenantCanCreateMaintenanceOnlyForOwnedLeaseAndSeesSafeProjection(): void
+    {
+        $tenantId = $this->insertUser('maintenance-tenant@example.com', 'TenantPassword123', 'tenant');
+        $foreignId = $this->insertUser('maintenance-foreign@example.com', 'TenantPassword123', 'tenant');
+        $owned = $this->createLease($tenantId, ['unit_code' => 'APT-MAINT-OWNED']);
+        $foreign = $this->createLease($foreignId, ['unit_code' => 'APT-MAINT-FOREIGN']);
+        $app = $this->app('/sub');
+        $this->login($app, 'maintenance-tenant@example.com', 'TenantPassword123', '/sub');
+
+        $created = $this->request($app, 'POST', '/sub/tenant/leases/' . $owned['lease_id'] . '/maintenance', [
+            'category' => '  Plomería  ',
+            'priority' => 'high',
+            'description' => '  Fuga bajo el lavaplatos  ',
+        ]);
+        self::assertSame(303, $created->getStatusCode());
+        self::assertSame('/sub/tenant/leases/' . $owned['lease_id'], $created->getHeaderLine('Location'));
+
+        $detail = $this->request($app, 'GET', '/sub/tenant/leases/' . $owned['lease_id']);
+        self::assertSame(200, $detail->getStatusCode());
+        $html = (string) $detail->getBody();
+        self::assertStringContainsString('Plomería', $html);
+        self::assertStringContainsString('Fuga bajo el lavaplatos', $html);
+        self::assertStringContainsString('Agregar foto', $html);
+        self::assertStringNotContainsString('maintenance.manage', $html);
+        self::assertStringNotContainsString('charge_id', $html);
+        self::assertStringNotContainsString('stored_name', $html);
+
+        $denied = $this->request($app, 'POST', '/sub/tenant/leases/' . $foreign['lease_id'] . '/maintenance', [
+            'category' => 'Privada',
+            'priority' => 'medium',
+            'description' => 'No debe crearse',
+        ]);
+        self::assertSame(404, $denied->getStatusCode());
+        self::assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM maintenance_requests')->fetchColumn());
+    }
+
+    public function testMaintenanceStaffRoutesSeparateViewAndManagePermissions(): void
+    {
+        $tenantId = $this->insertUser('maintenance-lease@example.com', 'TenantPassword123', 'tenant');
+        $lease = $this->createLease($tenantId, ['unit_code' => 'APT-MAINT-STAFF']);
+        $viewerEmail = 'maintenance-viewer@example.com';
+        $managerEmail = 'maintenance-manager@example.com';
+        $this->insertUser($viewerEmail, 'StaffPassword123', 'admin', ['maintenance.view']);
+        $this->insertUser($managerEmail, 'StaffPassword123', 'admin', ['maintenance.view', 'maintenance.manage']);
+
+        $viewerApp = $this->app('/sub');
+        $this->login($viewerApp, $viewerEmail, 'StaffPassword123', '/sub');
+        self::assertSame(200, $this->request($viewerApp, 'GET', '/sub/admin/maintenance')->getStatusCode());
+        self::assertSame(403, $this->request($viewerApp, 'POST', '/sub/admin/maintenance', [
+            'lease_id' => (string) $lease['lease_id'],
+            'category' => 'Eléctrica',
+            'priority' => 'medium',
+            'description' => 'Revisar interruptor',
+        ])->getStatusCode());
+
+        $managerApp = $this->app('/sub');
+        $this->login($managerApp, $managerEmail, 'StaffPassword123', '/sub');
+        $created = $this->request($managerApp, 'POST', '/sub/admin/maintenance', [
+            'lease_id' => (string) $lease['lease_id'],
+            'category' => 'Eléctrica',
+            'priority' => 'medium',
+            'description' => 'Revisar interruptor',
+        ]);
+        self::assertSame(303, $created->getStatusCode());
+        self::assertMatchesRegularExpression('#\A/sub/admin/maintenance/[1-9][0-9]*\z#', $created->getHeaderLine('Location'));
+        $requestId = (int) basename($created->getHeaderLine('Location'));
+        self::assertSame(303, $this->request($managerApp, 'POST', '/sub/admin/maintenance/' . $requestId . '/classification', [
+            'damage_classification' => 'tenant_damage',
+        ])->getStatusCode());
+        $detail = $this->request($managerApp, 'GET', $created->getHeaderLine('Location'));
+        self::assertSame(200, $detail->getStatusCode());
+        self::assertStringContainsString('Gestionar solicitud', (string) $detail->getBody());
+        self::assertStringContainsString('Registrar cargo de reparación', (string) $detail->getBody());
+    }
+
+    public function testMaintenancePhotosRequireOwnedLeaseOrStaffViewAndFailClosed(): void
+    {
+        $tenantId = $this->insertUser('maintenance-photo-owner@example.com', 'TenantPassword123', 'tenant');
+        $foreignId = $this->insertUser('maintenance-photo-foreign@example.com', 'TenantPassword123', 'tenant');
+        $owned = $this->createLease($tenantId, ['unit_code' => 'APT-MAINT-PHOTO-OWNED']);
+        $foreign = $this->createLease($foreignId, ['unit_code' => 'APT-MAINT-PHOTO-FOREIGN']);
+        $service = $this->maintenanceService();
+        $record = $service->create($owned['lease_id'], 'Ventana', 'medium', 'Vidrio rayado', $tenantId);
+        $service->addPhoto($record['id'], $this->qrUpload(), $tenantId, 1791980000);
+        $photo = $service->find($record['id'])['photos'][0];
+
+        $app = $this->app('/sub');
+        $this->login($app, 'maintenance-photo-owner@example.com', 'TenantPassword123', '/sub');
+        $ownedPhoto = $this->request(
+            $app,
+            'GET',
+            '/sub/tenant/leases/' . $owned['lease_id'] . '/maintenance/' . $record['id'] . '/photos/' . $photo['photo_id'],
+        );
+        self::assertSame(200, $ownedPhoto->getStatusCode());
+        self::assertSame('image/png', $ownedPhoto->getHeaderLine('Content-Type'));
+        self::assertSame('private, no-store', $ownedPhoto->getHeaderLine('Cache-Control'));
+        self::assertSame('nosniff', $ownedPhoto->getHeaderLine('X-Content-Type-Options'));
+        self::assertSame($this->pngBytes(), (string) $ownedPhoto->getBody());
+        self::assertSame(404, $this->request(
+            $app,
+            'GET',
+            '/sub/tenant/leases/' . $foreign['lease_id'] . '/maintenance/' . $record['id'] . '/photos/' . $photo['photo_id'],
+        )->getStatusCode());
+
+        $_SESSION = [];
+        $this->insertUser('maintenance-photo-viewer@example.com', 'StaffPassword123', 'admin', ['maintenance.view']);
+        $staffApp = $this->app('/sub');
+        $this->login($staffApp, 'maintenance-photo-viewer@example.com', 'StaffPassword123', '/sub');
+        self::assertSame(200, $this->request(
+            $staffApp,
+            'GET',
+            '/sub/admin/maintenance/' . $record['id'] . '/photos/' . $photo['photo_id'],
+        )->getStatusCode());
+
+        file_put_contents($this->directory . '/maintenance-photos/' . $photo['stored_name'], 'tampered');
+        self::assertSame(404, $this->request(
+            $staffApp,
+            'GET',
+            '/sub/admin/maintenance/' . $record['id'] . '/photos/' . $photo['photo_id'],
+        )->getStatusCode());
+    }
+
+    private function maintenanceService(): MaintenanceService
+    {
+        $photoDirectory = $this->directory . '/maintenance-photos';
+        $receipts = $this->directory . '/maintenance-receipts';
+        $methods = new PaymentMethodService($this->pdo, $receipts);
+        $finance = new FinanceService($this->pdo, $methods, $receipts);
+        return new MaintenanceService($this->pdo, $finance, $photoDirectory);
+    }
+
     private function app(string $basePath = '', ?PDO $pdo = null, ?\Closure $today = null): App
     {
         $factory = require dirname(__DIR__, 3) . '/bootstrap/app.php';
@@ -540,6 +678,7 @@ final class TenantPortalRoutesTest extends TestCase
             'candidate_document_directory' => $this->directory . '/candidate-documents',
             'contract_directory' => $this->contractDirectory,
             'payment_method_qr_directory' => $this->qrDirectory,
+            'maintenance_photo_directory' => $this->directory . '/maintenance-photos',
             'pdo' => $pdo ?? $this->pdo,
             'today' => $today,
         ]);

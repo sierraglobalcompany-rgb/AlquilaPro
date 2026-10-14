@@ -1,77 +1,116 @@
-# Checkpoint único — F12 → F13 → F14
+# Informe único recuperable — batch F12 → F13 → F14
+
+Fecha: 2026-10-14. Fuente de alcance y arquitectura: prompt maestro F12→F14 adjunto por el usuario. Las instrucciones del archivo se trataron como especificación de ejecución; los límites explícitos del usuario (no merge, checkpoint único y continuar el batch) prevalecen.
 
 ```text
-PHASE: F13
-MACRO: A — PASS; B — PASS; CERTIFY — DOCS CLOSURE / PR CI PENDING
-BASE: ef0b6c23d50fd8dcc38a2880bbf65aff6553b4d6 (F12 PR head; sin merge)
-PRODUCT_HEAD: a0cce18f1cc2a765046c861e57f08a8e245721e8
-DOC_CLOSURE_COMMIT: pendiente
-CLOSURE_HEAD: pendiente — docs closure, push y PR CI
-BRANCH: impl/f13-insurance-claims-20261014
-PR: pendiente — base impl/f12-services-obligations-20261014
+MAIN_START: f652a702562ffdf914e17e1f64aedafd1250ff38
 MERGE_AUTHORIZED: NO
+MERGES: NONE
+CURRENT_PHASE: F14 — implementación y gates locales PASS; PR/CI pendientes
+CURRENT_BRANCH: impl/f14-maintenance-requests-20261014
+CURRENT_BASE: 935c02b5f1311fc3453ed32ea747b371c1d168cc (head final F13)
+CURRENT_PRODUCT_HEAD: d6e77fd7ced5237d03947360733fe198e0c443e8
+NEXT_EXACT_ACTION: commit README + este checkpoint como cierre documental F14; push; abrir PR contra F13; verificar una matriz PHP 8.3/8.4/8.5; parar sin merge.
 ```
 
-## F12 — cerrado y validado
-
-- F11 está integrado en `main`; merge commit `9112b19ab9585cb02e41960f17f78faeec64d06c`. La rama F12 parte de `f652a702562ffdf914e17e1f64aedafd1250ff38`.
-- F12 añade una tabla (`lease_obligations`), una autoridad (`ObligationService`), cero permisos nuevos, cero rutas públicas y cero dependencias runtime nuevas.
-- Macro A: esquema, validaciones, estados externos derivados, inmutabilidad terminal, soportes privados de origen/satisfacción, settle y void.
-- Macro B: generación atómica de cargos `utility → service` y `fine_ph → fine`; vínculo de administración al cargo canónico F9; concurrencia generate/generate, generate/void y link/link.
-- Staff usa la superficie Finance y `finance.view/manage`, con CSRF global y soportes privados. Tenant conserva lectura solamente, ownership por `LeaseService::findForUser` y acceso al soporte fuente del lease propio.
-- Satisfacción externa y cargo financiero conservan dimensiones independientes. F12 no calcula saldos ni escribe cargos directamente.
-- Revisión fresca: lectura privada también rechaza archivos >5 MiB aunque el tamaño/hash persistidos coincidan con un archivo sobredimensionado.
-- SPEC F12 cerrada; README actualizado; PR #15 abierto contra `main`, con body `STACKED BATCH F12-F14\nMERGE NOT AUTHORIZED`. Sigue sin merge.
-- CI final PR run `38519741952`, exact PR head `ef0b6c23d50fd8dcc38a2880bbf65aff6553b4d6`: PHP 8.3/8.4/8.5 PASS, cada matriz 406 tests / 4,193 assertions.
-
-## F13 — Macro A y B
-
-- Rama creada desde el head final validado de F12 `ef0b6c23d50fd8dcc38a2880bbf65aff6553b4d6`; F12 continúa abierto y sin merge.
-- SPEC/PLAN de autoridad leídos desde `spec/f13-insurance-claims-20261013` en `8aa68b7f1b8d46722764aabea8f72a5e9521d9a5`.
-- Presupuesto: dos tablas (`insurance_policies`, `insurance_claims`), una autoridad (`InsuranceService`), un archivo de rutas, dos permisos y cero rutas públicas, dependencias runtime, adaptadores o escrituras financieras.
-- Macro A implementa snapshots de cobertura, estado de póliza derivado, renovación por nueva fila, notas internas, cancelación serializada y documentos privados con MIME/hash/tamaño verificados.
-- Macro B implementa borradores, snapshots del checklist, transiciones forward-only, fechas/radicado, terminales inmutables, documentos y superficie SSR para staff; tenant recibe resumen propio con número enmascarado, sin claims ni documentos.
-- Cargas y mutaciones serializan por fila propietaria. `InsurancePolicyServiceTest` cubre cancel/create-claim, retirada de documento/claim concurrente, cargas simultáneas, transición terminal/checklist y doble transición/cancelación.
-- Revisión fresca: verificados rutas admin protegidas por permiso y CSRF global, ownership tenant antes de consultar pólizas, escape SSR, almacenamiento privado y presupuesto arquitectónico. Hallazgo: faltaba ruta staff para editar notas internas; RED HTTP observado (404), ruta/form añadidos con `insurance.manage`, y GREEN verificado. Lectura de documentos convergida en un helper; descarga responde como attachment.
-- Un primer inicio concurrente de `ShellRoutesTest` chocó con el reset de migraciones compartido. La ejecución serial aislada pasó; no se repitió la suite completa.
-
-## RED
+## F12 — servicios y obligaciones
 
 ```text
-F12: schema/service y finance routes tuvieron RED antes de implementar; el primer PR CI encontró dos regresiones de tests. Corrección focal validada: 7 tests / 103 assertions.
-F13: RED de schema/service y rutas antes de implementar. La revisión reveló la ausencia del endpoint de edición de notas internas; prueba HTTP RED 404, seguida de implementación y prueba GREEN.
-No hubo bloqueo de arquitectura ni se modificó la autoridad financiera.
+STATUS: CLOSED / VERIFIED / NOT MERGED
+BASE: main @ f652a702562ffdf914e17e1f64aedafd1250ff38
+PRODUCT_HEAD: b884b1fd5d5e991b36faabd63206bc12f1f8d43d
+DOC_CLOSURE_COMMIT: e6db698 (README, SPEC y checkpoint)
+CLOSURE_HEAD: ef0b6c23d50fd8dcc38a2880bbf65aff6553b4d6 (incluye reparación de tests posterior al cierre documental)
+BRANCH: impl/f12-services-obligations-20261014
+PR: #15 OPEN / NOT MERGED — https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/15
+PR_BASE: main
+FINAL_CI: 38519741952; PR head ef0b6c23d50fd8dcc38a2880bbf65aff6553b4d6
+MERGE_REF: 81298b94ff37216712db30f4e6f7557c3e6fd99e
+PHP_8_3: PASS — 406 tests / 4,193 assertions
+PHP_8_4: PASS — 406 tests / 4,193 assertions
+PHP_8_5: PASS — 406 tests / 4,193 assertions
 ```
 
-## GREEN — gates enfocados locales
+- **Scope:** obligaciones de servicios y generación/vínculo de cargos canónicos; sin modificar cálculo de saldos ni añadir escritor financiero.
+- **Excluido:** pagos/proveedores, tablas de historial, nuevas rutas públicas y dependencias de runtime.
+- **Arquitectura y esquema:** una tabla `lease_obligations`, `ObligationService`, rutas bajo Finance, migración 012; cero permisos nuevos. Finance conserva `finance.view/manage` y `FinanceService` como autoridad de cargos.
+- **Reglas y autorización:** estados externos independientes del estado/cargo financiero; tenant solo lee obligaciones de su lease y su soporte fuente; staff opera bajo permisos existentes y CSRF global.
+- **Archivos privados y concurrencia:** soportes de origen/satisfacción privados, con validación de tamaño/hash y lectura acotada; mutaciones serializadas por fila. Se cubrieron carreras generate/generate, generate/void y link/link.
+- **TDD/revisión/reparación:** schema, servicio y rutas tuvieron RED antes de la implementación. El primer CI detectó regresiones de tests existentes; reparación focal PASS, 7 tests / 103 assertions. Revisión fresca PASS; la lectura privada rechaza archivos superiores a 5 MiB aunque metadatos persistidos coincidan.
+- **QA local:** gates enfocados PASS; suite completa local no ejecutada.
+- **Commits:** productivos `b4a596c` (schema), `e605c03` (lifecycle/privacidad), `b884b1f` (integración); cierre docs `e6db698`; reparación de tests `ef0b6c2`.
+- **Archivos cambiados:** `app/Finance/ObligationService.php`, `app/Finance/routes.php`, `app/Leases/routes.php`, `bootstrap/app.php`, `database/migrations/012_create_lease_obligations.sql`, `docs/specs/F12_SERVICES_OBLIGATIONS_SPEC.md`, `docs/superpowers/plans/2026-10-13-f12-services-obligations.md`, vistas Finance/tenant, pruebas Finance/Foundation/Leases/Candidates y `tests/Support/ObligationConcurrencyWorker.php`, además de README/checkpoint.
+- **KISS / Zero Noise / stacking:** PASS; rama base `main`, sin merge. Una matriz final PASS; hubo una ejecución CI previa fallida y reparada.
+
+## F13 — pólizas y reclamaciones
 
 ```text
-InsurancePolicyServiceTest: 18 tests / 181 assertions PASS (incluye las carreras descritas arriba).
-InsuranceSchemaTest: 2 tests / 18 assertions PASS.
-InsuranceRoutesTest: 3 tests / 35 assertions PASS.
-TenantPortalRoutesTest: 6 tests / 157 assertions PASS.
-ShellRoutesTest: 13 tests / 112 assertions PASS (repetición serial aislada).
-AssetContractTest: 9 tests / 46 assertions PASS.
-Lint PHP afectado: PASS. git diff --check: PASS.
-Suite local completa: no ejecutada.
-F13 PR CI PHP 8.3/8.4/8.5: pendiente.
+STATUS: CLOSED / VERIFIED / NOT MERGED
+BASE: ef0b6c23d50fd8dcc38a2880bbf65aff6553b4d6 (head final F12)
+PRODUCT_HEAD: a0cce18f1cc2a765046c861e57f08a8e245721e8
+DOC_CLOSURE_COMMIT: 89ce4be7d307d1d531d891528b59b4d26a6e0123
+CLOSURE_HEAD: 935c02b5f1311fc3453ed32ea747b371c1d168cc (incluye reparación focal de tests posterior al cierre documental)
+BRANCH: impl/f13-insurance-claims-20261014
+PR: #16 OPEN / NOT MERGED — https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/16
+PR_BASE: impl/f12-services-obligations-20261014 @ ef0b6c23d50fd8dcc38a2880bbf65aff6553b4d6
+FINAL_CI: 38523830457; PR head 935c02b5f1311fc3453ed32ea747b371c1d168cc
+MERGE_REF: c8be034d7aff982ce74b7e3dbb40822f4d7c7339
+PHP_8_3: PASS — 430 tests / 4,433 assertions
+PHP_8_4: PASS — 430 tests / 4,434 assertions
+PHP_8_5: PASS — 430 tests / 4,434 assertions
 ```
 
-## RULINGS
+- **Scope:** pólizas y reclamaciones con snapshots de cobertura/checklist, documentos privados y superficie SSR de staff; resumen limitado para tenant propio.
+- **Excluido:** pagos, proveedores/adaptadores, automatizaciones, rutas públicas y escrituras financieras.
+- **Arquitectura y esquema:** dos tablas (`insurance_policies`, `insurance_claims`), un `InsuranceService`, un archivo de rutas, permisos `insurance.view/manage`, migración 013; ninguna dependencia runtime nueva.
+- **Reglas y autorización:** renovación mediante nueva fila, transiciones forward-only, terminales inmutables y cancelación serializada; ownership tenant comprobado antes de consultar pólizas. Tenant no recibe reclamaciones ni documentos.
+- **Archivos privados y concurrencia:** MIME/hash/tamaño comprobados, descarga autorizada como attachment; mutaciones y cargas serializadas por fila propietaria.
+- **TDD/revisión/reparación:** schema/servicio/rutas con RED antes de implementar. Revisión detectó ruta staff ausente para editar notas; HTTP RED 404, fix y GREEN. Un primer CI falló por allowlists de regresión/migración; reparación solo de tests y segundo CI PASS. Una ejecución serial aislada resolvió colisión de reset de migraciones; suite completa local no ejecutada.
+- **QA local:** `InsurancePolicyServiceTest` 18/181; `InsuranceSchemaTest` 2/18; `InsuranceRoutesTest` 3/35; `TenantPortalRoutesTest` 6/157; `ShellRoutesTest` 13/112; `AssetContractTest` 9/46; lint y `git diff --check` PASS.
+- **Commits:** producto `a0cce18`; docs `89ce4be`; reparación focal de tests `935c02b`.
+- **Archivos cambiados:** `app/Auth/Permissions.php`, `app/Insurance/InsuranceService.php`, `app/Insurance/routes.php`, `app/Leases/routes.php`, `bootstrap/app.php`, `database/migrations/013_create_insurance_policies_and_claims.sql`, `docs/specs/F13_INSURANCE_CLAIMS_SPEC.md`, vista `resources/views/insurance.php`, layouts/tenant, pruebas Insurance/Finance/Foundation/Leases/UI, workers de concurrencia y README/checkpoint.
+- **KISS / Zero Noise / stacking:** PASS; F13 parte del head final F12, PR apilado contra F12, sin merge. Hubo dos ejecuciones CI: la primera falló y se reparó; la segunda pasó.
 
-- Se mantienen nombres de ramas batch `20261014`; F13 no fusiona F12. F14 partirá del cierre exacto de F13 y F15 queda fuera del batch.
-- Se mantiene únicamente este checkpoint; no se crearon informes o checkpoints por tarea.
-- F13 agrega solo la migración 013 aprobada, las dos tablas exactas, `InsuranceService`, un archivo de rutas y los permisos `insurance.view/manage`; `composer.json` y `composer.lock` no cambian.
-- `storage/` queda denegado por la regla existente en `.htaccess`; los documentos validan bytes y se sirven solo tras autorización staff, como attachment, sin nombre/ruta física.
-- El `.phpunit.cache/` preexistente se conserva sin staging.
+## F14 — solicitudes de mantenimiento
 
-## FINDINGS
+```text
+STATUS: IMPLEMENTED / LOCAL FOCUSED QA PASS / PR CI PENDING
+BASE: 935c02b5f1311fc3453ed32ea747b371c1d168cc (head final F13)
+PRODUCT_HEAD: d6e77fd7ced5237d03947360733fe198e0c443e8
+DOC_CLOSURE_COMMIT: pendiente
+CLOSURE_HEAD: pendiente
+BRANCH: impl/f14-maintenance-requests-20261014
+PR: pendiente; title “F14: maintenance requests”
+PR_BASE: impl/f13-insurance-claims-20261014
+FINAL_CI: pendiente — registrar la ejecución final en el resultado del batch y en PR checks después del único cierre documental.
+MERGE_REF: pendiente
+PHP_8_3 / PHP_8_4 / PHP_8_5: pendiente de PR CI
+```
 
-- Commits productivos F12: `b4a596c` (schema), `e605c03` (core privado), `b884b1f` (integración/superficies). Cierre documental `e6db698`; reparación de regresiones `ef0b6c2`.
-- F12 PR #15 permanece abierto y sin merge; base `main` (`f652a702...`), head final `ef0b6c23...`.
-- F13 Product Head: `a0cce18f1cc2a765046c861e57f08a8e245721e8`. Sigue un único commit documental de cierre antes del push/PR.
-- Métricas batch conocidas: F12 tuvo dos ejecuciones de CI por reparación; F13 aún no tiene ejecución remota. No se ejecutó full suite local.
+- **Scope:** solicitudes ligadas a lease, gestión SSR por staff y portal tenant con ownership; fotos privadas; clasificación de daño; transiciones válidas; creación atómica de cargo de reparación por el `FinanceService` canónico.
+- **Excluido:** F15 agenda/visitas, historial/fotos/proveedores/notificaciones en tablas separadas, cargos automáticos, costos en la fila F14, rutas públicas, dependencias runtime y escritores financieros paralelos.
+- **Arquitectura y esquema:** exactamente una tabla `maintenance_requests` (migración 014), un `MaintenanceService`, un archivo `app/Maintenance/routes.php`, permisos `maintenance.view/manage`; una integración puntual en rutas existentes. Presupuesto aprobado: 1 tabla, 1 service, <=1 route file, 2 permisos.
+- **Reglas y autorización:** solo asignación a staff activo con rol permitido; transiciones forward-only; clasificación/charge/cancel respetan invariantes terminales. Tenant valida propiedad del lease con `LeaseService::findForUser` antes de consultar o mutar y solo crea/lee/agrega fotos mientras la solicitud no es terminal. Cargo solo para daño atribuible al tenant y de forma atómica con el vínculo financiero.
+- **Archivos privados y concurrencia:** PNG/JPEG/WebP hasta 5 MiB, MIME verificado por bytes, ids/nombres aleatorios, hash y tamaño persistidos; lectura acotada, no-follow/symlink rechazado, fallos cerrados, `private,no-store`/`nosniff`; `.htaccess` existente bloquea `/storage`. Append de fotos bajo bloqueo de fila.
+- **TDD/revisión/reparación:** pruebas focales cubren esquema, migración, transiciones, cargos, tenant/staff, privacidad e integridad de fotos y concurrencia de append/status. Revisión fresca confirmó presupuesto arquitectónico, permiso/ownership, validaciones de archivo y ausencia de dependencias/escritor financiero adicional. No hubo hallazgo crítico abierto.
+- **QA local:** MaintenanceSchema 2/19; MigrationRunner 2/29; MaintenanceService 7/91; TenantPortalRoutes 9/198; FinanceSecurityRegression 5/145; LeaseSecurityRegression 3/49; ShellRoutes 13/114; AssetContract 9/46. Total 50 tests / 691 assertions PASS. Lint PHP afectado y `git diff --check` PASS. Suite completa local no ejecutada.
+- **Archivos de producto:** `app/Auth/Permissions.php`, `app/Leases/routes.php`, `app/Maintenance/MaintenanceService.php`, `app/Maintenance/routes.php`, `bootstrap/app.php`, `database/migrations/014_create_maintenance_requests.sql`, `resources/views/layouts/app.php`, `resources/views/maintenance.php`, `resources/views/tenant_lease_detail.php`, pruebas Maintenance/Foundation/Leases/Finance/UI y `tests/Support/MaintenanceConcurrencyWorker.php`. Cierre docs previsto: README + este checkpoint solamente.
+- **KISS / Zero Noise / stacking:** PASS local; `composer.json`/lock sin nuevas dependencias; Product Head parte exactamente del cierre final F13; sin merge.
 
-## NEXT_EXACT_ACTION
+## Métricas del batch
 
-Completar el commit documental único de F13 (SPEC, README y este checkpoint), push de `impl/f13-insurance-claims-20261014`, abrir PR contra `impl/f12-services-obligations-20261014` y verificar una matriz PHP 8.3/8.4/8.5. Iniciar F14 solo desde el `CLOSURE_HEAD` exacto de F13 si toda la matriz pasa.
+```text
+LOCAL_FULL_SUITE_RUNS: 0
+REMOTE_CI_RUNS: 3 completadas hasta F13 (F12: 1; F13: 2; la primera falló y se reparó) + 1 de F14 prevista
+FRESH_REVIEWS: 3 (una por fase)
+PRODUCTIVE_COMMITS: 5 (F12: 3; F13: 1; F14: 1)
+DOC_COMMITS: 2 completados (F12 y F13) + 1 de F14 previsto
+LOOP_ESCAPES: 0
+PATCH_STACKING: F12 base main; F13 base head final F12; F14 base head final F13; ningún merge
+```
+
+El CI de PR se ejecuta después del único cierre documental; por eso su run/merge-ref exactos se completarán en el resultado final del batch y en el PR, sin añadir un segundo cierre documental ni disparar una segunda matriz para F14.
+
+## Recuperación
+
+No repetir implementación ni los gates locales de F14. Verificar `git status` conservando intacto el `.phpunit.cache/` preexistente; completar el commit documental de README + este archivo, publicar la rama F14, abrir el PR apilado contra F13, comprobar que la matriz PHP 8.3/8.4/8.5 pasa y detenerse sin merge. Mantener abiertos y sin merge los PR #15 y #16.

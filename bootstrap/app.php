@@ -20,6 +20,7 @@ use AlquilaPro\Finance\ObligationService;
 use AlquilaPro\Finance\PaymentMethodService;
 use AlquilaPro\Insurance\InsuranceService;
 use AlquilaPro\Leases\LeaseService;
+use AlquilaPro\Maintenance\MaintenanceService;
 use AlquilaPro\Properties\PropertyService;
 use AlquilaPro\Properties\UnitMediaService;
 use AlquilaPro\UI\Branding;
@@ -55,6 +56,9 @@ return static function (array $settings): App {
     );
     $insuranceDocumentDirectory = (string) (
         $settings['insurance_document_directory'] ?? dirname(__DIR__) . '/storage/insurance-documents'
+    );
+    $maintenancePhotoDirectory = (string) (
+        $settings['maintenance_photo_directory'] ?? dirname(__DIR__) . '/storage/maintenance-photos'
     );
 
     $lock = new InstallationLock($lockPath);
@@ -174,6 +178,7 @@ return static function (array $settings): App {
             $finance = new FinanceService($pdo, $paymentMethods, $paymentReceiptDirectory);
             $obligations = new ObligationService($pdo, $finance, $obligationSupportDirectory);
             $insurance = new InsuranceService($pdo, $insuranceDocumentDirectory);
+            $maintenance = new MaintenanceService($pdo, $finance, $maintenancePhotoDirectory);
 
             $currentUser = static function () use ($session, $auth): ?array {
                 $userId = $session->userId(time());
@@ -202,6 +207,7 @@ return static function (array $settings): App {
                 'finance' => $finance,
                 'obligations' => $obligations,
                 'insurance' => $insurance,
+                'maintenance' => $maintenance,
                 'payment_methods' => $paymentMethods,
                 'properties' => $properties,
                 'today' => $settings['today'] ?? null,
@@ -246,6 +252,9 @@ return static function (array $settings): App {
 
             $insuranceRoutes = require dirname(__DIR__) . '/app/Insurance/routes.php';
             $insuranceRoutes($app, $shared);
+
+            $maintenanceRoutes = require dirname(__DIR__) . '/app/Maintenance/routes.php';
+            $maintenanceRoutes($app, $shared + ['leases' => $leases]);
         }
     }
 
