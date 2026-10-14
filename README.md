@@ -5,7 +5,7 @@ Aplicación web mobile-first y autoinstalable para administrar arrendamientos de
 **Dominio objetivo:** `https://alquilapro.sierraglobalcompany.com`  
 **Stack:** PHP 8.3–8.5 + Slim 4 + MariaDB/MySQL + PDO + HTML server-side + CSS/JS mínimo  
 **Destino:** Hostinger; subdominio o subcarpeta HTTPS.  
-**Estado actual:** F0–F12 CLOSED / VERIFIED; **F1–F11 MERGED**; F12 permanece sin merge.
+**Estado actual:** F0–F12 CLOSED / VERIFIED; **F1–F11 MERGED**; F12 sigue sin merge; F13 está implementada con gates locales PASS y CI de PR pendiente.
 **F8 merge SHA:** `a1b50f0d1c6556531626fd35cba0668bd5c4029f`.  
 **F8 final audited closure HEAD:** `f258cd48f6a2c301b38e6a85683e5f30b8368770`.  
 **F8 final audit CI:** `38443826390` — PHP 8.3/8.4/8.5 PASS; PHP 8.3 `310 tests / 2611 assertions / 0 failures / 0 errors`.  
@@ -13,6 +13,7 @@ Aplicación web mobile-first y autoinstalable para administrar arrendamientos de
 **F10:** `CLOSED / VERIFIED / MERGED`; merge SHA `e64cba16ee697f9db09232543bc550baa847f25b`. Product HEAD `9adf07e199e2d77e995836bbe4d2e81e90daae81`; CI `38504263040` — PHP 8.3/8.4/8.5 PASS.
 **F11:** `CLOSED / VERIFIED / MERGED`; PR #14, merge SHA `9112b19ab9585cb02e41960f17f78faeec64d06c`.
 **F12:** `CLOSED / VERIFIED / NOT MERGED` sobre `impl/f12-services-obligations-20261014`; base `f652a702562ffdf914e17e1f64aedafd1250ff38`; Product HEAD `b884b1fd5d5e991b36faabd63206bc12f1f8d43d`. PR y matriz CI PHP 8.3/8.4/8.5 enlazados desde GitHub.
+**F13:** implementación `a0cce18f1cc2a765046c861e57f08a8e245721e8` sobre el cierre F12 `ef0b6c23d50fd8dcc38a2880bbf65aff6553b4d6`; gates locales PASS; PR y CI pendientes. F12 y F13 permanecen sin merge.
 **F7 merge SHA:** `b6ab43fefd7b4d2933e3e3adff0ac4c23efdf1b8`.  
 **F7 final product HEAD:** `829955f2b297959380df06a8c8cc3e3424115e74`.  
 **F7 final product CI:** `38360814842` — PHP 8.3/8.4/8.5 PASS.  
@@ -150,7 +151,7 @@ F8_FORENSIC_REVIEW: PASS — unit-edit/lease-activation TOCTOU race closed by se
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
 
-CURRENT_GATE: F12 CLOSED / VERIFIED / NOT MERGED
+CURRENT_GATE: F13 IMPLEMENTED / LOCAL FOCUSED QA PASS / PR CI PENDING
 F9_BRANCH: impl/f9-charges-portfolio-20261013
 F9_BASE: 89811cbba5ae922bab00b50dd02af08dbaa1cb8b
 F9_PRODUCT_HEAD: 225648a21fdf5dc50cd5c397f4dbbe13c234d9e4
@@ -172,9 +173,14 @@ F12_BASE_MAIN: f652a702562ffdf914e17e1f64aedafd1250ff38
 F12_PRODUCT_HEAD: b884b1fd5d5e991b36faabd63206bc12f1f8d43d
 F12_CLOSURE_HEAD: docs-only closure commit on the F12 branch; see PR checks
 F12_PR_CI: PHP 8.3 / 8.4 / 8.5 — see PR checks
+F13_STATUS: IMPLEMENTED / LOCAL FOCUSED QA PASS / PR CI PENDING
+F13_BRANCH: impl/f13-insurance-claims-20261014
+F13_BASE: ef0b6c23d50fd8dcc38a2880bbf65aff6553b4d6
+F13_PRODUCT_HEAD: a0cce18f1cc2a765046c861e57f08a8e245721e8
+F13_PR: pending docs-only closure
 MERGE_AUTHORIZED: NO
-CURRENT_ACTION: verify exact F12 closure-head PHP 8.3/8.4/8.5 CI
-NEXT: F13 from F12_CLOSURE_HEAD only after all three CI jobs pass
+CURRENT_ACTION: create the single F13 docs-only closure commit, then push and open PR against F12
+NEXT: continue to F14 only after F13 PR CI passes on PHP 8.3/8.4/8.5
 ```
 
 No reimplementar F1–F8. No reabrir una fase certificada sin evidencia de regresión o una nueva SPEC aprobada.
@@ -435,7 +441,7 @@ Autoridad técnica de cierre:
  **F10 — Medios de pago ✅ CLOSED / VERIFIED / MERGED**
  **F11 — Reporte + conciliación ✅ CLOSED / VERIFIED / MERGED — PR #14**
 - **F12 — Servicios + obligaciones ✅ CLOSED / VERIFIED / NOT MERGED**
-- F13 — Pólizas + reclamaciones
+- **F13 — Pólizas + reclamaciones: IMPLEMENTED / LOCAL FOCUSED QA PASS / PR CI PENDING; NOT MERGED**
 - F14 — Solicitudes + mantenimiento
 - F15 — Agenda + visitas
 - F16 — Recordatorios + cron + email
@@ -454,7 +460,7 @@ Autoridad técnica de cierre:
 
 # 10. PROTOCOLO DE RECUPERACIÓN
 
-Para continuar desde F12, leer `docs/checkpoints/F12_F14_BATCH_CHECKPOINT_2026-10-14.md` y revisar el PR F12 y sus checks. F12 permanece sin merge. F11 está integrada en `main` mediante `9112b19ab9585cb02e41960f17f78faeec64d06c`; F10 mediante `e64cba16ee697f9db09232543bc550baa847f25b`; F9 mediante `e11c053365f64cfab88e37254ea86466a31e24ce`. No reabrir fases cerradas sin evidencia correspondiente.
+Para continuar el batch F12→F14, leer `docs/checkpoints/F12_F14_BATCH_CHECKPOINT_2026-10-14.md` y revisar los PR/checks de F12 y F13. F12 y F13 permanecen sin merge. F11 está integrada en `main` mediante `9112b19ab9585cb02e41960f17f78faeec64d06c`; F10 mediante `e64cba16ee697f9db09232543bc550baa847f25b`; F9 mediante `e11c053365f64cfab88e37254ea86466a31e24ce`. No reabrir fases cerradas sin evidencia correspondiente.
 
 El checkpoint `F8_MERGED_2026-10-13.md` es la autoridad de integración F8.
 

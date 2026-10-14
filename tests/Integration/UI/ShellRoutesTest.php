@@ -96,6 +96,26 @@ final class ShellRoutesTest extends TestCase
         self::assertStringContainsString('Propiedades', $body);
     }
 
+    public function testInsuranceAppCardRequiresItsDedicatedPermission(): void
+    {
+        $this->insertUser('insurance-view@example.com', 'StaffPassword123', 'gestor', ['insurance.view']);
+        $app = $this->app();
+        $this->login($app, 'insurance-view@example.com', 'StaffPassword123');
+
+        $visible = (string) $this->request($app, 'GET', '/')->getBody();
+        self::assertStringContainsString('href="/admin/insurance"', $visible);
+        self::assertStringContainsString('>Seguros</strong>', $visible);
+
+        $_SESSION = [];
+        $this->insertUser('insurance-hidden@example.com', 'StaffPassword123', 'gestor', []);
+        $hiddenApp = $this->app();
+        $this->login($hiddenApp, 'insurance-hidden@example.com', 'StaffPassword123');
+
+        $hidden = (string) $this->request($hiddenApp, 'GET', '/')->getBody();
+        self::assertStringNotContainsString('/admin/insurance', $hidden);
+        self::assertStringNotContainsString('Seguros', $hidden);
+    }
+
     public function testAccountRequiresLoginAndRendersCurrentUser(): void
     {
         $userId = $this->insertUser('admin@example.com', 'AdminPassword123', 'admin', ['users.view'], false, 'Natalia Admin');
@@ -187,7 +207,7 @@ final class ShellRoutesTest extends TestCase
             'tenant-polluted@example.com',
             'TenantPassword123',
             'tenant',
-            ['users.view', 'users.manage', 'properties.view', 'candidates.view', 'contracts.view', 'contracts.manage', 'finance.view', 'finance.manage'],
+            ['users.view', 'users.manage', 'properties.view', 'candidates.view', 'contracts.view', 'contracts.manage', 'finance.view', 'finance.manage', 'insurance.view', 'insurance.manage'],
             false,
             'Tenant Polluted',
         );
@@ -208,6 +228,8 @@ final class ShellRoutesTest extends TestCase
         self::assertStringNotContainsString('>Apps<', $body);
         self::assertStringNotContainsString('/sub/admin/', $body);
         self::assertStringNotContainsString('/sub/admin/finance', $body);
+        self::assertStringNotContainsString('/sub/admin/insurance', $body);
+        self::assertStringNotContainsString('Seguros', $body);
         self::assertStringNotContainsString('Cartera', $body);
         self::assertStringNotContainsString('No tienes aplicaciones disponibles', $body);
 

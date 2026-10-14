@@ -1,60 +1,77 @@
 # Checkpoint único — F12 → F13 → F14
 
 ```text
-PHASE: F12
-MACRO: A — PASS; B — PASS; CERTIFY — cierre local listo, PR CI pendiente
-BASE: f652a702562ffdf914e17e1f64aedafd1250ff38 (main con F11 integrado)
-PRODUCT_HEAD: b884b1fd5d5e991b36faabd63206bc12f1f8d43d
-CURRENT_HEAD: b884b1fd5d5e991b36faabd63206bc12f1f8d43d (antes del commit documental de cierre)
-BRANCH: impl/f12-services-obligations-20261014
+PHASE: F13
+MACRO: A — PASS; B — PASS; CERTIFY — DOCS CLOSURE / PR CI PENDING
+BASE: ef0b6c23d50fd8dcc38a2880bbf65aff6553b4d6 (F12 PR head; sin merge)
+PRODUCT_HEAD: a0cce18f1cc2a765046c861e57f08a8e245721e8
+DOC_CLOSURE_COMMIT: pendiente
+CLOSURE_HEAD: pendiente — docs closure, push y PR CI
+BRANCH: impl/f13-insurance-claims-20261014
+PR: pendiente — base impl/f12-services-obligations-20261014
 MERGE_AUTHORIZED: NO
 ```
 
-## DONE
+## F12 — cerrado y validado
 
 - F11 está integrado en `main`; merge commit `9112b19ab9585cb02e41960f17f78faeec64d06c`. La rama F12 parte de `f652a702562ffdf914e17e1f64aedafd1250ff38`.
 - F12 añade una tabla (`lease_obligations`), una autoridad (`ObligationService`), cero permisos nuevos, cero rutas públicas y cero dependencias runtime nuevas.
 - Macro A: esquema, validaciones, estados externos derivados, inmutabilidad terminal, soportes privados de origen/satisfacción, settle y void.
-- Macro B: generación atómica de cargos `utility → service` y `fine_ph → fine`; vínculo de administración al cargo canónico F9; controles de concurrencia generate/generate, generate/void y link/link.
-- Superficie staff dentro de Finance con `finance.view/manage`, CSRF global y soportes privados; superficie tenant de solo lectura con ownership por `LeaseService::findForUser` y acceso únicamente al soporte fuente de lease propio.
-- La cancelación externa y el cargo financiero conservan dimensiones independientes. F12 no calcula saldos ni escribe cargos directamente.
-- Revisión fresca: se añadió un límite de lectura de 5 MiB también para soportes ya almacenados, incluso si los metadatos coinciden con un archivo sobredimensionado.
+- Macro B: generación atómica de cargos `utility → service` y `fine_ph → fine`; vínculo de administración al cargo canónico F9; concurrencia generate/generate, generate/void y link/link.
+- Staff usa la superficie Finance y `finance.view/manage`, con CSRF global y soportes privados. Tenant conserva lectura solamente, ownership por `LeaseService::findForUser` y acceso al soporte fuente del lease propio.
+- Satisfacción externa y cargo financiero conservan dimensiones independientes. F12 no calcula saldos ni escribe cargos directamente.
+- Revisión fresca: lectura privada también rechaza archivos >5 MiB aunque el tamaño/hash persistidos coincidan con un archivo sobredimensionado.
+- SPEC F12 cerrada; README actualizado; PR #15 abierto contra `main`, con body `STACKED BATCH F12-F14\nMERGE NOT AUTHORIZED`. Sigue sin merge.
+- CI final PR run `38519741952`, exact PR head `ef0b6c23d50fd8dcc38a2880bbf65aff6553b4d6`: PHP 8.3/8.4/8.5 PASS, cada matriz 406 tests / 4,193 assertions.
+
+## F13 — Macro A y B
+
+- Rama creada desde el head final validado de F12 `ef0b6c23d50fd8dcc38a2880bbf65aff6553b4d6`; F12 continúa abierto y sin merge.
+- SPEC/PLAN de autoridad leídos desde `spec/f13-insurance-claims-20261013` en `8aa68b7f1b8d46722764aabea8f72a5e9521d9a5`.
+- Presupuesto: dos tablas (`insurance_policies`, `insurance_claims`), una autoridad (`InsuranceService`), un archivo de rutas, dos permisos y cero rutas públicas, dependencias runtime, adaptadores o escrituras financieras.
+- Macro A implementa snapshots de cobertura, estado de póliza derivado, renovación por nueva fila, notas internas, cancelación serializada y documentos privados con MIME/hash/tamaño verificados.
+- Macro B implementa borradores, snapshots del checklist, transiciones forward-only, fechas/radicado, terminales inmutables, documentos y superficie SSR para staff; tenant recibe resumen propio con número enmascarado, sin claims ni documentos.
+- Cargas y mutaciones serializan por fila propietaria. `InsurancePolicyServiceTest` cubre cancel/create-claim, retirada de documento/claim concurrente, cargas simultáneas, transición terminal/checklist y doble transición/cancelación.
+- Revisión fresca: verificados rutas admin protegidas por permiso y CSRF global, ownership tenant antes de consultar pólizas, escape SSR, almacenamiento privado y presupuesto arquitectónico. Hallazgo: faltaba ruta staff para editar notas internas; RED HTTP observado (404), ruta/form añadidos con `insurance.manage`, y GREEN verificado. Lectura de documentos convergida en un helper; descarga responde como attachment.
+- Un primer inicio concurrente de `ShellRoutesTest` chocó con el reset de migraciones compartido. La ejecución serial aislada pasó; no se repitió la suite completa.
 
 ## RED
 
 ```text
-Schema/service: RED observado antes de implementar F12.
-Finance integration/routes: RED observado antes de añadir las superficies F12.
-Macro B regression: 3 fallas por allowlists históricas F8/F9 que no contemplaban la composición F12; se corrigieron condicionalmente a la presencia del esquema F12.
-Private support review: nuevo caso de lectura >5 MiB con hash/tamaño coincidentes; corregido en el servicio y cubierto por regresión.
+F12: schema/service y finance routes tuvieron RED antes de implementar; el primer PR CI encontró dos regresiones de tests. Corrección focal validada: 7 tests / 103 assertions.
+F13: RED de schema/service y rutas antes de implementar. La revisión reveló la ausencia del endpoint de edición de notas internas; prueba HTTP RED 404, seguida de implementación y prueba GREEN.
+No hubo bloqueo de arquitectura ni se modificó la autoridad financiera.
 ```
 
-## GREEN
+## GREEN — gates enfocados locales
 
 ```text
-Macro A schema/service focused: 14 tests / 259 assertions PASS.
-Macro B integrated focused gate: 88 tests / 1,415 assertions PASS.
-Post-review affected gate: 14 tests / 231 assertions PASS.
-PHP lint de archivos PHP modificados: PASS.
-git diff --check: PASS.
-No full local PHPUnit suite was run.
-PR CI PHP 8.3/8.4/8.5: pendiente de crear PR; F13 no inicia hasta PASS en las tres matrices.
+InsurancePolicyServiceTest: 18 tests / 181 assertions PASS (incluye las carreras descritas arriba).
+InsuranceSchemaTest: 2 tests / 18 assertions PASS.
+InsuranceRoutesTest: 3 tests / 35 assertions PASS.
+TenantPortalRoutesTest: 6 tests / 157 assertions PASS.
+ShellRoutesTest: 13 tests / 112 assertions PASS (repetición serial aislada).
+AssetContractTest: 9 tests / 46 assertions PASS.
+Lint PHP afectado: PASS. git diff --check: PASS.
+Suite local completa: no ejecutada.
+F13 PR CI PHP 8.3/8.4/8.5: pendiente.
 ```
 
 ## RULINGS
 
-- Se mantienen los nombres de ramas F12–F14 del prompt batch, con sufijo `20261014`.
-- Se conserva este único checkpoint. No se crea `F12_CLOSED` separado ni reporte por tarea.
-- Las regresiones F8/F9 aceptan las rutas/servicio F12 solo cuando existe la migración `012_create_lease_obligations.sql`; el presupuesto F12 queda además fijado por `ObligationSecurityRegressionTest`.
-- El directorio preexistente `.phpunit.cache/` se conserva sin cambios.
+- Se mantienen nombres de ramas batch `20261014`; F13 no fusiona F12. F14 partirá del cierre exacto de F13 y F15 queda fuera del batch.
+- Se mantiene únicamente este checkpoint; no se crearon informes o checkpoints por tarea.
+- F13 agrega solo la migración 013 aprobada, las dos tablas exactas, `InsuranceService`, un archivo de rutas y los permisos `insurance.view/manage`; `composer.json` y `composer.lock` no cambian.
+- `storage/` queda denegado por la regla existente en `.htaccess`; los documentos validan bytes y se sirven solo tras autorización staff, como attachment, sin nombre/ruta física.
+- El `.phpunit.cache/` preexistente se conserva sin staging.
 
 ## FINDINGS
 
-- Los commits productivos F12 son `b4a596c` (schema), `e605c03` (autoridad/core privado) y `b884b1f` (integración/superficies). El commit documental de cierre añade README, SPEC y este checkpoint.
-- SPEC/PLAN F12 se importaron de `spec/f12-services-obligations-20261013` (`db91fba2244b4d7824986c7567eb3620a41d8092`); SPEC se cierra en el commit documental. PLAN conservado como autoridad TDD.
-- F13 SPEC/PLAN se leerán una sola vez al iniciar F13. La base será el `HEAD` exacto de la rama F12 después del commit documental de cierre y tras confirmar CI verde.
-- No hay merge autorizado. No empezar F13 con CI de F12 pendiente o fallida.
+- Commits productivos F12: `b4a596c` (schema), `e605c03` (core privado), `b884b1f` (integración/superficies). Cierre documental `e6db698`; reparación de regresiones `ef0b6c2`.
+- F12 PR #15 permanece abierto y sin merge; base `main` (`f652a702...`), head final `ef0b6c23...`.
+- F13 Product Head: `a0cce18f1cc2a765046c861e57f08a8e245721e8`. Sigue un único commit documental de cierre antes del push/PR.
+- Métricas batch conocidas: F12 tuvo dos ejecuciones de CI por reparación; F13 aún no tiene ejecución remota. No se ejecutó full suite local.
 
 ## NEXT_EXACT_ACTION
 
-Crear el commit documental F12, hacer un solo push de `impl/f12-services-obligations-20261014`, abrir PR a `main` con título `F12: services and obligations` y body `STACKED BATCH F12-F14\nMERGE NOT AUTHORIZED`. Esperar y verificar CI PHP 8.3/8.4/8.5; solo con las tres matrices PASS, crear `impl/f13-insurance-claims-20261014` desde el closure HEAD exacto F12 y leer una vez su SPEC/PLAN.
+Completar el commit documental único de F13 (SPEC, README y este checkpoint), push de `impl/f13-insurance-claims-20261014`, abrir PR contra `impl/f12-services-obligations-20261014` y verificar una matriz PHP 8.3/8.4/8.5. Iniciar F14 solo desde el `CLOSURE_HEAD` exacto de F13 si toda la matriz pasa.

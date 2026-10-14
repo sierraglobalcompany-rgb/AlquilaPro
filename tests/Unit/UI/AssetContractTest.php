@@ -89,11 +89,11 @@ final class AssetContractTest extends TestCase
         self::assertStringNotContainsString('fetch(', $this->js);
     }
 
-    public function testAssetsContainNoFutureModuleLabels(): void
+    public function testAssetsContainNoUnreleasedModuleLabels(): void
     {
         $assets = $this->css . "\n" . $this->js;
 
-        foreach (['Cartera', 'Solicitudes', 'Propiedades', 'Contratos', 'Pólizas', 'Mantenimiento'] as $futureLabel) {
+        foreach (['Cartera', 'Solicitudes', 'Propiedades', 'Contratos', 'Mantenimiento'] as $futureLabel) {
             self::assertStringNotContainsString($futureLabel, $assets);
         }
     }

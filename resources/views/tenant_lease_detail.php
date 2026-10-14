@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $obligations = $obligations ?? [];
+$insurancePolicies = $insurancePolicies ?? [];
 $isApartment = (string) $lease['unit_type'] === 'apartment';
 $isParking = (string) $lease['unit_type'] === 'parking';
 $chargeStateLabels = [
@@ -61,6 +62,35 @@ $externalStateLabels = [
     <a class="button button--quiet" href="<?= $escape($basePath) ?>/tenant">Volver</a>
     <a class="button button--quiet" href="<?= $escape($basePath) ?>/tenant/leases/<?= $escape($lease['id']) ?>/contract">Descargar contrato</a>
 </section>
+
+<?php if ($insurancePolicies !== []): ?>
+    <section class="surface">
+        <h2>Seguro del arrendamiento</h2>
+        <div class="users-grid">
+            <?php foreach ($insurancePolicies as $policy): ?>
+                <article class="user-card">
+                    <div class="user-card__head">
+                        <strong><?= $escape($policy['provider_name']) ?> · <?= $escape($policy['product_name']) ?></strong>
+                        <span class="status-pill"><?= $escape($policy['status']) ?></span>
+                    </div>
+                    <div>Póliza: <?= $escape($policy['policy_number']) ?></div>
+                    <div>Vigencia: <?= $escape($policy['coverage_start']) ?> a <?= $escape($policy['coverage_end']) ?></div>
+                    <?php if ($policy['coverage'] !== []): ?>
+                        <div class="users-grid">
+                            <?php foreach ($policy['coverage'] as $coverage): ?>
+                                <div>
+                                    <strong><?= $escape($coverage['name']) ?></strong>
+                                    <div>Límite: <?= $escape($coverage['limit_amount'] ?? '—') ?></div>
+                                    <div>Deducible: <?= $escape($coverage['deductible_amount'] ?? '—') ?></div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    </section>
+<?php endif; ?>
 
 <section class="surface">
     <h2>Cartera</h2>

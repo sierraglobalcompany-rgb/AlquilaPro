@@ -140,7 +140,11 @@ final class FinanceSecurityRegressionTest extends TestCase
 
         $home = $this->file('resources/views/tenant_home.php');
         $tenantDetail = $this->file('resources/views/tenant_lease_detail.php');
-        foreach (['Reportes', 'Póliza', 'Mantenimiento', 'Solicitudes'] as $futureUi) {
+        $futureUiLabels = ['Reportes', 'Mantenimiento', 'Solicitudes'];
+        if (!$this->f13IsPresent()) {
+            $futureUiLabels[] = 'Póliza';
+        }
+        foreach ($futureUiLabels as $futureUi) {
             self::assertStringNotContainsString($futureUi, $home . "\n" . $tenantDetail);
         }
         self::assertStringNotContainsString('Cartera', $home);
@@ -160,6 +164,7 @@ final class FinanceSecurityRegressionTest extends TestCase
     public function testTenantPortfolioReusesOwnedLeaseRouteAndResolvesOwnershipBeforeFinance(): void
     {
         $f12Exists = $this->f12IsPresent();
+        $f13Exists = $this->f13IsPresent();
         $routes = $this->file('app/Leases/routes.php');
         preg_match_all('/\$app->(?:get|post)\(\'([^\']+)\'/i', $routes, $routeMatches);
         $expectedRoutes = [
@@ -207,9 +212,11 @@ final class FinanceSecurityRegressionTest extends TestCase
             $ownership < $notFound && $notFound < $todayProvider && $todayProvider < $summary
             && $summary < $list && $list < $paymentMethodScope && $paymentMethodScope < $render,
         );
-        $expectedTenantDetailUse = $f12Exists
-            ? 'use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $view, $csrf, $todayProvider, $path)'
-            : 'use ($tenantGuard, $leases, $finance, $paymentMethods, $view, $csrf, $todayProvider, $path)';
+        $expectedTenantDetailUse = $f13Exists
+            ? 'use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $insurance, $view, $csrf, $todayProvider, $path)'
+            : ($f12Exists
+                ? 'use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $view, $csrf, $todayProvider, $path)'
+                : 'use ($tenantGuard, $leases, $finance, $paymentMethods, $view, $csrf, $todayProvider, $path)');
         self::assertStringContainsString($expectedTenantDetailUse, $detailRoute);
 
         $qrStart = strpos($routes, "\$app->get('/tenant/leases/{leaseId:[0-9]+}/payment-methods/");
@@ -281,5 +288,12 @@ final class FinanceSecurityRegressionTest extends TestCase
         $migration = $this->root . '/database/migrations/012_create_lease_obligations.sql';
         return is_file($migration)
             && preg_match('/CREATE TABLE\s+lease_obligations\b/i', (string) file_get_contents($migration)) === 1;
+    }
+
+    private function f13IsPresent(): bool
+    {
+        $migration = $this->root . '/database/migrations/013_create_insurance_policies_and_claims.sql';
+        return is_file($migration)
+            && preg_match('/CREATE TABLE\s+insurance_policies\b/i', (string) file_get_contents($migration)) === 1;
     }
 }

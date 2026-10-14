@@ -9,6 +9,7 @@ use AlquilaPro\Contracts\ContractService;
 use AlquilaPro\Finance\FinanceService;
 use AlquilaPro\Finance\ObligationService;
 use AlquilaPro\Finance\PaymentMethodService;
+use AlquilaPro\Insurance\InsuranceService;
 use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
@@ -26,6 +27,8 @@ return static function (App $app, array $deps): void {
     $obligations = $deps['obligations'];
     /** @var PaymentMethodService $paymentMethods */
     $paymentMethods = $deps['payment_methods'];
+    /** @var InsuranceService $insurance */
+    $insurance = $deps['insurance'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -192,7 +195,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $view, $csrf, $todayProvider, $path): ResponseInterface {
+    ) use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $insurance, $view, $csrf, $todayProvider, $path): ResponseInterface {
         $user = $tenantGuard($response);
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -204,6 +207,7 @@ return static function (App $app, array $deps): void {
         }
 
         $today = $todayProvider();
+        $insurancePolicies = $insurance->tenantPolicySummary((int) $lease['id'], $today);
         $financeSummary = $finance->summaryForLease((int) $lease['id'], $today);
         $charges = $finance->listForLease((int) $lease['id'], $today);
         $chargesById = [];
@@ -271,6 +275,7 @@ return static function (App $app, array $deps): void {
             'obligations' => $tenantObligations,
             'paymentMethods' => $tenantPaymentMethods,
             'paymentHistory' => $paymentHistory,
+            'insurancePolicies' => $insurancePolicies,
             'today' => $today,
         ]));
 
