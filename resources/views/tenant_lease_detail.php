@@ -55,6 +55,12 @@ $externalStateLabels = [
     'settled_external' => 'Atendida externamente',
     'voided' => 'Anulada',
 ];
+$visitStatusLabels = [
+    'proposed' => 'Horarios disponibles',
+    'scheduled' => 'Programada',
+    'completed' => 'Completada',
+    'cancelled' => 'Cancelada',
+];
 ?>
 <section class="surface">
     <p class="eyebrow">Portal del inquilino</p>
@@ -131,6 +137,23 @@ $externalStateLabels = [
                     <?php if ($maintenanceRequest['resolution_notes'] !== null): ?>
                         <div>Resolución: <?= $escape($maintenanceRequest['resolution_notes']) ?></div>
                     <?php endif; ?>
+                    <?php foreach ($maintenanceRequest['visits'] as $visit): ?>
+                        <div class="visit-summary">
+                            <strong><?= $escape($visitStatusLabels[$visit['status']] ?? $visit['status']) ?></strong>
+                            <?php if ($visit['selected_start_at'] !== null): ?>
+                                <div><?= $escape($visit['selected_start_at']) ?> · <?= $escape($visit['duration_minutes']) ?> min</div>
+                            <?php endif; ?>
+                            <?php if (!$terminal && $visit['status'] === 'proposed'): ?>
+                                <?php foreach ($visit['proposed_slots'] as $slot): ?>
+                                    <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/tenant/leases/<?= $escape($lease['id']) ?>/maintenance/<?= $escape($maintenanceRequest['id']) ?>/visits/<?= $escape($visit['id']) ?>/select">
+                                        <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                                        <input type="hidden" name="start_at" value="<?= $escape($slot['start_at']) ?>">
+                                        <button class="button button--quiet" type="submit">Seleccionar horario · <?= $escape($slot['start_at']) ?> · <?= $escape($slot['duration_minutes']) ?> min</button>
+                                    </form>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
                     <?php foreach ($maintenanceRequest['photos'] as $photo): ?>
                         <?php if (is_array($photo) && preg_match('/\A[a-f0-9]{32}\z/', (string) ($photo['photo_id'] ?? '')) === 1): ?>
                             <p><a href="<?= $escape($maintenanceRequest['photo_base_url']) ?><?= $escape($photo['photo_id']) ?>">Ver foto <?= $escape($photo['created_at'] ?? '') ?></a></p>

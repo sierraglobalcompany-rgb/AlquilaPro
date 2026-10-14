@@ -12,6 +12,7 @@ use AlquilaPro\Finance\PaymentMethodService;
 use AlquilaPro\Insurance\InsuranceService;
 use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\Maintenance\MaintenanceService;
+use AlquilaPro\Maintenance\VisitService;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -32,6 +33,8 @@ return static function (App $app, array $deps): void {
     $insurance = $deps['insurance'];
     /** @var MaintenanceService $maintenance */
     $maintenance = $deps['maintenance'];
+    /** @var VisitService $visits */
+    $visits = $deps['visits'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -199,7 +202,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $insurance, $maintenance, $view, $csrf, $todayProvider, $path): ResponseInterface {
+    ) use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $insurance, $maintenance, $visits, $view, $csrf, $todayProvider, $path): ResponseInterface {
         $user = $tenantGuard($response);
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -212,7 +215,8 @@ return static function (App $app, array $deps): void {
 
         $today = $todayProvider();
         $insurancePolicies = $insurance->tenantPolicySummary((int) $lease['id'], $today);
-        $maintenanceRequests = array_map(static function (array $record) use ($path, $lease): array {
+        $maintenanceRequests = array_map(static function (array $record) use ($path, $lease, $visits): array {
+            $canSelect = !in_array($record['status'], ['resolved', 'cancelled'], true);
             return [
                 'id' => (int) $record['id'],
                 'category' => (string) $record['category'],
@@ -224,6 +228,23 @@ return static function (App $app, array $deps): void {
                 ], array_values(array_filter($record['photos'], 'is_array'))),
                 'status' => (string) $record['status'],
                 'resolution_notes' => $record['resolution_notes'] === null ? null : (string) $record['resolution_notes'],
+                'visits' => array_map(static function (array $visit) use ($canSelect): array {
+                    $status = (string) $visit['status'];
+                    return [
+                        'id' => (int) $visit['id'],
+                        'status' => $status,
+                        'proposed_slots' => $canSelect && $status === 'proposed'
+                            ? array_map(static fn (array $slot): array => [
+                                'start_at' => (string) $slot['start_at'],
+                                'duration_minutes' => (int) $slot['duration_minutes'],
+                            ], $visit['proposed_slots'])
+                            : [],
+                        'selected_start_at' => $visit['selected_start_at'] === null
+                            ? null : (string) $visit['selected_start_at'],
+                        'duration_minutes' => $visit['duration_minutes'] === null
+                            ? null : (int) $visit['duration_minutes'],
+                    ];
+                }, $visits->listForRequest((int) $record['id'])),
                 'photo_base_url' => $path('/tenant/leases/' . (int) $lease['id'] . '/maintenance/' . (int) $record['id'] . '/photos/'),
             ];
         }, $maintenance->listForLease((int) $lease['id']));
@@ -301,6 +322,46 @@ return static function (App $app, array $deps): void {
 
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8')
             ->withHeader('Cache-Control', 'private, no-store');
+    });
+
+    $app->post('/tenant/leases/{leaseId:[0-9]+}/maintenance/{id:[0-9]+}/visits/{visitId:[0-9]+}/select', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($tenantGuard, $leases, $maintenance, $visits, $path): ResponseInterface {
+        $user = $tenantGuard($response);
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+        $leaseId = (int) $args['leaseId'];
+        $lease = $leases->findForUser($leaseId, (int) $user['id']);
+        if ($lease === null) {
+            return $response->withStatus(404);
+        }
+        $requestId = (int) $args['id'];
+        $maintenanceRequest = $maintenance->find($requestId);
+        if ($maintenanceRequest === null || $maintenanceRequest['lease_id'] !== $leaseId
+            || in_array($maintenanceRequest['status'], ['resolved', 'cancelled'], true)
+        ) {
+            return $response->withStatus(404);
+        }
+        $visitId = (int) $args['visitId'];
+        $visit = $visits->find($visitId);
+        if ($visit === null || $visit['maintenance_request_id'] !== $requestId || $visit['status'] !== 'proposed') {
+            return $response->withStatus(404);
+        }
+        $form = (array) ($request->getParsedBody() ?? []);
+        try {
+            $visits->selectSlot(
+                $visitId,
+                (string) ($form['start_at'] ?? ''),
+                (int) $user['id'],
+                time(),
+            );
+        } catch (RuntimeException) {
+            return $response->withStatus(422);
+        }
+        return $response->withHeader('Location', $path('/tenant/leases/' . $leaseId))->withStatus(303);
     });
 
     $app->get('/tenant/leases/{leaseId:[0-9]+}/obligations/{obligationId:[0-9]+}/source-support', static function (
