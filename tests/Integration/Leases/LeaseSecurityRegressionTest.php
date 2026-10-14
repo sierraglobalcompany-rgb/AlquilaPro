@@ -119,10 +119,14 @@ final class LeaseSecurityRegressionTest extends TestCase
         $home = $this->file('resources/views/tenant_home.php');
         $detail = $this->file('resources/views/tenant_lease_detail.php');
         $credential = $this->file('resources/views/lease_activation_credential.php');
+        $futureLabels = ['Pagos', 'Mantenimiento', 'Solicitudes'];
+        if (!$this->f13IsPresent()) {
+            $futureLabels[] = 'Póliza';
+        }
 
         self::assertStringNotContainsString('Cartera', $home);
         self::assertStringContainsString('Cartera', $detail);
-        foreach (['Pagos', 'Póliza', 'Mantenimiento', 'Solicitudes'] as $futureLabel) {
+        foreach ($futureLabels as $futureLabel) {
             self::assertStringNotContainsString($futureLabel, $home . "\n" . $detail);
         }
 
@@ -147,5 +151,12 @@ final class LeaseSecurityRegressionTest extends TestCase
         self::assertIsString($contents, 'Missing F8 closure source: ' . $path);
 
         return $contents;
+    }
+
+    private function f13IsPresent(): bool
+    {
+        $migration = $this->root . '/database/migrations/013_create_insurance_policies_and_claims.sql';
+        return is_file($migration)
+            && preg_match('/CREATE TABLE\s+insurance_policies\b/i', (string) file_get_contents($migration)) === 1;
     }
 }
