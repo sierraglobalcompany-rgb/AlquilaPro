@@ -1,7 +1,7 @@
 # ALQUILAPRO — F15→F20 DESIGN CHECKPOINT
 
 **Fecha:** 2026-10-14  
-**Estado:** `DESIGN WRITTEN / USER REVIEW REQUIRED / NO PRODUCT IMPLEMENTATION`  
+**Estado:** `DESIGN WRITTEN / F20 CONSUMER MODEL RESOLVED / ONE COMMERCIAL GATE REMAINS / NO PRODUCT IMPLEMENTATION`  
 
 ```text
 PROJECT: AlquilaPro
@@ -28,6 +28,12 @@ docs/specs/F15_F20_SPEC_BATCH_V1_2026-10-14.md
 
 F15_F20_SPEC_COMMIT:
 f6a9690fae1f2d0fb5deb3a836fb16f3f8d61bdc
+
+F20_PRODUCT_DECISION:
+docs/specs/F20_PRODUCT_DECISION_2026-10-14.md
+
+F20_PRODUCT_DECISION_COMMIT:
+95a57885baa3276570b97f9f642b2b16fcdea795
 ```
 
 ## Design status
@@ -65,18 +71,28 @@ REUSE: F18 documents
 LEGAL CMS TABLE: 0
 
 F20 Memberships + Digital Services:
-PRE-KISS WRITTEN
-FULL SPEC: BLOCKED ON PRODUCT DEFINITION
+CONSUMER MODEL RESOLVED
+MODEL: A = tenant/lease add-on service
+PRE-KISS ARCHITECTURE: 2 tables digital_services + service_memberships; 1 MembershipService
+FULL SPEC: BLOCKED ON ONE COMMERCIAL DECISION
 ```
 
-## F20 required decision
+## F20 confirmed product decision
 
 ```text
 F20_CONSUMER_MODEL:
 A = tenant/lease add-on service
-B = owner/admin subscription to AlquilaPro
-C = another explicit model
+```
 
+Meaning:
+- services are optional/additional offerings accepted by a tenant for a specific lease;
+- not owner/admin SaaS billing;
+- not property-level subscription;
+- historical acceptance remains lease-scoped.
+
+## F20 remaining decision
+
+```text
 F20_CREATE_F9_CHARGE_ON_ACCEPTANCE:
 YES | NO
 ```
@@ -84,13 +100,15 @@ YES | NO
 Until resolved:
 
 ```text
+F20_FULL_SPEC: BLOCKED_ON_ONE_DECISION
 F20_PLAN: BLOCKED
+PRODUCT_IMPLEMENTATION: NOT AUTHORIZED
 ```
 
 ## Laws / audit
 
 ```text
-KISS: PASS F15-F19 / F20 intentionally gated
+KISS: PASS F15-F19 / F20 consumer model PASS, finance behavior intentionally gated
 ZERO_NOISE: PASS
 ANTIPATCH: PASS
 PHASE_BOUNDARIES: PASS
@@ -104,13 +122,12 @@ PROMPT/DESIGN_REVIEW_PASSES: 10 PASS
 ## Next exact action
 
 ```text
-1. USER reviews/approves written F15-F20 SPEC.
-2. USER resolves F20 consumer model + whether acceptance creates F9 charge.
-3. ChatGPT/Sol writes implementation PLANs F15-F19.
-4. ChatGPT/Sol freezes F20 full SPEC + PLAN.
-5. Build ONE ultra-lean Codex master F15→F20 with recoverable checkpointing.
-6. Codex implements stacked phases; no merge.
-7. ChatGPT/Sol forensic audit + sequential merge gates.
+1. USER decides whether F20 acceptance creates an F9 charge: YES or NO.
+2. ChatGPT/Sol freezes F20 full SPEC.
+3. ChatGPT/Sol writes implementation PLANs F15-F20.
+4. Build ONE ultra-lean Codex master F15→F20 with recoverable checkpointing.
+5. Codex implements stacked phases; no merge.
+6. ChatGPT/Sol forensic audit + sequential merge gates.
 ```
 
 ## Recovery rule
@@ -121,8 +138,9 @@ If this chat ends, new thread should read in this order:
 1 docs/checkpoints/F14_MERGED_2026-10-14.md
 2 docs/checkpoints/F15_F20_DESIGN_CHECKPOINT_2026-10-14.md
 3 docs/specs/F15_F20_SPEC_BATCH_V1_2026-10-14.md
-4 master SPEC + master roadmap
-5 current main / GitHub truth
+4 docs/specs/F20_PRODUCT_DECISION_2026-10-14.md
+5 master SPEC + master roadmap
+6 current main / GitHub truth
 ```
 
-Do not reimplement F12-F14. Do not write F15 product until written SPEC review is approved.
+Do not reimplement F12-F14. Do not write F15-F20 product until written specs/plans are approved.
