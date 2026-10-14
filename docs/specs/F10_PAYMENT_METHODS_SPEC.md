@@ -3,7 +3,9 @@
 **Proyecto:** AlquilaPro  
 **Fecha:** 2026-10-13 (America/Bogota)  
 **Rama de diseño:** `spec/f10-payment-methods-20261013`  
-**Estado:** `DRAFT / USER REVIEW REQUIRED / IMPLEMENTATION BLOCKED ON F9 FINAL AUDIT + MERGE`  
+**Estado:** `IMPLEMENTED / VERIFIED / NOT MERGED`
+**Base integrada F9:** `45a55bc97ccc4bcfc235cedb1252b48bf93a4cd6` (`main`, F9 merge `e11c053365f64cfab88e37254ea86466a31e24ce`)
+**Product HEAD:** `9adf07e199e2d77e995836bbe4d2e81e90daae81` — CI `38504263040`, PHP 8.3/8.4/8.5 PASS
 **Fuentes canónicas:** `ALQUILA_PRO_SPEC_MAESTRO_V1.2_AUDITADO.md`, `ALQUILA_PRO_PLAN_DESARROLLO_V1.2_AUDITADO.md`, F9 SPEC/PLAN aprobados y patrones reales de storage/auth del repositorio.
 
 ---
@@ -29,7 +31,7 @@ El hecho de que un medio aparezca en F10 **no significa que exista un pago**. Es
 
 ---
 
-# 2. DEPENDENCIA Y GATE DE ARRANQUE
+# 2. DEPENDENCIA Y GATE DE ARRANQUE — SATISFECHO
 
 F10 depende de F9 porque reutiliza su autoridad financiera administrativa y sus permisos:
 
@@ -38,19 +40,18 @@ finance.view
 finance.manage
 ```
 
-La implementación productiva F10 queda bloqueada hasta que:
+La dependencia fue satisfecha antes de iniciar la implementación:
 
-1. F9 termine `CLOSED / VERIFIED`;
-2. ChatGPT/Sol audite el cierre real de F9;
-3. F9 sea fusionada en `main`;
-4. se fije el SHA exacto de `main` que contiene F9;
-5. no existan cambios pendientes que alteren el shell financiero o el portal tenant.
+1. F9 terminó `CLOSED / VERIFIED`;
+2. F9 se integró mediante PR #12, merge `e11c053365f64cfab88e37254ea86466a31e24ce`;
+3. el `main` integrado usado como base se fijó en `45a55bc97ccc4bcfc235cedb1252b48bf93a4cd6`;
+4. se inspeccionaron las autoridades de finanzas, permisos, rutas y ownership tenant antes de implementar.
 
 Esta rama de SPEC parte de `main` solo para aislar documentación.
 
-**No es base autorizada de implementación F10.**
+La rama F10 parte de esa base integrada; su producto permanece sin merge.
 
-La implementación F10 debe partir del `main` que contenga F9 final auditada y fusionada.
+La implementación F10 partió del `main` que contiene F9 final auditada y fusionada.
 
 ---
 
@@ -1067,7 +1068,7 @@ README/checkpoints at closure
 
 No CSS/JS nuevo salvo defecto visual reproducido.
 
-Este mapa es provisional hasta contrastar con F9 final auditada/merged.
+Mapa contrastado con la base integrada F9. F10 reutilizó los archivos existentes de Finance y Leases; añadió cero route files.
 
 ---
 
@@ -1164,7 +1165,7 @@ Además:
 13. Ownership lease se resuelve antes del scope financiero.
 14. 4 rutas privadas esperadas; 0 públicas.
 15. F11 registrará pagos/conciliación y podrá snapshotear método si necesita histórico.
-16. Implementación parte de F9 final auditada y merged en main.
+16. Implementación parte de F9 final auditada e integrada en main, base `45a55bc97ccc4bcfc235cedb1252b48bf93a4cd6`.
 
 ---
 
@@ -1179,27 +1180,23 @@ Además:
 7. **Tenant isolation:** lease ownership antes de resolver method/scope — PASS.
 8. **Evolución:** F11 puede referenciar/snapshotear method sin precrear transactions — PASS.
 9. **Antiparches:** cambio de tipo limpia stale fields y QR, evitando residuos — PASS.
-10. **Git/dependencia:** implementación bloqueada hasta F9 auditada + merged — PASS.
+10. **Git/dependencia:** F9 auditada e integrada antes del inicio; F10 conserva su gate de merge independiente — PASS.
 
 No se encontró motivo demostrado para tabla de scopes, tabla de QR, permisos nuevos, provider adapters, bank API o payment transaction tables en F10.
 
 ---
 
-# 32. GATE DE APROBACIÓN
+# 32. IMPLEMENTACIÓN Y VERIFICACIÓN
 
 ```text
-F10_PRE_KISS: READY FOR USER REVIEW
-F10_SPEC: DRAFT / USER REVIEW REQUIRED
-F10_PLAN: NOT AUTHORIZED YET
-F10_IMPLEMENTATION: BLOCKED
-F9_DEPENDENCY: WAITING FINAL AUDIT + MERGE
+F10_STATUS: CLOSED / VERIFIED / NOT MERGED
+F10_BRANCH: impl/f10-payment-methods-20261013
+F10_BASE_MAIN: 45a55bc97ccc4bcfc235cedb1252b48bf93a4cd6
+F10_PRODUCT_HEAD: 9adf07e199e2d77e995836bbe4d2e81e90daae81
+F10_PRODUCT_CI: 38504263040 — PHP 8.3/8.4/8.5 PASS
+F10_CLOSURE_CI: exact checkpoint HEAD; exact run recorded in the review-ready PR
+F10_PR: review-ready PR; merge not authorized
+MERGE_AUTHORIZED: NO
 ```
 
-Después de aprobación explícita:
-
-1. contrastar contra F9 final auditada/merged;
-2. ajustar mapa de archivos a la autoridad real;
-3. escribir PLAN F10 task-by-task;
-4. auditar PLAN KISS/Cero Ruido/Antiparches;
-5. preparar prompt maestro Markdown para Codex Luna;
-6. abrir implementación solo sobre base F9 integrada autorizada.
+Validación local: focused F10/F9/F8 `122 tests / 1456 assertions`; full suite con GD `366 tests / 3521 assertions / 0 failures / 0 errors`; `composer validate --strict` PASS. La suite remota exacta está registrada en la sección de cierre del repositorio. El merge continúa sujeto a autorización explícita.
