@@ -18,8 +18,8 @@ use AlquilaPro\Memberships\MembershipService;
 $projectRoot = dirname(__DIR__, 2);
 require $projectRoot . '/vendor/autoload.php';
 
+$operation = (string) ($argv[2] ?? '');
 $leaseId = (int) ($argv[1] ?? 0);
-$decision = (string) ($argv[2] ?? '');
 $actorId = (int) ($argv[3] ?? 0);
 $now = (int) ($argv[4] ?? 0);
 $readyFile = (string) ($argv[5] ?? '');
@@ -48,7 +48,12 @@ try {
     );
 
     file_put_contents($readyFile, 'ready');
-    $service->decideBonus($leaseId, $decision, $actorId, $now);
+    if (str_starts_with($operation, 'configure:')) {
+        $amount = substr($operation, strlen('configure:'));
+        $service->configureBonus($leaseId, $amount, 'Concurrent update', $actorId, $now);
+    } else {
+        $service->decideBonus($leaseId, $operation, $actorId, $now);
+    }
     echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
 } catch (Throwable) {
     echo json_encode(['ok' => false], JSON_THROW_ON_ERROR);

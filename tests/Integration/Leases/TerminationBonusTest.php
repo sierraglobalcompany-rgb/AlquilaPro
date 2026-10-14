@@ -221,6 +221,64 @@ final class TerminationBonusTest extends TestCase
         }
     }
 
+    public function testConcurrentUpdateAndDecisionSerializeWithoutPostDecisionMutation(): void
+    {
+        if (!function_exists('proc_open')) {
+            self::markTestSkipped('Concurrent bonus test requires proc_open.');
+        }
+
+        $this->service(true)->configureBonus($this->leaseId, '700.00', 'Initial', $this->actorId, 1_800_000_070);
+        $chargesBefore = $this->tableCount('charges');
+        $paymentsBefore = $this->tableCount('payments');
+
+        $this->pdo->beginTransaction();
+        $lock = $this->pdo->prepare('SELECT id FROM good_conduct_bonuses WHERE lease_id = :lease_id FOR UPDATE');
+        $lock->execute(['lease_id' => $this->leaseId]);
+        self::assertNotFalse($lock->fetchColumn());
+
+        $workers = [
+            $this->startWorker('configure:800.00', 1_800_000_071),
+            $this->startWorker('approved', 1_800_000_072),
+        ];
+
+        try {
+            $this->waitUntilWorkersAreReady($workers);
+            $this->pdo->commit();
+            $results = array_map(fn (array $worker): array => $this->finishWorker($worker), $workers);
+            self::assertTrue($results[1]['ok'], 'Terminal decision must succeed after serialization.');
+
+            $stored = $this->service(true)->bonusForLease($this->leaseId);
+            self::assertIsArray($stored);
+            self::assertSame('approved', $stored['decision']);
+            self::assertSame($results[0]['ok'] ? '800.00' : '700.00', $stored['amount']);
+            $finalAmount = $stored['amount'];
+
+            $this->assertRuntimeFailure(fn () => $this->service(true)->configureBonus(
+                $this->leaseId,
+                '900.00',
+                'Must not mutate after decision',
+                $this->actorId,
+                1_800_000_073,
+            ));
+            $after = $this->service(true)->bonusForLease($this->leaseId);
+            self::assertIsArray($after);
+            self::assertSame('approved', $after['decision']);
+            self::assertSame($finalAmount, $after['amount']);
+            self::assertSame($chargesBefore, $this->tableCount('charges'));
+            self::assertSame($paymentsBefore, $this->tableCount('payments'));
+        } finally {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            foreach ($workers as $worker) {
+                if (is_resource($worker['process'])) {
+                    @proc_terminate($worker['process']);
+                }
+                @unlink($worker['ready']);
+            }
+        }
+    }
+
     private function service(bool $bonusEnabled): TerminationService
     {
         if (!class_exists(TerminationService::class)) {
@@ -244,7 +302,7 @@ final class TerminationBonusTest extends TestCase
     }
 
     /** @return array{process:resource,pipes:array,ready:string} */
-    private function startWorker(string $decision, int $now): array
+    private function startWorker(string $operation, int $now): array
     {
         $ready = $this->directory . '/worker-' . bin2hex(random_bytes(6)) . '.ready';
         $workerPath = dirname(__DIR__, 2) . '/Support/TerminationBonusConcurrencyWorker.php';
@@ -252,7 +310,7 @@ final class TerminationBonusTest extends TestCase
             PHP_BINARY,
             $workerPath,
             (string) $this->leaseId,
-            $decision,
+            $operation,
             (string) $this->actorId,
             (string) $now,
             $ready,
