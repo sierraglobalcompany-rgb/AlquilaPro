@@ -58,6 +58,23 @@ return static function (App $app, array $deps): void {
         return $charges === [] ? null : (int) $charges[0]['contract_id'];
     };
 
+    $allocationsFromForm = static function (mixed $input): array {
+        if (!is_array($input)) {
+            throw new RuntimeException('No fue posible completar la operación financiera.');
+        }
+        $allocations = [];
+        foreach ($input as $chargeId => $amount) {
+            if ((!is_int($chargeId) && (!is_string($chargeId) || preg_match('/\A[1-9]\d*\z/', $chargeId) !== 1))
+                || !is_string($amount)
+            ) {
+                throw new RuntimeException('No fue posible completar la operación financiera.');
+            }
+            $allocations[] = ['charge_id' => (int) $chargeId, 'amount' => $amount];
+        }
+
+        return $allocations;
+    };
+
     $app->get('/admin/finance/payment-methods', static function (
         ServerRequestInterface $request,
         ResponseInterface $response,
@@ -195,12 +212,128 @@ return static function (App $app, array $deps): void {
             'activeNav' => '',
             'csrfToken' => $csrf->token(),
             'portfolio' => $finance->portfolio($today()),
+            'pendingPayments' => $finance->listPendingPayments(),
             'basePath' => $basePath,
         ]));
 
         return $response
             ->withHeader('Content-Type', 'text/html; charset=utf-8')
             ->withHeader('Cache-Control', 'private, no-store');
+    });
+
+    $app->get('/admin/finance/payments/{id:[0-9]+}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($staffGuard, $finance, $view, $csrf, $today, $basePath): ResponseInterface {
+        $user = $staffGuard($response, 'finance.view');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+        $payment = $finance->findPayment((int) $args['id']);
+        if ($payment === null) {
+            return $response->withStatus(404);
+        }
+        $response->getBody()->write($view->renderApp('payment_detail', [
+            'pageTitle' => 'Revisión de pago #' . $payment['id'],
+            'user' => $user,
+            'activeNav' => '',
+            'csrfToken' => $csrf->token(),
+            'payment' => $payment,
+            'charges' => $finance->listForLease((int) $payment['lease_id'], $today()),
+            'canManage' => Permissions::allows($user, 'finance.manage'),
+            'basePath' => $basePath,
+        ]));
+
+        return $response
+            ->withHeader('Content-Type', 'text/html; charset=utf-8')
+            ->withHeader('Cache-Control', 'private, no-store');
+    });
+
+    $app->get('/admin/finance/payments/{id:[0-9]+}/receipt', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($staffGuard, $finance): ResponseInterface {
+        $user = $staffGuard($response, 'finance.view');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+        $payment = $finance->findPayment((int) $args['id']);
+        if ($payment === null || !$payment['has_receipt']) {
+            return $response->withStatus(404);
+        }
+        $receipt = $finance->privatePaymentReceipt((int) $payment['id']);
+        $bytes = $receipt === null ? false : @file_get_contents($receipt['path']);
+        if (!is_string($bytes)
+            || strlen($bytes) !== $receipt['size_bytes']
+            || (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes) !== $receipt['mime']
+            || !hash_equals($receipt['sha256'], hash('sha256', $bytes))) {
+            return $response->withStatus(404);
+        }
+        $response->getBody()->write($bytes);
+
+        return $response
+            ->withHeader('Content-Type', $receipt['mime'])
+            ->withHeader('Content-Length', (string) strlen($bytes))
+            ->withHeader('Cache-Control', 'private, no-store')
+            ->withHeader('X-Content-Type-Options', 'nosniff');
+    });
+
+    $app->post('/admin/finance/payments/{id:[0-9]+}/reconcile', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($staffGuard, $finance, $path, $allocationsFromForm): ResponseInterface {
+        $user = $staffGuard($response, 'finance.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+        $form = (array) ($request->getParsedBody() ?? []);
+        try {
+            $finance->reconcilePayment(
+                (int) $args['id'],
+                $allocationsFromForm($form['allocations'] ?? null),
+                (int) $user['id'],
+                time(),
+            );
+        } catch (RuntimeException) {
+            $response->getBody()->write('No fue posible completar la operación financiera.');
+
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/admin/finance/payments/' . (int) $args['id']))
+            ->withStatus(303);
+    });
+
+    $app->post('/admin/finance/payments/{id:[0-9]+}/reject', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($staffGuard, $finance, $path): ResponseInterface {
+        $user = $staffGuard($response, 'finance.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+        $form = (array) ($request->getParsedBody() ?? []);
+        try {
+            $finance->rejectPayment(
+                (int) $args['id'],
+                (string) ($form['reason'] ?? ''),
+                (int) $user['id'],
+                time(),
+            );
+        } catch (RuntimeException) {
+            $response->getBody()->write('No fue posible completar la operación financiera.');
+
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/admin/finance/payments/' . (int) $args['id']))
+            ->withStatus(303);
     });
 
     $app->post('/admin/leases/{id:[0-9]+}/charges/monthly', static function (

@@ -36,6 +36,22 @@ return static function (App $app, array $deps): void {
         (new DateTimeImmutable('now', new DateTimeZone('America/Bogota')))->format('Y-m-d');
 
     $path = static fn (string $value): string => $basePath . $value;
+    $allocationsFromForm = static function (mixed $input): array {
+        if (!is_array($input)) {
+            throw new RuntimeException('No fue posible reportar el pago.');
+        }
+        $allocations = [];
+        foreach ($input as $chargeId => $amount) {
+            if ((!is_int($chargeId) && (!is_string($chargeId) || preg_match('/\A[1-9]\d*\z/', $chargeId) !== 1))
+                || !is_string($amount)
+            ) {
+                throw new RuntimeException('No fue posible reportar el pago.');
+            }
+            $allocations[] = ['charge_id' => (int) $chargeId, 'amount' => $amount];
+        }
+
+        return $allocations;
+    };
 
     $adminGuard = static function (ResponseInterface $response) use ($currentUser, $session, $path): array|ResponseInterface {
         $user = $currentUser();
@@ -159,6 +175,7 @@ return static function (App $app, array $deps): void {
         $today = $todayProvider();
         $financeSummary = $finance->summaryForLease((int) $lease['id'], $today);
         $charges = $finance->listForLease((int) $lease['id'], $today);
+        $paymentHistory = $finance->listPaymentsForLease((int) $lease['id']);
         $tenantPaymentMethods = array_map(static function (array $method) use ($paymentMethods, $lease, $path): array {
             $qrUrl = null;
             if ($method['type'] === 'breb_qr' && $paymentMethods->privateQr((int) $method['id']) !== null) {
@@ -192,9 +209,88 @@ return static function (App $app, array $deps): void {
             'financeSummary' => $financeSummary,
             'charges' => $charges,
             'paymentMethods' => $tenantPaymentMethods,
+            'paymentHistory' => $paymentHistory,
+            'today' => $today,
         ]));
 
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    });
+
+    $app->post('/tenant/leases/{id:[0-9]+}/payments', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($tenantGuard, $leases, $finance, $path, $allocationsFromForm): ResponseInterface {
+        $user = $tenantGuard($response);
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+        $lease = $leases->findForUser((int) $args['id'], (int) $user['id']);
+        if ($lease === null) {
+            return $response->withStatus(404);
+        }
+
+        $form = (array) ($request->getParsedBody() ?? []);
+        $uploads = $request->getUploadedFiles();
+        $receipt = $uploads['receipt'] ?? null;
+        if (!$receipt instanceof \Psr\Http\Message\UploadedFileInterface || $receipt->getError() === UPLOAD_ERR_NO_FILE) {
+            $receipt = null;
+        }
+        try {
+            $finance->reportPayment(
+                (int) $lease['id'],
+                (int) ($form['payment_method_id'] ?? 0),
+                (string) ($form['amount'] ?? ''),
+                (string) ($form['paid_on'] ?? ''),
+                isset($form['paid_time']) && (string) $form['paid_time'] !== '' ? (string) $form['paid_time'] : null,
+                $allocationsFromForm($form['allocations'] ?? null),
+                $receipt,
+                time(),
+            );
+        } catch (RuntimeException) {
+            $response->getBody()->write('No fue posible reportar el pago.');
+
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/tenant/leases/' . (int) $lease['id']))
+            ->withStatus(303);
+    });
+
+    $app->get('/tenant/leases/{leaseId:[0-9]+}/payments/{paymentId:[0-9]+}/receipt', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($tenantGuard, $leases, $finance): ResponseInterface {
+        $user = $tenantGuard($response);
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+        $lease = $leases->findForUser((int) $args['leaseId'], (int) $user['id']);
+        if ($lease === null) {
+            return $response->withStatus(404);
+        }
+
+        $payment = $finance->findPayment((int) $args['paymentId']);
+        if ($payment === null || (int) $payment['lease_id'] !== (int) $lease['id'] || !$payment['has_receipt']) {
+            return $response->withStatus(404);
+        }
+        $receipt = $finance->privatePaymentReceipt((int) $payment['id']);
+        $bytes = $receipt === null ? false : @file_get_contents($receipt['path']);
+        if (!is_string($bytes)
+            || strlen($bytes) !== $receipt['size_bytes']
+            || (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes) !== $receipt['mime']
+            || !hash_equals($receipt['sha256'], hash('sha256', $bytes))) {
+            return $response->withStatus(404);
+        }
+        $response->getBody()->write($bytes);
+
+        return $response
+            ->withHeader('Content-Type', $receipt['mime'])
+            ->withHeader('Content-Length', (string) strlen($bytes))
+            ->withHeader('Cache-Control', 'private, no-store')
+            ->withHeader('X-Content-Type-Options', 'nosniff');
     });
 
     $app->get('/tenant/leases/{leaseId:[0-9]+}/payment-methods/{methodId:[0-9]+}/qr', static function (

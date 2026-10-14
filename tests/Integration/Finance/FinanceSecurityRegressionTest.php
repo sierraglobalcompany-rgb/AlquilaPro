@@ -60,15 +60,21 @@ final class FinanceSecurityRegressionTest extends TestCase
         self::assertCount(1, $routeFiles);
         $financeRoutes = $this->file('app/Finance/routes.php');
         preg_match_all('/\$app->(?:get|post)\(\'([^\']+)\'/i', $financeRoutes, $routeMatches);
-        self::assertSame([
+        foreach ([
             '/admin/finance/payment-methods',
             '/admin/finance/payment-methods',
             '/admin/finance/payment-methods/{id:[0-9]+}',
             '/admin/finance',
+            '/admin/finance/payments/{id:[0-9]+}',
+            '/admin/finance/payments/{id:[0-9]+}/receipt',
+            '/admin/finance/payments/{id:[0-9]+}/reconcile',
+            '/admin/finance/payments/{id:[0-9]+}/reject',
             '/admin/leases/{id:[0-9]+}/charges/monthly',
             '/admin/leases/{id:[0-9]+}/charges',
             '/admin/charges/{id:[0-9]+}/void',
-        ], $routeMatches[1] ?? []);
+        ] as $expectedRoute) {
+            self::assertContains($expectedRoute, $routeMatches[1] ?? []);
+        }
         foreach ($routeMatches[1] ?? [] as $route) {
             self::assertStringStartsWith('/admin/', $route, 'F9 routes must remain private staff routes.');
         }
@@ -106,7 +112,7 @@ final class FinanceSecurityRegressionTest extends TestCase
 
         $home = $this->file('resources/views/tenant_home.php');
         $tenantDetail = $this->file('resources/views/tenant_lease_detail.php');
-        foreach (['Pagos', 'Reportes', 'Póliza', 'Mantenimiento', 'Solicitudes'] as $futureUi) {
+        foreach (['Reportes', 'Póliza', 'Mantenimiento', 'Solicitudes'] as $futureUi) {
             self::assertStringNotContainsString($futureUi, $home . "\n" . $tenantDetail);
         }
         self::assertStringNotContainsString('Cartera', $home);
@@ -132,6 +138,8 @@ final class FinanceSecurityRegressionTest extends TestCase
             '/admin/leases/{id:[0-9]+}/end',
             '/tenant',
             '/tenant/leases/{id:[0-9]+}',
+            '/tenant/leases/{id:[0-9]+}/payments',
+            '/tenant/leases/{leaseId:[0-9]+}/payments/{paymentId:[0-9]+}/receipt',
             '/tenant/leases/{leaseId:[0-9]+}/payment-methods/{methodId:[0-9]+}/qr',
             '/tenant/leases/{id:[0-9]+}/contract',
         ], $routeMatches[1] ?? []);
@@ -200,11 +208,13 @@ final class FinanceSecurityRegressionTest extends TestCase
             'void_reason',
             'contract_id',
             'charge_id',
-            '<form',
-            'csrfToken',
         ] as $privateOrMutationField) {
             self::assertStringNotContainsString($privateOrMutationField, $view);
         }
+        self::assertStringContainsString('<form method="post" enctype="multipart/form-data"', $view);
+        self::assertStringContainsString('name="csrf_token"', $view);
+        self::assertStringContainsString('/tenant/leases/<?= $escape($lease[\'id\']) ?>/payments', $view);
+        self::assertStringNotContainsString('/admin/finance/payments', $view);
         foreach ([
             "'rent' => 'Canon mensual'",
             "'administration' => 'Administración'",

@@ -104,7 +104,7 @@ final readonly class FinanceService
         }
     }
 
-    /** @return list<array{id:int,lease_id:int,contract_id:int,type:string,period_month:?string,due_date:string,amount:string,description:?string,state:string,days_overdue:int}> */
+    /** @return list<array{id:int,lease_id:int,contract_id:int,type:string,period_month:?string,due_date:string,amount:string,description:?string,state:string,allocated:string,outstanding:string,is_overdue:bool,days_overdue:int}> */
     public function listForLease(int $leaseId, string $today): array
     {
         if ($leaseId <= 0) {
@@ -114,7 +114,14 @@ final readonly class FinanceService
         $todayDate = $this->parseDate($today);
         $statement = $this->pdo->prepare(
             'SELECT ch.id, ch.lease_id, l.contract_id, ch.type, ch.period_month, ch.due_date, '
-            . 'ch.amount, ch.description, ch.voided_at '
+            . 'ch.amount, ch.description, ch.voided_at, '
+            . $this->reconciledAllocationExpression('ch') . ' AS allocated, '
+            . $this->chargeOutstandingExpression('ch') . ' AS outstanding, '
+            . 'EXISTS (SELECT 1 FROM payment_allocations pa INNER JOIN payments p ON p.id = pa.payment_id '
+            . 'WHERE pa.charge_id = ch.id AND p.reconciled_at IS NULL AND p.rejected_at IS NULL '
+            . 'AND p.receipt_stored_name IS NOT NULL) AS has_pending_receipt, '
+            . 'EXISTS (SELECT 1 FROM payment_allocations pa INNER JOIN payments p ON p.id = pa.payment_id '
+            . 'WHERE pa.charge_id = ch.id AND p.reconciled_at IS NULL AND p.rejected_at IS NULL) AS has_pending_report '
             . 'FROM charges ch INNER JOIN leases l ON l.id = ch.lease_id '
             . 'WHERE ch.lease_id = :lease_id ORDER BY ch.due_date ASC, ch.id ASC',
         );
@@ -124,7 +131,20 @@ final readonly class FinanceService
         foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $dueDate = $this->parseDate((string) $row['due_date']);
             $voided = $row['voided_at'] !== null;
-            $overdue = !$voided && $dueDate < $todayDate;
+            $allocated = $this->normalizeTotal($row['allocated'] ?? null);
+            $outstanding = $this->normalizeTotal($row['outstanding'] ?? null);
+            $allocatedCents = $this->paymentAmountToCents($allocated);
+            $outstandingCents = $this->paymentAmountToCents($outstanding);
+            $overdue = !$voided && $outstandingCents > 0 && $dueDate < $todayDate;
+            $state = match (true) {
+                $voided => 'voided',
+                $outstandingCents === 0 => 'paid',
+                $allocatedCents > 0 => 'partial',
+                (bool) $row['has_pending_receipt'] => 'proof_received',
+                (bool) $row['has_pending_report'] => 'reported',
+                $overdue => 'overdue',
+                default => 'pending',
+            };
 
             $charges[] = [
                 'id' => (int) $row['id'],
@@ -135,7 +155,10 @@ final readonly class FinanceService
                 'due_date' => (string) $row['due_date'],
                 'amount' => (string) $row['amount'],
                 'description' => $row['description'] === null ? null : (string) $row['description'],
-                'state' => $voided ? 'voided' : ($overdue ? 'overdue' : 'pending'),
+                'state' => $state,
+                'allocated' => $allocated,
+                'outstanding' => $outstanding,
+                'is_overdue' => $overdue,
                 'days_overdue' => $overdue ? (int) $dueDate->diff($todayDate)->format('%a') : 0,
             ];
         }
@@ -340,15 +363,14 @@ final readonly class FinanceService
             . 'c.id AS contract_id, unit.id AS unit_id, unit.code AS unit_code, '
             . 'property.id AS property_id, property.name AS property_name, '
             . 'property.address AS property_address, property.city AS property_city, '
-            . $this->chargeSummaryExpressions('ch') . ' '
-            . 'FROM charges ch '
-            . 'INNER JOIN leases l ON l.id = ch.lease_id '
+            . 'charge_summary.outstanding, charge_summary.overdue, charge_summary.oldest_due_date '
+            . 'FROM (SELECT ch.lease_id, ' . $this->chargeSummaryExpressions('ch') . ' '
+            . 'FROM charges ch GROUP BY ch.lease_id) charge_summary '
+            . 'INNER JOIN leases l ON l.id = charge_summary.lease_id '
             . 'INNER JOIN contracts c ON c.id = l.contract_id '
             . 'INNER JOIN users tenant ON tenant.id = l.user_id '
             . 'INNER JOIN units unit ON unit.id = c.unit_id '
             . 'INNER JOIN properties property ON property.id = unit.property_id '
-            . 'GROUP BY l.id, l.user_id, tenant.full_name, c.id, unit.id, unit.code, '
-            . 'property.id, property.name, property.address, property.city '
             . 'ORDER BY property.name, unit.code, tenant.full_name, l.id',
         );
         $statement->execute(['today' => $today]);
@@ -512,13 +534,46 @@ final readonly class FinanceService
         return array_map(fn (array $row): array => $this->paymentProjection($row), $statement->fetchAll(PDO::FETCH_ASSOC));
     }
 
+    /** @return list<array<string,mixed>> */
+    public function listPendingPayments(): array
+    {
+        $statement = $this->pdo->query(
+            'SELECT p.*, tenant.full_name AS tenant_name, property.name AS property_name, unit.code AS unit_code '
+            . 'FROM payments p '
+            . 'INNER JOIN leases l ON l.id = p.lease_id '
+            . 'INNER JOIN contracts c ON c.id = l.contract_id '
+            . 'INNER JOIN units unit ON unit.id = c.unit_id '
+            . 'INNER JOIN properties property ON property.id = unit.property_id '
+            . 'INNER JOIN users tenant ON tenant.id = l.user_id '
+            . 'WHERE p.reconciled_at IS NULL AND p.rejected_at IS NULL '
+            . 'ORDER BY p.reported_at ASC, p.id ASC',
+        );
+        $payments = [];
+        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $payment = $this->paymentProjection($row);
+            $payment['duplicate_warnings'] = $this->duplicateWarnings($row);
+            $payments[] = $payment;
+        }
+
+        return $payments;
+    }
+
     /** @return array<string,mixed>|null */
     public function findPayment(int $paymentId): ?array
     {
         if ($paymentId <= 0) {
             return null;
         }
-        $statement = $this->pdo->prepare('SELECT * FROM payments WHERE id = :id LIMIT 1');
+        $statement = $this->pdo->prepare(
+            'SELECT p.*, tenant.full_name AS tenant_name, property.name AS property_name, unit.code AS unit_code '
+            . 'FROM payments p '
+            . 'INNER JOIN leases l ON l.id = p.lease_id '
+            . 'INNER JOIN contracts c ON c.id = l.contract_id '
+            . 'INNER JOIN units unit ON unit.id = c.unit_id '
+            . 'INNER JOIN properties property ON property.id = unit.property_id '
+            . 'INNER JOIN users tenant ON tenant.id = l.user_id '
+            . 'WHERE p.id = :id LIMIT 1',
+        );
         $statement->execute(['id' => $paymentId]);
         $row = $statement->fetch(PDO::FETCH_ASSOC);
         if (!is_array($row)) {
@@ -530,7 +585,173 @@ final readonly class FinanceService
         return $payment;
     }
 
-    /** @return array{path:string,mime:string,size_bytes:int}|null */
+    /** @param list<array{charge_id:int,amount:string}> $finalAllocations
+     *  @return array<string,mixed>
+     */
+    public function reconcilePayment(int $paymentId, array $finalAllocations, int $actorUserId, int $now): array
+    {
+        if ($paymentId <= 0 || $actorUserId <= 0 || $now <= 0 || $this->pdo->inTransaction()) {
+            throw new RuntimeException('No fue posible conciliar el pago.');
+        }
+
+        try {
+            if (!$this->pdo->beginTransaction()) {
+                throw new RuntimeException('No fue posible conciliar el pago.');
+            }
+            $paymentLock = $this->pdo->prepare('SELECT * FROM payments WHERE id = :id FOR UPDATE');
+            $paymentLock->execute(['id' => $paymentId]);
+            $payment = $paymentLock->fetch(PDO::FETCH_ASSOC);
+            if (!is_array($payment) || $payment['reconciled_at'] !== null || $payment['rejected_at'] !== null) {
+                throw new RuntimeException('No fue posible conciliar el pago.');
+            }
+            $leaseStatement = $this->pdo->prepare('SELECT id FROM leases WHERE id = :id LIMIT 1');
+            $leaseStatement->execute(['id' => (int) $payment['lease_id']]);
+            if ($leaseStatement->fetchColumn() === false) {
+                throw new RuntimeException('No fue posible conciliar el pago.');
+            }
+
+            if (!array_is_list($finalAllocations) || $finalAllocations === []) {
+                throw new RuntimeException('No fue posible conciliar el pago.');
+            }
+            $chargeIds = [];
+            foreach ($finalAllocations as $allocation) {
+                if (!is_array($allocation) || !isset($allocation['charge_id'])
+                    || !is_int($allocation['charge_id']) || $allocation['charge_id'] <= 0
+                ) {
+                    throw new RuntimeException('No fue posible conciliar el pago.');
+                }
+                $chargeIds[] = $allocation['charge_id'];
+            }
+            $chargeIds = array_values(array_unique($chargeIds));
+            sort($chargeIds, SORT_NUMERIC);
+            $lockParameters = [];
+            $placeholders = [];
+            foreach ($chargeIds as $index => $chargeId) {
+                $name = 'charge_' . $index;
+                $placeholders[] = ':' . $name;
+                $lockParameters[$name] = $chargeId;
+            }
+            $chargeLock = $this->pdo->prepare(
+                'SELECT id, lease_id, amount, voided_at FROM charges WHERE id IN (' . implode(', ', $placeholders) . ') '
+                . 'ORDER BY id ASC FOR UPDATE',
+            );
+            $chargeLock->execute($lockParameters);
+            $lockedCharges = $chargeLock->fetchAll(PDO::FETCH_ASSOC);
+            if (count($lockedCharges) !== count($chargeIds)) {
+                throw new RuntimeException('No fue posible conciliar el pago.');
+            }
+
+            $lockedById = [];
+            foreach ($lockedCharges as $lockedCharge) {
+                $lockedById[(int) $lockedCharge['id']] = $lockedCharge;
+            }
+            $normalizedAllocations = $this->validateFinalAllocationsAgainstLockedCharges(
+                (int) $payment['lease_id'],
+                $finalAllocations,
+                $this->paymentAmountToCents((string) $payment['amount']),
+                $lockedById,
+            );
+            usort($normalizedAllocations, static fn (array $first, array $second): int =>
+                $first['charge_id'] <=> $second['charge_id']);
+            $existingAllocations = $this->pdo->prepare(
+                'SELECT charge_id, amount FROM payment_allocations WHERE payment_id = :payment_id ORDER BY charge_id ASC',
+            );
+            $existingAllocations->execute(['payment_id' => $paymentId]);
+            $existing = array_map(static fn (array $allocation): array => [
+                'charge_id' => (int) $allocation['charge_id'],
+                'amount' => (string) $allocation['amount'],
+            ], $existingAllocations->fetchAll(PDO::FETCH_ASSOC));
+            if ($existing !== $normalizedAllocations) {
+                $delete = $this->pdo->prepare('DELETE FROM payment_allocations WHERE payment_id = :payment_id');
+                $delete->execute(['payment_id' => $paymentId]);
+                $insert = $this->pdo->prepare(
+                    'INSERT INTO payment_allocations (payment_id, charge_id, amount) '
+                    . 'VALUES (:payment_id, :charge_id, :amount)',
+                );
+                foreach ($normalizedAllocations as $allocation) {
+                    $insert->execute([
+                        'payment_id' => $paymentId,
+                        'charge_id' => $allocation['charge_id'],
+                        'amount' => $allocation['amount'],
+                    ]);
+                }
+            }
+
+            $terminal = $this->pdo->prepare(
+                'UPDATE payments SET reconciled_by_user_id = :actor_id, reconciled_at = :reconciled_at '
+                . 'WHERE id = :id AND reconciled_at IS NULL AND rejected_at IS NULL',
+            );
+            $terminal->execute([
+                'actor_id' => $actorUserId,
+                'reconciled_at' => $this->paymentDateTime($now),
+                'id' => $paymentId,
+            ]);
+            if ($terminal->rowCount() !== 1 || !$this->pdo->commit()) {
+                throw new RuntimeException('No fue posible conciliar el pago.');
+            }
+        } catch (Throwable $exception) {
+            $this->rollbackIfNeeded();
+            throw new RuntimeException('No fue posible conciliar el pago.', 0, $exception);
+        }
+
+        $result = $this->findPayment($paymentId);
+        if ($result === null) {
+            throw new RuntimeException('No fue posible conciliar el pago.');
+        }
+
+        return $result;
+    }
+
+    /** @return array<string,mixed> */
+    public function rejectPayment(int $paymentId, string $reason, int $actorUserId, int $now): array
+    {
+        if ($paymentId <= 0 || $actorUserId <= 0 || $now <= 0 || $this->pdo->inTransaction()) {
+            throw new RuntimeException('No fue posible rechazar el pago.');
+        }
+
+        try {
+            if (!$this->pdo->beginTransaction()) {
+                throw new RuntimeException('No fue posible rechazar el pago.');
+            }
+            $paymentLock = $this->pdo->prepare(
+                'SELECT id, reconciled_at, rejected_at FROM payments WHERE id = :id FOR UPDATE',
+            );
+            $paymentLock->execute(['id' => $paymentId]);
+            $payment = $paymentLock->fetch(PDO::FETCH_ASSOC);
+            if (!is_array($payment) || $payment['reconciled_at'] !== null || $payment['rejected_at'] !== null) {
+                throw new RuntimeException('No fue posible rechazar el pago.');
+            }
+            $normalizedReason = trim($reason);
+            if ($normalizedReason === '' || mb_strlen($normalizedReason, 'UTF-8') > 500) {
+                throw new RuntimeException('No fue posible rechazar el pago.');
+            }
+            $terminal = $this->pdo->prepare(
+                'UPDATE payments SET rejected_by_user_id = :actor_id, rejected_at = :rejected_at, '
+                . 'rejection_reason = :reason WHERE id = :id AND reconciled_at IS NULL AND rejected_at IS NULL',
+            );
+            $terminal->execute([
+                'actor_id' => $actorUserId,
+                'rejected_at' => $this->paymentDateTime($now),
+                'reason' => $normalizedReason,
+                'id' => $paymentId,
+            ]);
+            if ($terminal->rowCount() !== 1 || !$this->pdo->commit()) {
+                throw new RuntimeException('No fue posible rechazar el pago.');
+            }
+        } catch (Throwable $exception) {
+            $this->rollbackIfNeeded();
+            throw new RuntimeException('No fue posible rechazar el pago.', 0, $exception);
+        }
+
+        $result = $this->findPayment($paymentId);
+        if ($result === null) {
+            throw new RuntimeException('No fue posible rechazar el pago.');
+        }
+
+        return $result;
+    }
+
+    /** @return array{path:string,mime:string,sha256:string,size_bytes:int}|null */
     public function privatePaymentReceipt(int $paymentId): ?array
     {
         if ($paymentId <= 0) {
@@ -579,7 +800,12 @@ final readonly class FinanceService
             return null;
         }
 
-        return ['path' => $path, 'mime' => $actualMime, 'size_bytes' => $actualSize];
+        return [
+            'path' => $path,
+            'mime' => $actualMime,
+            'sha256' => strtolower($row['receipt_sha256']),
+            'size_bytes' => $actualSize,
+        ];
     }
 
     /** @param list<array{charge_id:int,amount:string}> $allocations
@@ -610,7 +836,8 @@ final readonly class FinanceService
             $allocationCents = $this->paymentAmountToCents($allocationAmount);
 
             $charge = $this->pdo->prepare(
-                'SELECT id, amount, voided_at FROM charges WHERE id = :id AND lease_id = :lease_id LIMIT 1',
+                'SELECT ch.id, ch.amount, ch.voided_at, ' . $this->chargeOutstandingExpression('ch') . ' AS outstanding '
+                . 'FROM charges ch WHERE ch.id = :id AND ch.lease_id = :lease_id LIMIT 1',
             );
             $charge->execute(['id' => $chargeId, 'lease_id' => $leaseId]);
             $chargeRow = $charge->fetch(PDO::FETCH_ASSOC);
@@ -618,14 +845,7 @@ final readonly class FinanceService
                 throw new RuntimeException('No fue posible reportar el pago.');
             }
 
-            $reconciled = $this->pdo->prepare(
-                'SELECT COALESCE(SUM(pa.amount), 0.00) FROM payment_allocations pa '
-                . 'INNER JOIN payments p ON p.id = pa.payment_id '
-                . 'WHERE pa.charge_id = :charge_id AND p.reconciled_at IS NOT NULL AND p.rejected_at IS NULL',
-            );
-            $reconciled->execute(['charge_id' => $chargeId]);
-            $alreadyAllocated = $this->paymentAmountToCents((string) $reconciled->fetchColumn());
-            $outstandingCents = max(0, $this->paymentAmountToCents((string) $chargeRow['amount']) - $alreadyAllocated);
+            $outstandingCents = $this->paymentAmountToCents($this->normalizeTotal($chargeRow['outstanding']));
             if ($allocationCents <= 0 || $allocationCents > $outstandingCents) {
                 throw new RuntimeException('No fue posible reportar el pago.');
             }
@@ -635,6 +855,67 @@ final readonly class FinanceService
 
         if ($totalCents !== $paymentCents) {
             throw new RuntimeException('No fue posible reportar el pago.');
+        }
+
+        return $normalized;
+    }
+
+    /** @param array<int,array{id:mixed,lease_id:mixed,amount:mixed,voided_at:mixed}> $lockedCharges
+     *  @return list<array{charge_id:int,amount:string}>
+     */
+    private function validateFinalAllocationsAgainstLockedCharges(
+        int $leaseId,
+        array $allocations,
+        int $paymentCents,
+        array $lockedCharges,
+    ): array {
+        $seen = [];
+        $normalized = [];
+        $totalCents = 0;
+        foreach ($allocations as $allocation) {
+            if (!is_array($allocation)
+                || !isset($allocation['charge_id'], $allocation['amount'])
+                || !is_int($allocation['charge_id'])
+                || $allocation['charge_id'] <= 0
+                || !is_string($allocation['amount'])
+                || isset($seen[$allocation['charge_id']])
+            ) {
+                throw new RuntimeException('No fue posible conciliar el pago.');
+            }
+            $chargeId = $allocation['charge_id'];
+            $seen[$chargeId] = true;
+            $charge = $lockedCharges[$chargeId] ?? null;
+            if (!is_array($charge)
+                || (int) $charge['lease_id'] !== $leaseId
+                || $charge['voided_at'] !== null
+            ) {
+                throw new RuntimeException('No fue posible conciliar el pago.');
+            }
+            $amount = $this->normalizePaymentAmount($allocation['amount']);
+            $amountCents = $this->paymentAmountToCents($amount);
+            $reconciled = $this->pdo->prepare(
+                'SELECT pa.amount FROM payment_allocations pa '
+                . 'INNER JOIN payments p ON p.id = pa.payment_id '
+                . 'WHERE pa.charge_id = :charge_id AND p.reconciled_at IS NOT NULL AND p.rejected_at IS NULL '
+                . 'LOCK IN SHARE MODE',
+            );
+            $reconciled->execute(['charge_id' => $chargeId]);
+            $alreadyAllocatedCents = 0;
+            foreach ($reconciled->fetchAll(PDO::FETCH_COLUMN) as $allocated) {
+                $alreadyAllocatedCents += $this->paymentAmountToCents((string) $allocated);
+            }
+            $outstandingCents = max(
+                0,
+                $this->paymentAmountToCents((string) $charge['amount']) - $alreadyAllocatedCents,
+            );
+            if ($amountCents <= 0 || $amountCents > $outstandingCents) {
+                throw new RuntimeException('No fue posible conciliar el pago.');
+            }
+            $totalCents += $amountCents;
+            $normalized[] = ['charge_id' => $chargeId, 'amount' => $amount];
+        }
+        if ($totalCents !== $paymentCents) {
+            throw new RuntimeException('No fue posible conciliar el pago.');
         }
 
         return $normalized;
@@ -655,7 +936,7 @@ final readonly class FinanceService
             ? 'reconciled'
             : ($row['rejected_at'] !== null ? 'rejected' : 'pending_reconciliation');
 
-        return [
+        $projection = [
             'id' => (int) $row['id'],
             'lease_id' => (int) $row['lease_id'],
             'payment_method_id' => (int) $row['payment_method_id'],
@@ -679,6 +960,13 @@ final readonly class FinanceService
                 'amount' => (string) $allocation['amount'],
             ], $allocations->fetchAll(PDO::FETCH_ASSOC)),
         ];
+        foreach (['tenant_name', 'property_name', 'unit_code'] as $contextField) {
+            if (isset($row[$contextField])) {
+                $projection[$contextField] = (string) $row[$contextField];
+            }
+        }
+
+        return $projection;
     }
 
     /** @return array{stored_name:string,mime:string,sha256:string,size_bytes:int} */
@@ -711,12 +999,6 @@ final readonly class FinanceService
         if (!is_string($mime) || !isset(self::PAYMENT_RECEIPT_EXTENSIONS[$mime])) {
             throw new RuntimeException('No fue posible reportar el pago.');
         }
-        $clientMime = strtolower(trim($receipt->getClientMediaType() ?? ''));
-        $clientExtension = strtolower(pathinfo($receipt->getClientFilename() ?? '', PATHINFO_EXTENSION));
-        if ($clientMime !== $mime || $clientExtension !== self::PAYMENT_RECEIPT_EXTENSIONS[$mime]) {
-            throw new RuntimeException('No fue posible reportar el pago.');
-        }
-
         $this->ensurePaymentReceiptDirectory();
         $storedName = 'receipt-' . bin2hex(random_bytes(16)) . '.' . self::PAYMENT_RECEIPT_EXTENSIONS[$mime];
         $target = $this->paymentReceiptPath($storedName, false);
@@ -916,6 +1198,13 @@ final readonly class FinanceService
         return strlen($time) === 5 ? $time . ':00' : $time;
     }
 
+    private function paymentDateTime(int $timestamp): string
+    {
+        return (new DateTimeImmutable('@' . $timestamp))
+            ->setTimezone(new DateTimeZone('America/Bogota'))
+            ->format('Y-m-d H:i:s');
+    }
+
     private function normalizeAmount(string $amount): string
     {
         $amount = trim($amount);
@@ -952,12 +1241,26 @@ final readonly class FinanceService
 
     private function chargeSummaryExpressions(string $alias): string
     {
-        return 'COALESCE(SUM(CASE WHEN ' . $alias . '.voided_at IS NULL '
-            . 'THEN ' . $alias . '.amount ELSE 0 END), 0.00) AS outstanding, '
-            . 'COALESCE(SUM(CASE WHEN ' . $alias . '.voided_at IS NULL '
-            . 'AND ' . $alias . '.due_date < :today THEN ' . $alias . '.amount ELSE 0 END), 0.00) AS overdue, '
-            . 'MIN(CASE WHEN ' . $alias . '.voided_at IS NULL THEN ' . $alias . '.due_date ELSE NULL END) '
-            . 'AS oldest_due_date';
+        $outstanding = $this->chargeOutstandingExpression($alias);
+
+        return 'COALESCE(SUM(' . $outstanding . '), 0.00) AS outstanding, '
+            . 'COALESCE(SUM(CASE WHEN ' . $alias . '.due_date < :today THEN ' . $outstanding
+            . ' ELSE 0 END), 0.00) AS overdue, '
+            . 'MIN(CASE WHEN ' . $outstanding . ' > 0 THEN ' . $alias . '.due_date ELSE NULL END) AS oldest_due_date';
+    }
+
+    private function reconciledAllocationExpression(string $alias): string
+    {
+        return '(SELECT COALESCE(SUM(pa.amount), 0.00) FROM payment_allocations pa '
+            . 'INNER JOIN payments p ON p.id = pa.payment_id '
+            . 'WHERE pa.charge_id = ' . $alias . '.id '
+            . 'AND p.reconciled_at IS NOT NULL AND p.rejected_at IS NULL)';
+    }
+
+    private function chargeOutstandingExpression(string $alias): string
+    {
+        return '(CASE WHEN ' . $alias . '.voided_at IS NULL THEN GREATEST(0.00, ' . $alias . '.amount - '
+            . $this->reconciledAllocationExpression($alias) . ') ELSE 0.00 END)';
     }
 
     private function normalizeTotal(mixed $amount): string

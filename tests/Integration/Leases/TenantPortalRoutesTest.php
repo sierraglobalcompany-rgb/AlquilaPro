@@ -42,6 +42,8 @@ final class TenantPortalRoutesTest extends TestCase
 
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
         foreach ([
+            'payment_allocations',
+            'payments',
             'payment_methods',
             'charges',
             'leases',
@@ -383,7 +385,7 @@ final class TenantPortalRoutesTest extends TestCase
             self::assertGreaterThan($lastPosition, $position, 'Applicable methods must retain stable configured order.');
             $lastPosition = $position;
         }
-        foreach (['Ya pagué', 'reportar pago', 'reconciliación', 'allocation', 'proof_received'] as $futureControl) {
+        foreach (['Ya pagué', 'reconciliación', 'allocation', 'proof_received'] as $futureControl) {
             self::assertStringNotContainsString(strtolower($futureControl), strtolower($html));
         }
 

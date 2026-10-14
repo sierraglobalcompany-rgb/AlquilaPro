@@ -9,6 +9,15 @@ $chargeStateLabels = [
     'pending' => 'Pendiente',
     'overdue' => 'Vencido',
     'voided' => 'Anulado',
+    'reported' => 'Pago reportado',
+    'proof_received' => 'Comprobante recibido',
+    'partial' => 'Pago parcial',
+    'paid' => 'Pagado',
+];
+$paymentStateLabels = [
+    'pending_reconciliation' => 'Pendiente de conciliación',
+    'reconciled' => 'Conciliado',
+    'rejected' => 'Rechazado',
 ];
 $chargeTypeLabels = [
     'rent' => 'Canon mensual',
@@ -69,9 +78,90 @@ $brebKeyTypeLabels = [
                         <div>Periodo: <?= $escape(substr($charge['period_month'], 0, 7)) ?></div>
                     <?php endif; ?>
                     <div>Vencimiento: <?= $escape($charge['due_date']) ?></div>
-                    <div>Valor: $<?= $escape($charge['amount']) ?></div>
+                    <div>Valor del cargo: $<?= $escape($charge['amount']) ?></div>
+                    <div>Saldo pendiente: $<?= $escape($charge['outstanding']) ?></div>
                     <?php if ($charge['days_overdue'] > 0): ?>
                         <div>Días vencidos: <?= $escape($charge['days_overdue']) ?></div>
+                    <?php endif; ?>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</section>
+
+<section class="surface">
+    <h2>Reportar pago</h2>
+    <?php
+    $reportableCharges = array_values(array_filter(
+        $charges,
+        static fn (array $charge): bool => $charge['state'] !== 'voided' && $charge['outstanding'] !== '0.00',
+    ));
+    ?>
+    <?php if ($reportableCharges === []): ?>
+        <p class="empty-state">No hay saldos pendientes para reportar.</p>
+    <?php elseif ($paymentMethods === []): ?>
+        <p class="empty-state">No hay medios de pago disponibles para esta propiedad.</p>
+    <?php else: ?>
+        <form method="post" enctype="multipart/form-data" action="<?= $escape($basePath) ?>/tenant/leases/<?= $escape($lease['id']) ?>/payments">
+            <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+            <label>Medio de pago
+                <select name="payment_method_id" required>
+                    <option value="">Selecciona un medio</option>
+                    <?php foreach ($paymentMethods as $method): ?>
+                        <option value="<?= $escape($method['id']) ?>"><?= $escape($method['label']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>Monto pagado
+                <input type="number" name="amount" min="0.01" step="0.01" required>
+            </label>
+            <label>Fecha del pago
+                <input type="date" name="paid_on" max="<?= $escape($today) ?>" required>
+            </label>
+            <label>Hora aproximada (opcional)
+                <input type="time" name="paid_time">
+            </label>
+            <h3>Asignar a cargos pendientes</h3>
+            <div class="users-grid">
+                <?php foreach ($reportableCharges as $charge): ?>
+                    <label class="user-card">
+                        Cargo de <?= $escape($chargeTypeLabels[(string) $charge['type']] ?? 'Cargo') ?>
+                        · vence <?= $escape($charge['due_date']) ?>
+                        · saldo $<?= $escape($charge['outstanding']) ?>
+                        <input type="number" name="allocations[<?= $escape($charge['id']) ?>]"
+                               min="0.01" max="<?= $escape($charge['outstanding']) ?>" step="0.01">
+                    </label>
+                <?php endforeach; ?>
+            </div>
+            <label>Comprobante (PNG, JPEG, WebP o PDF; máximo 5 MiB)
+                <input type="file" name="receipt" accept="image/png,image/jpeg,image/webp,application/pdf">
+            </label>
+            <button class="button" type="submit">Enviar reporte</button>
+        </form>
+    <?php endif; ?>
+</section>
+
+<section class="surface">
+    <h2>Mis reportes de pago</h2>
+    <?php if ($paymentHistory === []): ?>
+        <p class="empty-state">Aún no has reportado pagos.</p>
+    <?php else: ?>
+        <div class="users-grid">
+            <?php foreach ($paymentHistory as $payment): ?>
+                <article class="user-card">
+                    <div class="user-card__head">
+                        <strong>$<?= $escape($payment['amount']) ?></strong>
+                        <span class="status-pill" data-payment-state="<?= $escape($payment['state']) ?>">
+                            <?= $escape($paymentStateLabels[$payment['state']] ?? 'Pago') ?>
+                        </span>
+                    </div>
+                    <div>Fecha del pago: <?= $escape($payment['paid_on']) ?><?= $payment['paid_time'] === null ? '' : ' · ' . $escape($payment['paid_time']) ?></div>
+                    <div>Medio: <?= $escape($payment['payment_method_snapshot']['label'] ?? 'Medio de pago') ?></div>
+                    <?php if ($payment['state'] === 'rejected' && $payment['rejection_reason'] !== null): ?>
+                        <div>Motivo: <?= $escape($payment['rejection_reason']) ?></div>
+                    <?php endif; ?>
+                    <?php if ($payment['has_receipt']): ?>
+                        <a class="button button--quiet" href="<?= $escape($basePath) ?>/tenant/leases/<?= $escape($lease['id']) ?>/payments/<?= $escape($payment['id']) ?>/receipt">Ver comprobante</a>
                     <?php endif; ?>
                 </article>
             <?php endforeach; ?>

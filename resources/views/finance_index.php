@@ -3,12 +3,36 @@
 declare(strict_types=1);
 
 $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+$pendingPayments = $pendingPayments ?? [];
 ?>
 <section class="surface">
     <p class="eyebrow">Administración</p>
     <h1>Cartera</h1>
     <p class="hint">Cargos y saldos pendientes por arrendamiento.</p>
     <p><a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/finance/payment-methods">Configurar medios de pago</a></p>
+
+    <?php if ($pendingPayments !== []): ?>
+        <h2>Pendientes de conciliación</h2>
+        <div class="users-grid">
+            <?php foreach ($pendingPayments as $payment): ?>
+                <article class="user-card">
+                    <div class="user-card__head">
+                        <strong><?= $escape($payment['tenant_name']) ?></strong>
+                        <span class="status-pill">$<?= $escape($payment['amount']) ?></span>
+                    </div>
+                    <div><?= $escape($payment['property_name']) ?> · <?= $escape($payment['unit_code']) ?></div>
+                    <div><?= $escape($payment['paid_on']) ?><?= $payment['paid_time'] === null ? '' : ' · ' . $escape($payment['paid_time']) ?></div>
+                    <div>Medio: <?= $escape($payment['payment_method_snapshot']['label'] ?? 'Medio de pago') ?></div>
+                    <div>Comprobante: <?= $payment['has_receipt'] ? 'Sí' : 'No' ?></div>
+                    <div class="hint">Reportado: <?= $escape($payment['reported_at']) ?></div>
+                    <?php if ($payment['duplicate_warnings'] !== []): ?>
+                        <div class="status-pill">Posible reporte duplicado</div>
+                    <?php endif; ?>
+                    <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/finance/payments/<?= $escape($payment['id']) ?>">Revisar pago</a>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
 
     <?php if ($portfolio === []): ?>
         <p class="empty-state">No hay cargos registrados.</p>

@@ -224,6 +224,7 @@ final class PaymentReportTest extends TestCase
             $private = $this->service()->privatePaymentReceipt((int) $payment['id']);
             self::assertIsArray($private);
             self::assertSame($mime, $private['mime']);
+            self::assertSame(hash('sha256', $bytes), $private['sha256']);
             self::assertSame(strlen($bytes), $private['size_bytes']);
             self::assertFileExists($private['path']);
         }
@@ -237,6 +238,22 @@ final class PaymentReportTest extends TestCase
         self::assertNull($this->service()->privatePaymentReceipt($lastPayment));
     }
 
+    public function testReceiptFormatComesFromBytesInsteadOfClientMimeOrExtension(): void
+    {
+        $fixture = $this->createLease();
+        $chargeId = $this->insertCharge($fixture['lease_id'], '100.00');
+        $methodId = $this->insertPaymentMethod(null, 'Global', true);
+        $payment = $this->service()->reportPayment(
+            $fixture['lease_id'], $methodId, '10', '2026-10-12', null,
+            [['charge_id' => $chargeId, 'amount' => '10']],
+            $this->upload($this->pngBytes(), 'receipt.pdf', 'application/pdf'), $this->now(),
+        );
+
+        self::assertTrue($payment['has_receipt']);
+        self::assertSame('image/png', $this->payment((int) $payment['id'])['receipt_mime_type']);
+        self::assertStringEndsWith('.png', $this->payment((int) $payment['id'])['receipt_stored_name']);
+    }
+
     public function testReceiptRejectsEmptyOversizeUnsupportedAndSpoofedUploads(): void
     {
         $fixture = $this->createLease();
@@ -246,8 +263,6 @@ final class PaymentReportTest extends TestCase
             $this->upload('', 'empty.png', 'image/png'),
             $this->upload($this->pngBytes() . str_repeat('x', (5 * 1024 * 1024) + 1), 'large.png', 'image/png'),
             $this->upload('plain text', 'notes.txt', 'text/plain'),
-            $this->upload($this->pngBytes(), 'photo.png', 'application/pdf'),
-            $this->upload($this->pngBytes(), 'photo.pdf', 'image/png'),
         ];
 
         foreach ($invalidUploads as $upload) {
