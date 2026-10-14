@@ -16,6 +16,7 @@ use AlquilaPro\Foundation\InstallationLock;
 use AlquilaPro\Foundation\Installer;
 use AlquilaPro\Foundation\RuntimeRequirements;
 use AlquilaPro\Finance\FinanceService;
+use AlquilaPro\Finance\ObligationService;
 use AlquilaPro\Finance\PaymentMethodService;
 use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\Properties\PropertyService;
@@ -47,6 +48,9 @@ return static function (array $settings): App {
     );
     $paymentReceiptDirectory = (string) (
         $settings['payment_receipt_directory'] ?? dirname(__DIR__) . '/storage/payment-receipts'
+    );
+    $obligationSupportDirectory = (string) (
+        $settings['obligation_support_directory'] ?? dirname(__DIR__) . '/storage/obligation-supports'
     );
 
     $lock = new InstallationLock($lockPath);
@@ -164,6 +168,7 @@ return static function (array $settings): App {
             $leases = new LeaseService($pdo, $users);
             $paymentMethods = new PaymentMethodService($pdo, $paymentMethodQrDirectory);
             $finance = new FinanceService($pdo, $paymentMethods, $paymentReceiptDirectory);
+            $obligations = new ObligationService($pdo, $finance, $obligationSupportDirectory);
 
             $currentUser = static function () use ($session, $auth): ?array {
                 $userId = $session->userId(time());
@@ -190,6 +195,7 @@ return static function (array $settings): App {
                 'view' => $view,
                 'current_user' => $currentUser,
                 'finance' => $finance,
+                'obligations' => $obligations,
                 'payment_methods' => $paymentMethods,
                 'properties' => $properties,
                 'today' => $settings['today'] ?? null,
@@ -259,6 +265,10 @@ return static function (array $settings): App {
             bool $logErrors,
             bool $logErrorDetails,
         ) use ($responseFactory): ResponseInterface {
+            if ($exception instanceof \Slim\Exception\HttpNotFoundException) {
+                return $responseFactory->createResponse(404);
+            }
+
             $requestPath = $request->getUri()->getPath();
             $safePath = preg_replace(
                 '#(/apply/continue/)[a-f0-9]{64}(?=/|$)#i',

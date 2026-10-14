@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+$obligations = $obligations ?? [];
 $isApartment = (string) $lease['unit_type'] === 'apartment';
 $isParking = (string) $lease['unit_type'] === 'parking';
 $chargeStateLabels = [
@@ -40,6 +41,17 @@ $brebKeyTypeLabels = [
     'email' => 'Correo electrónico',
     'alphanumeric' => 'Llave alfanumérica',
     'merchant_code' => 'Código de comercio',
+];
+$obligationTypeLabels = [
+    'utility' => 'Servicio',
+    'administration_ph' => 'Administración PH',
+    'fine_ph' => 'Multa PH',
+];
+$externalStateLabels = [
+    'open' => 'Abierta',
+    'overdue_external' => 'Vencida externamente',
+    'settled_external' => 'Atendida externamente',
+    'voided' => 'Anulada',
 ];
 ?>
 <section class="surface">
@@ -82,6 +94,50 @@ $brebKeyTypeLabels = [
                     <div>Saldo pendiente: $<?= $escape($charge['outstanding']) ?></div>
                     <?php if ($charge['days_overdue'] > 0): ?>
                         <div>Días vencidos: <?= $escape($charge['days_overdue']) ?></div>
+                    <?php endif; ?>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</section>
+
+<section class="surface">
+    <h2>Mis obligaciones externas</h2>
+    <p class="hint">Valores y vencimientos informados por el proveedor o la propiedad horizontal.</p>
+    <?php if ($obligations === []): ?>
+        <p class="empty-state">No hay obligaciones externas registradas para este arrendamiento.</p>
+    <?php else: ?>
+        <div class="users-grid">
+            <?php foreach ($obligations as $obligation): ?>
+                <article class="user-card">
+                    <div class="user-card__head">
+                        <strong><?= $escape($obligationTypeLabels[$obligation['type']] ?? 'Obligación') ?><?= $obligation['service_name'] === null ? '' : ' · ' . $escape($obligation['service_name']) ?></strong>
+                        <span class="status-pill" data-obligation-state="<?= $escape($obligation['external_state']) ?>">
+                            <?= $escape($externalStateLabels[$obligation['external_state']] ?? 'Obligación') ?>
+                        </span>
+                    </div>
+                    <div><?= $escape($obligation['description']) ?></div>
+                    <?php if ($obligation['period_month'] !== null): ?>
+                        <div>Periodo externo: <?= $escape(substr((string) $obligation['period_month'], 0, 7)) ?></div>
+                    <?php endif; ?>
+                    <?php if ($obligation['issued_on'] !== null): ?>
+                        <div>Fecha de emisión: <?= $escape($obligation['issued_on']) ?></div>
+                    <?php endif; ?>
+                    <?php if ($obligation['due_on'] !== null): ?>
+                        <div>Vencimiento externo: <?= $escape($obligation['due_on']) ?></div>
+                    <?php endif; ?>
+                    <div>Valor externo: $<?= $escape($obligation['amount']) ?></div>
+                    <?php if ($obligation['is_charged']): ?>
+                        <div>
+                            Cargo financiero vinculado: <?= $escape($chargeTypeLabels[$obligation['linked_charge_type'] ?? ''] ?? 'Cargo') ?>
+                            · <?= $escape($chargeStateLabels[$obligation['linked_charge_state'] ?? ''] ?? 'Estado no disponible') ?>
+                            <?php if ($obligation['linked_charge_due_date'] !== null): ?>
+                                · vence <?= $escape($obligation['linked_charge_due_date']) ?>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+                    <?php if ($obligation['source_support_url'] !== null): ?>
+                        <a class="button button--quiet" href="<?= $escape($obligation['source_support_url']) ?>">Ver soporte de origen</a>
                     <?php endif; ?>
                 </article>
             <?php endforeach; ?>
