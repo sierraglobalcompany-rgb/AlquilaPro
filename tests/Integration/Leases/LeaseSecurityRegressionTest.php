@@ -21,6 +21,7 @@ final class LeaseSecurityRegressionTest extends TestCase
         $f12Exists = is_file($f12Migration)
             && preg_match('/CREATE TABLE\s+lease_obligations\b/i', (string) file_get_contents($f12Migration)) === 1;
         $f15Exists = is_file($this->root . '/database/migrations/015_create_maintenance_visits.sql');
+        $f21Exists = is_file($this->root . '/database/migrations/021_create_termination_bonus_and_liquidation.sql');
         $migration = $this->file('database/migrations/008_create_leases.sql');
         preg_match_all('/CREATE TABLE\s+([a-z_]+)/i', $migration, $tables);
         self::assertSame(['leases'], $tables[1] ?? []);
@@ -30,7 +31,12 @@ final class LeaseSecurityRegressionTest extends TestCase
 
         $services = glob($this->root . '/app/Leases/*Service.php') ?: [];
         sort($services);
-        self::assertSame([$this->root . '/app/Leases/LeaseService.php'], $services);
+        $expectedServices = [$this->root . '/app/Leases/LeaseService.php'];
+        if ($f21Exists) {
+            $expectedServices[] = $this->root . '/app/Leases/TerminationService.php';
+        }
+        sort($expectedServices);
+        self::assertSame($expectedServices, $services);
 
         $routeFiles = glob($this->root . '/app/Leases/routes.php') ?: [];
         self::assertCount(1, $routeFiles);
@@ -57,10 +63,12 @@ final class LeaseSecurityRegressionTest extends TestCase
         );
         self::assertSame($expectedRoutes, $routeMatches[1] ?? []);
 
-        $leaseCore = implode("\n", [
-            $this->file('app/Leases/LeaseService.php'),
-            $routes,
-        ]);
+        $leaseSources = [$this->file('app/Leases/LeaseService.php')];
+        if ($f21Exists) {
+            $leaseSources[] = $this->file('app/Leases/TerminationService.php');
+        }
+        $leaseSources[] = $routes;
+        $leaseCore = implode("\n", $leaseSources);
         foreach (['session_start(', 'new SessionGuard(', 'new Csrf('] as $forbidden) {
             self::assertStringNotContainsString(
                 $forbidden,
