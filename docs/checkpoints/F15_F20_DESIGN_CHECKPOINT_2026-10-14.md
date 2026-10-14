@@ -1,7 +1,7 @@
 # ALQUILAPRO — F15→F20 EXECUTION-READY CHECKPOINT
 
 **Fecha:** 2026-10-14  
-**Estado:** `SPECS APPROVED / PLANS COMPLETE / CODEX MASTER READY / NO PRODUCT IMPLEMENTATION STARTED`  
+**Estado:** `SPECS APPROVED / PLANS COMPLETE / CODEX MASTER V4 READY / NO PRODUCT IMPLEMENTATION STARTED`
 
 ```text
 PROJECT: AlquilaPro
@@ -11,25 +11,17 @@ F12: CLOSED / VERIFIED / MERGED
 F13: CLOSED / VERIFIED / MERGED
 F14: CLOSED / VERIFIED / MERGED
 
-F12_MERGE_SHA:
-23cf7576c95fca5e55825d8b5ffd5903bf3d3149
-
-F13_MERGE_SHA:
-57911302bd4e97e76b1e0fa6dc71c8ef24372453
-
-F14_MERGE_SHA:
-c58ee5e660f51e873546f03a578fde6b5778ba19
-
-F14_MERGED_CHECKPOINT_COMMIT:
-87eea6b69796484462cc47391d8d60fdd09f8344
+F12_MERGE_SHA: 23cf7576c95fca5e55825d8b5ffd5903bf3d3149
+F13_MERGE_SHA: 57911302bd4e97e76b1e0fa6dc71c8ef24372453
+F14_MERGE_SHA: c58ee5e660f51e873546f03a578fde6b5778ba19
+F14_MERGED_CHECKPOINT_COMMIT: 87eea6b69796484462cc47391d8d60fdd09f8344
 ```
 
-## Canonical specs
+## Canonical design
 
 ```text
 BATCH_SPEC:
 docs/specs/F15_F20_SPEC_BATCH_V1_2026-10-14.md
-initial commit f6a9690fae1f2d0fb5deb3a836fb16f3f8d61bdc
 
 F20_PRODUCT_DECISION:
 docs/specs/F20_PRODUCT_DECISION_2026-10-14.md
@@ -40,113 +32,107 @@ docs/specs/F20_MEMBERSHIPS_SERVICES_SPEC.md
 commit 54a506675d4e582c804460d3ba20651dc2d4b841
 ```
 
-## Approved implementation plans
+## Approved plans
 
 ```text
-F15:
-docs/superpowers/plans/2026-10-14-f15-agenda-visits.md
-commit 2e83966dae2477de2864557c7e070585824411e7
-
-F16:
-docs/superpowers/plans/2026-10-14-f16-reminders-email.md
-commit 9879cb0b4ad907e26251c783e3b54764bdddd682
-
-F17:
-docs/superpowers/plans/2026-10-14-f17-whatsapp-assisted.md
-commit b1d1518001142009107afb1cdd383ab42ceba63e
-
-F18:
-docs/superpowers/plans/2026-10-14-f18-documents-inventories.md
-commit 301cb1bfafeb86b233e0fb0747b6aeea694908c6
-
-F19:
-docs/superpowers/plans/2026-10-14-f19-community-legal.md
-commit 1aab820ee4df09e6cff0f5a535f9efe3f967be36
-
-F20:
-docs/superpowers/plans/2026-10-14-f20-memberships-services.md
-commit 0a2e8f9de96612a30861bec0031e69f5e9432d13
+F15 docs/superpowers/plans/2026-10-14-f15-agenda-visits.md
+F16 docs/superpowers/plans/2026-10-14-f16-reminders-email.md
+F17 docs/superpowers/plans/2026-10-14-f17-whatsapp-assisted.md
+F18 docs/superpowers/plans/2026-10-14-f18-documents-inventories.md
+F19 docs/superpowers/plans/2026-10-14-f19-community-legal.md
+F20 docs/superpowers/plans/2026-10-14-f20-memberships-services.md
 ```
 
-## Codex execution master
+## Canonical Codex master
 
 ```text
+PATH:
 docs/superpowers/plans/2026-10-14-f15-f20-codex-master.md
-commit 281845dac131b55fd7afa77aae09b898069ccf40
+
+VERSION:
+V4 FINAL LEAN-FAST / AUDITED 10 PASSES
+
+MASTER_COMMIT:
+7348058fc5854c50537989dc04619af313d261fa
 ```
 
-The master is intentionally DRY: detailed interfaces/tests live in the six phase plans; the master owns stacking, checkpoints, anti-loops, efficiency, CI and stop conditions.
+V4 is the only execution contract. Previous exported prompt versions are superseded.
 
-## Frozen architecture budgets
+## Frozen budgets
 
 ```text
-F15:
-1 table maintenance_visits
-1 VisitService
-0 new permissions
-0 runtime deps
-
-F16:
-1 table notification_jobs
-1 NotificationService
-0 new permissions
-1 runtime dep: phpmailer/phpmailer ^7.1
-0 workers/Redis/rule/template tables
-
-F17:
-1 table whatsapp_actions
-1 WhatsAppService
-1 permission whatsapp.use
-reuse Notifications route file
-0 API/provider/webhook
-
-F18:
-1 table documents
-1 DocumentService
-2 permissions documents.view/manage
-0 inventory/manual/version tables
-
-F19:
-1 new table community_incidents
-1 CommunityService
-2 permissions community.view/manage
-reuse F18 documents
-0 legal/support/history tables
-
-F20:
-2 tables digital_services + service_memberships
-1 MembershipService
-2 permissions memberships.view/manage
-0 payment/provider/history tables
+F15: 1 maintenance_visits + 1 VisitService + 0 new permissions/deps
+F16: 1 notification_jobs + 1 NotificationService + PHPMailer ^7.1 only
+F17: 1 whatsapp_actions + 1 WhatsAppService + whatsapp.use
+F18: 1 documents + 1 DocumentService + documents.view/manage
+F19: 1 community_incidents + 1 CommunityService + community.view/manage + reuse F18
+F20: 2 tables digital_services/service_memberships + 1 MembershipService + memberships.view/manage
 ```
 
-## F20 final commercial rule
+## F20 final rule
 
 ```text
 tenant accepts service
-→ membership is persisted immediately
+→ membership persists
+→ NEVER automatic F9 charge
 
 if price_snapshot == 0:
-→ no charge decision required
+→ no admin financial decision
 
 if price_snapshot > 0:
-→ admin module shows exactly:
+→ admin chooses exactly:
    CREATE / Crear cargo
    SKIP / No crear cargo
 
 CREATE:
-→ explicit transaction
 → canonical FinanceService::createManualCharge(type='service')
 → exactly one linked charge
 
 SKIP:
-→ terminal no-charge decision for that membership
+→ terminal no-charge decision
 → no linked charge
 ```
 
-Tenant acceptance NEVER creates a financial charge automatically.
+## V4 execution mechanics
 
-## Laws / self-review
+```text
+STACK:
+main → F15 → F16 → F17 → F18 → F19 → F20
+
+LIVE CHECKPOINT:
+docs/checkpoints/F15_F20_BATCH_CHECKPOINT_2026-10-14.md
+
+CHECKPOINT UPDATE:
+after every Task, before continuing
+
+RECOVERY:
+read live checkpoint → continue NEXT_EXACT_ACTION → never repeat PASS
+
+CI:
+launch one PR CI per phase; do NOT wait before starting next stacked phase
+final batch gate verifies all six matrices
+
+TARGETS:
+LOCAL_FULL_SUITE_RUNS: 0
+REMOTE_CI_RUNS: 1 per phase normally
+FRESH_REVIEWS: 1 per phase
+PRODUCTIVE_COMMITS: <=2 per phase
+DOC_COMMITS: 1 per phase
+LOOP_ESCAPES: 0
+MERGES: NONE
+```
+
+If an upstream CI fails after downstream work began:
+
+```text
+stop at next Task checkpoint
+→ repair owning phase once
+→ recertify owner
+→ propagate by clean merge
+→ recertify only affected descendants
+```
+
+## Laws / audit
 
 ```text
 KISS: PASS F15-F20
@@ -160,31 +146,6 @@ TENANT_OWNERSHIP: PASS
 PLAN_INTERFACE_CONSISTENCY: PASS
 PLAN_SPEC_COVERAGE: PASS
 MASTER_10_PASS_AUDIT: PASS
-```
-
-## Execution mechanics
-
-```text
-STACK:
-main
-→ F15
-→ F16
-→ F17
-→ F18
-→ F19
-→ F20
-
-CHECKPOINT DURING CODEX:
-docs/checkpoints/F15_F20_BATCH_CHECKPOINT_2026-10-14.md
-
-TARGET:
-LOCAL_FULL_SUITE_RUNS: 0
-REMOTE_CI_RUNS: 1 per phase
-FRESH_REVIEWS: 1 per phase
-PRODUCTIVE_COMMITS: <=3 per phase
-DOC_COMMITS: 1 per phase
-LOOP_ESCAPES: 0
-MERGES: NONE
 ```
 
 ## Current exact state
@@ -201,20 +162,37 @@ OPEN_DESIGN_BLOCKERS: NONE
 OPEN_PRODUCT_BLOCKERS: NONE
 
 NEXT_EXACT_ACTION:
-USER/CODEX executes docs/superpowers/plans/2026-10-14-f15-f20-codex-master.md
+CODEX executes docs/superpowers/plans/2026-10-14-f15-f20-codex-master.md
 ```
 
-## Recovery rule
+## Start rule
 
-If this chat ends, a new thread should read, in order:
+The V4 master was written on top of docs-only `PREPACKAGE_BASE`:
 
 ```text
-1. docs/checkpoints/F14_MERGED_2026-10-14.md
-2. docs/checkpoints/F15_F20_DESIGN_CHECKPOINT_2026-10-14.md
-3. docs/superpowers/plans/2026-10-14-f15-f20-codex-master.md
-4. current phase plan if implementation has started
-5. docs/checkpoints/F15_F20_BATCH_CHECKPOINT_2026-10-14.md if it exists
-6. current main / PR / CI GitHub truth
+37350105ac8c1806ae69194082098dbe230e5838
 ```
 
-Do not reimplement F12-F14. Do not merge F15-F20 from Codex. After Codex closes the batch, ChatGPT/Sol performs forensic audit and sequential merge gates.
+Before F15 product work Codex must resolve current `main` with:
+
+```bash
+git fetch origin
+git switch main
+git pull --ff-only
+git rev-parse HEAD
+```
+
+That exact SHA becomes `MAIN_START`; it must contain this V4/checkpoint and be a docs-only descendant of the prepackage base.
+
+## Recovery rule if this chat ends
+
+```text
+1 docs/checkpoints/F14_MERGED_2026-10-14.md
+2 docs/checkpoints/F15_F20_DESIGN_CHECKPOINT_2026-10-14.md
+3 docs/superpowers/plans/2026-10-14-f15-f20-codex-master.md
+4 current phase plan only if needed
+5 docs/checkpoints/F15_F20_BATCH_CHECKPOINT_2026-10-14.md if Codex started
+6 current GitHub main / PR / CI truth
+```
+
+Do not reimplement F12-F14. Codex must not merge F15-F20. After batch close, ChatGPT/Sol performs forensic audit and sequential merge gates.
