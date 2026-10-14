@@ -28,6 +28,30 @@ try {
     file_put_contents($readyFile, 'ready');
 
     switch ($operation) {
+        case 'propose':
+            $slots = json_decode($payload, true, 16, JSON_THROW_ON_ERROR);
+            if (!is_array($slots)) {
+                throw new RuntimeException('Invalid test payload.');
+            }
+            $service->propose($visitId, $slots, null, null, $actorId, $now);
+            break;
+        case 'direct':
+            $schedule = json_decode($payload, true, 16, JSON_THROW_ON_ERROR);
+            if (!is_array($schedule) || !is_string($schedule['start_at'] ?? null)
+                || !is_int($schedule['duration_minutes'] ?? null)
+            ) {
+                throw new RuntimeException('Invalid test payload.');
+            }
+            $service->scheduleDirect(
+                $visitId,
+                $schedule['start_at'],
+                $schedule['duration_minutes'],
+                null,
+                null,
+                $actorId,
+                $now,
+            );
+            break;
         case 'select':
             $service->selectSlot($visitId, $payload, $actorId, $now);
             break;

@@ -102,6 +102,44 @@ final class VisitConcurrencyTest extends TestCase
         self::assertSame([$second], array_column($current['proposed_slots'], 'start_at'));
     }
 
+    public function testSchedulingMutationsRejectSlotsThatExpireWhileWaitingForRequestLock(): void
+    {
+        $fixture = $this->createMaintenanceRequest($this->pdo);
+        $now = time();
+        $start = gmdate('Y-m-d H:i:s', $now + 3);
+        $service = new VisitService($this->pdo);
+        $proposedVisit = $service->propose($fixture['request_id'], [[
+            'start_at' => $start,
+            'duration_minutes' => 60,
+        ]], null, null, $fixture['actor_id'], $now);
+        $scheduledVisit = $service->scheduleDirect(
+            $fixture['request_id'], $start, 60, null, null, $fixture['actor_id'], $now,
+        );
+
+        $results = $this->runQueuedWorkers([
+            ['select', $proposedVisit['id'], $fixture['tenant_id'], $now, $start],
+            ['reprogram', $scheduledVisit['id'], $fixture['actor_id'], $now, json_encode([[
+                'start_at' => $start,
+                'duration_minutes' => 90,
+            ]], JSON_THROW_ON_ERROR)],
+            ['propose', $fixture['request_id'], $fixture['actor_id'], $now, json_encode([[
+                'start_at' => $start,
+                'duration_minutes' => 60,
+            ]], JSON_THROW_ON_ERROR)],
+            ['direct', $fixture['request_id'], $fixture['actor_id'], $now, json_encode([
+                'start_at' => $start,
+                'duration_minutes' => 45,
+            ], JSON_THROW_ON_ERROR)],
+        ], $fixture['request_id'], 3500);
+
+        self::assertCount(4, $results);
+        self::assertSame([], array_filter($results, static fn (array $result): bool => $result['ok']));
+        self::assertSame('proposed', $service->find($proposedVisit['id'])['status']);
+        self::assertNull($service->find($proposedVisit['id'])['selected_start_at']);
+        self::assertSame('scheduled', $service->find($scheduledVisit['id'])['status']);
+        self::assertCount(2, $service->listForRequest($fixture['request_id']));
+    }
+
     public function testCompleteAndCancelRaceHasOneTerminalWinner(): void
     {
         $fixture = $this->createMaintenanceRequest($this->pdo);
@@ -159,9 +197,12 @@ final class VisitConcurrencyTest extends TestCase
     }
 
     /** @param list<list<int|string>> $operations @return list<array<string,mixed>> */
-    private function runQueuedWorkers(array $operations): array
+    private function runQueuedWorkers(array $operations, ?int $holdRequestId = null, int $releaseDelayMs = 150): array
     {
         $this->workers = [];
+        if ($holdRequestId !== null) {
+            $this->lockRequest($holdRequestId);
+        }
         $workerPath = dirname(__DIR__, 2) . '/Support/VisitConcurrencyWorker.php';
         try {
             foreach ($operations as $operation) {
@@ -186,8 +227,8 @@ final class VisitConcurrencyTest extends TestCase
                 }
                 usleep(10000);
             } while (microtime(true) < $deadline);
-            self::assertTrue($allReady, 'Each worker should reach its service operation while the visit row is locked.');
-            usleep(150000);
+            self::assertTrue($allReady, 'Each worker should reach its service operation while the selected lock is held.');
+            usleep($releaseDelayMs * 1000);
             foreach ($this->workers as $worker) {
                 self::assertTrue(proc_get_status($worker['process'])['running']);
             }
@@ -213,5 +254,13 @@ final class VisitConcurrencyTest extends TestCase
                 $this->pdo->rollBack();
             }
         }
+    }
+
+    private function lockRequest(int $requestId): void
+    {
+        $this->pdo->beginTransaction();
+        $statement = $this->pdo->prepare('SELECT id FROM maintenance_requests WHERE id = :id FOR UPDATE');
+        $statement->execute(['id' => $requestId]);
+        self::assertSame($requestId, (int) $statement->fetchColumn());
     }
 }

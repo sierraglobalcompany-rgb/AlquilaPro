@@ -202,6 +202,16 @@ final readonly class MaintenanceService
             if ($targetStatus === 'cancelled' && $request['charge_id'] !== null) {
                 throw new RuntimeException('No fue posible actualizar el estado de la solicitud.');
             }
+            if (in_array($targetStatus, ['resolved', 'cancelled'], true)) {
+                $activeVisit = $this->pdo->prepare(
+                    'SELECT 1 FROM maintenance_visits WHERE maintenance_request_id = :request_id '
+                    . 'AND status IN (\'proposed\', \'scheduled\') LIMIT 1',
+                );
+                $activeVisit->execute(['request_id' => (int) $request['id']]);
+                if ($activeVisit->fetchColumn() !== false) {
+                    throw new RuntimeException('No fue posible actualizar el estado de la solicitud.');
+                }
+            }
             $timestamp = gmdate('Y-m-d H:i:s', $now);
             if ($targetStatus === 'resolved') {
                 $update = $this->pdo->prepare(

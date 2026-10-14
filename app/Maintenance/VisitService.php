@@ -44,6 +44,8 @@ final readonly class VisitService
             $now,
         ): array {
             $this->lockActiveRequest($requestId);
+            $operationNow = $this->effectiveNow($now);
+            $normalizedSlots = $this->validateSlots($normalizedSlots, $operationNow);
             $insert = $this->pdo->prepare(
                 'INSERT INTO maintenance_visits '
                 . '(maintenance_request_id, proposed_slots_json, technician_name, technician_contact, status, '
@@ -51,7 +53,7 @@ final readonly class VisitService
                 . 'VALUES (:request_id, :slots, :technician_name, :technician_contact, \'proposed\', '
                 . ':actor_id, :created_at, :updated_at)',
             );
-            $timestamp = gmdate('Y-m-d H:i:s', $now);
+            $timestamp = gmdate('Y-m-d H:i:s', $operationNow);
             $insert->execute([
                 'request_id' => $requestId,
                 'slots' => $this->encodeSlots($normalizedSlots),
@@ -92,7 +94,9 @@ final readonly class VisitService
             $now,
         ): array {
             $this->lockActiveRequest($requestId);
-            $timestamp = gmdate('Y-m-d H:i:s', $now);
+            $operationNow = $this->effectiveNow($now);
+            $startAt = $this->validateFutureDate($startAt, $operationNow);
+            $timestamp = gmdate('Y-m-d H:i:s', $operationNow);
             $insert = $this->pdo->prepare(
                 'INSERT INTO maintenance_visits '
                 . '(maintenance_request_id, proposed_slots_json, selected_start_at, duration_minutes, '
@@ -153,6 +157,7 @@ final readonly class VisitService
                 throw $this->failure();
             }
             $this->lockActiveRequest((int) $visit['maintenance_request_id']);
+            $operationNow = $this->effectiveNow($now);
             $selected = null;
             foreach ($visit['proposed_slots'] as $slot) {
                 if (hash_equals((string) $slot['start_at'], $startAt)) {
@@ -160,7 +165,7 @@ final readonly class VisitService
                     break;
                 }
             }
-            if (!is_array($selected) || $this->validateFutureDate($startAt, $now) !== $startAt) {
+            if (!is_array($selected) || $this->validateFutureDate($startAt, $operationNow) !== $startAt) {
                 throw $this->failure();
             }
             $update = $this->pdo->prepare(
@@ -170,7 +175,7 @@ final readonly class VisitService
             $update->execute([
                 'start_at' => $startAt,
                 'duration' => (int) $selected['duration_minutes'],
-                'updated_at' => gmdate('Y-m-d H:i:s', $now),
+                'updated_at' => gmdate('Y-m-d H:i:s', $operationNow),
                 'id' => $visitId,
             ]);
             if ($update->rowCount() !== 1) {
@@ -194,6 +199,8 @@ final readonly class VisitService
                 throw $this->failure();
             }
             $this->lockActiveRequest((int) $visit['maintenance_request_id']);
+            $operationNow = $this->effectiveNow($now);
+            $normalizedSlots = $this->validateSlots($normalizedSlots, $operationNow);
             $update = $this->pdo->prepare(
                 'UPDATE maintenance_visits SET proposed_slots_json = :slots, selected_start_at = NULL, '
                 . 'duration_minutes = NULL, status = \'proposed\', updated_at = :updated_at '
@@ -201,7 +208,7 @@ final readonly class VisitService
             );
             $update->execute([
                 'slots' => $this->encodeSlots($normalizedSlots),
-                'updated_at' => gmdate('Y-m-d H:i:s', $now),
+                'updated_at' => gmdate('Y-m-d H:i:s', $operationNow),
                 'id' => $visitId,
             ]);
             if ($update->rowCount() !== 1) {
@@ -328,11 +335,18 @@ final readonly class VisitService
         }
     }
 
+    private function effectiveNow(int $providedNow): int
+    {
+        return max($providedNow, time());
+    }
+
     /** @return array{0:?string,1:?string} */
     private function validateTechnician(?string $name, ?string $contact): array
     {
         $name = $name === null ? null : trim($name);
         $contact = $contact === null ? null : trim($contact);
+        $name = $name === '' ? null : $name;
+        $contact = $contact === '' ? null : $contact;
         if (($name !== null && ($name === '' || mb_strlen($name, 'UTF-8') > 120
                 || preg_match('/[\x00-\x1F\x7F]/', $name) === 1))
             || ($contact !== null && ($contact === '' || mb_strlen($contact, 'UTF-8') > 200

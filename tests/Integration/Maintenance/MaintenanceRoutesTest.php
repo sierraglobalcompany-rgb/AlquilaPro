@@ -124,6 +124,43 @@ final class MaintenanceRoutesTest extends TestCase
         self::assertStringContainsString('Técnico de prueba', (string) $this->request($app, 'GET', $detailPath)->getBody());
     }
 
+    public function testOptionalTechnicianFieldsMayBeBlankOnStaffForms(): void
+    {
+        $fixture = $this->createMaintenanceRequest($this->pdo);
+        $this->setPermissions($fixture['actor_id'], ['maintenance.view', 'maintenance.manage']);
+        $app = $this->app('/sub');
+        $this->login($app, $fixture['actor_email'], 'TemporaryPass123', '/sub');
+        $detailPath = '/sub/admin/maintenance/' . $fixture['request_id'];
+        $now = time();
+
+        $proposal = $this->request($app, 'POST', $detailPath . '/visits', [
+            'operation' => 'propose',
+            'slots' => gmdate('Y-m-d H:i:s', $now + 86400) . '|60',
+            'technician_name' => '',
+            'technician_contact' => '',
+        ]);
+        self::assertSame(303, $proposal->getStatusCode());
+        $proposed = $this->pdo->query(
+            'SELECT technician_name, technician_contact FROM maintenance_visits WHERE maintenance_request_id = '
+            . $fixture['request_id'],
+        )->fetch(PDO::FETCH_ASSOC);
+        self::assertSame(['technician_name' => null, 'technician_contact' => null], $proposed);
+
+        $direct = $this->request($app, 'POST', $detailPath . '/visits', [
+            'operation' => 'direct',
+            'start_at' => gmdate('Y-m-d H:i:s', $now + 172800),
+            'duration_minutes' => '60',
+            'technician_name' => '',
+            'technician_contact' => '',
+        ]);
+        self::assertSame(303, $direct->getStatusCode());
+        $scheduled = $this->pdo->query(
+            'SELECT technician_name, technician_contact FROM maintenance_visits WHERE maintenance_request_id = '
+            . $fixture['request_id'] . ' ORDER BY id DESC LIMIT 1',
+        )->fetch(PDO::FETCH_ASSOC);
+        self::assertSame(['technician_name' => null, 'technician_contact' => null], $scheduled);
+    }
+
     public function testViewOnlyStaffCannotMutateAndForcedPasswordGateStillApplies(): void
     {
         $fixture = $this->createMaintenanceRequest($this->pdo);
