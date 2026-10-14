@@ -38,6 +38,7 @@ final class LeaseSecurityRegressionTest extends TestCase
             '/admin/leases/{id:[0-9]+}/end',
             '/tenant',
             '/tenant/leases/{id:[0-9]+}',
+            '/tenant/leases/{leaseId:[0-9]+}/payment-methods/{methodId:[0-9]+}/qr',
             '/tenant/leases/{id:[0-9]+}/contract',
         ], $routeMatches[1] ?? []);
 
