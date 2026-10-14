@@ -442,21 +442,35 @@ final class InsuranceService
         return $policies;
     }
 
-    public function tenantPolicySummary(int $leaseId, string $today): array
+    public function listPoliciesForLease(int $leaseId, string $today): array
     {
-        if ($leaseId <= 0 || !$this->isDate($today)) {
+        if (!$this->isDate($today)) {
+            throw new RuntimeException('La fecha de consulta no es válida.');
+        }
+        if ($leaseId <= 0) {
             return [];
         }
         $statement = $this->pdo->prepare(
             'SELECT id FROM insurance_policies WHERE lease_id = :lease_id ORDER BY coverage_start DESC, id DESC',
         );
         $statement->execute(['lease_id' => $leaseId]);
-        $summary = [];
+        $policies = [];
         foreach ($statement->fetchAll(PDO::FETCH_COLUMN) as $policyId) {
             $policy = $this->findPolicy((int) $policyId, $today);
-            if ($policy === null) {
-                continue;
+            if ($policy !== null) {
+                $policies[] = $policy;
             }
+        }
+        return $policies;
+    }
+
+    public function tenantPolicySummary(int $leaseId, string $today): array
+    {
+        if ($leaseId <= 0 || !$this->isDate($today)) {
+            return [];
+        }
+        $summary = [];
+        foreach ($this->listPoliciesForLease($leaseId, $today) as $policy) {
             $number = (string) $policy['policy_number'];
             $maskedNumber = mb_strlen($number) <= 4 ? '••••' : '••••' . mb_substr($number, -4);
             $coverage = array_map(static fn (array $item): array => [
