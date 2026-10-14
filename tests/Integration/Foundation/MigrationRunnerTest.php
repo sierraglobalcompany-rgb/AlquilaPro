@@ -32,6 +32,7 @@ final class MigrationRunnerTest extends TestCase
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
         foreach ([
             'migration_probe',
+            'community_incidents',
             'whatsapp_actions',
             'documents',
             'notification_jobs',
@@ -95,6 +96,7 @@ final class MigrationRunnerTest extends TestCase
                 '016_create_notification_jobs.sql',
                 '017_create_whatsapp_actions.sql',
                 '018_create_documents.sql',
+                '019_create_community_incidents.sql',
         ];
         self::assertSame(count($expectedMigrations), $first['applied']);
         self::assertSame($expectedMigrations, $first['migrations']);
@@ -127,6 +129,7 @@ final class MigrationRunnerTest extends TestCase
         self::assertSame(1, $this->tableExists('notification_jobs'));
         self::assertSame(1, $this->tableExists('whatsapp_actions'));
         self::assertSame(1, $this->tableExists('documents'));
+        self::assertSame(1, $this->tableExists('community_incidents'));
     }
 
     public function testFailedMigrationIsNotRecordedAsApplied(): void

@@ -59,11 +59,13 @@ closed
 voided
 ```
 
-- [ ] RED exact incident table, FKs/indexes, no support/history/legal table.
-- [ ] GREEN schema/lifecycle with row locks for terminal transitions.
-- [ ] RED category/date/description bounds and forward-only transitions.
-- [ ] GREEN service and derived safe projections.
-- [ ] Run schema/service focused tests.
+- [x] RED exact incident table, FKs/indexes, no support/history/legal table.
+- [x] GREEN schema/lifecycle with row locks for terminal transitions.
+- [x] RED category/date/description bounds and forward-only transitions.
+- [x] GREEN service and derived safe projections.
+- [x] Run schema/service focused tests.
+
+Task 1 result: the initial RED found the missing table and migration 019. GREEN adds the exact incident schema and `CommunityService`; the final focused run passed 5 tests / 75 assertions. MySQL’s implicit FK support indexes are explicit in migration 019 and the schema test.
 
 ### Task 2: Converge incident evidence + legal notices into F18
 
