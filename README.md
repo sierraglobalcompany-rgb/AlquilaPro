@@ -152,7 +152,7 @@ F8_FORENSIC_REVIEW: PASS — unit-edit/lease-activation TOCTOU race closed by se
 LEY_1_KISS: PASS
 LEY_2_CERO_RUIDO: PASS
 
-CURRENT_GATE: F14 IMPLEMENTED / LOCAL FOCUSED QA PASS / PR CI PENDING
+CURRENT_GATE: F15 IMPLEMENTED / LOCAL FOCUSED QA PASS / PR CI PENDING
 F9_BRANCH: impl/f9-charges-portfolio-20261013
 F9_BASE: 89811cbba5ae922bab00b50dd02af08dbaa1cb8b
 F9_PRODUCT_HEAD: 225648a21fdf5dc50cd5c397f4dbbe13c234d9e4
@@ -186,9 +186,17 @@ F14_BRANCH: impl/f14-maintenance-requests-20261014
 F14_BASE: 935c02b5f1311fc3453ed32ea747b371c1d168cc
 F14_PRODUCT_HEAD: d6e77fd7ced5237d03947360733fe198e0c443e8
 F14_PR: pending docs-only closure
+F15_STATUS: IMPLEMENTED / LOCAL FOCUSED QA PASS / PR CI PENDING
+F15_BRANCH: impl/f15-agenda-visits-20261014
+F15_BASE: ddb24048326e3fd67df919f1bd829fac939d8861
+F15_PRODUCT_HEAD: d2c23d44aeefd28ba70fce9ad1d8679d87a3275e
+F15_CLOSURE_HEAD: pending docs-only closure commit
+F15_PR: pending push; base current main
+F15_CI: pending PHP 8.3/8.4/8.5 matrix
+F15_MERGE_AUTHORIZED: NO
 MERGE_AUTHORIZED: NO
-CURRENT_ACTION: create the single F14 docs-only closure commit, then push and open PR against F13
-NEXT: verify F14 PR CI on PHP 8.3/8.4/8.5; stop without merging
+CURRENT_ACTION: finish the single F15 docs-only closure commit, push once, and open the PR against current main
+NEXT: begin F16 after the F15 local gate; verify all batch PR CI matrices at F20; do not merge
 ```
 
 No reimplementar F1–F8. No reabrir una fase certificada sin evidencia de regresión o una nueva SPEC aprobada.
