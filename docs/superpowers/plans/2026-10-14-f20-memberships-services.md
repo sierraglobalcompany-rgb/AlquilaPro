@@ -52,11 +52,13 @@ MembershipService::findService(int $serviceId): ?array
 MembershipService::listServices(bool $activeOnly = false): array
 ```
 
-- [ ] RED exact two tables/FKs/indexes/unique nullable `charge_id`; no membership status/history/payment/provider tables.
-- [ ] GREEN migration.
-- [ ] RED service name/description/price/duration/active validation and no historical delete.
-- [ ] GREEN service catalog authority.
-- [ ] Run schema/catalog focused tests.
+- [x] RED exact two tables/FKs/indexes/unique nullable `charge_id`; no membership status/history/payment/provider tables.
+- [x] GREEN migration.
+- [x] RED service name/description/price/duration/active validation and no historical delete.
+- [x] GREEN service catalog authority.
+- [x] Run schema/catalog focused tests.
+
+Task 1 result: RED found migration 020 missing (19 applied vs 20), no F20 tables, and no `MembershipService`. GREEN adds exactly `digital_services` and `service_memberships` with nullable unique `charge_id`, specified foreign keys and derived charge-decision constraints, plus a validated non-deleting catalog authority. Focused migration/schema/catalog set passed 5 tests / 75 assertions.
 
 ### Task 2: Tenant acceptance + renewal history
 

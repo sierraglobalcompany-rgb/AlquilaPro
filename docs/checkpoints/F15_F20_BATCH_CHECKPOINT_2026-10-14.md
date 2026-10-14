@@ -4,13 +4,13 @@
 PREPACKAGE_BASE: 37350105ac8c1806ae69194082098dbe230e5838
 MAIN_START: ddb24048326e3fd67df919f1bd829fac939d8861
 MAIN_START_AUDIT: PASS — descendant of PREPACKAGE_BASE; only the V4 master and design checkpoint changed
-CURRENT_PHASE: F19
-CURRENT_TASK: F19 Product Head fixed; docs-only Closure Head prepared
-BRANCH: impl/f19-community-legal-20261014
-BASE: 24f2da7dcf043ff4750434e18dcca66dfd37aab1 (F18 CLOSURE_HEAD)
-CURRENT_HEAD: 5fe11b3 (F19 product head; closure pending)
+CURRENT_PHASE: F20
+CURRENT_TASK: F20 Task 1 complete (5 tests / 75 assertions); next T20.2 acceptance + renewal history
+BRANCH: impl/f20-memberships-services-20261014
+BASE: 75be03fc4ac17feb4f36fc25f28b853de3c45e2a (F19 CLOSURE_HEAD)
+CURRENT_HEAD: 75be03f (F19 closure; F20 Task 1 changes in worktree)
 WORKTREE: C:\Users\felip\.codex\worktrees\f15-f20-batch\AlquilaPro
-WORKTREE_STATUS: F18 product complete with PR #21 (mergeable; CI intentionally unpolled); F19 product head 5fe11b3 locally certified; README/SPEC/checkpoint closure docs pending; generated .phpunit.cache/ and app/graphify-out/ remain untracked
+WORKTREE_STATUS: F19 PR #22 open/mergeable with CI intentionally unpolled; F20 Task 1 code/tests complete locally and uncommitted; generated .phpunit.cache/ and app/graphify-out/ remain untracked
 F15_STATUS: LOCAL CERTIFIED / PR OPEN / MERGEABILITY CONFLICTING
 F15_BRANCH: impl/f15-agenda-visits-20261014
 F15_BASE: ddb24048326e3fd67df919f1bd829fac939d8861
@@ -57,6 +57,10 @@ F19_TASK1_RULING: close allowed from open/reviewed; void allowed from any nonvoi
 F19_TASK1_PRODUCT_HEAD: 4e35bf2e1fe01bc4364f2200106510c132ce75b0
 F19_PRODUCT_HEAD: 5fe11b32a674b277b05bd9f33d3a72a2a7df9550
 F19_PR_BASE: impl/f18-documents-inventories-20261014@24f2da7dcf043ff4750434e18dcca66dfd37aab1
+F19_CLOSURE_HEAD: 75be03fc4ac17feb4f36fc25f28b853de3c45e2a
+F19_PR: #22 https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/22 (OPEN / MERGEABLE)
+F19_PR_HEAD: 75be03fc4ac17feb4f36fc25f28b853de3c45e2a
+F19_CI: triggered; intentionally unpolled until final batch check
 F19_TASK2_RED: DocumentSchemaTest found missing community_incident_id; CommunityDocumentsTest reached undefined createIncidentFileVersion and rejected legal_notice type.
 F19_TASK2_GREEN: migration 019 extends the one documents table to an exact property/lease/incident scope; DocumentService reuses private file integrity and version lineage, adds current incident evidence and validates property legal notices. F18/F19 document + migration regression set: 19 tests / 209 assertions PASS, 1 Windows symlink skip.
 F19_TASK2_RULING: legal_notice requires source_label and notice_text; optional source_url is limited to valid HTTP(S), effective_on is strict ISO date; text caps are label 190, URL 2048, notice 10000. Spec requires validation but leaves limits open; cost if wrong: long but valid notices or non-HTTP sources may be rejected.
@@ -88,20 +92,20 @@ F16_TASK4: Architecture freeze and candidate-route transport proof PASS. Focused
 DONE: F15 locally certified, PR #18 open. F16 product head 7b5118b and docs-only closure commit complete; remote submission pending. PHPMailer ^7.1 resolves to 7.1.1.
 RULING/FINDING: (1) F15 F14 schema wildcard narrowed to maintenance_requests; F15 plan-named MaintenanceRoutesTest.php was absent, so a focused file was created. (2) F15 staff may reprogram proposed/scheduled visit slots, with only current slots selectable. (3) F15 fresh review found 4 Important, all fixed; reviewer declined no behavior. (4) F16 SMTP errors are reduced to generic keys; attempt increments only at actual send; stale exhausted claims fail closed. (5) Reminder cadence follows the F16 choices above; candidate mail is only for created/submitted. (6) F16 minor review findings on pagination and recipient retention are recorded for follow-up, not required by the phase Critical/Important repair gate.
 ENVIRONMENT: PHP 8.5.8; pdo_mysql/mbstring/dom/fileinfo present; gd absent; test DB connects.
-NEXT_EXACT_ACTION: finish separate whole-phase review of 24f2da7..0f9ad3d against the approved F19 spec; then only Critical/Important repairs, composer strict, diff check, and docs-only phase closure.
+NEXT_EXACT_ACTION: T20.2 — implement tenant acceptance and renewal snapshots with lease-row serialization, overlap rejection, immutable history and free/paid decision projections.
 
 F15: LOCAL CERTIFIED / PR CI PENDING RECONCILIATION
 F16: PRODUCT COMPLETE / PR OPEN / REMOTE CI PENDING FINAL CHECK
 F17: PRODUCT COMPLETE / PR #20 OPEN / REMOTE CI PENDING FINAL CHECK
 F18: PRODUCT COMPLETE / PR #21 OPEN / MERGEABLE / CI PENDING FINAL CHECK
-F19: LOCALLY CERTIFIED / STACKED PR PENDING
-F20: PENDING
+F19: LOCALLY CERTIFIED / PR #22 OPEN / CI PENDING FINAL CHECK
+F20: TASK 1 COMPLETE / TASK 2 NEXT
 
 LOCAL_FULL_SUITE_RUNS: 0
-REMOTE_CI_RUNS: 4 (F15–F18 PRs triggered; final check pending)
+REMOTE_CI_RUNS: 5 (F15–F19 PRs triggered; final check pending)
 FRESH_REVIEWS: 5 (F19 review was author self-review; no independent reviewer dispatched)
 PRODUCTIVE_COMMITS: 10
-DOC_COMMITS: 4
+DOC_COMMITS: 5
 LOOP_ESCAPES: 0
 CI_REPAIRS: 0
 MERGES: NONE
