@@ -104,8 +104,6 @@ final class ChargeSchemaTest extends TestCase
         ], $this->indexes('charges'));
 
         foreach ([
-            'payments',
-            'payment_allocations',
             'payment_reports',
             'receivables',
             'balances',

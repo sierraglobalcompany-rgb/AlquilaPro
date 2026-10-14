@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AlquilaPro\Tests\Integration\Finance;
 
 use AlquilaPro\Finance\FinanceService;
+use AlquilaPro\Finance\PaymentMethodService;
 use AlquilaPro\Foundation\DatabaseConfig;
 use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\MigrationRunner;
@@ -534,7 +535,11 @@ final class FinanceServiceTest extends TestCase
             }
         };
 
-        (new FinanceService($pdo))->createMonthlyCharges(
+        (new FinanceService(
+            $pdo,
+            new PaymentMethodService($pdo, sys_get_temp_dir()),
+            sys_get_temp_dir(),
+        ))->createMonthlyCharges(
             $fixture['lease_id'], '2026-10-01', '2026-10-05', $fixture['actor_id'],
         );
 
@@ -570,7 +575,11 @@ final class FinanceServiceTest extends TestCase
 
     private function service(): FinanceService
     {
-        return new FinanceService($this->pdo);
+        return new FinanceService(
+            $this->pdo,
+            new PaymentMethodService($this->pdo, sys_get_temp_dir()),
+            sys_get_temp_dir(),
+        );
     }
 
     /** @return array{lease_id:int,contract_id:int,unit_id:int,candidate_id:int,tenant_id:int,actor_id:int} */

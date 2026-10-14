@@ -38,8 +38,6 @@ final class PaymentMethodSecurityRegressionTest extends TestCase
             'bank_tokens',
             'payment_transactions',
             'payment_intents',
-            'payments',
-            'payment_allocations',
             'payment_reports',
         ] as $forbiddenTable) {
             self::assertNotContains($forbiddenTable, $allTables[1] ?? []);
@@ -207,7 +205,8 @@ final class PaymentMethodSecurityRegressionTest extends TestCase
             );
         }
 
-        $productSurfaces = strtolower($adminView . "\n" . $tenantView);
+        // F11 now composes reporting in the existing tenant lease view; keep this F10-only guard scoped to its own screen.
+        $productSurfaces = strtolower($adminView);
         foreach ([
             'ya pagué',
             'reportar pago',

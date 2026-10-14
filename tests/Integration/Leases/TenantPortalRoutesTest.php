@@ -42,6 +42,8 @@ final class TenantPortalRoutesTest extends TestCase
 
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
         foreach ([
+            'payment_allocations',
+            'payments',
             'payment_methods',
             'charges',
             'leases',
@@ -205,7 +207,11 @@ final class TenantPortalRoutesTest extends TestCase
         ]);
 
         $tracedPdo = $this->tracedPdo();
-        $monthlyCharges = (new FinanceService($tracedPdo))->createMonthlyCharges(
+        $monthlyCharges = (new FinanceService(
+            $tracedPdo,
+            new PaymentMethodService($tracedPdo, $this->qrDirectory),
+            $this->directory . '/payment-receipts',
+        ))->createMonthlyCharges(
             $apartment['lease_id'], '2026-10-01', '2026-10-12', $tenantId,
         );
         self::assertSame(['rent', 'administration'], array_column($monthlyCharges, 'type'));
@@ -383,7 +389,7 @@ final class TenantPortalRoutesTest extends TestCase
             self::assertGreaterThan($lastPosition, $position, 'Applicable methods must retain stable configured order.');
             $lastPosition = $position;
         }
-        foreach (['Ya pagué', 'reportar pago', 'reconciliación', 'allocation', 'proof_received'] as $futureControl) {
+        foreach (['Ya pagué', 'reconciliación', 'allocation', 'proof_received'] as $futureControl) {
             self::assertStringNotContainsString(strtolower($futureControl), strtolower($html));
         }
 

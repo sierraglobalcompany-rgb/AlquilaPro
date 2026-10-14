@@ -147,8 +147,6 @@ final class PaymentMethodSchemaTest extends TestCase
             'bank_tokens',
             'payment_transactions',
             'payment_intents',
-            'payments',
-            'payment_allocations',
             'payment_reports',
         ] as $forbiddenTable) {
             self::assertSame(0, $this->tableExists($forbiddenTable), $forbiddenTable . ' must not be introduced by F10');

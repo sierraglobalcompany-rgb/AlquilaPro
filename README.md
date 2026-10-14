@@ -419,9 +419,9 @@ Autoridad técnica de cierre:
 - F6 — Aseguradora/SURA ✅ CLOSED / VERIFIED / MERGED
 - **F7 — Contratos ✅ CLOSED / VERIFIED / MERGED**
 - **F8 — Inquilino + lease + portal usando auth único ✅ CLOSED / VERIFIED / MERGED**
-- F9 — Cargos + cartera
-- F10 — Medios de pago
-- F11 — Reporte + conciliación
+ **F9 — Cargos + cartera ✅ CLOSED / VERIFIED / MERGED**
+ **F10 — Medios de pago ✅ CLOSED / VERIFIED / MERGED**
+ **F11 — Reporte + conciliación ✅ CLOSED / VERIFIED / NOT MERGED — PR #14**
 - F12 — Servicios + obligaciones
 - F13 — Pólizas + reclamaciones
 - F14 — Solicitudes + mantenimiento
@@ -442,7 +442,7 @@ Autoridad técnica de cierre:
 
 # 10. PROTOCOLO DE RECUPERACIÓN
 
-Para continuar desde el cierre F10, leer `docs/checkpoints/F10_CLOSED_2026-10-13.md` y revisar el PR/CI exactos. F10 queda sin merge hasta una autorización posterior explícita. F9 está integrada en `main` en `e11c053365f64cfab88e37254ea86466a31e24ce`; no reabrir fases cerradas sin evidencia correspondiente.
+Para continuar desde F11, leer `docs/checkpoints/F11_CLOSED_2026-10-14.md` y revisar PR #14 y sus checks del commit de cierre. F11 queda sin merge hasta una autorización posterior explícita. F10 está integrada en `main` en `e64cba16ee697f9db09232543bc550baa847f25b`; F9 en `e11c053365f64cfab88e37254ea86466a31e24ce`. No reabrir fases cerradas sin evidencia correspondiente.
 
 El checkpoint `F8_MERGED_2026-10-13.md` es la autoridad de integración F8.
 
@@ -467,14 +467,21 @@ MERGE_AUTHORIZED: YES / EXECUTED 2026-10-13
 F9_STATUS: CLOSED / VERIFIED / MERGED
 F9_PR: #12 CLOSED / MERGED — https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/12
 F9_MERGE_SHA: e11c053365f64cfab88e37254ea86466a31e24ce
-F10_STATUS: CLOSED / VERIFIED / NOT MERGED
+F10_STATUS: CLOSED / VERIFIED / MERGED
 F10_BRANCH: impl/f10-payment-methods-20261013
 F10_BASE_MAIN: 45a55bc97ccc4bcfc235cedb1252b48bf93a4cd6
 F10_PRODUCT_HEAD: 9adf07e199e2d77e995836bbe4d2e81e90daae81
 F10_PRODUCT_CI: 38504263040 — PHP 8.3 / 8.4 / 8.5 PASS
-F10_CLOSURE_HEAD: exact commit containing this checkpoint; see PR and exact-head CI evidence
-F10_PR: review-ready PR for this branch; see GitHub handoff
+F10_CLOSURE_HEAD: 2a544dc72d15bcd2015d79540008189b6108ee1d
+F10_MERGE_SHA: e64cba16ee697f9db09232543bc550baa847f25b
+F10_PR: #13 CLOSED / MERGED — https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/13
+F11_STATUS: CLOSED / VERIFIED / NOT MERGED
+F11_BRANCH: impl/f11-payment-report-reconciliation-20261014
+F11_BASE_MAIN: 420af68109a8366ec5d720784cfb7c02085a069d
+F11_PRODUCT_HEAD: 68046902594c6a7cb93e69945c0f1b3ac6c73838
+F11_FINAL_CI_SHA: same as closure report commit; see PR #14 checks
+F11_PR: #14 REVIEW-READY — https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/14
 MERGE_AUTHORIZED: NO
-CURRENT_ACTION: F10 REVIEW-READY PR after exact closure CI
+CURRENT_ACTION: F11 REVIEW-READY PR; verify exact closure-head PHP 8.3/8.4/8.5 CI
 NEXT: CHATGPT/SOL FINAL FORENSIC AUDIT; STOP BEFORE MERGE
 ```

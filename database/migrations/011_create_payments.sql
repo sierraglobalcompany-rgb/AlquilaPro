@@ -1,0 +1,42 @@
+CREATE TABLE payments (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    lease_id BIGINT UNSIGNED NOT NULL,
+    payment_method_id BIGINT UNSIGNED NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    paid_on DATE NOT NULL,
+    paid_time TIME NULL,
+    payment_method_snapshot_json TEXT NOT NULL,
+    reported_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    receipt_stored_name VARCHAR(190) NULL,
+    receipt_mime_type VARCHAR(80) NULL,
+    receipt_sha256 CHAR(64) NULL,
+    receipt_size_bytes BIGINT UNSIGNED NULL,
+    reconciled_by_user_id BIGINT UNSIGNED NULL,
+    reconciled_at DATETIME NULL,
+    rejected_by_user_id BIGINT UNSIGNED NULL,
+    rejected_at DATETIME NULL,
+    rejection_reason VARCHAR(500) NULL,
+    PRIMARY KEY (id),
+    KEY payments_lease_reported_index (lease_id, reported_at),
+    KEY payments_pending_index (reconciled_at, rejected_at, reported_at),
+    KEY payments_method_date_amount_index (payment_method_id, paid_on, amount),
+    KEY payments_receipt_sha_index (receipt_sha256),
+    KEY payments_reconciled_by_index (reconciled_by_user_id),
+    KEY payments_rejected_by_index (rejected_by_user_id),
+    CONSTRAINT payments_lease_fk FOREIGN KEY (lease_id) REFERENCES leases (id) ON DELETE RESTRICT,
+    CONSTRAINT payments_payment_method_fk FOREIGN KEY (payment_method_id) REFERENCES payment_methods (id) ON DELETE RESTRICT,
+    CONSTRAINT payments_reconciled_by_user_fk FOREIGN KEY (reconciled_by_user_id) REFERENCES users (id) ON DELETE SET NULL,
+    CONSTRAINT payments_rejected_by_user_fk FOREIGN KEY (rejected_by_user_id) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE payment_allocations (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    payment_id BIGINT UNSIGNED NOT NULL,
+    charge_id BIGINT UNSIGNED NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY payment_allocations_payment_charge_unique (payment_id, charge_id),
+    KEY payment_allocations_charge_index (charge_id),
+    CONSTRAINT payment_allocations_payment_fk FOREIGN KEY (payment_id) REFERENCES payments (id) ON DELETE RESTRICT,
+    CONSTRAINT payment_allocations_charge_fk FOREIGN KEY (charge_id) REFERENCES charges (id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -45,6 +45,9 @@ return static function (array $settings): App {
     $paymentMethodQrDirectory = (string) (
         $settings['payment_method_qr_directory'] ?? dirname(__DIR__) . '/storage/payment-method-qrs'
     );
+    $paymentReceiptDirectory = (string) (
+        $settings['payment_receipt_directory'] ?? dirname(__DIR__) . '/storage/payment-receipts'
+    );
 
     $lock = new InstallationLock($lockPath);
     $installer = new Installer($lock, $migrationDirectory, $databaseConfigPath);
@@ -159,8 +162,8 @@ return static function (array $settings): App {
             $contracts = new ContractService($pdo, $candidates, $screening, $properties, $contractDirectory);
             $users = new UserService($pdo);
             $leases = new LeaseService($pdo, $users);
-            $finance = new FinanceService($pdo);
             $paymentMethods = new PaymentMethodService($pdo, $paymentMethodQrDirectory);
+            $finance = new FinanceService($pdo, $paymentMethods, $paymentReceiptDirectory);
 
             $currentUser = static function () use ($session, $auth): ?array {
                 $userId = $session->userId(time());
