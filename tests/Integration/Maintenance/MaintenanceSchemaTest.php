@@ -36,7 +36,7 @@ final class MaintenanceSchemaTest extends TestCase
     {
         $tables = $this->pdo->query(
             "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() "
-            . "AND table_name LIKE 'maintenance\\_%' ORDER BY table_name",
+            . "AND table_name = 'maintenance_requests' ORDER BY table_name",
         )->fetchAll(PDO::FETCH_COLUMN);
         self::assertSame(['maintenance_requests'], array_map('strval', $tables));
         self::assertSame([

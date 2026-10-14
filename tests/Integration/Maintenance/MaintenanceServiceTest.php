@@ -10,6 +10,7 @@ use AlquilaPro\Foundation\DatabaseConfig;
 use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\MigrationRunner;
 use AlquilaPro\Maintenance\MaintenanceService;
+use AlquilaPro\Maintenance\VisitService;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -132,6 +133,37 @@ final class MaintenanceServiceTest extends TestCase
             $request['id'], 'cancelled', $lease['actor_id'], 1791980200, null, 'Cancelación posterior',
         ));
         self::assertSame('open', $service->find($request['id'])['status']);
+    }
+
+    public function testTerminalRequestCannotKeepAnActiveVisit(): void
+    {
+        $lease = $this->createLease();
+        $maintenance = $this->service();
+        $request = $maintenance->create($lease['lease_id'], 'Plomería', 'high', 'Revisar fuga', $lease['actor_id']);
+        $visits = new VisitService($this->pdo);
+        $now = time();
+        $visit = $visits->scheduleDirect(
+            $request['id'],
+            gmdate('Y-m-d H:i:s', $now + 86400),
+            60,
+            null,
+            null,
+            $lease['actor_id'],
+            $now,
+        );
+
+        $this->assertRejected(fn () => $maintenance->transitionStatus(
+            $request['id'], 'resolved', $lease['actor_id'], $now + 1, 'Trabajo terminado',
+        ));
+        $this->assertRejected(fn () => $maintenance->transitionStatus(
+            $request['id'], 'cancelled', $lease['actor_id'], $now + 2, null, 'Solicitud cancelada',
+        ));
+        self::assertSame('open', $maintenance->find($request['id'])['status']);
+        self::assertSame('scheduled', $visits->find($visit['id'])['status']);
+
+        $visits->cancel($visit['id'], 'No se requiere la visita', $lease['actor_id'], $now + 3);
+        $maintenance->transitionStatus($request['id'], 'resolved', $lease['actor_id'], $now + 4);
+        self::assertSame('resolved', $maintenance->find($request['id'])['status']);
     }
 
     public function testPrivatePhotosVerifyMimeHashSizeAndMissingFiles(): void

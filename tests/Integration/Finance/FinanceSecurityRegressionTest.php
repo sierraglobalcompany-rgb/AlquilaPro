@@ -168,6 +168,7 @@ final class FinanceSecurityRegressionTest extends TestCase
     {
         $f12Exists = $this->f12IsPresent();
         $f13Exists = $this->f13IsPresent();
+        $f15Exists = is_file($this->root . '/database/migrations/015_create_maintenance_visits.sql');
         $routes = $this->file('app/Leases/routes.php');
         preg_match_all('/\$app->(?:get|post)\(\'([^\']+)\'/i', $routes, $routeMatches);
         $expectedRoutes = [
@@ -176,6 +177,9 @@ final class FinanceSecurityRegressionTest extends TestCase
             '/tenant',
             '/tenant/leases/{id:[0-9]+}',
         ];
+        if ($f15Exists) {
+            $expectedRoutes[] = '/tenant/leases/{leaseId:[0-9]+}/maintenance/{id:[0-9]+}/visits/{visitId:[0-9]+}/select';
+        }
         if ($f12Exists) {
             $expectedRoutes[] = '/tenant/leases/{leaseId:[0-9]+}/obligations/{obligationId:[0-9]+}/source-support';
         }
@@ -216,7 +220,9 @@ final class FinanceSecurityRegressionTest extends TestCase
             && $summary < $list && $list < $paymentMethodScope && $paymentMethodScope < $render,
         );
         $expectedTenantDetailUse = $f13Exists
-            ? 'use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $insurance, $maintenance, $view, $csrf, $todayProvider, $path)'
+            ? ($f15Exists
+                ? 'use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $insurance, $maintenance, $visits, $view, $csrf, $todayProvider, $path)'
+                : 'use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $insurance, $maintenance, $view, $csrf, $todayProvider, $path)')
             : ($f12Exists
                 ? 'use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $view, $csrf, $todayProvider, $path)'
                 : 'use ($tenantGuard, $leases, $finance, $paymentMethods, $view, $csrf, $todayProvider, $path)');

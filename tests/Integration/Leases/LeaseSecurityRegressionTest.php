@@ -20,6 +20,7 @@ final class LeaseSecurityRegressionTest extends TestCase
         $f12Migration = $this->root . '/database/migrations/012_create_lease_obligations.sql';
         $f12Exists = is_file($f12Migration)
             && preg_match('/CREATE TABLE\s+lease_obligations\b/i', (string) file_get_contents($f12Migration)) === 1;
+        $f15Exists = is_file($this->root . '/database/migrations/015_create_maintenance_visits.sql');
         $migration = $this->file('database/migrations/008_create_leases.sql');
         preg_match_all('/CREATE TABLE\s+([a-z_]+)/i', $migration, $tables);
         self::assertSame(['leases'], $tables[1] ?? []);
@@ -42,6 +43,9 @@ final class LeaseSecurityRegressionTest extends TestCase
             '/tenant',
             '/tenant/leases/{id:[0-9]+}',
         ];
+        if ($f15Exists) {
+            $expectedRoutes[] = '/tenant/leases/{leaseId:[0-9]+}/maintenance/{id:[0-9]+}/visits/{visitId:[0-9]+}/select';
+        }
         if ($f12Exists) {
             $expectedRoutes[] = '/tenant/leases/{leaseId:[0-9]+}/obligations/{obligationId:[0-9]+}/source-support';
         }

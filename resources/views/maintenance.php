@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $requests = $requests ?? [];
+$visits = $visits ?? [];
 $staff = $staff ?? [];
 $selectedRequest = $selectedRequest ?? null;
 $canManage = $canManage ?? false;
@@ -25,6 +26,12 @@ $damageLabels = [
     'owner_responsibility' => 'Responsabilidad del propietario',
     'third_party' => 'Tercero',
     'not_applicable' => 'No aplica',
+];
+$visitStatusLabels = [
+    'proposed' => 'Propuesta',
+    'scheduled' => 'Programada',
+    'completed' => 'Completada',
+    'cancelled' => 'Cancelada',
 ];
 $activeRequest = is_array($selectedRequest)
     && !in_array($selectedRequest['status'], ['resolved', 'cancelled'], true);
@@ -93,9 +100,89 @@ $activeRequest = is_array($selectedRequest)
         <?php endif; ?>
     </section>
 
-    <?php if ($canManage && $activeRequest): ?>
+<?php if ($visits !== [] && (!$canManage || !$activeRequest)): ?>
+    <section class="surface">
+        <h2>Visitas</h2>
+        <div class="users-grid">
+            <?php foreach ($visits as $visit): ?>
+                <article class="user-card">
+                    <div class="user-card__head">
+                        <strong>Visita #<?= $escape($visit['id']) ?></strong>
+                        <span class="status-pill"><?= $escape($visitStatusLabels[$visit['status']] ?? $visit['status']) ?></span>
+                    </div>
+                    <?php if ($visit['selected_start_at'] !== null): ?><p>Fecha: <?= $escape($visit['selected_start_at']) ?> · <?= $escape($visit['duration_minutes']) ?> min</p><?php endif; ?>
+                    <?php if ($visit['technician_name'] !== null): ?><p>Técnico: <?= $escape($visit['technician_name']) ?></p><?php endif; ?>
+                    <?php if ($visit['technician_contact'] !== null): ?><p>Contacto: <?= $escape($visit['technician_contact']) ?></p><?php endif; ?>
+                    <?php if ($visit['result_notes'] !== null): ?><p>Resultado: <?= nl2br($escape($visit['result_notes'])) ?></p><?php endif; ?>
+                    <?php if ($visit['cancel_reason'] !== null): ?><p>Motivo de cancelación: <?= $escape($visit['cancel_reason']) ?></p><?php endif; ?>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    </section>
+<?php endif; ?>
+
+<?php if ($canManage && $activeRequest): ?>
         <section class="surface">
             <h2>Gestionar solicitud</h2>
+            <h3>Agenda de visitas</h3>
+            <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/admin/maintenance/<?= $escape($record['id']) ?>/visits">
+                <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                <input type="hidden" name="operation" value="propose">
+                <label>Opciones de visita · una por línea: fecha y hora UTC|duración en minutos
+                    <textarea name="slots" maxlength="4096" rows="3" placeholder="2026-10-20 14:00:00|60" required></textarea>
+                </label>
+                <label>Técnico<input name="technician_name" maxlength="120"></label>
+                <label>Contacto del técnico<input name="technician_contact" maxlength="200"></label>
+                <button class="button button--quiet" type="submit">Proponer horarios</button>
+            </form>
+            <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/admin/maintenance/<?= $escape($record['id']) ?>/visits">
+                <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                <input type="hidden" name="operation" value="direct">
+                <label>Fecha y hora UTC<input name="start_at" placeholder="2026-10-20 14:00:00" required></label>
+                <label>Duración en minutos<input type="number" name="duration_minutes" min="1" max="65535" required></label>
+                <label>Técnico<input name="technician_name" maxlength="120"></label>
+                <label>Contacto del técnico<input name="technician_contact" maxlength="200"></label>
+                <button class="button button--quiet" type="submit">Programar directamente</button>
+            </form>
+            <?php if ($visits === []): ?>
+                <p class="empty-state">Todavía no hay visitas para esta solicitud.</p>
+            <?php else: ?>
+                <div class="users-grid">
+                    <?php foreach ($visits as $visit): ?>
+                        <article class="user-card">
+                            <div class="user-card__head">
+                                <strong>Visita #<?= $escape($visit['id']) ?></strong>
+                                <span class="status-pill"><?= $escape($visitStatusLabels[$visit['status']] ?? $visit['status']) ?></span>
+                            </div>
+                            <?php if ($visit['selected_start_at'] !== null): ?><p>Fecha: <?= $escape($visit['selected_start_at']) ?> · <?= $escape($visit['duration_minutes']) ?> min</p><?php endif; ?>
+                            <?php if ($visit['technician_name'] !== null): ?><p>Técnico: <?= $escape($visit['technician_name']) ?></p><?php endif; ?>
+                            <?php if ($visit['technician_contact'] !== null): ?><p>Contacto: <?= $escape($visit['technician_contact']) ?></p><?php endif; ?>
+                            <?php if ($visit['result_notes'] !== null): ?><p>Resultado: <?= nl2br($escape($visit['result_notes'])) ?></p><?php endif; ?>
+                            <?php if ($visit['cancel_reason'] !== null): ?><p>Motivo de cancelación: <?= $escape($visit['cancel_reason']) ?></p><?php endif; ?>
+                            <?php if (in_array($visit['status'], ['proposed', 'scheduled'], true)): ?>
+                                <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/admin/maintenance/<?= $escape($record['id']) ?>/visits/<?= $escape($visit['id']) ?>/reprogram">
+                                    <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                                    <label>Reprogramar · opciones fecha y hora UTC|duración
+                                        <textarea name="slots" maxlength="4096" rows="2" required></textarea>
+                                    </label>
+                                    <button class="button button--quiet" type="submit">Reprogramar</button>
+                                </form>
+                                <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/admin/maintenance/<?= $escape($record['id']) ?>/visits/<?= $escape($visit['id']) ?>/complete">
+                                    <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                                    <label>Resultado<textarea name="result_notes" maxlength="1000"></textarea></label>
+                                    <button class="button button--quiet" type="submit">Completar visita</button>
+                                </form>
+                                <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/admin/maintenance/<?= $escape($record['id']) ?>/visits/<?= $escape($visit['id']) ?>/cancel">
+                                    <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                                    <label>Motivo de cancelación<input name="reason" maxlength="500" required></label>
+                                    <button class="button button--quiet" type="submit">Cancelar visita</button>
+                                </form>
+                            <?php endif; ?>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+
             <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/admin/maintenance/<?= $escape($record['id']) ?>/assignment">
                 <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
                 <label>Responsable

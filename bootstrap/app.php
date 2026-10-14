@@ -21,6 +21,7 @@ use AlquilaPro\Finance\PaymentMethodService;
 use AlquilaPro\Insurance\InsuranceService;
 use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\Maintenance\MaintenanceService;
+use AlquilaPro\Maintenance\VisitService;
 use AlquilaPro\Properties\PropertyService;
 use AlquilaPro\Properties\UnitMediaService;
 use AlquilaPro\UI\Branding;
@@ -179,6 +180,7 @@ return static function (array $settings): App {
             $obligations = new ObligationService($pdo, $finance, $obligationSupportDirectory);
             $insurance = new InsuranceService($pdo, $insuranceDocumentDirectory);
             $maintenance = new MaintenanceService($pdo, $finance, $maintenancePhotoDirectory);
+            $visits = new VisitService($pdo);
 
             $currentUser = static function () use ($session, $auth): ?array {
                 $userId = $session->userId(time());
@@ -208,6 +210,7 @@ return static function (array $settings): App {
                 'obligations' => $obligations,
                 'insurance' => $insurance,
                 'maintenance' => $maintenance,
+                'visits' => $visits,
                 'payment_methods' => $paymentMethods,
                 'properties' => $properties,
                 'today' => $settings['today'] ?? null,

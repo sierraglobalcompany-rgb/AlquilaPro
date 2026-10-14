@@ -7,6 +7,7 @@ use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\Maintenance\MaintenanceService;
+use AlquilaPro\Maintenance\VisitService;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -16,6 +17,8 @@ use Slim\App;
 return static function (App $app, array $deps): void {
     /** @var MaintenanceService $maintenance */
     $maintenance = $deps['maintenance'];
+    /** @var VisitService $visits */
+    $visits = $deps['visits'];
     /** @var LeaseService $leases */
     $leases = $deps['leases'];
     /** @var View $view */
@@ -80,6 +83,77 @@ return static function (App $app, array $deps): void {
             ->withHeader('Cache-Control', 'private, no-store')
             ->withHeader('X-Content-Type-Options', 'nosniff');
     };
+    $parseVisitSlots = static function (mixed $input): array {
+        if (!is_string($input) || trim($input) === '') {
+            throw new RuntimeException('Ingresa al menos una opción de visita.');
+        }
+        $lines = preg_split('/\r\n|\r|\n/', trim($input));
+        if (!is_array($lines) || count($lines) > 10) {
+            throw new RuntimeException('Las opciones de visita no son válidas.');
+        }
+        $slots = [];
+        foreach ($lines as $line) {
+            $parts = explode('|', trim($line));
+            if (count($parts) !== 2 || preg_match('/\A[1-9][0-9]{0,4}\z/', trim($parts[1])) !== 1) {
+                throw new RuntimeException('Las opciones de visita no son válidas.');
+            }
+            $slots[] = [
+                'start_at' => trim($parts[0]),
+                'duration_minutes' => (int) trim($parts[1]),
+            ];
+        }
+        return $slots;
+    };
+    $mutateVisit = static function (
+        string $operation,
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($staffGuard, $maintenance, $visits, $parseVisitSlots, $path): ResponseInterface {
+        $user = $staffGuard($response, 'maintenance.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+        $requestId = (int) $args['id'];
+        $visitId = (int) $args['visitId'];
+        if ($maintenance->find($requestId) === null) {
+            return $response->withStatus(404);
+        }
+        $visit = $visits->find($visitId);
+        if ($visit === null || $visit['maintenance_request_id'] !== $requestId) {
+            return $response->withStatus(404);
+        }
+        $form = (array) ($request->getParsedBody() ?? []);
+        try {
+            if ($operation === 'reprogram') {
+                $visits->reprogram(
+                    $visitId,
+                    $parseVisitSlots($form['slots'] ?? null),
+                    (int) $user['id'],
+                    time(),
+                );
+            } elseif ($operation === 'complete') {
+                $visits->complete(
+                    $visitId,
+                    isset($form['result_notes']) ? (string) $form['result_notes'] : null,
+                    (int) $user['id'],
+                    time(),
+                );
+            } elseif ($operation === 'cancel') {
+                $visits->cancel(
+                    $visitId,
+                    (string) ($form['reason'] ?? ''),
+                    (int) $user['id'],
+                    time(),
+                );
+            } else {
+                return $response->withStatus(404);
+            }
+        } catch (RuntimeException) {
+            return $response->withStatus(422);
+        }
+        return $response->withHeader('Location', $path('/admin/maintenance/' . $requestId))->withStatus(303);
+    };
     $app->get('/admin/maintenance', static function (
         ServerRequestInterface $request,
         ResponseInterface $response,
@@ -135,7 +209,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($staffGuard, $maintenance, $view, $csrf, $basePath): ResponseInterface {
+    ) use ($staffGuard, $maintenance, $visits, $view, $csrf, $basePath): ResponseInterface {
         $user = $staffGuard($response, 'maintenance.view');
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -151,6 +225,7 @@ return static function (App $app, array $deps): void {
             'csrfToken' => $csrf->token(),
             'requests' => [$record],
             'selectedRequest' => $record,
+            'visits' => $visits->listForRequest((int) $record['id']),
             'staff' => Permissions::allows($user, 'maintenance.manage') ? $maintenance->listActiveStaff() : [],
             'canManage' => Permissions::allows($user, 'maintenance.manage'),
             'basePath' => $basePath,
@@ -264,6 +339,75 @@ return static function (App $app, array $deps): void {
         }
         return $response->withHeader('Location', $path('/admin/maintenance/' . (int) $args['id']))->withStatus(303);
     });
+
+    $app->post('/admin/maintenance/{id:[0-9]+}/visits', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($staffGuard, $maintenance, $visits, $parseVisitSlots, $path): ResponseInterface {
+        $user = $staffGuard($response, 'maintenance.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+        $requestId = (int) $args['id'];
+        if ($maintenance->find($requestId) === null) {
+            return $response->withStatus(404);
+        }
+        $form = (array) ($request->getParsedBody() ?? []);
+        try {
+            if (($form['operation'] ?? null) === 'propose') {
+                $visits->propose(
+                    $requestId,
+                    $parseVisitSlots($form['slots'] ?? null),
+                    isset($form['technician_name']) ? (string) $form['technician_name'] : null,
+                    isset($form['technician_contact']) ? (string) $form['technician_contact'] : null,
+                    (int) $user['id'],
+                    time(),
+                );
+            } elseif (($form['operation'] ?? null) === 'direct') {
+                $duration = filter_var(
+                    $form['duration_minutes'] ?? null,
+                    FILTER_VALIDATE_INT,
+                    ['options' => ['min_range' => 1, 'max_range' => 65535]],
+                );
+                if ($duration === false) {
+                    return $response->withStatus(422);
+                }
+                $visits->scheduleDirect(
+                    $requestId,
+                    (string) ($form['start_at'] ?? ''),
+                    $duration,
+                    isset($form['technician_name']) ? (string) $form['technician_name'] : null,
+                    isset($form['technician_contact']) ? (string) $form['technician_contact'] : null,
+                    (int) $user['id'],
+                    time(),
+                );
+            } else {
+                return $response->withStatus(422);
+            }
+        } catch (RuntimeException) {
+            return $response->withStatus(422);
+        }
+        return $response->withHeader('Location', $path('/admin/maintenance/' . $requestId))->withStatus(303);
+    });
+
+    $app->post('/admin/maintenance/{id:[0-9]+}/visits/{visitId:[0-9]+}/reprogram', static fn (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ): ResponseInterface => $mutateVisit('reprogram', $request, $response, $args));
+
+    $app->post('/admin/maintenance/{id:[0-9]+}/visits/{visitId:[0-9]+}/complete', static fn (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ): ResponseInterface => $mutateVisit('complete', $request, $response, $args));
+
+    $app->post('/admin/maintenance/{id:[0-9]+}/visits/{visitId:[0-9]+}/cancel', static fn (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ): ResponseInterface => $mutateVisit('cancel', $request, $response, $args));
 
     $app->get('/admin/maintenance/{id:[0-9]+}/photos/{photoId:[a-f0-9]+}', static function (
         ServerRequestInterface $request,

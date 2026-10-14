@@ -12,6 +12,7 @@ use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
 use AlquilaPro\Foundation\MigrationRunner;
 use AlquilaPro\Maintenance\MaintenanceService;
+use AlquilaPro\Maintenance\VisitService;
 use PDO;
 use PDOStatement;
 use PHPUnit\Framework\TestCase;
@@ -566,6 +567,99 @@ final class TenantPortalRoutesTest extends TestCase
         ]);
         self::assertSame(404, $denied->getStatusCode());
         self::assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM maintenance_requests')->fetchColumn());
+    }
+
+    public function testTenantSelectsOnlyOwnedProposedSlotAfterLeaseOwnershipCheck(): void
+    {
+        $tenantId = $this->insertUser('visit-tenant@example.com', 'TenantPassword123', 'tenant');
+        $foreignId = $this->insertUser('visit-foreign@example.com', 'TenantPassword123', 'tenant');
+        $owned = $this->createLease($tenantId, ['unit_code' => 'APT-VISIT-OWNED']);
+        $foreign = $this->createLease($foreignId, ['unit_code' => 'APT-VISIT-FOREIGN']);
+        $maintenance = $this->maintenanceService();
+        $ownedRequest = $maintenance->create($owned['lease_id'], 'Plomería', 'medium', 'Fuga', $tenantId);
+        $foreignRequest = $maintenance->create($foreign['lease_id'], 'Electricidad', 'medium', 'Cable', $foreignId);
+        $visits = new VisitService($this->pdo);
+        $now = time();
+        $ownedStart = gmdate('Y-m-d H:i:s', $now + 86400);
+        $foreignStart = gmdate('Y-m-d H:i:s', $now + 172800);
+        $ownedVisit = $visits->propose($ownedRequest['id'], [[
+            'start_at' => $ownedStart,
+            'duration_minutes' => 60,
+        ]], 'Técnico privado', '3009998877', $tenantId, $now);
+        $foreignVisit = $visits->propose($foreignRequest['id'], [[
+            'start_at' => $foreignStart,
+            'duration_minutes' => 60,
+        ]], 'Técnico extranjero', '3008887766', $foreignId, $now);
+
+        $tracedPdo = $this->tracedPdo();
+        $app = $this->app('/sub', $tracedPdo);
+        $this->login($app, 'visit-tenant@example.com', 'TenantPassword123', '/sub');
+        $detail = $this->request($app, 'GET', '/sub/tenant/leases/' . $owned['lease_id']);
+        self::assertSame(200, $detail->getStatusCode());
+        $html = (string) $detail->getBody();
+        self::assertStringContainsString('Seleccionar horario', $html);
+        self::assertStringContainsString($ownedStart, $html);
+        self::assertStringNotContainsString('Técnico privado', $html);
+        self::assertStringNotContainsString('3009998877', $html);
+        self::assertStringNotContainsString('Completar visita', $html);
+        self::assertStringNotContainsString('Cancelar visita', $html);
+        self::assertStringNotContainsString($foreignStart, $html);
+
+        $tracedPdo->preparedSql = [];
+        $foreignSelection = $this->request(
+            $app,
+            'POST',
+            '/sub/tenant/leases/' . $foreign['lease_id'] . '/maintenance/' . $foreignRequest['id']
+                . '/visits/' . $foreignVisit['id'] . '/select',
+            ['start_at' => $foreignStart],
+        );
+        self::assertSame(404, $foreignSelection->getStatusCode());
+        $foreignQueries = array_map('strtolower', $tracedPdo->preparedSql);
+        self::assertNotFalse(array_search(true, array_map(
+            static fn (string $sql): bool => str_contains($sql, 'from leases'),
+            $foreignQueries,
+        ), true));
+        self::assertSame([], array_values(array_filter(
+            $foreignQueries,
+            static fn (string $sql): bool => str_contains($sql, 'from maintenance_requests')
+                || str_contains($sql, 'from maintenance_visits'),
+        )));
+
+        $tracedPdo->preparedSql = [];
+        $selected = $this->request(
+            $app,
+            'POST',
+            '/sub/tenant/leases/' . $owned['lease_id'] . '/maintenance/' . $ownedRequest['id']
+                . '/visits/' . $ownedVisit['id'] . '/select',
+            ['start_at' => $ownedStart, 'technician_name' => 'Attacker'],
+        );
+        self::assertSame(303, $selected->getStatusCode());
+        $orderedQueries = array_map('strtolower', $tracedPdo->preparedSql);
+        $leaseIndex = array_search(true, array_map(
+            static fn (string $sql): bool => str_contains($sql, 'from leases'),
+            $orderedQueries,
+        ), true);
+        $requestIndex = array_search(true, array_map(
+            static fn (string $sql): bool => str_contains($sql, 'from maintenance_requests'),
+            $orderedQueries,
+        ), true);
+        $visitIndex = array_search(true, array_map(
+            static fn (string $sql): bool => str_contains($sql, 'from maintenance_visits'),
+            $orderedQueries,
+        ), true);
+        self::assertIsInt($leaseIndex);
+        self::assertIsInt($requestIndex);
+        self::assertIsInt($visitIndex);
+        self::assertLessThan($requestIndex, $leaseIndex);
+        self::assertLessThan($visitIndex, $requestIndex);
+        self::assertSame('scheduled', $visits->find($ownedVisit['id'])['status']);
+        self::assertSame('Técnico privado', $visits->find($ownedVisit['id'])['technician_name']);
+        self::assertSame(404, $this->request(
+            $app,
+            'POST',
+            '/sub/tenant/leases/' . $owned['lease_id'] . '/maintenance/' . $ownedRequest['id']
+                . '/visits/' . $ownedVisit['id'] . '/complete',
+        )->getStatusCode());
     }
 
     public function testMaintenanceStaffRoutesSeparateViewAndManagePermissions(): void
