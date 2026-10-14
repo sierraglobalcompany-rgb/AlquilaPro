@@ -6,6 +6,7 @@ use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Contracts\ContractService;
+use AlquilaPro\Finance\FinanceService;
 use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
@@ -17,6 +18,8 @@ return static function (App $app, array $deps): void {
     $leases = $deps['leases'];
     /** @var ContractService $contracts */
     $contracts = $deps['contracts'];
+    /** @var FinanceService $finance */
+    $finance = $deps['finance'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -26,6 +29,8 @@ return static function (App $app, array $deps): void {
     /** @var Closure(): ?array $currentUser */
     $currentUser = $deps['current_user'];
     $basePath = (string) ($deps['base_path'] ?? '');
+    $todayProvider = $deps['today'] ?? static fn (): string =>
+        (new DateTimeImmutable('now', new DateTimeZone('America/Bogota')))->format('Y-m-d');
 
     $path = static fn (string $value): string => $basePath . $value;
 
@@ -137,7 +142,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($tenantGuard, $leases, $view, $csrf): ResponseInterface {
+    ) use ($tenantGuard, $leases, $finance, $view, $csrf, $todayProvider): ResponseInterface {
         $user = $tenantGuard($response);
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -148,12 +153,18 @@ return static function (App $app, array $deps): void {
             return $response->withStatus(404);
         }
 
+        $today = $todayProvider();
+        $financeSummary = $finance->summaryForLease((int) $lease['id'], $today);
+        $charges = $finance->listForLease((int) $lease['id'], $today);
+
         $response->getBody()->write($view->renderApp('tenant_lease_detail', [
             'pageTitle' => 'Arrendamiento #' . (int) $lease['id'],
             'user' => $user,
             'activeNav' => 'home',
             'csrfToken' => $csrf->token(),
             'lease' => $lease,
+            'financeSummary' => $financeSummary,
+            'charges' => $charges,
         ]));
 
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');

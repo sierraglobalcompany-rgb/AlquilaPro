@@ -91,7 +91,7 @@ final class ShellRoutesTest extends TestCase
         self::assertStringContainsString('Cuenta', $body);
         self::assertStringContainsString('<dialog', $body);
         self::assertStringContainsString('aria-current="page"', $body);
-        self::assertStringNotContainsString('Cartera', $body);
+        self::assertStringContainsString('Cartera', $body);
         self::assertStringNotContainsString('Solicitudes', $body);
         self::assertStringContainsString('Propiedades', $body);
     }
@@ -187,7 +187,7 @@ final class ShellRoutesTest extends TestCase
             'tenant-polluted@example.com',
             'TenantPassword123',
             'tenant',
-            ['users.view', 'users.manage', 'properties.view', 'candidates.view', 'contracts.view', 'contracts.manage'],
+            ['users.view', 'users.manage', 'properties.view', 'candidates.view', 'contracts.view', 'contracts.manage', 'finance.view', 'finance.manage'],
             false,
             'Tenant Polluted',
         );
@@ -207,6 +207,8 @@ final class ShellRoutesTest extends TestCase
         self::assertStringNotContainsString('apps-dialog', $body);
         self::assertStringNotContainsString('>Apps<', $body);
         self::assertStringNotContainsString('/sub/admin/', $body);
+        self::assertStringNotContainsString('/sub/admin/finance', $body);
+        self::assertStringNotContainsString('Cartera', $body);
         self::assertStringNotContainsString('No tienes aplicaciones disponibles', $body);
 
         self::assertSame(403, $this->request($app, 'GET', '/sub/admin/users')->getStatusCode());
@@ -261,13 +263,15 @@ final class ShellRoutesTest extends TestCase
         self::assertStringContainsString('Apariencia', $ownerBody);
 
         $_SESSION = [];
-        $this->insertUser('viewer@example.com', 'ViewerPassword123', 'admin', ['users.view'], false, 'Viewer');
+        $this->insertUser('viewer@example.com', 'ViewerPassword123', 'admin', ['users.view', 'finance.view'], false, 'Viewer');
         $viewerApp = $this->app();
         $this->login($viewerApp, 'viewer@example.com', 'ViewerPassword123');
         $viewerBody = (string) $this->request($viewerApp, 'GET', '/')->getBody();
 
         self::assertStringContainsString('/admin/users', $viewerBody);
         self::assertStringContainsString('Usuarios', $viewerBody);
+        self::assertStringContainsString('/admin/finance', $viewerBody);
+        self::assertStringContainsString('Cartera', $viewerBody);
         self::assertStringNotContainsString('/admin/appearance', $viewerBody);
         self::assertStringNotContainsString('Apariencia', $viewerBody);
     }

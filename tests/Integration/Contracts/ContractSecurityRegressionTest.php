@@ -51,6 +51,11 @@ final class ContractSecurityRegressionTest extends TestCase
             $contractCore,
             'F7 core must not absorb F8 lease domain logic.',
         );
+        self::assertStringNotContainsString(
+            'FinanceService',
+            $contractCore,
+            'Finance composition belongs in route/view boundaries, not the F7 contract or PDF core.',
+        );
 
         $contractPhp = implode("\n", [$contractCore, $routes]);
         foreach ([

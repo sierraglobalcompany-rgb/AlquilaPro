@@ -17,6 +17,7 @@ $canViewUsers = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'users
 $canViewProperties = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'properties.view');
 $canViewCandidates = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'candidates.view');
 $canViewContracts = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'contracts.view');
+$canViewFinance = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'finance.view');
 $isOwner = !$isTenant && ($user['role'] ?? null) === 'owner';
 ?>
 <!doctype html>
@@ -83,13 +84,19 @@ $isOwner = !$isTenant && ($user['role'] ?? null) === 'owner';
                         <span>Plantillas y versiones</span>
                     </a>
                 <?php endif; ?>
+                <?php if ($canViewFinance): ?>
+                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/finance">
+                        <strong>Cartera</strong>
+                        <span>Cargos y saldos de arrendamientos</span>
+                    </a>
+                <?php endif; ?>
                 <?php if ($isOwner): ?>
                     <a class="app-card" href="<?= $escape($basePath) ?>/admin/appearance">
                         <strong>Apariencia</strong>
                         <span>Nombre, color y logo</span>
                     </a>
                 <?php endif; ?>
-                <?php if (!$canViewUsers && !$canViewProperties && !$canViewCandidates && !$canViewContracts && !$isOwner): ?>
+                <?php if (!$canViewUsers && !$canViewProperties && !$canViewCandidates && !$canViewContracts && !$canViewFinance && !$isOwner): ?>
                     <p class="empty-state">No tienes aplicaciones disponibles.</p>
                 <?php endif; ?>
             </div>

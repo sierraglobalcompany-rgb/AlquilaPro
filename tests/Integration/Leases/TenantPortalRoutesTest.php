@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace AlquilaPro\Tests\Integration\Leases;
 
 use AlquilaPro\Auth\Csrf;
+use AlquilaPro\Finance\FinanceService;
 use AlquilaPro\Foundation\DatabaseConfig;
 use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
 use AlquilaPro\Foundation\MigrationRunner;
 use PDO;
+use PDOStatement;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
 use Slim\App;
@@ -36,6 +38,7 @@ final class TenantPortalRoutesTest extends TestCase
 
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
         foreach ([
+            'charges',
             'leases',
             'contracts',
             'contract_template_versions',
@@ -171,6 +174,8 @@ final class TenantPortalRoutesTest extends TestCase
             'unit_number' => '401',
             'tower' => 'Torre Norte',
             'floor' => '4',
+            'start_date' => '2026-10-01',
+            'end_date' => '2027-09-30',
         ]);
         $parking = $this->createLease($tenantId, [
             'type' => 'parking',
@@ -186,7 +191,24 @@ final class TenantPortalRoutesTest extends TestCase
             'unit_code' => 'APT-SECRET',
         ]);
 
-        $app = $this->app('/tenant-base');
+        $tracedPdo = $this->tracedPdo();
+        $monthlyCharges = (new FinanceService($tracedPdo))->createMonthlyCharges(
+            $apartment['lease_id'], '2026-10-01', '2026-10-12', $tenantId,
+        );
+        self::assertSame(['rent', 'administration'], array_column($monthlyCharges, 'type'));
+        self::assertSame([null, null], array_column($monthlyCharges, 'description'));
+        $this->insertCharge(
+            $apartment['lease_id'], $tenantId, 'service', null, '2026-11-03', '75.25', '<script>tenant()</script>',
+        );
+        $this->insertCharge(
+            $apartment['lease_id'], $tenantId, 'fine', null, '2026-09-01', '900.00', 'Anulado',
+            '2026-09-02 12:00:00', 'MOTIVO PRIVADO TENANT',
+        );
+        $this->insertCharge(
+            $parking['lease_id'], $tenantId, 'repair', null, '2026-10-12', '30.00', 'Reparación histórica',
+        );
+
+        $app = $this->app('/tenant-base', $tracedPdo, static fn (): string => '2026-10-14');
         $this->login($app, 'detail@example.com', 'TenantPassword123', '/tenant-base');
 
         $apartmentResponse = $this->request(
@@ -199,6 +221,26 @@ final class TenantPortalRoutesTest extends TestCase
         foreach (['Edificio Apartamentos', 'APT-401', '401', 'Torre Norte', '4', '1500000.00', '220000.00'] as $value) {
             self::assertStringContainsString($value, $apartmentHtml);
         }
+        self::assertStringContainsString('Cartera', $apartmentHtml);
+        self::assertStringContainsString('Saldo pendiente: $1720075.25', $apartmentHtml);
+        self::assertStringContainsString('Saldo vencido: $1720000.00', $apartmentHtml);
+        self::assertStringContainsString('Vencimiento pendiente más antiguo: 2026-10-12', $apartmentHtml);
+        self::assertStringContainsString('Canon mensual', $apartmentHtml);
+        self::assertStringContainsString('Administración', $apartmentHtml);
+        self::assertStringContainsString('Periodo: 2026-10', $apartmentHtml);
+        self::assertStringContainsString('pending', $apartmentHtml);
+        self::assertStringContainsString('overdue', $apartmentHtml);
+        self::assertStringContainsString('voided', $apartmentHtml);
+        self::assertStringContainsString('Días vencidos: 2', $apartmentHtml);
+        self::assertStringContainsString('&lt;script&gt;tenant()&lt;/script&gt;', $apartmentHtml);
+        self::assertStringNotContainsString('<script>tenant()</script>', $apartmentHtml);
+        self::assertStringNotContainsString('MOTIVO PRIVADO TENANT', $apartmentHtml);
+        self::assertStringNotContainsString('created_by_user_id', $apartmentHtml);
+        self::assertStringNotContainsString('voided_by_user_id', $apartmentHtml);
+        self::assertStringNotContainsString('void_reason', $apartmentHtml);
+        self::assertStringNotContainsString('name="csrf_token"', $apartmentHtml);
+        self::assertStringNotContainsString('/admin/charges/', $apartmentHtml);
+        self::assertStringNotContainsString('/tenant/payments', $apartmentHtml);
         self::assertStringContainsString(
             '/tenant-base/tenant/leases/' . $apartment['lease_id'] . '/contract',
             $apartmentHtml,
@@ -215,15 +257,28 @@ final class TenantPortalRoutesTest extends TestCase
             self::assertStringContainsString($value, $parkingHtml);
         }
         self::assertStringContainsString('Finalizado', $parkingHtml);
+        self::assertStringContainsString('Reparación histórica', $parkingHtml);
+        self::assertStringContainsString('Saldo pendiente: $30.00', $parkingHtml);
 
+        $tracedPdo->preparedSql = [];
         self::assertSame(
             404,
             $this->request($app, 'GET', '/tenant-base/tenant/leases/' . $foreign['lease_id'])->getStatusCode(),
         );
+        self::assertSame([], array_values(array_filter(
+            $tracedPdo->preparedSql,
+            static fn (string $sql): bool => str_contains(strtolower($sql), 'from charges'),
+        )), 'Foreign lease must be rejected before FinanceService is queried.');
+
+        $tracedPdo->preparedSql = [];
         self::assertSame(
             404,
             $this->request($app, 'GET', '/tenant-base/tenant/leases/999999')->getStatusCode(),
         );
+        self::assertSame([], array_values(array_filter(
+            $tracedPdo->preparedSql,
+            static fn (string $sql): bool => str_contains(strtolower($sql), 'from charges'),
+        )), 'Missing lease must be rejected before FinanceService is queried.');
     }
 
     public function testOwnedContractPdfKeepsPrivateIntegrityAndForeignLeaseIs404(): void
@@ -282,7 +337,7 @@ final class TenantPortalRoutesTest extends TestCase
         );
     }
 
-    private function app(string $basePath = ''): App
+    private function app(string $basePath = '', ?PDO $pdo = null, ?\Closure $today = null): App
     {
         $factory = require dirname(__DIR__, 3) . '/bootstrap/app.php';
 
@@ -296,8 +351,35 @@ final class TenantPortalRoutesTest extends TestCase
             'unit_media_directory' => $this->directory . '/unit-media',
             'candidate_document_directory' => $this->directory . '/candidate-documents',
             'contract_directory' => $this->contractDirectory,
-            'pdo' => $this->pdo,
+            'pdo' => $pdo ?? $this->pdo,
+            'today' => $today,
         ]);
+    }
+
+    private function tracedPdo(): PDO
+    {
+        $host = getenv('TEST_DB_HOST') ?: '127.0.0.1';
+        $port = getenv('TEST_DB_PORT') ?: '3306';
+        $database = getenv('TEST_DB_NAME') ?: 'alquila_test';
+        $username = getenv('TEST_DB_USER') ?: 'root';
+        $password = getenv('TEST_DB_PASSWORD') ?: 'root';
+        $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4', $host, $port, $database);
+
+        return new class($dsn, $username, $password) extends PDO {
+            public array $preparedSql = [];
+
+            public function __construct(string $dsn, string $username, string $password)
+            {
+                parent::__construct($dsn, $username, $password, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+            }
+
+            public function prepare(string $query, array $options = []): PDOStatement|false
+            {
+                $this->preparedSql[] = $query;
+
+                return parent::prepare($query, $options);
+            }
+        };
     }
 
     private function request(App $app, string $method, string $path, array $body = []): ResponseInterface
@@ -359,6 +441,37 @@ final class TenantPortalRoutesTest extends TestCase
         return (int) $this->pdo->lastInsertId();
     }
 
+    private function insertCharge(
+        int $leaseId,
+        int $actorUserId,
+        string $type,
+        ?string $periodMonth,
+        string $dueDate,
+        string $amount,
+        ?string $description,
+        ?string $voidedAt = null,
+        ?string $voidReason = null,
+    ): void {
+        $statement = $this->pdo->prepare(
+            'INSERT INTO charges '
+            . '(lease_id, type, period_month, due_date, amount, description, created_by_user_id, '
+            . 'voided_by_user_id, voided_at, void_reason) '
+            . 'VALUES (:lease_id, :type, :period, :due_date, :amount, :description, :creator, :voider, :voided_at, :reason)',
+        );
+        $statement->execute([
+            'lease_id' => $leaseId,
+            'type' => $type,
+            'period' => $periodMonth,
+            'due_date' => $dueDate,
+            'amount' => $amount,
+            'description' => $description,
+            'creator' => $actorUserId,
+            'voider' => $voidedAt === null ? null : $actorUserId,
+            'voided_at' => $voidedAt,
+            'reason' => $voidReason,
+        ]);
+    }
+
     /** @return array{lease_id:int,contract_id:int,pdf_name:string,pdf_bytes:string} */
     private function createLease(int $userId, array $options = []): array
     {
@@ -374,6 +487,8 @@ final class TenantPortalRoutesTest extends TestCase
         $activatedAt = (string) ($options['activated_at'] ?? '2026-10-13 10:00:00');
         $endedAt = $options['ended_at'] ?? null;
         $withPdf = (bool) ($options['with_pdf'] ?? false);
+        $startDate = (string) ($options['start_date'] ?? '2026-11-01');
+        $endDate = (string) ($options['end_date'] ?? '2027-10-31');
 
         $property = $this->pdo->prepare(
             'INSERT INTO properties (name, address, city, sector, is_active) VALUES (:name, :address, :city, :sector, 1)',
@@ -475,8 +590,8 @@ final class TenantPortalRoutesTest extends TestCase
             'document_type' => $documentType,
             'monthly_rent' => '1500000.00',
             'administration_fee' => $type === 'apartment' ? '220000.00' : null,
-            'start_date' => '2026-11-01',
-            'end_date' => '2027-10-31',
+            'start_date' => $startDate,
+            'end_date' => $endDate,
             'duration_text' => 'Doce meses',
             'pdf_stored_name' => $withPdf ? $pdfName : null,
             'pdf_sha256' => $pdfHash,
