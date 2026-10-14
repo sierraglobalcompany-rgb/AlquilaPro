@@ -11,6 +11,7 @@ use AlquilaPro\Finance\ObligationService;
 use AlquilaPro\Finance\PaymentMethodService;
 use AlquilaPro\Insurance\InsuranceService;
 use AlquilaPro\Leases\LeaseService;
+use AlquilaPro\Maintenance\MaintenanceService;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -29,6 +30,8 @@ return static function (App $app, array $deps): void {
     $paymentMethods = $deps['payment_methods'];
     /** @var InsuranceService $insurance */
     $insurance = $deps['insurance'];
+    /** @var MaintenanceService $maintenance */
+    $maintenance = $deps['maintenance'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -188,14 +191,15 @@ return static function (App $app, array $deps): void {
             'leases' => $leases->listForUser((int) $user['id']),
         ]));
 
-        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8')
+            ->withHeader('Cache-Control', 'private, no-store');
     });
 
     $app->get('/tenant/leases/{id:[0-9]+}', static function (
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $insurance, $view, $csrf, $todayProvider, $path): ResponseInterface {
+    ) use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $insurance, $maintenance, $view, $csrf, $todayProvider, $path): ResponseInterface {
         $user = $tenantGuard($response);
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -208,6 +212,21 @@ return static function (App $app, array $deps): void {
 
         $today = $todayProvider();
         $insurancePolicies = $insurance->tenantPolicySummary((int) $lease['id'], $today);
+        $maintenanceRequests = array_map(static function (array $record) use ($path, $lease): array {
+            return [
+                'id' => (int) $record['id'],
+                'category' => (string) $record['category'],
+                'priority' => (string) $record['priority'],
+                'description' => (string) $record['description'],
+                'photos' => array_map(static fn (array $photo): array => [
+                    'photo_id' => (string) ($photo['photo_id'] ?? ''),
+                    'created_at' => (string) ($photo['created_at'] ?? ''),
+                ], array_values(array_filter($record['photos'], 'is_array'))),
+                'status' => (string) $record['status'],
+                'resolution_notes' => $record['resolution_notes'] === null ? null : (string) $record['resolution_notes'],
+                'photo_base_url' => $path('/tenant/leases/' . (int) $lease['id'] . '/maintenance/' . (int) $record['id'] . '/photos/'),
+            ];
+        }, $maintenance->listForLease((int) $lease['id']));
         $financeSummary = $finance->summaryForLease((int) $lease['id'], $today);
         $charges = $finance->listForLease((int) $lease['id'], $today);
         $chargesById = [];
@@ -276,10 +295,12 @@ return static function (App $app, array $deps): void {
             'paymentMethods' => $tenantPaymentMethods,
             'paymentHistory' => $paymentHistory,
             'insurancePolicies' => $insurancePolicies,
+            'maintenanceRequests' => $maintenanceRequests,
             'today' => $today,
         ]));
 
-        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8')
+            ->withHeader('Cache-Control', 'private, no-store');
     });
 
     $app->get('/tenant/leases/{leaseId:[0-9]+}/obligations/{obligationId:[0-9]+}/source-support', static function (

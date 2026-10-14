@@ -120,6 +120,9 @@ final class LeaseSecurityRegressionTest extends TestCase
         $detail = $this->file('resources/views/tenant_lease_detail.php');
         $credential = $this->file('resources/views/lease_activation_credential.php');
         $futureLabels = ['Pagos', 'Mantenimiento', 'Solicitudes'];
+        if ($this->f14IsPresent()) {
+            $futureLabels = array_values(array_diff($futureLabels, ['Mantenimiento']));
+        }
         if (!$this->f13IsPresent()) {
             $futureLabels[] = 'Póliza';
         }
@@ -158,5 +161,12 @@ final class LeaseSecurityRegressionTest extends TestCase
         $migration = $this->root . '/database/migrations/013_create_insurance_policies_and_claims.sql';
         return is_file($migration)
             && preg_match('/CREATE TABLE\s+insurance_policies\b/i', (string) file_get_contents($migration)) === 1;
+    }
+
+    private function f14IsPresent(): bool
+    {
+        $migration = $this->root . '/database/migrations/014_create_maintenance_requests.sql';
+        return is_file($migration)
+            && preg_match('/CREATE TABLE\s+maintenance_requests\b/i', (string) file_get_contents($migration)) === 1;
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $obligations = $obligations ?? [];
 $insurancePolicies = $insurancePolicies ?? [];
+$maintenanceRequests = $maintenanceRequests ?? [];
 $isApartment = (string) $lease['unit_type'] === 'apartment';
 $isParking = (string) $lease['unit_type'] === 'parking';
 $chargeStateLabels = [
@@ -91,6 +92,62 @@ $externalStateLabels = [
         </div>
     </section>
 <?php endif; ?>
+
+<section class="surface">
+    <h2>Mantenimiento</h2>
+    <p class="hint">Reporta novedades relacionadas con este arrendamiento.</p>
+    <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/tenant/leases/<?= $escape($lease['id']) ?>/maintenance">
+        <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+        <label>Categoría<input name="category" maxlength="80" required></label>
+        <label>Prioridad
+            <select name="priority">
+                <option value="low">Baja</option>
+                <option value="medium" selected>Media</option>
+                <option value="high">Alta</option>
+                <option value="urgent">Urgente</option>
+            </select>
+        </label>
+        <label>Descripción<textarea name="description" maxlength="5000" required></textarea></label>
+        <button class="button" type="submit">Crear solicitud</button>
+    </form>
+    <?php if ($maintenanceRequests === []): ?>
+        <p class="empty-state">Aún no hay solicitudes de mantenimiento.</p>
+    <?php else: ?>
+        <div class="users-grid">
+            <?php foreach ($maintenanceRequests as $maintenanceRequest): ?>
+                <?php $terminal = in_array($maintenanceRequest['status'], ['resolved', 'cancelled'], true); ?>
+                <article class="user-card">
+                    <div class="user-card__head">
+                        <strong><?= $escape($maintenanceRequest['category']) ?> · #<?= $escape($maintenanceRequest['id']) ?></strong>
+                        <span class="status-pill"><?= $escape([
+                            'open' => 'Abierta', 'in_progress' => 'En proceso',
+                            'resolved' => 'Resuelta', 'cancelled' => 'Cancelada',
+                        ][$maintenanceRequest['status']] ?? $maintenanceRequest['status']) ?></span>
+                    </div>
+                    <div>Prioridad: <?= $escape([
+                        'low' => 'Baja', 'medium' => 'Media', 'high' => 'Alta', 'urgent' => 'Urgente',
+                    ][$maintenanceRequest['priority']] ?? $maintenanceRequest['priority']) ?></div>
+                    <p><?= nl2br($escape($maintenanceRequest['description'])) ?></p>
+                    <?php if ($maintenanceRequest['resolution_notes'] !== null): ?>
+                        <div>Resolución: <?= $escape($maintenanceRequest['resolution_notes']) ?></div>
+                    <?php endif; ?>
+                    <?php foreach ($maintenanceRequest['photos'] as $photo): ?>
+                        <?php if (is_array($photo) && preg_match('/\A[a-f0-9]{32}\z/', (string) ($photo['photo_id'] ?? '')) === 1): ?>
+                            <p><a href="<?= $escape($maintenanceRequest['photo_base_url']) ?><?= $escape($photo['photo_id']) ?>">Ver foto <?= $escape($photo['created_at'] ?? '') ?></a></p>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                    <?php if (!$terminal): ?>
+                        <form class="stack-form" method="post" enctype="multipart/form-data" action="<?= $escape($basePath) ?>/tenant/leases/<?= $escape($lease['id']) ?>/maintenance/<?= $escape($maintenanceRequest['id']) ?>/photos">
+                            <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                            <label>Agregar foto<input type="file" name="photo" accept="image/png,image/jpeg,image/webp" required></label>
+                            <button class="button button--quiet" type="submit">Guardar foto</button>
+                        </form>
+                    <?php endif; ?>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</section>
 
 <section class="surface">
     <h2>Cartera</h2>

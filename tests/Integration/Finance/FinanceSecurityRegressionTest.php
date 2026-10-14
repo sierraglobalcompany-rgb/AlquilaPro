@@ -141,6 +141,9 @@ final class FinanceSecurityRegressionTest extends TestCase
         $home = $this->file('resources/views/tenant_home.php');
         $tenantDetail = $this->file('resources/views/tenant_lease_detail.php');
         $futureUiLabels = ['Reportes', 'Mantenimiento', 'Solicitudes'];
+        if ($this->f14IsPresent()) {
+            $futureUiLabels = array_values(array_diff($futureUiLabels, ['Mantenimiento']));
+        }
         if (!$this->f13IsPresent()) {
             $futureUiLabels[] = 'Póliza';
         }
@@ -213,7 +216,7 @@ final class FinanceSecurityRegressionTest extends TestCase
             && $summary < $list && $list < $paymentMethodScope && $paymentMethodScope < $render,
         );
         $expectedTenantDetailUse = $f13Exists
-            ? 'use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $insurance, $view, $csrf, $todayProvider, $path)'
+            ? 'use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $insurance, $maintenance, $view, $csrf, $todayProvider, $path)'
             : ($f12Exists
                 ? 'use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $view, $csrf, $todayProvider, $path)'
                 : 'use ($tenantGuard, $leases, $finance, $paymentMethods, $view, $csrf, $todayProvider, $path)');
@@ -295,5 +298,12 @@ final class FinanceSecurityRegressionTest extends TestCase
         $migration = $this->root . '/database/migrations/013_create_insurance_policies_and_claims.sql';
         return is_file($migration)
             && preg_match('/CREATE TABLE\s+insurance_policies\b/i', (string) file_get_contents($migration)) === 1;
+    }
+
+    private function f14IsPresent(): bool
+    {
+        $migration = $this->root . '/database/migrations/014_create_maintenance_requests.sql';
+        return is_file($migration)
+            && preg_match('/CREATE TABLE\s+maintenance_requests\b/i', (string) file_get_contents($migration)) === 1;
     }
 }

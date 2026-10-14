@@ -92,7 +92,8 @@ final class ShellRoutesTest extends TestCase
         self::assertStringContainsString('<dialog', $body);
         self::assertStringContainsString('aria-current="page"', $body);
         self::assertStringContainsString('Cartera', $body);
-        self::assertStringNotContainsString('Solicitudes', $body);
+        self::assertStringContainsString('href="/admin/maintenance"', $body);
+        self::assertStringContainsString('>Mantenimiento</strong>', $body);
         self::assertStringContainsString('Propiedades', $body);
     }
 
@@ -207,7 +208,7 @@ final class ShellRoutesTest extends TestCase
             'tenant-polluted@example.com',
             'TenantPassword123',
             'tenant',
-            ['users.view', 'users.manage', 'properties.view', 'candidates.view', 'contracts.view', 'contracts.manage', 'finance.view', 'finance.manage', 'insurance.view', 'insurance.manage'],
+            ['users.view', 'users.manage', 'properties.view', 'candidates.view', 'contracts.view', 'contracts.manage', 'finance.view', 'finance.manage', 'insurance.view', 'insurance.manage', 'maintenance.view', 'maintenance.manage'],
             false,
             'Tenant Polluted',
         );
@@ -229,6 +230,7 @@ final class ShellRoutesTest extends TestCase
         self::assertStringNotContainsString('/sub/admin/', $body);
         self::assertStringNotContainsString('/sub/admin/finance', $body);
         self::assertStringNotContainsString('/sub/admin/insurance', $body);
+        self::assertStringNotContainsString('/sub/admin/maintenance', $body);
         self::assertStringNotContainsString('Seguros', $body);
         self::assertStringNotContainsString('Cartera', $body);
         self::assertStringNotContainsString('No tienes aplicaciones disponibles', $body);
