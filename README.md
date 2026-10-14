@@ -472,6 +472,8 @@ Autoridad técnica de cierre:
 - F25 — SERVER_READY
 - F26 — Hostinger + smoke test
 
+La configuración de SMTP y el scheduler de F16 está en [F16 SMTP y cron](docs/deployment/F16_SMTP_CRON.md).
+
 ---
 
 # 10. PROTOCOLO DE RECUPERACIÓN

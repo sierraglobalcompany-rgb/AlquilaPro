@@ -22,6 +22,7 @@ use AlquilaPro\Insurance\InsuranceService;
 use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\Maintenance\MaintenanceService;
 use AlquilaPro\Maintenance\VisitService;
+use AlquilaPro\Notifications\NotificationService;
 use AlquilaPro\Properties\PropertyService;
 use AlquilaPro\Properties\UnitMediaService;
 use AlquilaPro\UI\Branding;
@@ -29,6 +30,7 @@ use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use PHPMailer\PHPMailer\PHPMailer;
 use Slim\App;
 use Slim\Factory\AppFactory;
 
@@ -163,6 +165,66 @@ return static function (array $settings): App {
         }
 
         if ($pdo instanceof \PDO) {
+            $notificationService = $settings['notifications'] ?? null;
+            $notificationCronSecret = (string) ($settings['notification_cron_secret'] ?? '');
+            if (array_key_exists('notification_settings', $settings)) {
+                $mailSettings = $settings['notification_settings'];
+                if (!is_array($mailSettings)) {
+                    throw new RuntimeException('La configuración SMTP de notificaciones no es válida.');
+                }
+                $smtpHost = trim((string) ($mailSettings['host'] ?? ''));
+                $smtpPort = filter_var($mailSettings['port'] ?? null, FILTER_VALIDATE_INT, [
+                    'options' => ['min_range' => 1, 'max_range' => 65535],
+                ]);
+                $smtpUsername = (string) ($mailSettings['username'] ?? '');
+                $smtpPassword = (string) ($mailSettings['password'] ?? '');
+                $smtpEncryption = strtolower(trim((string) ($mailSettings['encryption'] ?? '')));
+                $fromEmail = trim((string) ($mailSettings['from_email'] ?? ''));
+                $fromName = trim((string) ($mailSettings['from_name'] ?? ''));
+                $notificationCronSecret = (string) ($mailSettings['cron_secret'] ?? '');
+                if ($smtpHost === '' || preg_match('/[\r\n\x00]/', $smtpHost) === 1
+                    || $smtpPort === false || $smtpUsername === '' || $smtpPassword === ''
+                    || !in_array($smtpEncryption, ['tls', 'ssl'], true)
+                    || filter_var($fromEmail, FILTER_VALIDATE_EMAIL) === false
+                    || $fromName === '' || preg_match('/[\r\n\x00]/', $fromName) === 1
+                    || strlen($notificationCronSecret) < 32
+                ) {
+                    throw new RuntimeException('La configuración SMTP de notificaciones no es válida.');
+                }
+
+                $transport = static function (
+                    string $email,
+                    string $name,
+                    string $subject,
+                    string $htmlBody,
+                    string $textBody,
+                ) use ($smtpHost, $smtpPort, $smtpUsername, $smtpPassword, $smtpEncryption, $fromEmail, $fromName): void {
+                    $mail = new PHPMailer(true);
+                    $mail->isSMTP();
+                    $mail->Host = $smtpHost;
+                    $mail->Port = $smtpPort;
+                    $mail->SMTPAuth = true;
+                    $mail->Username = $smtpUsername;
+                    $mail->Password = $smtpPassword;
+                    $mail->SMTPSecure = $smtpEncryption === 'tls'
+                        ? PHPMailer::ENCRYPTION_STARTTLS
+                        : PHPMailer::ENCRYPTION_SMTPS;
+                    $mail->Timeout = 15;
+                    $mail->CharSet = PHPMailer::CHARSET_UTF8;
+                    $mail->setFrom($fromEmail, $fromName);
+                    $mail->addAddress($email, $name);
+                    $mail->Subject = $subject;
+                    $mail->isHTML(true);
+                    $mail->Body = $htmlBody;
+                    $mail->AltBody = $textBody;
+                    $mail->send();
+                };
+                $notificationService = new NotificationService($pdo, $transport);
+            }
+            if (!$notificationService instanceof NotificationService) {
+                $notificationService = null;
+            }
+
             $auth = new AuthService($pdo);
             $session = new SessionGuard();
             $branding = new Branding($pdo, $logoDirectory);
@@ -170,7 +232,11 @@ return static function (array $settings): App {
             $properties = new PropertyService($pdo);
             $unitMedia = new UnitMediaService($pdo, $unitMediaDirectory);
             $candidateDocuments = new CandidateDocumentService($pdo, $candidateDocumentDirectory);
-            $candidates = new CandidateService($pdo, candidateDocumentService: $candidateDocuments);
+            $candidates = new CandidateService(
+                $pdo,
+                candidateDocumentService: $candidateDocuments,
+                notificationService: $notificationService,
+            );
             $screening = new ScreeningService($pdo, $candidates);
             $contracts = new ContractService($pdo, $candidates, $screening, $properties, $contractDirectory);
             $users = new UserService($pdo);
@@ -258,12 +324,23 @@ return static function (array $settings): App {
 
             $maintenanceRoutes = require dirname(__DIR__) . '/app/Maintenance/routes.php';
             $maintenanceRoutes($app, $shared + ['leases' => $leases]);
+
+            if ($notificationService instanceof NotificationService) {
+                $notificationRoutes = require dirname(__DIR__) . '/app/Notifications/routes.php';
+                $notificationRoutes($app, [
+                    'notifications' => $notificationService,
+                    'cron_secret' => $notificationCronSecret,
+                ]);
+            }
         }
     }
 
     $responseFactory = $app->getResponseFactory();
-    $app->add(static function (ServerRequestInterface $request, RequestHandlerInterface $handler) use ($csrf, $responseFactory): ResponseInterface {
-        if (strtoupper($request->getMethod()) === 'POST') {
+    $cronPath = $basePath . '/cron/notifications';
+    $app->add(static function (ServerRequestInterface $request, RequestHandlerInterface $handler) use ($csrf, $responseFactory, $cronPath): ResponseInterface {
+        $isCronRequest = strtoupper($request->getMethod()) === 'POST'
+            && $request->getUri()->getPath() === $cronPath;
+        if (strtoupper($request->getMethod()) === 'POST' && !$isCronRequest) {
             $body = $request->getParsedBody();
             $token = is_array($body) ? (string) ($body['csrf_token'] ?? '') : '';
 

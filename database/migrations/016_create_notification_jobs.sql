@@ -1,0 +1,21 @@
+CREATE TABLE notification_jobs (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    type VARCHAR(80) NOT NULL,
+    recipient_email VARCHAR(254) NOT NULL,
+    recipient_name VARCHAR(120) NOT NULL,
+    subject VARCHAR(200) NOT NULL,
+    template_key VARCHAR(100) NOT NULL,
+    payload_json LONGTEXT NOT NULL,
+    scheduled_at DATETIME NOT NULL,
+    dedupe_key VARCHAR(191) NOT NULL,
+    attempt_count TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    last_attempt_at DATETIME NULL,
+    claim_until DATETIME NULL,
+    sent_at DATETIME NULL,
+    failed_at DATETIME NULL,
+    last_error VARCHAR(160) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY notification_jobs_dedupe_uq (dedupe_key),
+    KEY notification_jobs_due_index (sent_at, failed_at, scheduled_at, last_attempt_at, claim_until, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
