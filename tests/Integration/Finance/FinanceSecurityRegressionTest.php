@@ -186,8 +186,9 @@ final class FinanceSecurityRegressionTest extends TestCase
     public function testFinanceServiceIsSharedAndTenantViewExposesOnlySafeReadFields(): void
     {
         $bootstrap = $this->file('bootstrap/app.php');
-        self::assertSame(1, substr_count($bootstrap, 'new FinanceService($pdo)'));
+        self::assertSame(1, substr_count($bootstrap, 'new FinanceService($pdo, $paymentMethods, $paymentReceiptDirectory)'));
         self::assertSame(1, substr_count($bootstrap, 'new PaymentMethodService($pdo, $paymentMethodQrDirectory)'));
+        self::assertStringContainsString("storage/payment-receipts", $bootstrap);
         self::assertStringContainsString("'finance' => \$finance", $bootstrap);
         self::assertStringContainsString("'payment_methods' => \$paymentMethods", $bootstrap);
         self::assertStringContainsString('$leaseRoutes($app, $shared + [', $bootstrap);

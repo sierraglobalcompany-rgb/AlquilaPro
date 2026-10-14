@@ -38,8 +38,6 @@ final class PaymentMethodSecurityRegressionTest extends TestCase
             'bank_tokens',
             'payment_transactions',
             'payment_intents',
-            'payments',
-            'payment_allocations',
             'payment_reports',
         ] as $forbiddenTable) {
             self::assertNotContains($forbiddenTable, $allTables[1] ?? []);
