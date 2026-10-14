@@ -97,8 +97,9 @@ POST /admin/whatsapp/{id}/open
 - [x] Freeze 1 table / 1 service / 1 permission / 0 API/webhook/provider/dependency.
 - [x] Assert no columns/strings for delivered/read/provider message id.
 - [x] Assert all open/prepare routes private and tenant denied.
-- [ ] Fresh phase review before remote CI; repair only real Critical/Important findings.
+- [x] Fresh phase review before remote CI; 0 Critical/Important, 2 Minors deferred.
 - [x] `composer validate --strict`, `git diff --check`, focused F16/F17/auth tests.
-- [ ] Define Product Head; docs-only closure; one push.
+- [x] Define Product Head: `56d221c`.
+- [ ] Docs-only closure; one push.
 - [ ] Stacked PR against F16 closure branch; one PHP 8.3/8.4/8.5 PR CI.
 - [ ] Stop without merge/F18 if gate fails.

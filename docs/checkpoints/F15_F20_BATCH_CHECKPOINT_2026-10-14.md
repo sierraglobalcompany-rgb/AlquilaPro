@@ -28,6 +28,11 @@ F17_TASK1_GREEN: migration 017 + WhatsAppService snapshots normalized phone/mess
 F17_TASK1_PRODUCT_HEAD: 19ad7ac (Task 1 code/tests + checkpoint/plan)
 F17_TASK2_GREEN: Private SSR WhatsApp routes derive recipient/variables from existing candidate/lease/maintenance records; whatsapp.use with owner bypass and tenant hard deny; URL integrity checked before first-open audit; no SMTP dependency. Focused regressions: Notifications + Auth UserService + UI Shell = 53 tests/420 assertions PASS, no warnings.
 F17_TASK3_LOCAL: WhatsAppSecurityRegressionTest freezes exact action schema, notification files, permission, runtime packages and route surface; integration regression denies anonymous prepare/open and tenant prepare/open. Focused Notifications + Auth UserService + UI Shell: 56 tests/445 assertions PASS. Composer strict, diff check, and PHP lint PASS.
+F17_PRODUCT_HEAD: 56d221c61e3ec7ddf5ca710b022a44de112cd846
+F17_REVIEW: fresh subagent review; 0 Critical/Important; 2 Minor deferred (latest 100 history rows without paging; staff actor names not rendered). Ruling: whatsapp.use is shared across allowlisted records because F17 specifies one feature permission and no per-record policy; risk if wrong is staff contacting records outside intended operational scope.
+F17_CLOSURE_HEAD: pending docs-only closure commit
+F17_PR: pending single push and stacked PR against impl/f16-reminders-email-20261014
+F17_CI: not triggered yet; do not poll until final batch check
 F16_BRANCH: impl/f16-reminders-email-20261014
 F16_BASE: c40cd33321739effdce0253f67dc372e412dccde
 F16_PRODUCT_HEAD: 7b5118bc6b6ec29ceab8cfe3e2eb0901aafa3f7d
@@ -49,11 +54,11 @@ F16_TASK4: Architecture freeze and candidate-route transport proof PASS. Focused
 DONE: F15 locally certified, PR #18 open. F16 product head 7b5118b and docs-only closure commit complete; remote submission pending. PHPMailer ^7.1 resolves to 7.1.1.
 RULING/FINDING: (1) F15 F14 schema wildcard narrowed to maintenance_requests; F15 plan-named MaintenanceRoutesTest.php was absent, so a focused file was created. (2) F15 staff may reprogram proposed/scheduled visit slots, with only current slots selectable. (3) F15 fresh review found 4 Important, all fixed; reviewer declined no behavior. (4) F16 SMTP errors are reduced to generic keys; attempt increments only at actual send; stale exhausted claims fail closed. (5) Reminder cadence follows the F16 choices above; candidate mail is only for created/submitted. (6) F16 minor review findings on pagination and recipient retention are recorded for follow-up, not required by the phase Critical/Important repair gate.
 ENVIRONMENT: PHP 8.5.8; pdo_mysql/mbstring/dom/fileinfo present; gd absent; test DB connects.
-NEXT_EXACT_ACTION: run F17 Task 3 start/brief; add architecture/security freeze, then fresh whole-phase review and certification.
+NEXT_EXACT_ACTION: commit F17 docs-only closure; push branch once; open stacked PR; then begin F18. Do not merge or poll CI before final batch check.
 
 F15: LOCAL CERTIFIED / PR CI PENDING RECONCILIATION
 F16: PRODUCT COMPLETE / PR OPEN / REMOTE CI PENDING FINAL CHECK
-F17: TASKS 1–2 COMPLETE / TASK 3 LOCAL GATES PASS / FRESH REVIEW PENDING
+F17: PRODUCT HEAD 56d221c / FRESH REVIEW PASS / DOC CLOSURE + PUSH/PR PENDING
 F18: PENDING
 F19: PENDING
 F20: PENDING
