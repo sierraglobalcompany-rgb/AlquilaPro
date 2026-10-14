@@ -78,15 +78,8 @@ REPRODUCE
 → SEARCH DUPLICATION
 → RED
 → MINIMAL GREEN
-→ VERIFY GREEN
-→ CONVERGE
-→ FOCUSED QA
-→ FRESH REVIEW
-→ KISS / ZERO-NOISE / ANTIPATCH GATE
-→ CHECKPOINT
-→ PR CI
-→ FORENSIC AUDIT
-→ MERGE AUTORIZADO
+→ REMOVE SUPERSEDED LOGIC
+→ REGRESSION
 ```
 
 No compatibility fallbacks, segundos writers, optional dependencies para callers viejos ni parches laterales si puede corregirse el owner.
