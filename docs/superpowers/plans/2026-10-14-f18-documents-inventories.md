@@ -94,11 +94,11 @@ Inventory `content_json`:
 }
 ```
 
-- [ ] RED bounded upload/read, missing/tampered/oversize/symlink fail closed.
-- [ ] GREEN physical size cap before bounded read, then MIME/hash verification.
-- [ ] RED inventory validation: bounded item count/text lengths, quantity nonnegative/null, no unknown top-level shape.
-- [ ] GREEN normalized JSON snapshot; no automatic F14/F9 charge.
-- [ ] Run private storage/inventory focused tests.
+- [x] RED bounded upload/read, missing/tampered/oversize/symlink fail closed.
+- [x] GREEN physical size cap before bounded read, then MIME/hash verification.
+- [x] RED inventory validation: bounded item count/text lengths, quantity nonnegative/null, no unknown top-level shape.
+- [x] GREEN normalized JSON snapshot; no automatic F14/F9 charge.
+- [x] Run private storage/inventory focused tests.
 
 ### Task 3: Permissions + staff/tenant surfaces
 
@@ -111,23 +111,23 @@ Inventory `content_json`:
 - Create: `tests/Integration/Documents/DocumentRoutesTest.php`
 - Modify: `tests/Integration/Leases/TenantPortalRoutesTest.php`
 
-- [ ] RED permissions owner/admin/tenant behavior.
-- [ ] Staff can create new versions and view history/current docs.
-- [ ] Tenant lease page exposes only safe current lease docs/inventories plus current property `manual_convivencia` applicable to that lease.
-- [ ] Tenant private download proves `LeaseService::findForUser()` before document lookup/delivery.
-- [ ] No stored_name/hash/path leakage in HTML.
-- [ ] Wire `document_directory` + one service in bootstrap.
-- [ ] Run routes/ownership/auth/basePath focused tests.
+- [x] RED permissions owner/admin/tenant behavior.
+- [x] Staff can create new versions and view history/current docs.
+- [x] Tenant lease page exposes only safe current lease docs/inventories plus current property `manual_convivencia` applicable to that lease.
+- [x] Tenant private download proves `LeaseService::findForUser()` before document lookup/delivery.
+- [x] No stored_name/hash/path leakage in HTML.
+- [x] Wire `document_directory` + one service in bootstrap.
+- [x] Run routes/ownership/auth/basePath focused tests.
 
 ### Task 4: Architecture freeze + certification
 
 **Files:**
 - Create: `tests/Integration/Documents/DocumentSecurityRegressionTest.php`
 
-- [ ] Freeze 1 table / 1 service / 2 permissions / 0 parallel inventory/manual/version tables.
-- [ ] Freeze no legacy-evidence migration and no financial writes.
-- [ ] Fresh review before remote CI; repair only Critical/Important.
-- [ ] `composer validate --strict`, `git diff --check`, F18 + affected F4/F8/security focused tests.
+- [x] Freeze 1 table / 1 service / 2 permissions / 0 parallel inventory/manual/version tables.
+- [x] Freeze no legacy-evidence migration and no financial writes.
+- [x] Fresh review before remote CI; repair only Critical/Important.
+- [x] `composer validate --strict`, `git diff --check`, F18 + affected F4/F8/security focused tests.
 - [ ] Product Head → docs-only Closure Head.
 - [ ] One push; stacked PR against F17 closure branch; one PHP 8.3/8.4/8.5 PR CI.
 - [ ] Stop without merge/F19 on failure.

@@ -13,6 +13,7 @@ use Throwable;
 final class DocumentService
 {
     private const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+    private const MAX_INVENTORY_ITEMS = 200;
     private const TYPE_SCOPE = [
         'property_document' => 'property',
         'lease_document' => 'lease',
@@ -97,6 +98,9 @@ final class DocumentService
         $title = trim($title);
         if (!in_array($type, self::CONTENT_TYPES, true)) {
             throw $this->failure('El tipo de documento requiere un archivo.');
+        }
+        if (in_array($type, ['inventory_initial', 'inventory_final'], true)) {
+            $content = $this->normalizeInventory($content);
         }
 
         try {
@@ -553,6 +557,67 @@ final class DocumentService
             throw $this->failure('El almacenamiento privado no es válido.');
         }
         @chmod($this->documentDirectory, 0700);
+    }
+
+    /** @param array<string,mixed> $content
+     *  @return array{general_notes:?string,items:list<array{area:string,item:string,condition:string,quantity:?int,notes:?string}>}
+     */
+    private function normalizeInventory(array $content): array
+    {
+        $keys = array_keys($content);
+        sort($keys);
+        if ($keys !== ['general_notes', 'items'] || !array_key_exists('general_notes', $content)
+            || !array_key_exists('items', $content) || !is_array($content['items'])
+            || !array_is_list($content['items']) || count($content['items']) > self::MAX_INVENTORY_ITEMS
+        ) {
+            throw $this->failure('La estructura del inventario no es válida.');
+        }
+
+        $generalNotes = $this->inventoryText($content['general_notes'], 4000, true, true);
+        $items = [];
+        foreach ($content['items'] as $item) {
+            if (!is_array($item)) {
+                throw $this->failure('Los elementos del inventario no son válidos.');
+            }
+            $itemKeys = array_keys($item);
+            sort($itemKeys);
+            if ($itemKeys !== ['area', 'condition', 'item', 'notes', 'quantity']) {
+                throw $this->failure('Cada elemento del inventario debe tener solo los campos permitidos.');
+            }
+
+            $quantity = $item['quantity'];
+            if ($quantity !== null && (!is_int($quantity) || $quantity < 0)) {
+                throw $this->failure('La cantidad del elemento no es válida.');
+            }
+            $items[] = [
+                'area' => $this->inventoryText($item['area'], 100, false, false),
+                'item' => $this->inventoryText($item['item'], 190, false, false),
+                'condition' => $this->inventoryText($item['condition'], 80, false, false),
+                'quantity' => $quantity,
+                'notes' => $this->inventoryText($item['notes'], 1000, true, true),
+            ];
+        }
+        return ['general_notes' => $generalNotes, 'items' => $items];
+    }
+
+    private function inventoryText(mixed $value, int $maxLength, bool $nullable, bool $emptyIsNull): ?string
+    {
+        if ($value === null && $nullable) {
+            return null;
+        }
+        if (!is_string($value)) {
+            throw $this->failure('El texto del inventario no es válido.');
+        }
+        $value = trim($value);
+        if ($value === '' && $emptyIsNull) {
+            return null;
+        }
+        if ($value === '' || mb_strlen($value, 'UTF-8') > $maxLength
+            || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $value) === 1
+        ) {
+            throw $this->failure('El texto del inventario está vacío o excede el límite.');
+        }
+        return $value;
     }
 
     private function documentPath(string $storedName): ?string

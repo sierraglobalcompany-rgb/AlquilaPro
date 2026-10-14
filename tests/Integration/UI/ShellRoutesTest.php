@@ -135,6 +135,24 @@ final class ShellRoutesTest extends TestCase
         self::assertStringNotContainsString('WhatsApp', $hidden);
     }
 
+    public function testDocumentsAppCardRequiresViewPermission(): void
+    {
+        $this->insertUser('documents-visible@example.com', 'StaffPassword123', 'gestor', ['documents.view']);
+        $visibleApp = $this->app();
+        $this->login($visibleApp, 'documents-visible@example.com', 'StaffPassword123');
+        $visible = (string) $this->request($visibleApp, 'GET', '/')->getBody();
+        self::assertStringContainsString('href="/admin/documents"', $visible);
+        self::assertStringContainsString('>Documentos</strong>', $visible);
+
+        $_SESSION = [];
+        $this->insertUser('documents-hidden@example.com', 'StaffPassword123', 'gestor', []);
+        $hiddenApp = $this->app();
+        $this->login($hiddenApp, 'documents-hidden@example.com', 'StaffPassword123');
+        $hidden = (string) $this->request($hiddenApp, 'GET', '/')->getBody();
+        self::assertStringNotContainsString('/admin/documents', $hidden);
+        self::assertStringNotContainsString('Documentos privados', $hidden);
+    }
+
     public function testAccountRequiresLoginAndRendersCurrentUser(): void
     {
         $userId = $this->insertUser('admin@example.com', 'AdminPassword123', 'admin', ['users.view'], false, 'Natalia Admin');

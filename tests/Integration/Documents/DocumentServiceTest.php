@@ -182,6 +182,58 @@ final class DocumentServiceTest extends TestCase
         self::assertSame([], $service->listCurrentForLease(0));
     }
 
+    public function testInventoryContentIsNormalizedAndRejectsUnknownOrUnboundedShapes(): void
+    {
+        $service = $this->service();
+        $inventory = $service->createContentVersion(
+            null,
+            $this->leaseId,
+            'inventory_initial',
+            'Inventario inicial',
+            [
+                'general_notes' => '  Revisar al entregar.  ',
+                'items' => [[
+                    'area' => '  Sala  ',
+                    'item' => '  Ventana principal  ',
+                    'condition' => '  Buen estado  ',
+                    'quantity' => 2,
+                    'notes' => '  Sin rayones.  ',
+                ]],
+            ],
+            null,
+            $this->actorId,
+            1_800_000_000,
+        );
+
+        self::assertSame('Revisar al entregar.', $inventory['content_json']['general_notes']);
+        self::assertSame([
+            'area' => 'Sala',
+            'item' => 'Ventana principal',
+            'condition' => 'Buen estado',
+            'quantity' => 2,
+            'notes' => 'Sin rayones.',
+        ], $inventory['content_json']['items'][0]);
+
+        $invalidContent = [
+            ['items' => []],
+            ['general_notes' => null, 'items' => [], 'extra' => 'no'],
+            ['general_notes' => null, 'items' => 'not-a-list'],
+            ['general_notes' => str_repeat('n', 4001), 'items' => []],
+            ['general_notes' => null, 'items' => [['area' => 'Sala', 'item' => 'Mesa', 'condition' => 'Ok', 'quantity' => 1, 'notes' => null, 'extra' => true]]],
+            ['general_notes' => null, 'items' => [['area' => '', 'item' => 'Mesa', 'condition' => 'Ok', 'quantity' => 1, 'notes' => null]]],
+            ['general_notes' => null, 'items' => [['area' => 'Sala', 'item' => 'Mesa', 'condition' => 'Ok', 'quantity' => -1, 'notes' => null]]],
+            ['general_notes' => null, 'items' => [['area' => 'Sala', 'item' => 'Mesa', 'condition' => 'Ok', 'quantity' => '2', 'notes' => null]]],
+            ['general_notes' => null, 'items' => array_fill(0, 201, ['area' => 'Sala', 'item' => 'Mesa', 'condition' => 'Ok', 'quantity' => null, 'notes' => null])],
+        ];
+        foreach ($invalidContent as $content) {
+            $this->assertRejected(fn () => $service->createContentVersion(
+                null, $this->leaseId, 'inventory_final', 'Inventario final', $content, null, $this->actorId, 1_800_000_001,
+            ));
+        }
+        self::assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM documents')->fetchColumn());
+        self::assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM charges')->fetchColumn());
+    }
+
     private function service(): DocumentService
     {
         if (!class_exists(DocumentService::class)) {
