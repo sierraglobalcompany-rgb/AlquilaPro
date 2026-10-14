@@ -170,6 +170,7 @@ final class FinanceSecurityRegressionTest extends TestCase
         $f13Exists = $this->f13IsPresent();
         $f15Exists = is_file($this->root . '/database/migrations/015_create_maintenance_visits.sql');
         $f18Exists = is_file($this->root . '/database/migrations/018_create_documents.sql');
+        $f20Exists = is_file($this->root . '/database/migrations/020_create_digital_services_memberships.sql');
         $routes = $this->file('app/Leases/routes.php');
         preg_match_all('/\$app->(?:get|post)\(\'([^\']+)\'/i', $routes, $routeMatches);
         $expectedRoutes = [
@@ -235,6 +236,13 @@ final class FinanceSecurityRegressionTest extends TestCase
                 : 'use ($tenantGuard, $leases, $finance, $paymentMethods, $view, $csrf, $todayProvider, $path)');
         if ($f18Exists) {
             $expectedTenantDetailUse = str_replace('$leases, $finance', '$leases, $documents, $finance', $expectedTenantDetailUse);
+        }
+        if ($f20Exists) {
+            $expectedTenantDetailUse = str_replace(
+                '$documents, $finance',
+                '$documents, $community, $memberships, $finance',
+                $expectedTenantDetailUse,
+            );
         }
         self::assertStringContainsString($expectedTenantDetailUse, $detailRoute);
 

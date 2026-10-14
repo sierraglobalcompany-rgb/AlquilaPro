@@ -15,6 +15,7 @@ use AlquilaPro\Insurance\InsuranceService;
 use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\Maintenance\MaintenanceService;
 use AlquilaPro\Maintenance\VisitService;
+use AlquilaPro\Memberships\MembershipService;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -41,6 +42,8 @@ return static function (App $app, array $deps): void {
     $documents = $deps['documents'];
     /** @var CommunityService $community */
     $community = $deps['community'];
+    /** @var MembershipService $memberships */
+    $memberships = $deps['memberships'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -208,7 +211,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($tenantGuard, $leases, $documents, $community, $finance, $obligations, $paymentMethods, $insurance, $maintenance, $visits, $view, $csrf, $todayProvider, $path): ResponseInterface {
+    ) use ($tenantGuard, $leases, $documents, $community, $memberships, $finance, $obligations, $paymentMethods, $insurance, $maintenance, $visits, $view, $csrf, $todayProvider, $path): ResponseInterface {
         $user = $tenantGuard($response);
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -218,6 +221,57 @@ return static function (App $app, array $deps): void {
         if ($lease === null) {
             return $response->withStatus(404);
         }
+
+        $today = $todayProvider();
+        $membershipHistory = $memberships->listForLease((int) $lease['id']);
+        $availableServices = $lease['is_active'] ? $memberships->listServices(true) : [];
+        $serviceById = [];
+        foreach ($memberships->listServices() as $service) {
+            $serviceById[(int) $service['id']] = $service;
+        }
+        $renewedMembershipIds = [];
+        $occupiedServiceIds = [];
+        foreach ($membershipHistory as $membership) {
+            if ($membership['renews_membership_id'] !== null) {
+                $renewedMembershipIds[(int) $membership['renews_membership_id']] = true;
+            }
+            if ($membership['ended_at'] === null && $membership['ends_on'] >= $today) {
+                $occupiedServiceIds[(int) $membership['service_id']] = true;
+            }
+        }
+        $availableServices = array_values(array_filter(
+            $availableServices,
+            static fn (array $service): bool => !isset($occupiedServiceIds[(int) $service['id']]),
+        ));
+        $tenantMemberships = array_map(static function (array $membership) use (
+            $today,
+            $serviceById,
+            $renewedMembershipIds,
+        ): array {
+            $service = $serviceById[(int) $membership['service_id']] ?? null;
+            $outcomeLabel = match ($membership['charge_outcome']) {
+                'created' => 'Cargo creado',
+                'skipped' => 'No se creará cargo',
+                'pending' => 'Pendiente de decisión administrativa',
+                default => 'Sin cargo',
+            };
+            $status = $membership['ended_at'] !== null
+                ? 'Finalizado'
+                : (($membership['ends_on'] < $today)
+                    ? 'Vencido'
+                    : (($membership['starts_on'] > $today) ? 'Programado' : 'Activo'));
+            return [
+                'id' => (int) $membership['id'],
+                'service_name' => (string) ($membership['service_name'] ?? $service['name'] ?? 'Servicio'),
+                'price_snapshot' => (string) $membership['price_snapshot'],
+                'starts_on' => (string) $membership['starts_on'],
+                'ends_on' => (string) $membership['ends_on'],
+                'status' => $status,
+                'charge_outcome_label' => $outcomeLabel,
+                'can_renew' => is_array($service) && $service['active']
+                    && !isset($renewedMembershipIds[(int) $membership['id']]),
+            ];
+        }, $membershipHistory);
 
         $communityIncidents = [];
         foreach ($community->listForLease((int) $lease['id']) as $incident) {
@@ -276,7 +330,6 @@ return static function (App $app, array $deps): void {
             }
         }
 
-        $today = $todayProvider();
         $insurancePolicies = $insurance->tenantPolicySummary((int) $lease['id'], $today);
         $maintenanceRequests = array_map(static function (array $record) use ($path, $lease, $visits): array {
             $canSelect = !in_array($record['status'], ['resolved', 'cancelled'], true);
@@ -384,6 +437,8 @@ return static function (App $app, array $deps): void {
             'propertyManuals' => $propertyManuals,
             'communityIncidents' => $communityIncidents,
             'propertyLegalNotices' => $propertyLegalNotices,
+            'digitalServices' => $availableServices,
+            'digitalServiceMemberships' => $tenantMemberships,
             'today' => $today,
         ]));
 

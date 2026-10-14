@@ -15,6 +15,7 @@ use AlquilaPro\Foundation\InstallationLock;
 use AlquilaPro\Foundation\MigrationRunner;
 use AlquilaPro\Maintenance\MaintenanceService;
 use AlquilaPro\Maintenance\VisitService;
+use AlquilaPro\Memberships\MembershipService;
 use PDO;
 use PDOStatement;
 use PHPUnit\Framework\TestCase;
@@ -49,7 +50,9 @@ final class TenantPortalRoutesTest extends TestCase
             'payment_allocations',
             'payments',
             'payment_methods',
+            'service_memberships',
             'charges',
+            'digital_services',
             'community_incidents',
             'documents',
             'leases',
@@ -549,6 +552,140 @@ final class TenantPortalRoutesTest extends TestCase
             static fn (string $sql): bool => str_contains($sql, 'from community_incidents')
                 || str_contains($sql, 'from documents'),
         )));
+    }
+
+    public function testTenantMembershipRoutesEnforceLeaseOwnershipAndProjectOnlySafeOutcomes(): void
+    {
+        $tenantId = $this->insertUser('membership-portal@example.com', 'TenantPassword123', 'tenant');
+        $foreignTenantId = $this->insertUser('membership-portal-foreign@example.com', 'TenantPassword123', 'tenant');
+        $owned = $this->createLease($tenantId, ['unit_code' => 'APT-MEMBERSHIP-OWNED']);
+        $foreign = $this->createLease($foreignTenantId, ['unit_code' => 'APT-MEMBERSHIP-FOREIGN']);
+        $membershipService = new MembershipService(
+            $this->pdo,
+            new FinanceService($this->pdo, new PaymentMethodService($this->pdo, $this->qrDirectory), $this->directory . '/receipts'),
+        );
+        $catalog = $membershipService->createService(
+            'Soporte digital', 'Ayuda adicional para residentes.', '28.50', 10, $tenantId, 1_800_000_000,
+        );
+
+        $tracedPdo = $this->tracedPdo();
+        $app = $this->app('/sub', $tracedPdo, static fn (): string => '2026-10-14');
+        $this->login($app, 'membership-portal@example.com', 'TenantPassword123', '/sub');
+
+        $tracedPdo->preparedSql = [];
+        $detail = $this->request($app, 'GET', '/sub/tenant/leases/' . $owned['lease_id']);
+        self::assertSame(200, $detail->getStatusCode());
+        $html = (string) $detail->getBody();
+        self::assertStringContainsString('Servicios digitales', $html);
+        self::assertStringContainsString('Soporte digital', $html);
+        self::assertStringContainsString('Aceptar servicio', $html);
+        self::assertStringNotContainsString('accepted_by_user_id', $html);
+        self::assertStringNotContainsString('charge_decided_by_user_id', $html);
+        self::assertStringNotContainsString('charge_id', $html);
+        $queries = array_map('strtolower', $tracedPdo->preparedSql);
+        $leaseQuery = array_search(true, array_map(
+            static fn (string $sql): bool => str_contains($sql, 'from leases l'),
+            $queries,
+        ), true);
+        $membershipQuery = array_search(true, array_map(
+            static fn (string $sql): bool => str_contains($sql, 'from service_memberships'),
+            $queries,
+        ), true);
+        self::assertIsInt($leaseQuery);
+        self::assertIsInt($membershipQuery);
+        self::assertLessThan($membershipQuery, $leaseQuery);
+
+        $tracedPdo->preparedSql = [];
+        self::assertSame(404, $this->request(
+            $app,
+            'GET',
+            '/sub/tenant/leases/' . $foreign['lease_id'],
+        )->getStatusCode());
+        $foreignQueries = array_map('strtolower', $tracedPdo->preparedSql);
+        self::assertSame([], array_values(array_filter(
+            $foreignQueries,
+            static fn (string $sql): bool => str_contains($sql, 'digital_services')
+                || str_contains($sql, 'service_memberships'),
+        )));
+
+        $tracedPdo->preparedSql = [];
+        self::assertSame(404, $this->request(
+            $app,
+            'POST',
+            '/sub/tenant/leases/' . $foreign['lease_id'] . '/memberships',
+            ['service_id' => (string) $catalog['id']],
+        )->getStatusCode());
+        $foreignPostQueries = array_map('strtolower', $tracedPdo->preparedSql);
+        self::assertSame([], array_values(array_filter(
+            $foreignPostQueries,
+            static fn (string $sql): bool => str_contains($sql, 'digital_services')
+                || str_contains($sql, 'service_memberships'),
+        )));
+
+        $tracedPdo->preparedSql = [];
+        self::assertSame(303, $this->request(
+            $app,
+            'POST',
+            '/sub/tenant/leases/' . $owned['lease_id'] . '/memberships',
+            ['service_id' => (string) $catalog['id']],
+        )->getStatusCode());
+        $membershipId = (int) $this->pdo->query('SELECT MAX(id) FROM service_memberships')->fetchColumn();
+        self::assertGreaterThan(0, $membershipId);
+
+        $tracedPdo->preparedSql = [];
+        self::assertSame(404, $this->request(
+            $app,
+            'POST',
+            '/sub/tenant/leases/' . $foreign['lease_id'] . '/memberships/' . $membershipId . '/renew',
+        )->getStatusCode());
+        $foreignRenewQueries = array_map('strtolower', $tracedPdo->preparedSql);
+        self::assertSame([], array_values(array_filter(
+            $foreignRenewQueries,
+            static fn (string $sql): bool => str_contains($sql, 'digital_services')
+                || str_contains($sql, 'service_memberships'),
+        )));
+
+        $queries = array_map('strtolower', $tracedPdo->preparedSql);
+        $leaseQuery = array_search(true, array_map(
+            static fn (string $sql): bool => str_contains($sql, 'from leases l'),
+            $queries,
+        ), true);
+        self::assertIsInt($leaseQuery);
+
+        $membershipService->decideCharge(
+            $membershipId, 'create', '2026-10-20', 'Servicio digital', $tenantId, 1_800_000_030,
+        );
+        $tracedPdo->preparedSql = [];
+        $renewResponse = $this->request(
+            $app,
+            'POST',
+            '/sub/tenant/leases/' . $owned['lease_id'] . '/memberships/' . $membershipId . '/renew',
+        );
+        self::assertSame(303, $renewResponse->getStatusCode());
+        $renewQueries = array_map('strtolower', $tracedPdo->preparedSql);
+        $leaseQuery = array_search(true, array_map(
+            static fn (string $sql): bool => str_contains($sql, 'from leases l'),
+            $renewQueries,
+        ), true);
+        $membershipQuery = array_search(true, array_map(
+            static fn (string $sql): bool => str_contains($sql, 'from service_memberships'),
+            $renewQueries,
+        ), true);
+        self::assertIsInt($leaseQuery);
+        self::assertIsInt($membershipQuery);
+        self::assertLessThan($membershipQuery, $leaseQuery);
+        self::assertSame(2, (int) $this->pdo->query('SELECT COUNT(*) FROM service_memberships')->fetchColumn());
+        $renewed = $membershipService->listForLease($owned['lease_id'])[0];
+        self::assertSame($membershipId, $renewed['renews_membership_id']);
+
+        $history = $this->request($app, 'GET', '/sub/tenant/leases/' . $owned['lease_id']);
+        self::assertSame(200, $history->getStatusCode());
+        $historyHtml = (string) $history->getBody();
+        self::assertStringContainsString('Cargo creado', $historyHtml);
+        self::assertStringContainsString('Pendiente de decisión administrativa', $historyHtml);
+        foreach (['accepted_by_user_id', 'charge_decided_by_user_id', 'charge_id'] as $privateField) {
+            self::assertStringNotContainsString($privateField, $historyHtml);
+        }
     }
 
     public function testTenantLeaseDetailShowsOnlyActiveGlobalAndOwnedPropertyPaymentMethods(): void

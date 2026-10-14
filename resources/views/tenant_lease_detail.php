@@ -10,6 +10,8 @@ $leaseDocuments = $leaseDocuments ?? [];
 $propertyManuals = $propertyManuals ?? [];
 $communityIncidents = $communityIncidents ?? [];
 $propertyLegalNotices = $propertyLegalNotices ?? [];
+$digitalServices = $digitalServices ?? [];
+$digitalServiceMemberships = $digitalServiceMemberships ?? [];
 $isApartment = (string) $lease['unit_type'] === 'apartment';
 $isParking = (string) $lease['unit_type'] === 'parking';
 $chargeStateLabels = [
@@ -72,6 +74,55 @@ $visitStatusLabels = [
     <p class="hint">Estado: <?= $lease['is_active'] ? 'Activo' : 'Finalizado' ?></p>
     <a class="button button--quiet" href="<?= $escape($basePath) ?>/tenant">Volver</a>
     <a class="button button--quiet" href="<?= $escape($basePath) ?>/tenant/leases/<?= $escape($lease['id']) ?>/contract">Descargar contrato</a>
+</section>
+
+<section class="surface" id="digital-services">
+    <h2>Servicios digitales</h2>
+    <?php if ($lease['is_active'] && $digitalServices !== []): ?>
+        <div class="users-grid">
+            <?php foreach ($digitalServices as $service): ?>
+                <article class="user-card">
+                    <strong><?= $escape($service['name']) ?></strong>
+                    <p><?= nl2br($escape($service['description'])) ?></p>
+                    <div><?= $escape($service['current_price']) ?> · <?= $escape($service['duration_days']) ?> días</div>
+                    <form method="post" action="<?= $escape($basePath) ?>/tenant/leases/<?= $escape($lease['id']) ?>/memberships">
+                        <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                        <input type="hidden" name="service_id" value="<?= $escape($service['id']) ?>">
+                        <button class="button" type="submit">Aceptar servicio</button>
+                    </form>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    <?php elseif (!$lease['is_active']): ?>
+        <p class="empty-state">Los servicios nuevos requieren un arrendamiento activo.</p>
+    <?php elseif ($digitalServiceMemberships === []): ?>
+        <p class="empty-state">No hay servicios disponibles en este momento.</p>
+    <?php endif; ?>
+
+    <?php if ($digitalServiceMemberships === []): ?>
+        <p class="empty-state">Aún no has aceptado servicios digitales.</p>
+    <?php else: ?>
+        <h3>Historial de servicios</h3>
+        <div class="users-grid">
+            <?php foreach ($digitalServiceMemberships as $membership): ?>
+                <article class="user-card">
+                    <div class="user-card__head">
+                        <strong><?= $escape($membership['service_name']) ?></strong>
+                        <span class="status-pill"><?= $escape($membership['status']) ?></span>
+                    </div>
+                    <div>Vigencia: <?= $escape($membership['starts_on']) ?> a <?= $escape($membership['ends_on']) ?></div>
+                    <div>Precio aceptado: <?= $escape($membership['price_snapshot']) ?></div>
+                    <div><?= $escape($membership['charge_outcome_label']) ?></div>
+                    <?php if ($lease['is_active'] && $membership['can_renew']): ?>
+                        <form method="post" action="<?= $escape($basePath) ?>/tenant/leases/<?= $escape($lease['id']) ?>/memberships/<?= $escape($membership['id']) ?>/renew">
+                            <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                            <button class="button button--quiet" type="submit">Renovar servicio</button>
+                        </form>
+                    <?php endif; ?>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
 </section>
 
 <section class="surface">
