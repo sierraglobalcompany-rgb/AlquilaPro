@@ -6,6 +6,7 @@ use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Contracts\ContractService;
+use AlquilaPro\Documents\DocumentService;
 use AlquilaPro\Finance\FinanceService;
 use AlquilaPro\Finance\ObligationService;
 use AlquilaPro\Finance\PaymentMethodService;
@@ -35,6 +36,8 @@ return static function (App $app, array $deps): void {
     $maintenance = $deps['maintenance'];
     /** @var VisitService $visits */
     $visits = $deps['visits'];
+    /** @var DocumentService $documents */
+    $documents = $deps['documents'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -202,7 +205,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $insurance, $maintenance, $visits, $view, $csrf, $todayProvider, $path): ResponseInterface {
+    ) use ($tenantGuard, $leases, $documents, $finance, $obligations, $paymentMethods, $insurance, $maintenance, $visits, $view, $csrf, $todayProvider, $path): ResponseInterface {
         $user = $tenantGuard($response);
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -211,6 +214,35 @@ return static function (App $app, array $deps): void {
         $lease = $leases->findForUser((int) $args['id'], (int) $user['id']);
         if ($lease === null) {
             return $response->withStatus(404);
+        }
+
+        $leaseDocuments = [];
+        foreach ($documents->listCurrentForLease((int) $lease['id']) as $document) {
+            if (!in_array($document['type'], ['lease_document', 'inventory_initial', 'inventory_final'], true)) {
+                continue;
+            }
+            $leaseDocuments[] = [
+                'id' => (int) $document['id'],
+                'type' => (string) $document['type'],
+                'title' => (string) $document['title'],
+                'created_at' => (string) $document['created_at'],
+                'content_json' => is_array($document['content_json'] ?? null) ? $document['content_json'] : null,
+                'file_url' => $document['type'] === 'lease_document' && is_string($document['stored_name'] ?? null)
+                    ? $path('/tenant/leases/' . (int) $lease['id'] . '/documents/' . (int) $document['id'] . '/file')
+                    : null,
+            ];
+        }
+        $propertyManuals = [];
+        foreach ($documents->listCurrentForProperty((int) $lease['property_id']) as $document) {
+            if ($document['type'] !== 'manual_convivencia' || !is_array($document['content_json'] ?? null)) {
+                continue;
+            }
+            $propertyManuals[] = [
+                'id' => (int) $document['id'],
+                'title' => (string) $document['title'],
+                'created_at' => (string) $document['created_at'],
+                'content_json' => $document['content_json'],
+            ];
         }
 
         $today = $todayProvider();
@@ -317,6 +349,8 @@ return static function (App $app, array $deps): void {
             'paymentHistory' => $paymentHistory,
             'insurancePolicies' => $insurancePolicies,
             'maintenanceRequests' => $maintenanceRequests,
+            'leaseDocuments' => $leaseDocuments,
+            'propertyManuals' => $propertyManuals,
             'today' => $today,
         ]));
 

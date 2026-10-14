@@ -41,6 +41,7 @@ $app = $factory([
     'migration_directory' => __DIR__ . '/database/migrations',
     'base_url' => $baseUrl,
     'base_path' => $basePath,
+    'document_directory' => $environmentValue('ALQUILAPRO_DOCUMENT_DIRECTORY'),
     'notification_settings' => [
         'host' => $environmentValue('ALQUILAPRO_SMTP_HOST'),
         'port' => $environmentValue('ALQUILAPRO_SMTP_PORT'),

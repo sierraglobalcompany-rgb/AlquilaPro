@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AlquilaPro\Tests\Integration\Leases;
 
 use AlquilaPro\Auth\Csrf;
+use AlquilaPro\Documents\DocumentService;
 use AlquilaPro\Finance\FinanceService;
 use AlquilaPro\Finance\PaymentMethodService;
 use AlquilaPro\Foundation\DatabaseConfig;
@@ -48,6 +49,7 @@ final class TenantPortalRoutesTest extends TestCase
             'payments',
             'payment_methods',
             'charges',
+            'documents',
             'leases',
             'contracts',
             'contract_template_versions',
@@ -94,6 +96,9 @@ final class TenantPortalRoutesTest extends TestCase
         foreach (glob($this->directory . '/maintenance-photos/*') ?: [] as $file) {
             @unlink($file);
         }
+        foreach (glob($this->directory . '/documents/*') ?: [] as $file) {
+            @unlink($file);
+        }
         @unlink($this->lockPath);
         @unlink($this->lockPath . '.tmp');
         @rmdir($this->directory . '/branding');
@@ -102,6 +107,7 @@ final class TenantPortalRoutesTest extends TestCase
         @rmdir($this->contractDirectory);
         @rmdir($this->qrDirectory);
         @rmdir($this->directory . '/maintenance-photos');
+        @rmdir($this->directory . '/documents');
         @rmdir($this->directory . '/maintenance-receipts');
         @rmdir($this->directory);
     }
@@ -306,6 +312,141 @@ final class TenantPortalRoutesTest extends TestCase
             $tracedPdo->preparedSql,
             static fn (string $sql): bool => str_contains(strtolower($sql), 'from charges'),
         )), 'Missing lease must be rejected before FinanceService is queried.');
+    }
+
+    public function testTenantDocumentsAreSafeCurrentAndPrivateDownloadsCheckLeaseOwnershipFirst(): void
+    {
+        $tenantId = $this->insertUser('documents-tenant@example.com', 'TenantPassword123', 'tenant');
+        $foreignTenantId = $this->insertUser('documents-foreign@example.com', 'TenantPassword123', 'tenant');
+        $ownedLease = $this->createLease($tenantId);
+        $foreignLease = $this->createLease($foreignTenantId, ['property_name' => 'Foreign document property']);
+        $documents = new DocumentService($this->pdo, $this->directory . '/documents');
+
+        $oldDocument = $documents->createFileVersion(
+            null,
+            $ownedLease['lease_id'],
+            'lease_document',
+            'Versión anterior privada',
+            $this->documentUpload(),
+            null,
+            $tenantId,
+            1_800_000_000,
+        );
+        $currentDocument = $documents->createFileVersion(
+            null,
+            $ownedLease['lease_id'],
+            'lease_document',
+            'Documento de arrendamiento vigente',
+            $this->documentUpload(),
+            (int) $oldDocument['id'],
+            $tenantId,
+            1_800_000_001,
+        );
+        $documents->createContentVersion(
+            null,
+            $ownedLease['lease_id'],
+            'inventory_initial',
+            'Inventario inicial vigente',
+            ['general_notes' => 'Entrega documentada', 'items' => [[
+                'area' => 'Sala', 'item' => 'Ventana', 'condition' => 'Buen estado', 'quantity' => 1, 'notes' => null,
+            ]]],
+            null,
+            $tenantId,
+            1_800_000_002,
+        );
+        $manual = $documents->createContentVersion(
+            $ownedLease['property_id'],
+            null,
+            'manual_convivencia',
+            'Manual aplicable de convivencia',
+            ['rules' => ['Mantener silencio después de las 10 p. m.']],
+            null,
+            $tenantId,
+            1_800_000_003,
+        );
+        $documents->createFileVersion(
+            $ownedLease['property_id'],
+            null,
+            'property_document',
+            'Documento interno de la propiedad',
+            $this->documentUpload(),
+            null,
+            $tenantId,
+            1_800_000_004,
+        );
+        $foreignDocument = $documents->createFileVersion(
+            null,
+            $foreignLease['lease_id'],
+            'lease_document',
+            'Documento de otro inquilino',
+            $this->documentUpload(),
+            null,
+            $foreignTenantId,
+            1_800_000_005,
+        );
+
+        $app = $this->app('/sub');
+        $this->login($app, 'documents-tenant@example.com', 'TenantPassword123', '/sub');
+        $page = $this->request($app, 'GET', '/sub/tenant/leases/' . $ownedLease['lease_id']);
+        self::assertSame(200, $page->getStatusCode());
+        $html = (string) $page->getBody();
+        self::assertStringContainsString('Documento de arrendamiento vigente', $html);
+        self::assertStringContainsString('Inventario inicial vigente', $html);
+        self::assertStringContainsString('Manual aplicable de convivencia', $html);
+        self::assertStringNotContainsString('Versión anterior privada', $html);
+        self::assertStringNotContainsString('Documento interno de la propiedad', $html);
+        self::assertStringNotContainsString('Documento de otro inquilino', $html);
+        self::assertStringNotContainsString((string) $currentDocument['stored_name'], $html);
+        self::assertStringNotContainsString((string) $currentDocument['sha256'], $html);
+        self::assertStringContainsString(
+            '/sub/tenant/leases/' . $ownedLease['lease_id'] . '/documents/' . $currentDocument['id'] . '/file',
+            $html,
+        );
+        self::assertSame((int) $manual['id'], (int) $this->pdo->query(
+            "SELECT id FROM documents WHERE type = 'manual_convivencia' ORDER BY id DESC LIMIT 1",
+        )->fetchColumn());
+
+        $tracePdo = $this->tracedPdo();
+        $_SESSION = [];
+        $traceApp = $this->app('/sub', $tracePdo);
+        $this->login($traceApp, 'documents-tenant@example.com', 'TenantPassword123', '/sub');
+        $tracePdo->preparedSql = [];
+        $foreignResponse = $this->request(
+            $traceApp,
+            'GET',
+            '/sub/tenant/leases/' . $foreignLease['lease_id'] . '/documents/' . $foreignDocument['id'] . '/file',
+        );
+        self::assertSame(404, $foreignResponse->getStatusCode());
+        self::assertNotEmpty($tracePdo->preparedSql);
+        self::assertNotSame(false, array_search(true, array_map(
+            static fn (string $sql): bool => str_contains(strtolower($sql), 'from leases l'),
+            $tracePdo->preparedSql,
+        ), true));
+        self::assertSame([], array_values(array_filter(
+            $tracePdo->preparedSql,
+            static fn (string $sql): bool => str_contains(strtolower($sql), 'from documents'),
+        )));
+
+        $tracePdo->preparedSql = [];
+        $download = $this->request(
+            $traceApp,
+            'GET',
+            '/sub/tenant/leases/' . $ownedLease['lease_id'] . '/documents/' . $currentDocument['id'] . '/file',
+        );
+        self::assertSame(200, $download->getStatusCode());
+        self::assertSame($this->pdfBytes(), (string) $download->getBody());
+        $leaseLookup = array_search(true, array_map(
+            static fn (string $sql): bool => str_contains(strtolower($sql), 'from leases l'),
+            $tracePdo->preparedSql,
+        ), true);
+        $documentLookup = array_search(true, array_map(
+            static fn (string $sql): bool => str_contains(strtolower($sql), 'from documents'),
+            $tracePdo->preparedSql,
+        ), true);
+        self::assertIsInt($leaseLookup);
+        self::assertIsInt($documentLookup);
+        self::assertLessThan($documentLookup, $leaseLookup);
+        self::assertSame('private, no-store', $download->getHeaderLine('Cache-Control'));
     }
 
     public function testTenantLeaseDetailShowsOnlyActiveGlobalAndOwnedPropertyPaymentMethods(): void
@@ -773,6 +914,7 @@ final class TenantPortalRoutesTest extends TestCase
             'contract_directory' => $this->contractDirectory,
             'payment_method_qr_directory' => $this->qrDirectory,
             'maintenance_photo_directory' => $this->directory . '/maintenance-photos',
+            'document_directory' => $this->directory . '/documents',
             'pdo' => $pdo ?? $this->pdo,
             'today' => $today,
         ]);
@@ -1084,5 +1226,21 @@ final class TenantPortalRoutesTest extends TestCase
         self::assertIsString($bytes);
 
         return $bytes;
+    }
+
+    private function documentUpload(): UploadedFile
+    {
+        $bytes = $this->pdfBytes();
+        $path = tempnam(sys_get_temp_dir(), 'alquila_tenant_document_');
+        if ($path === false || file_put_contents($path, $bytes) === false) {
+            self::fail('Unable to create tenant document fixture.');
+        }
+        $this->temporaryUploads[] = $path;
+        return new UploadedFile($path, 'tenant-document.pdf', 'application/pdf', strlen($bytes), UPLOAD_ERR_OK, false);
+    }
+
+    private function pdfBytes(): string
+    {
+        return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<<>>\n%%EOF\n";
     }
 }

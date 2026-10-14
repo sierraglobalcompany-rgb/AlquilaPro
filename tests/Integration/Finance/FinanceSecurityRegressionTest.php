@@ -169,6 +169,7 @@ final class FinanceSecurityRegressionTest extends TestCase
         $f12Exists = $this->f12IsPresent();
         $f13Exists = $this->f13IsPresent();
         $f15Exists = is_file($this->root . '/database/migrations/015_create_maintenance_visits.sql');
+        $f18Exists = is_file($this->root . '/database/migrations/018_create_documents.sql');
         $routes = $this->file('app/Leases/routes.php');
         preg_match_all('/\$app->(?:get|post)\(\'([^\']+)\'/i', $routes, $routeMatches);
         $expectedRoutes = [
@@ -203,6 +204,7 @@ final class FinanceSecurityRegressionTest extends TestCase
 
         $ownership = strpos($detailRoute, '$leases->findForUser(');
         $notFound = strpos($detailRoute, '$lease === null');
+        $documentScope = strpos($detailRoute, '$documents->listCurrentForLease(');
         $todayProvider = strpos($detailRoute, '$todayProvider()');
         $summary = strpos($detailRoute, '$finance->summaryForLease(');
         $list = strpos($detailRoute, '$finance->listForLease(');
@@ -210,13 +212,18 @@ final class FinanceSecurityRegressionTest extends TestCase
         $render = strpos($detailRoute, "\$view->renderApp('tenant_lease_detail'");
         self::assertNotFalse($ownership);
         self::assertNotFalse($notFound);
+        if ($f18Exists) {
+            self::assertNotFalse($documentScope);
+        }
         self::assertNotFalse($todayProvider);
         self::assertNotFalse($summary);
         self::assertNotFalse($list);
         self::assertNotFalse($paymentMethodScope);
         self::assertNotFalse($render);
         self::assertTrue(
-            $ownership < $notFound && $notFound < $todayProvider && $todayProvider < $summary
+            $ownership < $notFound
+            && (!$f18Exists || $notFound < $documentScope)
+            && $notFound < $todayProvider && $todayProvider < $summary
             && $summary < $list && $list < $paymentMethodScope && $paymentMethodScope < $render,
         );
         $expectedTenantDetailUse = $f13Exists
@@ -226,6 +233,9 @@ final class FinanceSecurityRegressionTest extends TestCase
             : ($f12Exists
                 ? 'use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $view, $csrf, $todayProvider, $path)'
                 : 'use ($tenantGuard, $leases, $finance, $paymentMethods, $view, $csrf, $todayProvider, $path)');
+        if ($f18Exists) {
+            $expectedTenantDetailUse = str_replace('$leases, $finance', '$leases, $documents, $finance', $expectedTenantDetailUse);
+        }
         self::assertStringContainsString($expectedTenantDetailUse, $detailRoute);
 
         $qrStart = strpos($routes, "\$app->get('/tenant/leases/{leaseId:[0-9]+}/payment-methods/");

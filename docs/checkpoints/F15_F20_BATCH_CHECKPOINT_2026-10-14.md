@@ -4,13 +4,13 @@
 PREPACKAGE_BASE: 37350105ac8c1806ae69194082098dbe230e5838
 MAIN_START: ddb24048326e3fd67df919f1bd829fac939d8861
 MAIN_START_AUDIT: PASS — descendant of PREPACKAGE_BASE; only the V4 master and design checkpoint changed
-CURRENT_PHASE: F17
-CURRENT_TASK: F17 Task 3 — architecture/security freeze + certification in progress
-BRANCH: impl/f17-whatsapp-assisted-20261014
-BASE: b8c951a5359344fe441d8ab4be5dc86b07922c47 (F16 CLOSURE_HEAD)
-CURRENT_HEAD: 19ad7ac (F17 Task 1 committed; Task 2 complete; Task 3 working changes)
+CURRENT_PHASE: F18
+CURRENT_TASK: F18 close — docs-only Closure Head pending
+BRANCH: impl/f18-documents-inventories-20261014
+BASE: d14d50f7e58fcf50dba9114e322c09fe0e9e9e66 (F17 CLOSURE_HEAD)
+CURRENT_HEAD: b0f06ac (F18 Product Head; closure docs in worktree)
 WORKTREE: C:\Users\felip\.codex\worktrees\f15-f20-batch\AlquilaPro
-WORKTREE_STATUS: F17 Task 1 committed; Task 2 implementation and focused verification complete; Task 3 in progress; .phpunit.cache/ and generated app/graphify-out/ untracked
+WORKTREE_STATUS: F17 product complete with PR #20; F18 Product Head b0f06ac complete, local gates and fresh review pass; docs-only Closure Head pending; generated .phpunit.cache/ and app/graphify-out/ remain untracked
 F15_STATUS: LOCAL CERTIFIED / PR OPEN / MERGEABILITY CONFLICTING
 F15_BRANCH: impl/f15-agenda-visits-20261014
 F15_BASE: ddb24048326e3fd67df919f1bd829fac939d8861
@@ -30,9 +30,25 @@ F17_TASK2_GREEN: Private SSR WhatsApp routes derive recipient/variables from exi
 F17_TASK3_LOCAL: WhatsAppSecurityRegressionTest freezes exact action schema, notification files, permission, runtime packages and route surface; integration regression denies anonymous prepare/open and tenant prepare/open. Focused Notifications + Auth UserService + UI Shell: 56 tests/445 assertions PASS. Composer strict, diff check, and PHP lint PASS.
 F17_PRODUCT_HEAD: 56d221c61e3ec7ddf5ca710b022a44de112cd846
 F17_REVIEW: fresh subagent review; 0 Critical/Important; 2 Minor deferred (latest 100 history rows without paging; staff actor names not rendered). Ruling: whatsapp.use is shared across allowlisted records because F17 specifies one feature permission and no per-record policy; risk if wrong is staff contacting records outside intended operational scope.
-F17_CLOSURE_HEAD: pending docs-only closure commit
-F17_PR: pending single push and stacked PR against impl/f16-reminders-email-20261014
-F17_CI: not triggered yet; do not poll until final batch check
+F17_CLOSURE_HEAD: d14d50f7e58fcf50dba9114e322c09fe0e9e9e66
+F17_PR: #20 https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/20
+F17_PR_BASE: impl/f16-reminders-email-20261014@b8c951a5359344fe441d8ab4be5dc86b07922c47
+F17_PR_HEAD: d14d50f7e58fcf50dba9114e322c09fe0e9e9e66
+F17_CI: triggered; intentionally unpolled until final batch check
+F18_TASK1_RED: DocumentSchemaTest found no documents table; DocumentServiceTest failed because the core class was absent; MigrationRunner expected 18 migrations and found 17.
+F18_TASK1_GREEN: migration 018 creates one XOR-scoped documents table with immutable snapshots and self-FK lineage; DocumentService validates type/scope/title, stores file/content versions, and returns current leaves/history. Focused schema/service/MigrationRunner: 6 tests/75 assertions PASS.
+F18_TASK2_RED: upload/private-read tests confirmed missing, tampered, physical oversize and MIME spoof rejection; inventory test failed because createContentVersion did not normalize/bound inventory JSON. Symlink creation is unavailable on this Windows host and is explicitly skipped.
+F18_TASK2_GREEN: inventory snapshots now enforce exact shape, <=200 items, bounded text and null/nonnegative integer quantities; existing privateFile checks physical cap before bounded read, inode/device, size, MIME and SHA-256. Focused DocumentServiceTest + DocumentStorageSecurityTest: 10 tests/77 assertions PASS, 1 symlink skip; no charge rows created.
+F18_TASK3_RED: DocumentRoutesTest initially returned 404 for the missing staff route; tenant ownership test found an uncaptured DocumentService variable, corrected before final GREEN. Review pass also found partial-upload errors could fall through to content JSON; route now rejects every upload error except UPLOAD_ERR_NO_FILE and the regression proves 422/no insert.
+F18_TASK3_GREEN: exactly documents.view/manage added; staff current/history/create/download surfaces wired; tenant page projects only current lease docs/inventories and current property manual. Trace proves LeaseService::findForUser runs before documents SQL and foreign lease requests issue no document query. Documents suite: 12 tests/108 assertions PASS with 1 Windows symlink skip; TenantPortalRoutesTest: 11 tests/245 assertions PASS.
+F18_STORAGE: bootstrap default is a sibling private directory outside the app root; ALQUILAPRO_DOCUMENT_DIRECTORY can set the deployment path. .htaccess also denies /storage/ paths.
+F18_TASK4_LOCAL: DocumentSecurityRegressionTest freezes one table/one service/two permissions/no parallel document systems and private route list; F8 regression guard updated for the DocumentService dependency while retaining lease ownership ordering. Final focal set (Documents, Auth UserService, F4 Properties security, F8 Lease security/tenant portal, Finance security, UI shell): 61 tests/767 assertions PASS, 1 Windows symlink skip. Composer strict, PHP lint, diff check PASS.
+F18_REVIEW: fresh independent read-only review by Ampere; 0 Critical/Important and no Minor findings reported. Latest upload-error guard and regression were included. No review repair required.
+F18_PRODUCT_HEAD: b0f06ac (feat(f18): add private document routes and tenant projections)
+F18_PR_BASE: impl/f17-whatsapp-assisted-20261014@d14d50f7e58fcf50dba9114e322c09fe0e9e9e66
+F18_CLOSURE_HEAD: THIS_DOCS_ONLY_COMMIT
+F18_PR: pending push/create
+F18_CI: not yet triggered; do not poll until final batch check
 F16_BRANCH: impl/f16-reminders-email-20261014
 F16_BASE: c40cd33321739effdce0253f67dc372e412dccde
 F16_PRODUCT_HEAD: 7b5118bc6b6ec29ceab8cfe3e2eb0901aafa3f7d
@@ -54,20 +70,20 @@ F16_TASK4: Architecture freeze and candidate-route transport proof PASS. Focused
 DONE: F15 locally certified, PR #18 open. F16 product head 7b5118b and docs-only closure commit complete; remote submission pending. PHPMailer ^7.1 resolves to 7.1.1.
 RULING/FINDING: (1) F15 F14 schema wildcard narrowed to maintenance_requests; F15 plan-named MaintenanceRoutesTest.php was absent, so a focused file was created. (2) F15 staff may reprogram proposed/scheduled visit slots, with only current slots selectable. (3) F15 fresh review found 4 Important, all fixed; reviewer declined no behavior. (4) F16 SMTP errors are reduced to generic keys; attempt increments only at actual send; stale exhausted claims fail closed. (5) Reminder cadence follows the F16 choices above; candidate mail is only for created/submitted. (6) F16 minor review findings on pagination and recipient retention are recorded for follow-up, not required by the phase Critical/Important repair gate.
 ENVIRONMENT: PHP 8.5.8; pdo_mysql/mbstring/dom/fileinfo present; gd absent; test DB connects.
-NEXT_EXACT_ACTION: commit F17 docs-only closure; push branch once; open stacked PR; then begin F18. Do not merge or poll CI before final batch check.
+NEXT_EXACT_ACTION: create the README/SPEC/checkpoint-only F18 closure commit; verify Product→Closure changed files are documentation only; push the F18 branch once and open its stacked PR against F17. Leave CI unpolled until final batch check and do not merge.
 
 F15: LOCAL CERTIFIED / PR CI PENDING RECONCILIATION
 F16: PRODUCT COMPLETE / PR OPEN / REMOTE CI PENDING FINAL CHECK
-F17: PRODUCT HEAD 56d221c / FRESH REVIEW PASS / DOC CLOSURE + PUSH/PR PENDING
-F18: PENDING
+F17: PRODUCT COMPLETE / PR #20 OPEN / REMOTE CI PENDING FINAL CHECK
+F18: PRODUCT COMPLETE / LOCAL QA PASS / REVIEW PASS / DOCS CLOSURE PENDING
 F19: PENDING
 F20: PENDING
 
 LOCAL_FULL_SUITE_RUNS: 0
-REMOTE_CI_RUNS: 2 (F15 and F16 PRs triggered; final check pending)
-FRESH_REVIEWS: 2
-PRODUCTIVE_COMMITS: 4
-DOC_COMMITS: 2
+REMOTE_CI_RUNS: 3 (F15, F16 and F17 PRs triggered; final check pending)
+FRESH_REVIEWS: 4
+PRODUCTIVE_COMMITS: 7
+DOC_COMMITS: 3
 LOOP_ESCAPES: 0
 CI_REPAIRS: 0
 MERGES: NONE

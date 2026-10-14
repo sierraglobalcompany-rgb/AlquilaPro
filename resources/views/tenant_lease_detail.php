@@ -6,6 +6,8 @@ $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, 
 $obligations = $obligations ?? [];
 $insurancePolicies = $insurancePolicies ?? [];
 $maintenanceRequests = $maintenanceRequests ?? [];
+$leaseDocuments = $leaseDocuments ?? [];
+$propertyManuals = $propertyManuals ?? [];
 $isApartment = (string) $lease['unit_type'] === 'apartment';
 $isParking = (string) $lease['unit_type'] === 'parking';
 $chargeStateLabels = [
@@ -69,6 +71,46 @@ $visitStatusLabels = [
     <a class="button button--quiet" href="<?= $escape($basePath) ?>/tenant">Volver</a>
     <a class="button button--quiet" href="<?= $escape($basePath) ?>/tenant/leases/<?= $escape($lease['id']) ?>/contract">Descargar contrato</a>
 </section>
+
+<section class="surface">
+    <h2>Documentos del arrendamiento</h2>
+    <?php if ($leaseDocuments === []): ?>
+        <p class="empty-state">Aún no hay documentos o inventarios disponibles.</p>
+    <?php else: ?>
+        <div class="users-grid">
+            <?php foreach ($leaseDocuments as $document): ?>
+                <article class="user-card">
+                    <div class="user-card__head">
+                        <strong><?= $escape($document['title']) ?></strong>
+                        <span class="status-pill"><?= $escape($document['type']) ?></span>
+                    </div>
+                    <div>Actualizado: <?= $escape($document['created_at']) ?></div>
+                    <?php if (is_string($document['file_url'])): ?>
+                        <a class="button button--quiet" href="<?= $escape($document['file_url']) ?>">Descargar documento</a>
+                    <?php endif; ?>
+                    <?php if (is_array($document['content_json'])): ?>
+                        <pre><?= $escape(json_encode($document['content_json'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?></pre>
+                    <?php endif; ?>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</section>
+
+<?php if ($propertyManuals !== []): ?>
+    <section class="surface">
+        <h2>Manual de convivencia de la propiedad</h2>
+        <div class="users-grid">
+            <?php foreach ($propertyManuals as $manual): ?>
+                <article class="user-card">
+                    <strong><?= $escape($manual['title']) ?></strong>
+                    <div>Actualizado: <?= $escape($manual['created_at']) ?></div>
+                    <pre><?= $escape(json_encode($manual['content_json'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?></pre>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    </section>
+<?php endif; ?>
 
 <?php if ($insurancePolicies !== []): ?>
     <section class="surface">

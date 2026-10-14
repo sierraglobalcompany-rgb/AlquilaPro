@@ -10,6 +10,7 @@ use AlquilaPro\Candidates\CandidateDocumentService;
 use AlquilaPro\Candidates\CandidateService;
 use AlquilaPro\Candidates\ScreeningService;
 use AlquilaPro\Contracts\ContractService;
+use AlquilaPro\Documents\DocumentService;
 use AlquilaPro\Foundation\DatabaseConfig;
 use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
@@ -64,6 +65,10 @@ return static function (array $settings): App {
     $maintenancePhotoDirectory = (string) (
         $settings['maintenance_photo_directory'] ?? dirname(__DIR__) . '/storage/maintenance-photos'
     );
+    $documentDirectory = trim((string) ($settings['document_directory'] ?? ''));
+    if ($documentDirectory === '') {
+        $documentDirectory = dirname(__DIR__, 2) . '/alquilapro-private/' . basename(dirname(__DIR__)) . '/documents';
+    }
 
     $lock = new InstallationLock($lockPath);
     $installer = new Installer($lock, $migrationDirectory, $databaseConfigPath);
@@ -243,6 +248,7 @@ return static function (array $settings): App {
             $contracts = new ContractService($pdo, $candidates, $screening, $properties, $contractDirectory);
             $users = new UserService($pdo);
             $leases = new LeaseService($pdo, $users);
+            $documents = new DocumentService($pdo, $documentDirectory);
             $paymentMethods = new PaymentMethodService($pdo, $paymentMethodQrDirectory);
             $finance = new FinanceService($pdo, $paymentMethods, $paymentReceiptDirectory);
             $obligations = new ObligationService($pdo, $finance, $obligationSupportDirectory);
@@ -316,6 +322,13 @@ return static function (array $settings): App {
             $leaseRoutes($app, $shared + [
                 'leases' => $leases,
                 'contracts' => $contracts,
+                'documents' => $documents,
+            ]);
+
+            $documentRoutes = require dirname(__DIR__) . '/app/Documents/routes.php';
+            $documentRoutes($app, $shared + [
+                'documents' => $documents,
+                'leases' => $leases,
             ]);
 
             $financeRoutes = require dirname(__DIR__) . '/app/Finance/routes.php';
