@@ -982,17 +982,43 @@ final class InsuranceService
             }
             clearstatcache(true, $path);
             $size = @filesize($path);
-            $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($path);
-            $sha256 = @hash_file('sha256', $path);
-            $bytes = @file_get_contents($path);
             if (!is_int($size)
+                || $size <= 0
+                || $size > self::MAX_DOCUMENT_BYTES
                 || $size !== $document['size_bytes']
-                || $mime !== $document['mime']
-                || !is_string($sha256)
-                || !hash_equals($document['sha256'], $sha256)
-                || !is_string($bytes)
-                || strlen($bytes) !== $size
             ) {
+                return null;
+            }
+
+            $handle = @fopen($path, 'rb');
+            if ($handle === false) {
+                return null;
+            }
+            try {
+                $stat = @fstat($handle);
+                $openedSize = is_array($stat) ? ($stat['size'] ?? null) : null;
+                if (!is_int($openedSize)
+                    || $openedSize <= 0
+                    || $openedSize > self::MAX_DOCUMENT_BYTES
+                    || $openedSize !== $size
+                    || $openedSize !== $document['size_bytes']
+                ) {
+                    return null;
+                }
+                $bytes = @stream_get_contents($handle, self::MAX_DOCUMENT_BYTES + 1);
+            } finally {
+                fclose($handle);
+            }
+
+            if (!is_string($bytes)
+                || strlen($bytes) !== $openedSize
+                || strlen($bytes) > self::MAX_DOCUMENT_BYTES
+            ) {
+                return null;
+            }
+            $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+            $sha256 = hash('sha256', $bytes);
+            if ($mime !== $document['mime'] || !hash_equals($document['sha256'], $sha256)) {
                 return null;
             }
             return ['bytes' => $bytes, 'mime' => $mime, 'size_bytes' => $size];
