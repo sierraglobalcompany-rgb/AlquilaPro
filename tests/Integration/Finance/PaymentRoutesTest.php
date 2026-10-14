@@ -87,6 +87,9 @@ final class PaymentRoutesTest extends TestCase
     {
         $tenant = $this->createLease('Tenant <script>alert(1)</script>');
         $chargeId = $this->insertCharge($tenant['lease_id'], $tenant['actor_id'], '500.00');
+        $unselectedChargeId = $this->insertCharge(
+            $tenant['lease_id'], $tenant['actor_id'], '300.00', 'Cargo no seleccionado',
+        );
         $methodId = $this->insertPaymentMethod(null, 'Cuenta de nómina');
         $first = $this->report($tenant['lease_id'], $methodId, $chargeId, '20.00', $this->upload($this->pngBytes(), 'proof.png', 'image/png'));
         $second = $this->report($tenant['lease_id'], $methodId, $chargeId, '20.00');
@@ -170,7 +173,10 @@ final class PaymentRoutesTest extends TestCase
             $app,
             'POST',
             '/sub/admin/finance/payments/' . $ownerPayment['id'] . '/reconcile',
-            ['allocations' => [(string) $chargeId => '30.00']],
+            ['allocations' => [
+                (string) $chargeId => '30.00',
+                (string) $unselectedChargeId => '',
+            ]],
         );
         self::assertSame(303, $ownerReconcile->getStatusCode());
         self::assertSame('reconciled', $this->service()->findPayment((int) $ownerPayment['id'])['state']);
@@ -180,7 +186,10 @@ final class PaymentRoutesTest extends TestCase
             'allocations' => [(string) $chargeId => '20.00'],
         ], withCsrf: false)->getStatusCode());
         $reconcile = $this->request($app, 'POST', $detailPath . '/reconcile', [
-            'allocations' => [(string) $chargeId => '20.00'],
+            'allocations' => [
+                (string) $chargeId => '20.00',
+                (string) $unselectedChargeId => '',
+            ],
         ]);
         self::assertSame(303, $reconcile->getStatusCode());
         self::assertSame($detailPath, $reconcile->getHeaderLine('Location'));
@@ -199,6 +208,9 @@ final class PaymentRoutesTest extends TestCase
         $owned = $this->createLease('Tenant Owner');
         $foreign = $this->createLease('Foreign Tenant');
         $chargeId = $this->insertCharge($owned['lease_id'], $owned['actor_id'], '300.00', 'Cargo propio');
+        $unselectedChargeId = $this->insertCharge(
+            $owned['lease_id'], $owned['actor_id'], '150.00', 'Cargo propio no seleccionado',
+        );
         $foreignChargeId = $this->insertCharge($foreign['lease_id'], $foreign['actor_id'], '300.00', 'Cargo ajeno');
         $methodId = $this->insertPaymentMethod(null, 'Medio global');
         $foreignMethodId = $this->insertPaymentMethod($foreign['property_id'], 'Método ajeno');
@@ -257,7 +269,10 @@ final class PaymentRoutesTest extends TestCase
             'amount' => '20.00',
             'paid_on' => '2026-10-12',
             'paid_time' => '09:30',
-            'allocations' => [(string) $chargeId => '20.00'],
+            'allocations' => [
+                (string) $chargeId => '20.00',
+                (string) $unselectedChargeId => '',
+            ],
         ], ['receipt' => $this->upload($this->pngBytes(), 'receipt.png', 'image/png')]);
         self::assertSame(303, $reported->getStatusCode());
         self::assertSame('/sub/tenant/leases/' . $owned['lease_id'], $reported->getHeaderLine('Location'));

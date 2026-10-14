@@ -69,6 +69,9 @@ return static function (App $app, array $deps): void {
             ) {
                 throw new RuntimeException('No fue posible completar la operación financiera.');
             }
+            if ($amount === '') {
+                continue;
+            }
             $allocations[] = ['charge_id' => (int) $chargeId, 'amount' => $amount];
         }
 
