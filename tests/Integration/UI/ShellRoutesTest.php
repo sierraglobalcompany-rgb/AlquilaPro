@@ -34,8 +34,8 @@ final class ShellRoutesTest extends TestCase
         ]));
 
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (['unit_media', 'units', 'properties', 'settings', 'users', 'schema_migrations'] as $table) {
-            $this->pdo->exec(sprintf('DROP TABLE IF EXISTS `%s`', $table));
+        foreach ($this->pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN) as $table) {
+            $this->pdo->exec(sprintf('DROP TABLE IF EXISTS `%s`', str_replace('`', '``', (string) $table)));
         }
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
         MigrationRunner::migrate($this->pdo, dirname(__DIR__, 3) . '/database/migrations');
@@ -115,6 +115,24 @@ final class ShellRoutesTest extends TestCase
         $hidden = (string) $this->request($hiddenApp, 'GET', '/')->getBody();
         self::assertStringNotContainsString('/admin/insurance', $hidden);
         self::assertStringNotContainsString('Seguros', $hidden);
+    }
+
+    public function testWhatsAppAppCardRequiresDedicatedPermission(): void
+    {
+        $this->insertUser('whatsapp-visible@example.com', 'StaffPassword123', 'gestor', ['whatsapp.use']);
+        $visibleApp = $this->app();
+        $this->login($visibleApp, 'whatsapp-visible@example.com', 'StaffPassword123');
+        $visible = (string) $this->request($visibleApp, 'GET', '/')->getBody();
+        self::assertStringContainsString('href="/admin/whatsapp"', $visible);
+        self::assertStringContainsString('>WhatsApp</strong>', $visible);
+
+        $_SESSION = [];
+        $this->insertUser('whatsapp-hidden@example.com', 'StaffPassword123', 'gestor', []);
+        $hiddenApp = $this->app();
+        $this->login($hiddenApp, 'whatsapp-hidden@example.com', 'StaffPassword123');
+        $hidden = (string) $this->request($hiddenApp, 'GET', '/')->getBody();
+        self::assertStringNotContainsString('/admin/whatsapp', $hidden);
+        self::assertStringNotContainsString('WhatsApp', $hidden);
     }
 
     public function testAccountRequiresLoginAndRendersCurrentUser(): void

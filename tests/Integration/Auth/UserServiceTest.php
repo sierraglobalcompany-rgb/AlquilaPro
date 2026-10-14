@@ -29,7 +29,7 @@ final class UserServiceTest extends TestCase
         ]));
 
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (['leases', 'unit_media', 'units', 'properties', 'settings', 'users', 'schema_migrations'] as $table) {
+        foreach ($this->pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN) as $table) {
             $this->pdo->exec(sprintf('DROP TABLE IF EXISTS `%s`', $table));
         }
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
@@ -119,6 +119,17 @@ final class UserServiceTest extends TestCase
             ['finance.view', 'finance.manage'],
             $service->listUsers()[0]['permissions'],
         );
+    }
+
+    public function testWhatsAppPermissionIsKnownOwnerBypassesAndTenantHardDenies(): void
+    {
+        $permissions = $this->permissions();
+
+        self::assertSame(['whatsapp.use'], $permissions::sanitize(['whatsapp.use', 'whatsapp.send', 'whatsapp.use']));
+        self::assertTrue($permissions::allows(['role' => 'admin', 'permissions' => ['whatsapp.use']], 'whatsapp.use'));
+        self::assertFalse($permissions::allows(['role' => 'admin', 'permissions' => []], 'whatsapp.use'));
+        self::assertTrue($permissions::allows(['role' => 'owner', 'permissions' => []], 'whatsapp.use'));
+        self::assertFalse($permissions::allows(['role' => 'tenant', 'permissions' => ['whatsapp.use']], 'whatsapp.use'));
     }
 
     public function testCreatesManagedUserWithTemporaryPasswordAndNormalizedUniqueEmail(): void

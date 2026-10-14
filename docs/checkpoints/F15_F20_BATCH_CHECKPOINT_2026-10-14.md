@@ -5,12 +5,12 @@ PREPACKAGE_BASE: 37350105ac8c1806ae69194082098dbe230e5838
 MAIN_START: ddb24048326e3fd67df919f1bd829fac939d8861
 MAIN_START_AUDIT: PASS — descendant of PREPACKAGE_BASE; only the V4 master and design checkpoint changed
 CURRENT_PHASE: F17
-CURRENT_TASK: F17 Task 1 complete; Task 2 — permissions/routes/UI next
+CURRENT_TASK: F17 Task 3 — architecture/security freeze + certification in progress
 BRANCH: impl/f17-whatsapp-assisted-20261014
 BASE: b8c951a5359344fe441d8ab4be5dc86b07922c47 (F16 CLOSURE_HEAD)
-CURRENT_HEAD: F17 Task 1 product commit pending; checkpoint travels with commit
+CURRENT_HEAD: 19ad7ac (F17 Task 1 committed; Task 2 complete; Task 3 working changes)
 WORKTREE: C:\Users\felip\.codex\worktrees\f15-f20-batch\AlquilaPro
-WORKTREE_STATUS: F17 Task 1 code/tests and checkpoint/plan modified; .phpunit.cache/ and generated app/graphify-out/ untracked
+WORKTREE_STATUS: F17 Task 1 committed; Task 2 implementation and focused verification complete; Task 3 in progress; .phpunit.cache/ and generated app/graphify-out/ untracked
 F15_STATUS: LOCAL CERTIFIED / PR OPEN / MERGEABILITY CONFLICTING
 F15_BRANCH: impl/f15-agenda-visits-20261014
 F15_BASE: ddb24048326e3fd67df919f1bd829fac939d8861
@@ -25,6 +25,9 @@ F16_STATUS: PRODUCT COMPLETE / STACKED PR #19 OPEN / MERGEABLE; checks intention
 F17_SCOPE: 1 whatsapp_actions table; 1 WhatsAppService under Notifications; 1 whatsapp.use permission; reuse Notifications routes; 0 provider/API/webhook/dependencies
 F17_TASK1_RED: WhatsAppSchemaTest found no whatsapp_actions; WhatsAppServiceTest asserted the class absent; MigrationRunner expected 17 migrations and got 16.
 F17_TASK1_GREEN: migration 017 + WhatsAppService snapshots normalized phone/message/HTTPS wa.me URL, validates exact template/context/variable allowlists, stores actor/time, and preserves first-open audit without delivery state. Notifications 22/179; MigrationRunner 2/32 PASS.
+F17_TASK1_PRODUCT_HEAD: 19ad7ac (Task 1 code/tests + checkpoint/plan)
+F17_TASK2_GREEN: Private SSR WhatsApp routes derive recipient/variables from existing candidate/lease/maintenance records; whatsapp.use with owner bypass and tenant hard deny; URL integrity checked before first-open audit; no SMTP dependency. Focused regressions: Notifications + Auth UserService + UI Shell = 53 tests/420 assertions PASS, no warnings.
+F17_TASK3_LOCAL: WhatsAppSecurityRegressionTest freezes exact action schema, notification files, permission, runtime packages and route surface; integration regression denies anonymous prepare/open and tenant prepare/open. Focused Notifications + Auth UserService + UI Shell: 56 tests/445 assertions PASS. Composer strict, diff check, and PHP lint PASS.
 F16_BRANCH: impl/f16-reminders-email-20261014
 F16_BASE: c40cd33321739effdce0253f67dc372e412dccde
 F16_PRODUCT_HEAD: 7b5118bc6b6ec29ceab8cfe3e2eb0901aafa3f7d
@@ -46,11 +49,11 @@ F16_TASK4: Architecture freeze and candidate-route transport proof PASS. Focused
 DONE: F15 locally certified, PR #18 open. F16 product head 7b5118b and docs-only closure commit complete; remote submission pending. PHPMailer ^7.1 resolves to 7.1.1.
 RULING/FINDING: (1) F15 F14 schema wildcard narrowed to maintenance_requests; F15 plan-named MaintenanceRoutesTest.php was absent, so a focused file was created. (2) F15 staff may reprogram proposed/scheduled visit slots, with only current slots selectable. (3) F15 fresh review found 4 Important, all fixed; reviewer declined no behavior. (4) F16 SMTP errors are reduced to generic keys; attempt increments only at actual send; stale exhausted claims fail closed. (5) Reminder cadence follows the F16 choices above; candidate mail is only for created/submitted. (6) F16 minor review findings on pagination and recipient retention are recorded for follow-up, not required by the phase Critical/Important repair gate.
 ENVIRONMENT: PHP 8.5.8; pdo_mysql/mbstring/dom/fileinfo present; gd absent; test DB connects.
-NEXT_EXACT_ACTION: commit F17 Task 1 code/tests with this checkpoint and plan; then start Task 2 permission/routes/UI RED tests. Preserve F15 README conflict for final batch reconciliation. Do not poll CI or merge PRs.
+NEXT_EXACT_ACTION: run F17 Task 3 start/brief; add architecture/security freeze, then fresh whole-phase review and certification.
 
 F15: LOCAL CERTIFIED / PR CI PENDING RECONCILIATION
 F16: PRODUCT COMPLETE / PR OPEN / REMOTE CI PENDING FINAL CHECK
-F17: TASK 1 COMPLETE / TASK 2 NEXT
+F17: TASKS 1–2 COMPLETE / TASK 3 LOCAL GATES PASS / FRESH REVIEW PENDING
 F18: PENDING
 F19: PENDING
 F20: PENDING
@@ -58,7 +61,7 @@ F20: PENDING
 LOCAL_FULL_SUITE_RUNS: 0
 REMOTE_CI_RUNS: 2 (F15 and F16 PRs triggered; final check pending)
 FRESH_REVIEWS: 2
-PRODUCTIVE_COMMITS: 3
+PRODUCTIVE_COMMITS: 4
 DOC_COMMITS: 2
 LOOP_ESCAPES: 0
 CI_REPAIRS: 0

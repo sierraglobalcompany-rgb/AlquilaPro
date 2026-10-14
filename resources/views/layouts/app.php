@@ -20,6 +20,7 @@ $canViewContracts = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'c
 $canViewFinance = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'finance.view');
 $canViewInsurance = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'insurance.view');
 $canViewMaintenance = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'maintenance.view');
+$canUseWhatsApp = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'whatsapp.use');
 $isOwner = !$isTenant && ($user['role'] ?? null) === 'owner';
 ?>
 <!doctype html>
@@ -104,13 +105,19 @@ $isOwner = !$isTenant && ($user['role'] ?? null) === 'owner';
                         <span>Solicitudes y reparaciones</span>
                     </a>
                 <?php endif; ?>
+                <?php if ($canUseWhatsApp): ?>
+                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/whatsapp">
+                        <strong>WhatsApp</strong>
+                        <span>Acciones asistidas e historial</span>
+                    </a>
+                <?php endif; ?>
                 <?php if ($isOwner): ?>
                     <a class="app-card" href="<?= $escape($basePath) ?>/admin/appearance">
                         <strong>Apariencia</strong>
                         <span>Nombre, color y logo</span>
                     </a>
                 <?php endif; ?>
-                <?php if (!$canViewUsers && !$canViewProperties && !$canViewCandidates && !$canViewContracts && !$canViewFinance && !$canViewInsurance && !$canViewMaintenance && !$isOwner): ?>
+                <?php if (!$canViewUsers && !$canViewProperties && !$canViewCandidates && !$canViewContracts && !$canViewFinance && !$canViewInsurance && !$canViewMaintenance && !$canUseWhatsApp && !$isOwner): ?>
                     <p class="empty-state">No tienes aplicaciones disponibles.</p>
                 <?php endif; ?>
             </div>

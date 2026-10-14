@@ -22,6 +22,7 @@ final class Permissions
         'insurance.manage',
         'maintenance.view',
         'maintenance.manage',
+        'whatsapp.use',
     ];
 
     public static function allows(array $user, string $permission): bool
