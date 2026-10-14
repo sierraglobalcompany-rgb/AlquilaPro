@@ -32,6 +32,7 @@ final class MigrationRunnerTest extends TestCase
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
         foreach ([
             'migration_probe',
+            'lease_obligations',
             'payment_allocations',
             'payments',
             'charges',
@@ -68,9 +69,7 @@ final class MigrationRunnerTest extends TestCase
         $first = MigrationRunner::migrate($this->pdo, $directory);
         $second = MigrationRunner::migrate($this->pdo, $directory);
 
-        self::assertSame(11, $first['applied']);
-        self::assertSame(
-            [
+        $expectedMigrations = [
                 '001_create_users.sql',
                 '002_create_settings.sql',
                 '003_extend_users_for_auth.sql',
@@ -82,12 +81,13 @@ final class MigrationRunnerTest extends TestCase
                 '009_create_charges.sql',
                 '010_create_payment_methods.sql',
                 '011_create_payments.sql',
-            ],
-            $first['migrations'],
-        );
+                '012_create_lease_obligations.sql',
+        ];
+        self::assertSame(count($expectedMigrations), $first['applied']);
+        self::assertSame($expectedMigrations, $first['migrations']);
         self::assertSame(0, $second['applied']);
         self::assertSame([], $second['migrations']);
-        self::assertSame(11, (int) $this->pdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn());
+        self::assertSame(count($expectedMigrations), (int) $this->pdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn());
         self::assertSame(1, $this->tableExists('users'));
         self::assertSame(1, $this->tableExists('settings'));
         self::assertSame(1, $this->tableExists('properties'));
@@ -106,6 +106,7 @@ final class MigrationRunnerTest extends TestCase
         self::assertSame(1, $this->tableExists('payment_methods'));
         self::assertSame(1, $this->tableExists('payments'));
         self::assertSame(1, $this->tableExists('payment_allocations'));
+        self::assertSame(1, $this->tableExists('lease_obligations'));
     }
 
     public function testFailedMigrationIsNotRecordedAsApplied(): void

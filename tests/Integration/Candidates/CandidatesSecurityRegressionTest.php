@@ -83,6 +83,13 @@ final class CandidatesSecurityRegressionTest extends TestCase
         $expired = $service->startCandidate($unit['public_key'], $this->candidateInput('SEC-TOKEN-2'), $now);
         $app = $this->app('/sub');
 
+        $app->get('/apply/continue/{token}/explode', static function (
+            ServerRequestInterface $request,
+            ResponseInterface $response,
+        ): ResponseInterface {
+            throw new RuntimeException('forced security regression exception');
+        });
+
         self::assertSame(404, $this->request($app, 'GET', '/sub/apply/continue/short')->getStatusCode());
         self::assertSame(404, $this->request($app, 'GET', '/sub/apply/continue/' . str_repeat('z', 64))->getStatusCode());
         $this->pdo->prepare('UPDATE candidates SET continuation_token_expires_at = :expired WHERE id = :id')->execute([
@@ -94,13 +101,6 @@ final class CandidatesSecurityRegressionTest extends TestCase
         $newToken = $service->regenerateToken((int) $started['candidate_id'], $now + 1);
         self::assertSame(404, $this->request($app, 'GET', '/sub/apply/continue/' . $started['continuation_token'])->getStatusCode());
         self::assertSame(200, $this->request($app, 'GET', '/sub/apply/continue/' . $newToken)->getStatusCode());
-
-        $app->get('/apply/continue/{token}/explode', static function (
-            ServerRequestInterface $request,
-            ResponseInterface $response,
-        ): ResponseInterface {
-            throw new RuntimeException('forced security regression exception');
-        });
 
         $logPath = $this->directory . '/error.log';
         $oldErrorLog = ini_get('error_log');
