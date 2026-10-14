@@ -461,6 +461,40 @@ final class FinanceServiceTest extends TestCase
         self::assertNull($this->charge($rentId)['voided_at']);
     }
 
+    public function testMonthlySecondInsertFailureRollsBackBothNewChargesForThePeriod(): void
+    {
+        $fixture = $this->createLease();
+        $this->pdo->exec(
+            "CREATE TRIGGER fail_monthly_administration BEFORE INSERT ON charges FOR EACH ROW "
+            . "BEGIN IF NEW.type = 'administration' THEN SET @f9_administration_insert_attempted = 1; "
+            . "SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced F9 rollback test'; END IF; END",
+        );
+
+        try {
+            $this->assertRejected(fn () => $this->service()->createMonthlyCharges(
+                $fixture['lease_id'], '2026-10-01', '2026-10-05', $fixture['actor_id'],
+            ));
+
+            self::assertSame(1, (int) $this->pdo->query('SELECT @f9_administration_insert_attempted')->fetchColumn());
+
+            $byType = $this->pdo->prepare(
+                'SELECT type, COUNT(*) AS total FROM charges '
+                . 'WHERE lease_id = :lease_id AND period_month = :period_month '
+                . "AND type IN ('rent', 'administration') GROUP BY type",
+            );
+            $byType->execute(['lease_id' => $fixture['lease_id'], 'period_month' => '2026-10-01']);
+            self::assertSame([], $byType->fetchAll(PDO::FETCH_ASSOC));
+
+            $periodCount = $this->pdo->prepare(
+                'SELECT COUNT(*) FROM charges WHERE lease_id = :lease_id AND period_month = :period_month',
+            );
+            $periodCount->execute(['lease_id' => $fixture['lease_id'], 'period_month' => '2026-10-01']);
+            self::assertSame(0, (int) $periodCount->fetchColumn());
+        } finally {
+            $this->pdo->exec('DROP TRIGGER IF EXISTS fail_monthly_administration');
+        }
+    }
+
     public function testMonthlyGenerationLocksLeaseBeforeActiveChargeReadAndInsert(): void
     {
         $fixture = $this->createLease();

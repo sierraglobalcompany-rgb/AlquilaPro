@@ -184,6 +184,33 @@ final class FinanceRoutesTest extends TestCase
         self::assertSame('Registro duplicado', $stored->fetchColumn());
     }
 
+    public function testMonthlyDatabaseFailureDoesNotExposeDriverDetailsInHttpResponse(): void
+    {
+        $fixture = $this->createLease();
+        $managerId = $this->insertUser('Finance Manager', 'manager-secret@example.com', 'gestor', ['finance.manage']);
+        $app = $this->app();
+        $this->login($managerId);
+        $this->pdo->exec(
+            "CREATE TRIGGER fail_monthly_administration BEFORE INSERT ON charges FOR EACH ROW "
+            . "BEGIN IF NEW.type = 'administration' THEN SIGNAL SQLSTATE '45000' "
+            . "SET MESSAGE_TEXT = 'SECRET_DB_INTERNAL_F9'; END IF; END",
+        );
+
+        try {
+            $response = $this->request($app, 'POST', '/admin/leases/' . $fixture['lease_id'] . '/charges/monthly', [
+                'period_month' => '2026-10-01',
+                'due_date' => '2026-10-05',
+            ]);
+            $body = (string) $response->getBody();
+
+            self::assertSame(422, $response->getStatusCode());
+            self::assertStringNotContainsString('SECRET_DB_INTERNAL_F9', $body);
+            self::assertStringNotContainsString('SQLSTATE', $body);
+        } finally {
+            $this->pdo->exec('DROP TRIGGER IF EXISTS fail_monthly_administration');
+        }
+    }
+
     public function testEveryFinancePostUsesGlobalCsrfMiddleware(): void
     {
         $fixture = $this->createLease();

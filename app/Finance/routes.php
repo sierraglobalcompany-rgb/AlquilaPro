@@ -97,8 +97,8 @@ return static function (App $app, array $deps): void {
             if ($contractId === null) {
                 throw new RuntimeException('No fue posible abrir el contrato del arrendamiento.');
             }
-        } catch (RuntimeException $exception) {
-            $response->getBody()->write($exception->getMessage());
+        } catch (RuntimeException) {
+            $response->getBody()->write('No fue posible completar la operación financiera.');
 
             return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
         }
@@ -135,8 +135,8 @@ return static function (App $app, array $deps): void {
             if ($contractId === null) {
                 throw new RuntimeException('No fue posible abrir el contrato del arrendamiento.');
             }
-        } catch (RuntimeException $exception) {
-            $response->getBody()->write($exception->getMessage());
+        } catch (RuntimeException) {
+            $response->getBody()->write('No fue posible completar la operación financiera.');
 
             return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
         }
@@ -168,8 +168,8 @@ return static function (App $app, array $deps): void {
             if ($contractId === null) {
                 throw new RuntimeException('No fue posible abrir el contrato del arrendamiento.');
             }
-        } catch (RuntimeException $exception) {
-            $response->getBody()->write($exception->getMessage());
+        } catch (RuntimeException) {
+            $response->getBody()->write('No fue posible completar la operación financiera.');
 
             return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
         }
