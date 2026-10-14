@@ -23,6 +23,7 @@ use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\Maintenance\MaintenanceService;
 use AlquilaPro\Maintenance\VisitService;
 use AlquilaPro\Notifications\NotificationService;
+use AlquilaPro\Notifications\WhatsAppService;
 use AlquilaPro\Properties\PropertyService;
 use AlquilaPro\Properties\UnitMediaService;
 use AlquilaPro\UI\Branding;
@@ -224,6 +225,7 @@ return static function (array $settings): App {
             if (!$notificationService instanceof NotificationService) {
                 $notificationService = null;
             }
+            $whatsApp = new WhatsAppService($pdo);
 
             $auth = new AuthService($pdo);
             $session = new SessionGuard();
@@ -325,13 +327,13 @@ return static function (array $settings): App {
             $maintenanceRoutes = require dirname(__DIR__) . '/app/Maintenance/routes.php';
             $maintenanceRoutes($app, $shared + ['leases' => $leases]);
 
-            if ($notificationService instanceof NotificationService) {
-                $notificationRoutes = require dirname(__DIR__) . '/app/Notifications/routes.php';
-                $notificationRoutes($app, [
-                    'notifications' => $notificationService,
-                    'cron_secret' => $notificationCronSecret,
-                ]);
-            }
+            $notificationRoutes = require dirname(__DIR__) . '/app/Notifications/routes.php';
+            $notificationRoutes($app, $shared + [
+                'notifications' => $notificationService,
+                'whatsapp' => $whatsApp,
+                'pdo' => $pdo,
+                'cron_secret' => $notificationCronSecret,
+            ]);
         }
     }
 

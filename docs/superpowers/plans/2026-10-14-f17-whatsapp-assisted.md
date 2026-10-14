@@ -57,12 +57,12 @@ maintenance_request
 
 Initial template keys remain code constants and must have allowlisted variables. Exact Spanish copy can be concise and operational; no DB template CMS.
 
-- [ ] RED schema: exact columns, no delivery/read/provider fields.
-- [ ] RED phone normalization to digits/E.164-style wa.me destination; reject malformed/empty.
-- [ ] RED template allowlist + missing/extra variable rejection.
-- [ ] GREEN snapshot of phone/message/URL at preparation time.
-- [ ] `markOpened()` records authenticated actor/time but never sent/delivery state.
-- [ ] Run schema/service focused tests.
+- [x] RED schema: exact columns, no delivery/read/provider fields.
+- [x] RED phone normalization to digits/E.164-style wa.me destination; reject malformed/empty.
+- [x] RED template allowlist + missing/extra variable rejection.
+- [x] GREEN snapshot of phone/message/URL at preparation time.
+- [x] `markOpened()` records authenticated actor/time but never sent/delivery state.
+- [x] Run schema/service focused tests.
 
 ### Task 2: Permissions + routes + UI
 
@@ -82,23 +82,24 @@ POST /admin/whatsapp
 POST /admin/whatsapp/{id}/open
 ```
 
-- [ ] RED `whatsapp.use` permission, owner bypass, tenant hard deny.
-- [ ] RED prepare route requires valid existing context id for its allowlisted type.
-- [ ] GREEN confirmation/history SSR page with snapshot, no secret/internal filesystem data.
-- [ ] Open route calls `markOpened()` then 303 redirects to stored HTTPS `wa.me` URL.
-- [ ] Keep CSRF/forced-password/basePath behavior.
-- [ ] Run route/permission/auth focused tests.
+- [x] RED `whatsapp.use` permission, owner bypass, tenant hard deny.
+- [x] RED prepare route requires valid existing context id for its allowlisted type.
+- [x] GREEN confirmation/history SSR page with snapshot, no secret/internal filesystem data.
+- [x] Open route calls `markOpened()` then 303 redirects to stored HTTPS `wa.me` URL.
+- [x] Keep CSRF/forced-password/basePath behavior.
+- [x] Run route/permission/auth focused tests.
 
 ### Task 3: Architecture/security freeze + certification
 
 **Files:**
 - Create: `tests/Integration/Notifications/WhatsAppSecurityRegressionTest.php`
 
-- [ ] Freeze 1 table / 1 service / 1 permission / 0 API/webhook/provider/dependency.
-- [ ] Assert no columns/strings for delivered/read/provider message id.
-- [ ] Assert all open/prepare routes private and tenant denied.
-- [ ] Fresh phase review before remote CI; repair only real Critical/Important findings.
-- [ ] `composer validate --strict`, `git diff --check`, focused F16/F17/auth tests.
-- [ ] Define Product Head; docs-only closure; one push.
+- [x] Freeze 1 table / 1 service / 1 permission / 0 API/webhook/provider/dependency.
+- [x] Assert no columns/strings for delivered/read/provider message id.
+- [x] Assert all open/prepare routes private and tenant denied.
+- [x] Fresh phase review before remote CI; 0 Critical/Important, 2 Minors deferred.
+- [x] `composer validate --strict`, `git diff --check`, focused F16/F17/auth tests.
+- [x] Define Product Head: `56d221c`.
+- [ ] Docs-only closure; one push.
 - [ ] Stacked PR against F16 closure branch; one PHP 8.3/8.4/8.5 PR CI.
 - [ ] Stop without merge/F18 if gate fails.
