@@ -153,6 +153,24 @@ final class ShellRoutesTest extends TestCase
         self::assertStringNotContainsString('Documentos privados', $hidden);
     }
 
+    public function testMembershipsAppCardRequiresViewPermission(): void
+    {
+        $this->insertUser('memberships-visible@example.com', 'StaffPassword123', 'gestor', ['memberships.view']);
+        $visibleApp = $this->app();
+        $this->login($visibleApp, 'memberships-visible@example.com', 'StaffPassword123');
+        $visible = (string) $this->request($visibleApp, 'GET', '/')->getBody();
+        self::assertStringContainsString('href="/admin/memberships"', $visible);
+        self::assertStringContainsString('>Servicios digitales</strong>', $visible);
+
+        $_SESSION = [];
+        $this->insertUser('memberships-hidden@example.test', 'StaffPassword123', 'gestor', []);
+        $hiddenApp = $this->app();
+        $this->login($hiddenApp, 'memberships-hidden@example.test', 'StaffPassword123');
+        $hidden = (string) $this->request($hiddenApp, 'GET', '/')->getBody();
+        self::assertStringNotContainsString('/admin/memberships', $hidden);
+        self::assertStringNotContainsString('Servicios digitales', $hidden);
+    }
+
     public function testAccountRequiresLoginAndRendersCurrentUser(): void
     {
         $userId = $this->insertUser('admin@example.com', 'AdminPassword123', 'admin', ['users.view'], false, 'Natalia Admin');
@@ -321,6 +339,8 @@ final class ShellRoutesTest extends TestCase
         self::assertStringContainsString('Usuarios', $ownerBody);
         self::assertStringContainsString('/admin/community', $ownerBody);
         self::assertStringContainsString('Convivencia y avisos legales', $ownerBody);
+        self::assertStringContainsString('/admin/memberships', $ownerBody);
+        self::assertStringContainsString('Servicios digitales', $ownerBody);
         self::assertStringContainsString('/admin/appearance', $ownerBody);
         self::assertStringContainsString('Apariencia', $ownerBody);
 
@@ -363,6 +383,7 @@ final class ShellRoutesTest extends TestCase
         self::assertStringNotContainsString('Solicitudes', $body);
         self::assertStringNotContainsString('Propiedades', $body);
         self::assertStringNotContainsString('/admin/community', $body);
+        self::assertStringNotContainsString('/admin/memberships', $body);
     }
 
     public function testUserAdministrationUsesAppShellCardsAndManagePermissionShowsCreateForm(): void

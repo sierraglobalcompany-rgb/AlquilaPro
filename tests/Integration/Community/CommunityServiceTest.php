@@ -31,6 +31,8 @@ final class CommunityServiceTest extends TestCase
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
         $this->pdo->exec('DELETE FROM documents');
         $this->pdo->exec('DELETE FROM community_incidents');
+        $this->pdo->exec('DELETE FROM service_memberships');
+        $this->pdo->exec('DELETE FROM digital_services');
         $this->pdo->exec('DELETE FROM leases');
         $this->pdo->exec('DELETE FROM users');
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');

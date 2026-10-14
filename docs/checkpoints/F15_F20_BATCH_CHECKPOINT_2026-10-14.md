@@ -4,13 +4,13 @@
 PREPACKAGE_BASE: 37350105ac8c1806ae69194082098dbe230e5838
 MAIN_START: ddb24048326e3fd67df919f1bd829fac939d8861
 MAIN_START_AUDIT: PASS — descendant of PREPACKAGE_BASE; only the V4 master and design checkpoint changed
-CURRENT_PHASE: F19
-CURRENT_TASK: F19 Product Head fixed; docs-only Closure Head prepared
-BRANCH: impl/f19-community-legal-20261014
-BASE: 24f2da7dcf043ff4750434e18dcca66dfd37aab1 (F18 CLOSURE_HEAD)
-CURRENT_HEAD: 5fe11b3 (F19 product head; closure pending)
+CURRENT_PHASE: F20
+CURRENT_TASK: F20 Task 5 local certification recorded in docs-only Closure Head; remote push/PR/CI pending
+BRANCH: impl/f20-memberships-services-20261014
+BASE: 75be03fc4ac17feb4f36fc25f28b853de3c45e2a (F19 CLOSURE_HEAD)
+CURRENT_HEAD: pending docs-only Closure Head (Product Head 5f46c63882672e6d34566284051a5f62e1db56db)
 WORKTREE: C:\Users\felip\.codex\worktrees\f15-f20-batch\AlquilaPro
-WORKTREE_STATUS: F18 product complete with PR #21 (mergeable; CI intentionally unpolled); F19 product head 5fe11b3 locally certified; README/SPEC/checkpoint closure docs pending; generated .phpunit.cache/ and app/graphify-out/ remain untracked
+WORKTREE_STATUS: F19 PR #22 open/mergeable with CI intentionally unpolled; F20 Product Head locally certified and this docs-only commit closes local work; generated .phpunit.cache/ and app/graphify-out/ remain untracked and unstaged
 F15_STATUS: LOCAL CERTIFIED / PR OPEN / MERGEABILITY CONFLICTING
 F15_BRANCH: impl/f15-agenda-visits-20261014
 F15_BASE: ddb24048326e3fd67df919f1bd829fac939d8861
@@ -57,6 +57,10 @@ F19_TASK1_RULING: close allowed from open/reviewed; void allowed from any nonvoi
 F19_TASK1_PRODUCT_HEAD: 4e35bf2e1fe01bc4364f2200106510c132ce75b0
 F19_PRODUCT_HEAD: 5fe11b32a674b277b05bd9f33d3a72a2a7df9550
 F19_PR_BASE: impl/f18-documents-inventories-20261014@24f2da7dcf043ff4750434e18dcca66dfd37aab1
+F19_CLOSURE_HEAD: 75be03fc4ac17feb4f36fc25f28b853de3c45e2a
+F19_PR: #22 https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/22 (OPEN / MERGEABLE)
+F19_PR_HEAD: 75be03fc4ac17feb4f36fc25f28b853de3c45e2a
+F19_CI: triggered; intentionally unpolled until final batch check
 F19_TASK2_RED: DocumentSchemaTest found missing community_incident_id; CommunityDocumentsTest reached undefined createIncidentFileVersion and rejected legal_notice type.
 F19_TASK2_GREEN: migration 019 extends the one documents table to an exact property/lease/incident scope; DocumentService reuses private file integrity and version lineage, adds current incident evidence and validates property legal notices. F18/F19 document + migration regression set: 19 tests / 209 assertions PASS, 1 Windows symlink skip.
 F19_TASK2_RULING: legal_notice requires source_label and notice_text; optional source_url is limited to valid HTTP(S), effective_on is strict ISO date; text caps are label 190, URL 2048, notice 10000. Spec requires validation but leaves limits open; cost if wrong: long but valid notices or non-HTTP sources may be rejected.
@@ -88,20 +92,35 @@ F16_TASK4: Architecture freeze and candidate-route transport proof PASS. Focused
 DONE: F15 locally certified, PR #18 open. F16 product head 7b5118b and docs-only closure commit complete; remote submission pending. PHPMailer ^7.1 resolves to 7.1.1.
 RULING/FINDING: (1) F15 F14 schema wildcard narrowed to maintenance_requests; F15 plan-named MaintenanceRoutesTest.php was absent, so a focused file was created. (2) F15 staff may reprogram proposed/scheduled visit slots, with only current slots selectable. (3) F15 fresh review found 4 Important, all fixed; reviewer declined no behavior. (4) F16 SMTP errors are reduced to generic keys; attempt increments only at actual send; stale exhausted claims fail closed. (5) Reminder cadence follows the F16 choices above; candidate mail is only for created/submitted. (6) F16 minor review findings on pagination and recipient retention are recorded for follow-up, not required by the phase Critical/Important repair gate.
 ENVIRONMENT: PHP 8.5.8; pdo_mysql/mbstring/dom/fileinfo present; gd absent; test DB connects.
-NEXT_EXACT_ACTION: finish separate whole-phase review of 24f2da7..0f9ad3d against the approved F19 spec; then only Critical/Important repairs, composer strict, diff check, and docs-only phase closure.
+F20_TASK2: MembershipService accepts, renews, ends, and lists lease-scoped memberships; lease-row serialization prevents duplicate accepts/renewals, snapshots remain immutable, paid decisions stay pending, free services require no decision, and no charges are written. Focused migration/schema/service/concurrency set: 11 tests / 135 assertions PASS.
+F20_TASK2_RULING: An unended membership whose end date has not passed renews on the following day; an ended or expired membership renews starting today. This preserves contiguous terms while allowing a restart after early end; cost if wrong: users may expect a new renewal term to start immediately or wait until a different business date.
+F20_TASK3: Explicit CREATE/SKIP decisions resolve lease ID, then lock lease before membership; CREATE calls canonical FinanceService in the same PDO transaction using the immutable snapshot amount and validated admin due date/description, then links charge and actor/time. SKIP creates no charge. Terminality and all three CREATE/CREATE, CREATE/SKIP, SKIP/SKIP races plus forced link rollback pass. F20 + F9 focused set: 43 tests / 386 assertions PASS.
+F20_TASK4: Added memberships.view/manage, owner bypass, staff catalog/edit/history and pending CREATE/SKIP actions, plus tenant service acceptance/renewal and safe outcome projection. Tenant GET/accept/renew paths prove LeaseService ownership before membership queries; CSRF, PRG, forced-password gate, and base path pass. F8/F9/auth/launcher regression set: 117 tests / 1334 assertions PASS; F9 closure guard updated for the shared MembershipService dependency.
+F20_TASK5_FREEZE: one migration creates exactly digital_services and service_memberships; exactly one MembershipService domain class; exactly memberships.view/manage; no raw F20 charges INSERT, acceptance/renewal charge side effect, provider/history tables, public routes or runtime dependency. MembershipSecurityRegressionTest passes.
+F20_REVIEW: fresh independent whole-range review of 75be03f..58ab661; 0 Critical, 2 Important, both fixed in 5f46c63. Important: tenant had not seen/confirmed current price and duration before acceptance/renewal; stale terms can no longer be accepted, with displayed current price/duration/start/end and 409 on stale confirmation. CREATE locked membership after its FK lease lock, reversing accept/renew order; now decision locks lease then membership and a coordinated CREATE/renew race passes.
+F20_REVIEW_MINOR_DEFERRED: (1) renewal lookup is not explicitly scoped by verified lease ID (route does not disclose foreign result); (2) nullable charge fields make SQL CHECK semantics UNKNOWN in some combinations; (3) staff history caps at 200 without paging; (4) view-only role in negative CSRF case lets permission denial mask CSRF; (5) security freeze does not enumerate the entire memberships permission namespace; (6) expected mutation failures return blank 422. Deferred under Critical/Important-only repair gate.
+F20_REVIEW_DECLINED_TO_JUDGE: tenant/staff early-termination UI policy; refunds/proration; pre-existing staff permission-editing controls; recovery from partial migration DDL failure.
+F20_REVIEW_RULING: no new business ruling; the sole F20 ruling remains Task 2 renewal timing (unended renewal starts the day after ends_on; ended/expired renewal starts today). F9 closure guard change is regression-test maintenance.
+F20_FINAL_LOCAL_QA: focused set 120 tests / 1419 assertions PASS (PHP 8.5.8); composer validate --strict PASS; git diff --check PASS; PHP lint of 9 changed PHP files PASS. Architecture freeze PASS.
+F20_PRODUCT_HEAD: 5f46c63882672e6d34566284051a5f62e1db56db (fix(f20): confirm membership terms and serialize charge locks)
+F20_PR_BASE: impl/f19-community-legal-20261014@75be03fc4ac17feb4f36fc25f28b853de3c45e2a
+F20_CLOSURE_HEAD: this docs-only closure commit, following Product Head 5f46c638
+F20_PR: pending single push and stacked PR creation
+F20_CI: pending PR creation; expected matrix PHP 8.3/8.4/8.5
+NEXT_EXACT_ACTION: one push of Product Head + docs-only Closure Head, open one stacked PR against F19, check PR CI once; do not merge or start F21.
 
 F15: LOCAL CERTIFIED / PR CI PENDING RECONCILIATION
 F16: PRODUCT COMPLETE / PR OPEN / REMOTE CI PENDING FINAL CHECK
 F17: PRODUCT COMPLETE / PR #20 OPEN / REMOTE CI PENDING FINAL CHECK
 F18: PRODUCT COMPLETE / PR #21 OPEN / MERGEABLE / CI PENDING FINAL CHECK
-F19: LOCALLY CERTIFIED / STACKED PR PENDING
-F20: PENDING
+F19: LOCALLY CERTIFIED / PR #22 OPEN / CI PENDING FINAL CHECK
+F20: LOCALLY CERTIFIED / DOCS CLOSURE COMPLETE / REMOTE SUBMISSION PENDING
 
 LOCAL_FULL_SUITE_RUNS: 0
-REMOTE_CI_RUNS: 4 (F15–F18 PRs triggered; final check pending)
-FRESH_REVIEWS: 5 (F19 review was author self-review; no independent reviewer dispatched)
-PRODUCTIVE_COMMITS: 10
-DOC_COMMITS: 4
+REMOTE_CI_RUNS: 5 (F15–F19 PRs triggered; final check pending)
+FRESH_REVIEWS: 6 (F19 review was author self-review; F20 independently reviewed)
+PRODUCTIVE_COMMITS: 11
+DOC_COMMITS: 6
 LOOP_ESCAPES: 0
 CI_REPAIRS: 0
 MERGES: NONE

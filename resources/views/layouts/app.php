@@ -23,6 +23,7 @@ $canViewMaintenance = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 
 $canUseWhatsApp = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'whatsapp.use');
 $canViewDocuments = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'documents.view');
 $canViewCommunity = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'community.view');
+$canViewMemberships = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'memberships.view');
 $isOwner = !$isTenant && ($user['role'] ?? null) === 'owner';
 ?>
 <!doctype html>
@@ -125,13 +126,19 @@ $isOwner = !$isTenant && ($user['role'] ?? null) === 'owner';
                         <span>Incidentes y avisos vigentes de propiedades</span>
                     </a>
                 <?php endif; ?>
+                <?php if ($canViewMemberships): ?>
+                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/memberships">
+                        <strong>Servicios digitales</strong>
+                        <span>Catálogo y decisiones de cargo</span>
+                    </a>
+                <?php endif; ?>
                 <?php if ($isOwner): ?>
                     <a class="app-card" href="<?= $escape($basePath) ?>/admin/appearance">
                         <strong>Apariencia</strong>
                         <span>Nombre, color y logo</span>
                     </a>
                 <?php endif; ?>
-                <?php if (!$canViewUsers && !$canViewProperties && !$canViewCandidates && !$canViewContracts && !$canViewFinance && !$canViewInsurance && !$canViewMaintenance && !$canUseWhatsApp && !$canViewDocuments && !$canViewCommunity && !$isOwner): ?>
+                <?php if (!$canViewUsers && !$canViewProperties && !$canViewCandidates && !$canViewContracts && !$canViewFinance && !$canViewInsurance && !$canViewMaintenance && !$canUseWhatsApp && !$canViewDocuments && !$canViewCommunity && !$canViewMemberships && !$isOwner): ?>
                     <p class="empty-state">No tienes aplicaciones disponibles.</p>
                 <?php endif; ?>
             </div>

@@ -27,6 +27,8 @@ final class Permissions
         'documents.manage',
         'community.view',
         'community.manage',
+        'memberships.view',
+        'memberships.manage',
     ];
 
     public static function allows(array $user, string $permission): bool

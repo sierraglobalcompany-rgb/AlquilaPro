@@ -97,6 +97,7 @@ final class MigrationRunnerTest extends TestCase
                 '017_create_whatsapp_actions.sql',
                 '018_create_documents.sql',
                 '019_create_community_incidents.sql',
+                '020_create_digital_services_memberships.sql',
         ];
         self::assertSame(count($expectedMigrations), $first['applied']);
         self::assertSame($expectedMigrations, $first['migrations']);

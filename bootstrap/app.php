@@ -24,6 +24,7 @@ use AlquilaPro\Insurance\InsuranceService;
 use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\Maintenance\MaintenanceService;
 use AlquilaPro\Maintenance\VisitService;
+use AlquilaPro\Memberships\MembershipService;
 use AlquilaPro\Notifications\NotificationService;
 use AlquilaPro\Notifications\WhatsAppService;
 use AlquilaPro\Properties\PropertyService;
@@ -253,6 +254,7 @@ return static function (array $settings): App {
             $community = new CommunityService($pdo);
             $paymentMethods = new PaymentMethodService($pdo, $paymentMethodQrDirectory);
             $finance = new FinanceService($pdo, $paymentMethods, $paymentReceiptDirectory);
+            $memberships = new MembershipService($pdo, $finance);
             $obligations = new ObligationService($pdo, $finance, $obligationSupportDirectory);
             $insurance = new InsuranceService($pdo, $insuranceDocumentDirectory);
             $maintenance = new MaintenanceService($pdo, $finance, $maintenancePhotoDirectory);
@@ -290,6 +292,7 @@ return static function (array $settings): App {
                 'payment_methods' => $paymentMethods,
                 'properties' => $properties,
                 'today' => $settings['today'] ?? null,
+                'memberships' => $memberships,
             ];
 
             $authRoutes = require dirname(__DIR__) . '/app/Auth/routes.php';
@@ -326,6 +329,13 @@ return static function (array $settings): App {
                 'contracts' => $contracts,
                 'documents' => $documents,
                 'community' => $community,
+                'memberships' => $memberships,
+            ]);
+
+            $membershipRoutes = require dirname(__DIR__) . '/app/Memberships/routes.php';
+            $membershipRoutes($app, $shared + [
+                'memberships' => $memberships,
+                'leases' => $leases,
             ]);
 
             $documentRoutes = require dirname(__DIR__) . '/app/Documents/routes.php';
