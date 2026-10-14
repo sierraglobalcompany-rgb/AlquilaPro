@@ -43,6 +43,7 @@ final class TerminationSchemaTest extends TestCase
             'decision',
             'created_by_user_id',
             'created_at',
+            'updated_at',
             'decided_by_user_id',
             'decided_at',
         ], $this->columns('good_conduct_bonuses'));
