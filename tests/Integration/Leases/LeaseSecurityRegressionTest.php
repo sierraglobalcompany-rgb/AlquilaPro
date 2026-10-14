@@ -21,7 +21,7 @@ final class LeaseSecurityRegressionTest extends TestCase
         $f12Exists = is_file($f12Migration)
             && preg_match('/CREATE TABLE\s+lease_obligations\b/i', (string) file_get_contents($f12Migration)) === 1;
         $f15Exists = is_file($this->root . '/database/migrations/015_create_maintenance_visits.sql');
-        $f21Exists = is_file($this->root . '/database/migrations/021_create_termination_bonus_and_liquidation.sql');
+        $f21Exists = is_file($this->root . '/database/migrations/021_create_lease_termination.sql');
         $migration = $this->file('database/migrations/008_create_leases.sql');
         preg_match_all('/CREATE TABLE\s+([a-z_]+)/i', $migration, $tables);
         self::assertSame(['leases'], $tables[1] ?? []);
