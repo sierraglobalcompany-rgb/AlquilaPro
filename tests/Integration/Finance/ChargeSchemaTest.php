@@ -106,7 +106,6 @@ final class ChargeSchemaTest extends TestCase
         foreach ([
             'payments',
             'payment_allocations',
-            'payment_methods',
             'payment_reports',
             'receivables',
             'balances',

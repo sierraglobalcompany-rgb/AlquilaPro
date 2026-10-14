@@ -42,13 +42,17 @@ final class FinanceSecurityRegressionTest extends TestCase
         $serviceFiles = glob($this->root . '/app/Finance/*Service.php') ?: [];
         $serviceFiles = array_map(static fn (string $path): string => str_replace('\\', '/', $path), $serviceFiles);
         sort($serviceFiles);
-        self::assertSame([str_replace('\\', '/', $this->root) . '/app/Finance/FinanceService.php'], $serviceFiles);
+        self::assertSame([
+            str_replace('\\', '/', $this->root) . '/app/Finance/FinanceService.php',
+            str_replace('\\', '/', $this->root) . '/app/Finance/PaymentMethodService.php',
+        ], $serviceFiles);
 
         $financePhpFiles = glob($this->root . '/app/Finance/*.php') ?: [];
         $financePhpFiles = array_map(static fn (string $path): string => str_replace('\\', '/', $path), $financePhpFiles);
         sort($financePhpFiles);
         self::assertSame([
             str_replace('\\', '/', $this->root) . '/app/Finance/FinanceService.php',
+            str_replace('\\', '/', $this->root) . '/app/Finance/PaymentMethodService.php',
             str_replace('\\', '/', $this->root) . '/app/Finance/routes.php',
         ], $financePhpFiles);
 
@@ -57,6 +61,9 @@ final class FinanceSecurityRegressionTest extends TestCase
         $financeRoutes = $this->file('app/Finance/routes.php');
         preg_match_all('/\$app->(?:get|post)\(\'([^\']+)\'/i', $financeRoutes, $routeMatches);
         self::assertSame([
+            '/admin/finance/payment-methods',
+            '/admin/finance/payment-methods',
+            '/admin/finance/payment-methods/{id:[0-9]+}',
             '/admin/finance',
             '/admin/leases/{id:[0-9]+}/charges/monthly',
             '/admin/leases/{id:[0-9]+}/charges',
@@ -125,6 +132,7 @@ final class FinanceSecurityRegressionTest extends TestCase
             '/admin/leases/{id:[0-9]+}/end',
             '/tenant',
             '/tenant/leases/{id:[0-9]+}',
+            '/tenant/leases/{leaseId:[0-9]+}/payment-methods/{methodId:[0-9]+}/qr',
             '/tenant/leases/{id:[0-9]+}/contract',
         ], $routeMatches[1] ?? []);
         foreach (['/tenant/finance', '/tenant/charges', '/tenant/payments'] as $forbiddenRoute) {
@@ -132,7 +140,7 @@ final class FinanceSecurityRegressionTest extends TestCase
         }
 
         $start = strpos($routes, "\$app->get('/tenant/leases/{id:[0-9]+}'");
-        $end = strpos($routes, "\$app->get('/tenant/leases/{id:[0-9]+}/contract'", $start === false ? 0 : $start);
+        $end = strpos($routes, "\$app->get('/tenant/leases/{leaseId:[0-9]+}/payment-methods/", $start === false ? 0 : $start);
         self::assertNotFalse($start);
         self::assertNotFalse($end);
         $detailRoute = substr($routes, $start, $end - $start);
@@ -143,25 +151,45 @@ final class FinanceSecurityRegressionTest extends TestCase
         $todayProvider = strpos($detailRoute, '$todayProvider()');
         $summary = strpos($detailRoute, '$finance->summaryForLease(');
         $list = strpos($detailRoute, '$finance->listForLease(');
+        $paymentMethodScope = strpos($detailRoute, '$paymentMethods->listForProperty(');
         $render = strpos($detailRoute, "\$view->renderApp('tenant_lease_detail'");
         self::assertNotFalse($ownership);
         self::assertNotFalse($notFound);
         self::assertNotFalse($todayProvider);
         self::assertNotFalse($summary);
         self::assertNotFalse($list);
+        self::assertNotFalse($paymentMethodScope);
         self::assertNotFalse($render);
         self::assertTrue(
             $ownership < $notFound && $notFound < $todayProvider && $todayProvider < $summary
-            && $summary < $list && $list < $render,
+            && $summary < $list && $list < $paymentMethodScope && $paymentMethodScope < $render,
         );
-        self::assertStringContainsString('use ($tenantGuard, $leases, $finance, $view, $csrf, $todayProvider)', $detailRoute);
+        self::assertStringContainsString(
+            'use ($tenantGuard, $leases, $finance, $paymentMethods, $view, $csrf, $todayProvider, $path)',
+            $detailRoute,
+        );
+
+        $qrStart = strpos($routes, "\$app->get('/tenant/leases/{leaseId:[0-9]+}/payment-methods/");
+        $qrEnd = strpos($routes, "\$app->get('/tenant/leases/{id:[0-9]+}/contract'", $qrStart === false ? 0 : $qrStart);
+        self::assertNotFalse($qrStart);
+        self::assertNotFalse($qrEnd);
+        $qrRoute = substr($routes, $qrStart, $qrEnd - $qrStart);
+        $qrOwnership = strpos($qrRoute, '$leases->findForUser(');
+        $qrScope = strpos($qrRoute, '$paymentMethods->listForProperty(');
+        $qrDelivery = strpos($qrRoute, '$paymentMethods->privateQr(');
+        self::assertNotFalse($qrOwnership);
+        self::assertNotFalse($qrScope);
+        self::assertNotFalse($qrDelivery);
+        self::assertTrue($qrOwnership < $qrScope && $qrScope < $qrDelivery);
     }
 
     public function testFinanceServiceIsSharedAndTenantViewExposesOnlySafeReadFields(): void
     {
         $bootstrap = $this->file('bootstrap/app.php');
         self::assertSame(1, substr_count($bootstrap, 'new FinanceService($pdo)'));
+        self::assertSame(1, substr_count($bootstrap, 'new PaymentMethodService($pdo, $paymentMethodQrDirectory)'));
         self::assertStringContainsString("'finance' => \$finance", $bootstrap);
+        self::assertStringContainsString("'payment_methods' => \$paymentMethods", $bootstrap);
         self::assertStringContainsString('$leaseRoutes($app, $shared + [', $bootstrap);
 
         $view = $this->file('resources/views/tenant_lease_detail.php');

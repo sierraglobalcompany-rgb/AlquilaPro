@@ -32,6 +32,8 @@ final class MigrationRunnerTest extends TestCase
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
         foreach ([
             'migration_probe',
+            'charges',
+            'payment_methods',
             'leases',
             'contracts',
             'contract_template_versions',
@@ -64,7 +66,7 @@ final class MigrationRunnerTest extends TestCase
         $first = MigrationRunner::migrate($this->pdo, $directory);
         $second = MigrationRunner::migrate($this->pdo, $directory);
 
-        self::assertSame(9, $first['applied']);
+        self::assertSame(10, $first['applied']);
         self::assertSame(
             [
                 '001_create_users.sql',
@@ -76,12 +78,13 @@ final class MigrationRunnerTest extends TestCase
                 '007_create_contract_engine.sql',
                 '008_create_leases.sql',
                 '009_create_charges.sql',
+                '010_create_payment_methods.sql',
             ],
             $first['migrations'],
         );
         self::assertSame(0, $second['applied']);
         self::assertSame([], $second['migrations']);
-        self::assertSame(9, (int) $this->pdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn());
+        self::assertSame(10, (int) $this->pdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn());
         self::assertSame(1, $this->tableExists('users'));
         self::assertSame(1, $this->tableExists('settings'));
         self::assertSame(1, $this->tableExists('properties'));
@@ -97,6 +100,7 @@ final class MigrationRunnerTest extends TestCase
         self::assertSame(1, $this->tableExists('contracts'));
         self::assertSame(1, $this->tableExists('leases'));
         self::assertSame(1, $this->tableExists('charges'));
+        self::assertSame(1, $this->tableExists('payment_methods'));
     }
 
     public function testFailedMigrationIsNotRecordedAsApplied(): void

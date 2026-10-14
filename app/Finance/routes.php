@@ -6,14 +6,21 @@ use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Finance\FinanceService;
+use AlquilaPro\Finance\PaymentMethodService;
+use AlquilaPro\Properties\PropertyService;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\UploadedFileInterface;
 use Slim\App;
 
 return static function (App $app, array $deps): void {
     /** @var FinanceService $finance */
     $finance = $deps['finance'];
+    /** @var PaymentMethodService $paymentMethods */
+    $paymentMethods = $deps['payment_methods'];
+    /** @var PropertyService $properties */
+    $properties = $deps['properties'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -50,6 +57,128 @@ return static function (App $app, array $deps): void {
 
         return $charges === [] ? null : (int) $charges[0]['contract_id'];
     };
+
+    $app->get('/admin/finance/payment-methods', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ) use ($staffGuard, $paymentMethods, $properties, $view, $csrf, $basePath): ResponseInterface {
+        $user = $staffGuard($response, 'finance.view');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $allProperties = $properties->listProperties();
+        $propertyNames = [];
+        foreach ($allProperties as $property) {
+            $propertyNames[(int) $property['id']] = (string) $property['name'];
+        }
+
+        $methods = array_map(static function (array $method) use ($propertyNames, $paymentMethods): array {
+            $propertyId = $method['property_id'];
+            $method['property_label'] = $propertyId === null
+                ? 'Global'
+                : ($propertyNames[$propertyId] ?? 'Propiedad');
+            $method['has_qr'] = $method['type'] === 'breb_qr'
+                && $paymentMethods->privateQr((int) $method['id']) !== null;
+            unset(
+                $method['qr_stored_name'],
+                $method['qr_mime_type'],
+                $method['qr_sha256'],
+                $method['qr_size_bytes'],
+            );
+
+            return $method;
+        }, $paymentMethods->listAll());
+
+        $propertyOptions = array_map(
+            static fn (array $property): array => [
+                'id' => (int) $property['id'],
+                'name' => (string) $property['name'],
+            ],
+            $allProperties,
+        );
+
+        $response->getBody()->write($view->renderApp('payment_methods', [
+            'pageTitle' => 'Medios de pago',
+            'user' => $user,
+            'activeNav' => '',
+            'csrfToken' => $csrf->token(),
+            'methods' => $methods,
+            'properties' => $propertyOptions,
+            'canManage' => Permissions::allows($user, 'finance.manage'),
+            'basePath' => $basePath,
+        ]));
+
+        return $response
+            ->withHeader('Content-Type', 'text/html; charset=utf-8')
+            ->withHeader('Cache-Control', 'private, no-store');
+    });
+
+    $app->post('/admin/finance/payment-methods', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ) use ($staffGuard, $paymentMethods, $path): ResponseInterface {
+        $user = $staffGuard($response, 'finance.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $form = (array) ($request->getParsedBody() ?? []);
+        unset($form['csrf_token']);
+        $uploads = $request->getUploadedFiles();
+        $qr = $uploads['qr'] ?? null;
+        if (!$qr instanceof UploadedFileInterface || $qr->getError() === UPLOAD_ERR_NO_FILE) {
+            $qr = null;
+        }
+
+        try {
+            $paymentMethods->create($form, $qr);
+        } catch (RuntimeException) {
+            $response->getBody()->write('No fue posible guardar el medio de pago.');
+
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/admin/finance/payment-methods'))
+            ->withStatus(303);
+    });
+
+    $app->post('/admin/finance/payment-methods/{id:[0-9]+}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($staffGuard, $paymentMethods, $path): ResponseInterface {
+        $user = $staffGuard($response, 'finance.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $form = (array) ($request->getParsedBody() ?? []);
+        unset($form['csrf_token']);
+        $uploads = $request->getUploadedFiles();
+        $qr = $uploads['qr'] ?? null;
+        if (!$qr instanceof UploadedFileInterface || $qr->getError() === UPLOAD_ERR_NO_FILE) {
+            $qr = null;
+        }
+
+        try {
+            $paymentMethods->update(
+                (int) $args['id'],
+                $form,
+                $qr,
+                ($form['remove_qr'] ?? null) === '1',
+            );
+        } catch (RuntimeException) {
+            $response->getBody()->write('No fue posible guardar el medio de pago.');
+
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/admin/finance/payment-methods'))
+            ->withStatus(303);
+    });
 
     $app->get('/admin/finance', static function (
         ServerRequestInterface $request,

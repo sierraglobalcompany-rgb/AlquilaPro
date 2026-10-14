@@ -176,7 +176,11 @@ final class CandidateDocumentsTest extends TestCase
         $private = $service->privateDocument($candidate['candidate_id'], $pdf['id']);
         self::assertNotNull($private);
         self::assertSame('application/pdf', $private['mime']);
-        self::assertSame($this->documentDirectory . '/' . $pdf['stored_name'], $private['path']);
+        $expectedDocumentPath = realpath($this->documentDirectory . '/' . $pdf['stored_name']);
+        $actualDocumentPath = realpath($private['path']);
+        self::assertIsString($expectedDocumentPath);
+        self::assertIsString($actualDocumentPath);
+        self::assertSame($expectedDocumentPath, $actualDocumentPath);
 
         $oldPath = $this->documentDirectory . '/' . $pdf['stored_name'];
         $replacement = $service->addOrReplaceDocument(
