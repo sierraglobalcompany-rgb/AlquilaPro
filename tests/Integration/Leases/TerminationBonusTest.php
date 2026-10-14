@@ -356,7 +356,7 @@ final class TerminationBonusTest extends TestCase
 
         $contract = $this->pdo->prepare(
             'INSERT INTO contracts (candidate_id, unit_id, template_version_id, document_type, status, monthly_rent, administration_fee, start_date, end_date, duration_text, resolved_variables_json, snapshot_html, pdf_stored_name, pdf_sha256, pdf_size_bytes, created_by_user_id, finalized_by_user_id, generated_at, finalized_at) '
-            . 'VALUES (:candidate, :unit, :version, \'urban_housing\', \'finalized\', \'1750000.00\', \'250000.00\', \'2026-11-01\', \'2027-10-31\', \'Doce meses\', \'{}\', \'<article>F21</article>\', :pdf_name, :pdf_hash, 1234, :actor, :actor, \'2026-10-14 10:10:00\', \'2026-10-14 10:20:00\')',
+            . 'VALUES (:candidate, :unit, :version, \'urban_housing\', \'finalized\', \'1750000.00\', \'250000.00\', \'2026-11-01\', \'2027-10-31\', \'Doce meses\', \'{}\', \'<article>F21</article>\', :pdf_name, :pdf_hash, 1234, :created_actor, :finalized_actor, \'2026-10-14 10:10:00\', \'2026-10-14 10:20:00\')',
         );
         $contract->execute([
             'candidate' => $candidateId,
@@ -364,7 +364,8 @@ final class TerminationBonusTest extends TestCase
             'version' => $versionId,
             'pdf_name' => str_repeat('c', 32) . '.pdf',
             'pdf_hash' => str_repeat('d', 64),
-            'actor' => $actorId,
+            'created_actor' => $actorId,
+            'finalized_actor' => $actorId,
         ]);
         $contractId = (int) $this->pdo->lastInsertId();
 
