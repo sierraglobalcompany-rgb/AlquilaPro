@@ -4,41 +4,52 @@
 PREPACKAGE_BASE: 37350105ac8c1806ae69194082098dbe230e5838
 MAIN_START: ddb24048326e3fd67df919f1bd829fac939d8861
 MAIN_START_AUDIT: PASS — descendant of PREPACKAGE_BASE; only the V4 master and design checkpoint changed
-CURRENT_PHASE: F15
-CURRENT_TASK: F15_CLOSE / docs-only closure complete next; then push and open PR
-BRANCH: impl/f15-agenda-visits-20261014
-BASE: ddb24048326e3fd67df919f1bd829fac939d8861
-PRODUCT_HEAD: d2c23d44aeefd28ba70fce9ad1d8679d87a3275e
-CURRENT_HEAD: d2c23d44aeefd28ba70fce9ad1d8679d87a3275e (docs-only closure commit follows)
-CLOSURE_HEAD: pending docs-only closure commit; capture exact SHA in next F16 checkpoint update
-PR_BASE: main; observed origin/main cc4eabd5910d02dcf792209dcc15d749b581b72b
-PR: pending
-PR_HEAD: pending closure commit
-CI_RUN: pending; no polling before F20
-CI_MERGE_REF: pending
-PHP_MATRIX: PHP 8.3/8.4/8.5 pending
+CURRENT_PHASE: F16
+CURRENT_TASK: F16 stacked PR/CI pending; then F17 implementation
+BRANCH: impl/f16-reminders-email-20261014
+BASE: c40cd33321739effdce0253f67dc372e412dccde (F15 CLOSURE_HEAD)
+CURRENT_HEAD: F16 docs-only closure immediately after product head 7b5118b
 WORKTREE: C:\Users\felip\.codex\worktrees\f15-f20-batch\AlquilaPro
-WORKTREE_STATUS: only README, SPEC, checkpoint closure documents modified; PHPUnit cache untracked and excluded; product files unchanged since PRODUCT_HEAD
-DONE: T15.1–T15.3 complete. Migration 015 adds one maintenance_visits table; one VisitService owns lifecycle and row locks. Staff routes/UI reuse maintenance.view/manage; bootstrap wires one service. Tenant selection verifies lease ownership before request/visit lookup and offers only current proposed slots. Review repair: blank optional technician fields normalize to null; scheduling mutations recheck slot time after locks; terminal F14 transitions reject while active visits remain; migration runner fixture expects and cleans migration 015.
-RED: F15 schema test failed with the visit table absent; service tests errored with VisitService absent. T15.2 proposal-reprogram test failed on the old transition rule; agenda route and view-only history tests failed before their UI existed. T15.3 tenant portal test failed because no selection UI existed. Review repairs: blank staff fields returned 422; expired slot remained selectable after request-lock wait; terminal transition left a scheduled visit; migration runner expected 14 while migration 015 applied.
-GREEN: Review repair red/green: staff blank-field route red 422 then green 303 (1 test/6 assertions); expired-slot lock-wait red scheduled stale slot then green rejection across select/reprogram/propose/direct (1/20); terminal request red left active visit then green blocks resolve/cancel until visit cancelled (1/5); migration runner red expected 14 vs 15 then green (2/30). Final focused gates: Maintenance F14/F15 PASS (25/252), TenantPortal PASS (10/220), CsrfRoutes PASS (5/9), MigrationRunner PASS (2/30). Composer strict validation PASS; git diff --check PASS. No local full suite run.
-RULING/FINDING: (1) Narrowed F14 schema query from broad maintenance_* wildcard to maintenance_requests; F15 schema test asserts the complete allowed set. (2) Plan-named MaintenanceRoutesTest.php was absent, so created the focused file; existing F14 route coverage remains in TenantPortalRoutesTest.php. Cost if wrong: shared-route behavior may need another focused assertion. (3) Staff may reprogram proposed and scheduled visits; replacement proposal stays proposed, with locks preventing stale selection. Cost if wrong: tenants may see replaced options, but only the current set remains selectable. (4) Fresh whole-phase review found 4 Important, 0 Critical, 0 Minor; all four were repaired in one pass, followed by focused reruns; reviewer declined no behavior and ran no tests. Terminal F14 closure is rejected until active visits are completed/cancelled. Environment: PHP 8.5.8; pdo_mysql/mbstring/dom/fileinfo present; gd absent; test DB connects.
-NEXT_EXACT_ACTION: make the single docs-only closure commit and verify Product→Closure changes are docs only; push branch once, open PR against main, attach it, then create F16 from F15 CLOSURE_HEAD after local gate without waiting for CI.
+WORKTREE_STATUS: F16 product and closure docs committed; PHPUnit cache untracked and excluded
+F15_STATUS: LOCAL CERTIFIED / PR OPEN / MERGEABILITY CONFLICTING
+F15_BRANCH: impl/f15-agenda-visits-20261014
+F15_BASE: ddb24048326e3fd67df919f1bd829fac939d8861
+F15_PRODUCT_HEAD: d2c23d44aeefd28ba70fce9ad1d8679d87a3275e
+F15_CLOSURE_HEAD: c40cd33321739effdce0253f67dc372e412dccde
+F15_PR: #18 https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/18
+F15_PR_BASE: main@5fa4141c197204f60fafdb10690de3014ac4606a
+F15_PR_HEAD: c40cd33321739effdce0253f67dc372e412dccde
+F15_PR_CI: triggered; run ID and merge-ref pending final batch check
+F15_PR_MERGEABILITY: CONFLICTING — README.md only; current main has three documentation commits beyond MAIN_START. Reconcile before final F15 CI certification.
+F15_SCOPE: 1 migration/table; 1 VisitService; 0 permissions/dependencies/public routes; no F16 behavior
+F15_REVIEW: 1 fresh whole-phase review; 4 Important fixed in one repair pass; 0 Critical; 0 Minor; no declined behavior
+F15_LOCAL_QA: Maintenance 25/252; TenantPortal 10/220; CSRF 5/9; MigrationRunner 2/30; composer validate --strict PASS; git diff --check PASS
+F16_SCOPE: 1 notification_jobs table; 1 NotificationService; PHPMailer ^7.1; no workers/Redis/rule/template tables; one protected cron route
+F16_TASK1: Migration 016 and NotificationService queue/claim/send lifecycle. Due claims use 600-second leases, consume attempts immediately before transport, retry at most 3 times with 300-second delay, and terminalize expired exhausted claims; generic error keys only.
+F16_TASK1_DESIGN: unique dedupe key; no status column; pending/sent/failed derived from timestamps; max 3 attempts; 300-second retry delay; transport errors persisted only as generic keys; batch capped at 100 and claimed under SKIP LOCKED.
+F16_TASK2: Daily idempotent charge/obligation reminders, policy-expiry-day reminders, same-day scheduled-visit reminders; candidate-created/submitted events queued transactionally with candidate mutations. Payload/template allowlists; Bogota-local visit dates converted to UTC query bounds. Due financial rows target active lease tenants; paid/void charges, settled/void/charge-linked obligations, cancelled/superseded policies, ended leases and cancelled visits are excluded.
+F16_TASK3: Protected `POST /cron/notifications`, timing-safe secret, exact-path/base-path CSRF exemption, no cron session, required SMTP environment, PHPMailer TLS/SSL, safe counts-only response, batch 50. Setup documented in docs/deployment/F16_SMTP_CRON.md.
+F16_REVIEW: 1 fresh whole-phase review; 3 Important fixed (Bogota visit boundary, recoverable claim lease/attempt accounting, transactional candidate enqueue); 0 Critical. Minor findings deferred: reminder source scans are not paginated and recipient name/email retention has no explicit expiry policy.
+F16_TASK4: Architecture freeze and candidate-route transport proof PASS. Focused regression suites PASS: Notifications 15/126; Candidates 84/805; Finance 93/1459; Maintenance 25/254; Insurance 24/252; CSRF 5/9; MigrationRunner 2/31; Lease security 3/49; Contract security 5/81. Total 256 tests/3066 assertions PASS. Composer strict, git diff check and PHP lint PASS. AppBootstrapTest 3/6 fail because GD is absent and installer preconditions reject the host; unrelated to F16. No full suite.
+DONE: F15 locally certified, PR #18 open. F16 product head 7b5118b and docs-only closure commit complete; remote submission pending. PHPMailer ^7.1 resolves to 7.1.1.
+RULING/FINDING: (1) F15 F14 schema wildcard narrowed to maintenance_requests; F15 plan-named MaintenanceRoutesTest.php was absent, so a focused file was created. (2) F15 staff may reprogram proposed/scheduled visit slots, with only current slots selectable. (3) F15 fresh review found 4 Important, all fixed; reviewer declined no behavior. (4) F16 SMTP errors are reduced to generic keys; attempt increments only at actual send; stale exhausted claims fail closed. (5) Reminder cadence follows the F16 choices above; candidate mail is only for created/submitted. (6) F16 minor review findings on pagination and recipient retention are recorded for follow-up, not required by the phase Critical/Important repair gate.
+ENVIRONMENT: PHP 8.5.8; pdo_mysql/mbstring/dom/fileinfo present; gd absent; test DB connects.
+NEXT_EXACT_ACTION: push F16 once, create stacked PR against impl/f15-agenda-visits-20261014, record remote check state without polling, then continue F17. Preserve F15 README conflict for final batch reconciliation. No PR merges.
 
-F15: LOCAL CERTIFIED / PR CI PENDING
-F16: PENDING
+F15: LOCAL CERTIFIED / PR CI PENDING RECONCILIATION
+F16: PRODUCT COMPLETE / PR AND REMOTE CI PENDING
 F17: PENDING
 F18: PENDING
 F19: PENDING
 F20: PENDING
 
 LOCAL_FULL_SUITE_RUNS: 0
-REMOTE_CI_RUNS: 0
+REMOTE_CI_RUNS: 1 (F15 PR triggered; F16 PR not yet created)
 FRESH_REVIEWS: 1
-PRODUCTIVE_COMMITS: 2
-DOC_COMMITS: 1 (closure commit pending)
+PRODUCTIVE_COMMITS: 3
+DOC_COMMITS: 2
 LOOP_ESCAPES: 0
 CI_REPAIRS: 0
 MERGES: NONE
-BLOCKERS: NONE; gd absence recorded for impact assessment before F18
+BLOCKERS: F15 PR has a README.md conflict with newer main documentation; F16 may proceed under non-blocking CI rule. Host lacks GD, so three AppBootstrap installer assertions fail locally.
 ~~~
