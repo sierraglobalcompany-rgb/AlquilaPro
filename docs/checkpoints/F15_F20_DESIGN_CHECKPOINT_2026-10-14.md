@@ -1,7 +1,7 @@
 # ALQUILAPRO — F15→F20 DESIGN CHECKPOINT
 
 **Fecha:** 2026-10-14  
-**Estado:** `DESIGN WRITTEN / F20 CONSUMER MODEL RESOLVED / ONE COMMERCIAL GATE REMAINS / NO PRODUCT IMPLEMENTATION`  
+**Estado:** `WRITTEN SPECS APPROVED / F20 PRODUCT GATE CLOSED / IMPLEMENTATION PLANS IN PROGRESS / NO PRODUCT IMPLEMENTATION`  
 
 ```text
 PROJECT: AlquilaPro
@@ -26,89 +26,78 @@ F14_MERGED_CHECKPOINT_COMMIT:
 F15_F20_SPEC:
 docs/specs/F15_F20_SPEC_BATCH_V1_2026-10-14.md
 
-F15_F20_SPEC_COMMIT:
+F15_F20_SPEC_INITIAL_COMMIT:
 f6a9690fae1f2d0fb5deb3a836fb16f3f8d61bdc
 
 F20_PRODUCT_DECISION:
 docs/specs/F20_PRODUCT_DECISION_2026-10-14.md
 
-F20_PRODUCT_DECISION_COMMIT:
-95a57885baa3276570b97f9f642b2b16fcdea795
+F20_FINAL_PRODUCT_DECISION_COMMIT:
+1739e376eba5a8e2c740bfb253335e41bb87fc01
 ```
 
 ## Design status
 
 ```text
 F15 Agenda + Visits:
-SPEC WRITTEN / READY FOR USER REVIEW
+SPEC APPROVED
 ARCHITECTURE: 1 table maintenance_visits + 1 VisitService
 PERMISSIONS: reuse maintenance.view/manage
 F16 SURFACE: NONE
 
 F16 Reminders + Cron + Email:
-SPEC WRITTEN / READY FOR USER REVIEW
+SPEC APPROVED
 ARCHITECTURE: 1 notification_jobs + 1 NotificationService
 DEPENDENCY: PHPMailer allowed
 WORKERS/REDIS: 0
 
 F17 Assisted WhatsApp:
-SPEC WRITTEN / READY FOR USER REVIEW
+SPEC APPROVED
 ARCHITECTURE: 1 whatsapp_actions + 1 WhatsAppService
 PERMISSION: whatsapp.use
 PROVIDER/API/WEBHOOK: 0
 FAKE DELIVERY/READ STATE: 0
 
 F18 Documents + Manual + Inventories:
-SPEC WRITTEN / READY FOR USER REVIEW
+SPEC APPROVED
 ARCHITECTURE: 1 documents + 1 DocumentService
 PERMISSIONS: documents.view/manage
 PARALLEL INVENTORY/MANUAL TABLES: 0
 
 F19 Community + Legal Content:
-SPEC WRITTEN / READY FOR USER REVIEW
+SPEC APPROVED
 ARCHITECTURE: 1 community_incidents + 1 CommunityService
 REUSE: F18 documents
 LEGAL CMS TABLE: 0
 
 F20 Memberships + Digital Services:
-CONSUMER MODEL RESOLVED
-MODEL: A = tenant/lease add-on service
-PRE-KISS ARCHITECTURE: 2 tables digital_services + service_memberships; 1 MembershipService
-FULL SPEC: BLOCKED ON ONE COMMERCIAL DECISION
+SPEC PRODUCT MODEL RESOLVED
+MODEL: tenant/lease add-on service
+ARCHITECTURE: 2 tables digital_services + service_memberships; 1 MembershipService
+TENANT ACCEPTANCE: no automatic F9 charge
+PAID MEMBERSHIP ADMIN DECISION: CREATE | SKIP
+FINANCE WRITER: canonical FinanceService only
 ```
 
-## F20 confirmed product decision
+## F20 final product rule
 
 ```text
-F20_CONSUMER_MODEL:
-A = tenant/lease add-on service
+tenant accepts paid service
+→ membership persists
+→ admin module shows pending decision
+→ admin chooses:
+   CREATE = create exactly one F9 service charge via FinanceService
+   SKIP   = persist no-charge decision, no linked charge
 ```
 
-Meaning:
-- services are optional/additional offerings accepted by a tenant for a specific lease;
-- not owner/admin SaaS billing;
-- not property-level subscription;
-- historical acceptance remains lease-scoped.
+No automatic financial side effect occurs on tenant acceptance.
 
-## F20 remaining decision
-
-```text
-F20_CREATE_F9_CHARGE_ON_ACCEPTANCE:
-YES | NO
-```
-
-Until resolved:
-
-```text
-F20_FULL_SPEC: BLOCKED_ON_ONE_DECISION
-F20_PLAN: BLOCKED
-PRODUCT_IMPLEMENTATION: NOT AUTHORIZED
-```
+For free services (`price_snapshot = 0`) no administrative charge decision is required.
 
 ## Laws / audit
 
 ```text
-KISS: PASS F15-F19 / F20 consumer model PASS, finance behavior intentionally gated
+KISS: PASS F15-F20
 ZERO_NOISE: PASS
 ANTIPATCH: PASS
 PHASE_BOUNDARIES: PASS
@@ -116,16 +105,17 @@ FINANCE_AUTHORITY: PASS
 DOCUMENT_AUTHORITY: PASS
 NOTIFICATION_AUTHORITY: PASS
 SECURITY_BOUNDARIES: PASS
+F20_PRODUCT_GATE: CLOSED
 PROMPT/DESIGN_REVIEW_PASSES: 10 PASS
 ```
 
-## Next exact action
+## Current exact action
 
 ```text
-1. USER decides whether F20 acceptance creates an F9 charge: YES or NO.
-2. ChatGPT/Sol freezes F20 full SPEC.
-3. ChatGPT/Sol writes implementation PLANs F15-F20.
-4. Build ONE ultra-lean Codex master F15→F20 with recoverable checkpointing.
+1. ChatGPT/Sol writes implementation PLANs F15-F20.
+2. ChatGPT/Sol self-reviews plan coverage/interfaces.
+3. Build ONE ultra-lean Codex master F15→F20 with recoverable checkpointing.
+4. User reviews execution package.
 5. Codex implements stacked phases; no merge.
 6. ChatGPT/Sol forensic audit + sequential merge gates.
 ```
@@ -143,4 +133,4 @@ If this chat ends, new thread should read in this order:
 6 current main / GitHub truth
 ```
 
-Do not reimplement F12-F14. Do not write F15-F20 product until written specs/plans are approved.
+Do not reimplement F12-F14. Do not implement F15-F20 product before the plans/master execution contract are reviewed.
