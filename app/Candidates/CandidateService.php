@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AlquilaPro\Candidates;
 
 use AlquilaPro\Properties\PropertyService;
+use AlquilaPro\Notifications\NotificationService;
 use PDO;
 use PDOException;
 use RuntimeException;
@@ -20,6 +21,7 @@ final class CandidateService
         private readonly PDO $pdo,
         private readonly int $tokenTtlSeconds = 604800,
         private readonly ?CandidateDocumentService $candidateDocumentService = null,
+        private readonly ?NotificationService $notificationService = null,
     ) {
         $this->propertyService = new PropertyService($pdo);
     }
@@ -76,6 +78,11 @@ final class CandidateService
             ]);
 
             $candidateId = (int) $this->pdo->lastInsertId();
+            $this->notificationService?->queueCandidateEvent(
+                $candidateId,
+                'created',
+                $this->dateTime($now),
+            );
             $this->pdo->commit();
 
             return [
@@ -323,22 +330,33 @@ final class CandidateService
         $this->assertLaborCompleteness($row);
         $this->assertDocumentCompleteness($row);
 
-        $statement = $this->pdo->prepare(
-            "UPDATE candidates SET status = 'verification', submitted_at = :submitted_at, updated_at = :updated_at WHERE id = :id",
-        );
-        $timestamp = $this->dateTime($now);
-        $statement->execute([
-            'submitted_at' => $timestamp,
-            'updated_at' => $timestamp,
-            'id' => (int) $row['id'],
-        ]);
+        $this->pdo->beginTransaction();
+        try {
+            $statement = $this->pdo->prepare(
+                "UPDATE candidates SET status = 'verification', submitted_at = :submitted_at, updated_at = :updated_at WHERE id = :id",
+            );
+            $timestamp = $this->dateTime($now);
+            $statement->execute([
+                'submitted_at' => $timestamp,
+                'updated_at' => $timestamp,
+                'id' => (int) $row['id'],
+            ]);
 
-        $candidate = $this->findCandidate((int) $row['id']);
-        if ($candidate === null) {
-            throw new RuntimeException('No fue posible enviar la solicitud.');
+            $candidate = $this->findCandidate((int) $row['id']);
+            if ($candidate === null) {
+                throw new RuntimeException('No fue posible enviar la solicitud.');
+            }
+            $this->notificationService?->queueCandidateEvent(
+                (int) $candidate['id'],
+                'submitted',
+                $timestamp,
+            );
+            $this->pdo->commit();
+            return $candidate;
+        } catch (Throwable $exception) {
+            $this->rollbackIfNeeded();
+            throw $exception;
         }
-
-        return $candidate;
     }
 
     public function listCandidates(): array

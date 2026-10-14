@@ -113,7 +113,7 @@ final class PaymentMethodSecurityRegressionTest extends TestCase
         $composer = json_decode($this->file('composer.json'), true, 32, JSON_THROW_ON_ERROR);
         $runtimeRequirements = array_keys($composer['require'] ?? []);
         sort($runtimeRequirements);
-        self::assertSame(['dompdf/dompdf', 'php', 'slim/psr7', 'slim/slim'], $runtimeRequirements);
+        self::assertSame(['dompdf/dompdf', 'php', 'phpmailer/phpmailer', 'slim/psr7', 'slim/slim'], $runtimeRequirements);
 
         $bootstrap = $this->file('bootstrap/app.php');
         self::assertSame(1, substr_count($bootstrap, 'new PaymentMethodService($pdo, $paymentMethodQrDirectory)'));
@@ -182,7 +182,7 @@ final class PaymentMethodSecurityRegressionTest extends TestCase
         );
 
         $adminRoute = $this->file('app/Finance/routes.php');
-        self::assertStringContainsString("unset(\n                \$method['qr_stored_name']", $adminRoute);
+        self::assertStringContainsString("unset(\n                \$method['qr_stored_name']", str_replace("\r\n", "\n", $adminRoute));
         foreach (['qr_stored_name', 'qr_mime_type', 'qr_sha256', 'qr_size_bytes'] as $internalQrField) {
             self::assertStringNotContainsString($internalQrField, $this->file('resources/views/payment_methods.php'));
             self::assertStringNotContainsString($internalQrField, $this->file('resources/views/tenant_lease_detail.php'));
@@ -238,6 +238,6 @@ final class PaymentMethodSecurityRegressionTest extends TestCase
         $contents = file_get_contents($this->root . '/' . $path);
         self::assertIsString($contents, 'Missing F10 security regression source: ' . $path);
 
-        return $contents;
+        return str_replace("\r\n", "\n", $contents);
     }
 }

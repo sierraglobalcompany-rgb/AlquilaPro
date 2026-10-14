@@ -10,6 +10,7 @@ use AlquilaPro\Foundation\DatabaseConfig;
 use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
 use AlquilaPro\Foundation\MigrationRunner;
+use AlquilaPro\Notifications\NotificationService;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
@@ -243,7 +244,11 @@ final class PublicCandidateApplyTest extends TestCase
     public function testExistingCandidateSurvivesUnitUnpublishAndSubmitNeverChangesUnitStatus(): void
     {
         $unit = $this->seedUnit(bin2hex(random_bytes(12)), true);
-        $app = $this->app();
+        $sent = 0;
+        $notifications = new NotificationService($this->pdo, static function () use (&$sent): void {
+            $sent++;
+        });
+        $app = $this->app(notifications: $notifications);
 
         $created = $this->request($app, 'POST', '/apply/' . $unit['public_key'], $this->candidateInput('cc', 'F57-LIFECYCLE-1') + [
             'csrf_token' => $this->csrfToken(),
@@ -252,6 +257,8 @@ final class PublicCandidateApplyTest extends TestCase
         $continuePath = $created->getHeaderLine('Location');
         self::assertMatchesRegularExpression('#^/apply/continue/[a-f0-9]{64}$#', $continuePath);
         self::assertSame('available', $this->unitStatus($unit['id']));
+        self::assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM notification_jobs')->fetchColumn());
+        self::assertSame(0, $sent, 'Candidate creation queues an email without sending inline.');
 
         $this->pdo->prepare('UPDATE units SET status = :status, is_public = 0 WHERE id = :id')->execute([
             'status' => 'occupied',
@@ -271,6 +278,56 @@ final class PublicCandidateApplyTest extends TestCase
         self::assertSame($continuePath, $submitted->getHeaderLine('Location'));
         self::assertSame('verification', $this->candidateRowByDocument('F57-LIFECYCLE-1')['status']);
         self::assertSame('occupied', $this->unitStatus($unit['id']));
+        self::assertSame(2, (int) $this->pdo->query('SELECT COUNT(*) FROM notification_jobs')->fetchColumn());
+        self::assertSame(0, $sent, 'Candidate submission queues an email without sending inline.');
+        self::assertSame(
+            ['candidate_created', 'candidate_submitted'],
+            $this->pdo->query('SELECT template_key FROM notification_jobs ORDER BY id')->fetchAll(PDO::FETCH_COLUMN),
+        );
+    }
+
+    public function testCandidateCreationRollsBackIfItsNotificationCannotBeQueued(): void
+    {
+        $unit = $this->seedUnit(bin2hex(random_bytes(12)), true);
+        $notifications = new NotificationService($this->pdo, static function (): void {
+        });
+        $app = $this->app(notifications: $notifications);
+        $this->pdo->exec('DROP TABLE notification_jobs');
+
+        $response = $this->request(
+            $app,
+            'POST',
+            '/apply/' . $unit['public_key'],
+            $this->candidateInput('cc', 'QUEUE-ROLLBACK-1') + ['csrf_token' => $this->csrfToken()],
+        );
+
+        self::assertSame(422, $response->getStatusCode());
+        self::assertSame(0, $this->candidateCount(), 'A committed candidate must never lose its creation email job.');
+    }
+
+    public function testCandidateSubmissionRollsBackIfItsNotificationCannotBeQueued(): void
+    {
+        $unit = $this->seedUnit(bin2hex(random_bytes(12)), true);
+        $started = (new CandidateService($this->pdo))->startCandidate(
+            $unit['public_key'],
+            $this->candidateInput('cc', 'QUEUE-ROLLBACK-2'),
+            time(),
+        );
+        $notifications = new NotificationService($this->pdo, static function (): void {
+        });
+        $app = $this->app(notifications: $notifications);
+        $this->pdo->exec('DROP TABLE notification_jobs');
+
+        $response = $this->request(
+            $app,
+            'POST',
+            '/apply/continue/' . $started['continuation_token'] . '/submit',
+            ['csrf_token' => $this->csrfToken()],
+        );
+
+        self::assertSame(422, $response->getStatusCode());
+        self::assertSame('new', $this->candidateRowByDocument('QUEUE-ROLLBACK-2')['status']);
+        self::assertNull($this->candidateRowByDocument('QUEUE-ROLLBACK-2')['submitted_at']);
     }
 
     public function testApplyAndContinuePreserveSubfolderInFormsAndRedirects(): void
@@ -296,7 +353,7 @@ final class PublicCandidateApplyTest extends TestCase
         self::assertStringNotContainsString('/sub/sub/', (string) $continue->getBody());
     }
 
-    private function app(string $basePath = ''): App
+    private function app(string $basePath = '', ?NotificationService $notifications = null): App
     {
         $factory = require dirname(__DIR__, 3) . '/bootstrap/app.php';
 
@@ -309,6 +366,7 @@ final class PublicCandidateApplyTest extends TestCase
             'logo_directory' => $this->directory . '/branding',
             'unit_media_directory' => $this->directory . '/unit-media',
             'pdo' => $this->pdo,
+            'notifications' => $notifications,
         ]);
     }
 

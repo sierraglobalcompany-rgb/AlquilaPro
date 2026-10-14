@@ -57,12 +57,12 @@ NotificationService::processDue(int $limit, string $now): array
 NotificationService::queueCandidateEvent(int $candidateId, string $eventKey, string $scheduledAt): ?int
 ```
 
-- [ ] RED schema: minimal columns, `UNIQUE(dedupe_key)`, no persisted status/rule/template table.
-- [ ] GREEN migration.
-- [ ] RED queue validation/idempotency, pending/sent/failed derived state, attempt cap and retry eligibility.
-- [ ] GREEN minimal queue/process authority.
-- [ ] Add PHPMailer `^7.1`; no other mail package.
-- [ ] Run schema/service focused tests.
+- [x] RED schema: minimal columns, `UNIQUE(dedupe_key)`, no persisted status/rule/template table.
+- [x] GREEN migration.
+- [x] RED queue validation/idempotency, pending/sent/failed derived state, attempt cap and retry eligibility.
+- [x] GREEN minimal queue/process authority.
+- [x] Add PHPMailer `^7.1`; no other mail package.
+- [x] Run schema/service focused tests.
 
 ### Task 2: Reminder rules + candidate events
 
@@ -72,12 +72,12 @@ NotificationService::queueCandidateEvent(int $candidateId, string $eventKey, str
 - Create/modify: `tests/Integration/Notifications/NotificationRulesTest.php`
 - Modify: relevant candidate route tests.
 
-- [ ] RED reminder generation for real existing domains: due/overdue charges, F12 obligations, F13 policy expiry and F15 scheduled visits.
-- [ ] Use stable dedupe keys containing entity id + rule/event date/version; no generic event bus.
-- [ ] RED candidate-created / relevant candidate-update event queues one job and never sends inline.
-- [ ] GREEN route integration calls `queueCandidateEvent()` after successful candidate mutation.
-- [ ] Templates remain private methods/config keyed by allowlisted `template_key`.
-- [ ] Run notification + affected Candidates/F9/F12/F13/F15 focused tests.
+- [x] RED reminder generation for real existing domains: due/overdue charges, F12 obligations, F13 policy expiry and F15 scheduled visits.
+- [x] Use stable dedupe keys containing entity id + rule/event date/version; no generic event bus.
+- [x] RED candidate-created / relevant candidate-update event queues one job and never sends inline.
+- [x] GREEN candidate event enqueue is atomic with successful candidate mutation; candidate routes do not invoke SMTP.
+- [x] Templates remain private methods/config keyed by allowlisted `template_key`.
+- [x] Run notification + affected Candidates/F9/F12/F13/F15 focused tests.
 
 ### Task 3: SMTP wiring + protected cron
 
@@ -100,22 +100,22 @@ POST /cron/notifications
 header: X-AlquilaPro-Cron-Secret
 ```
 
-- [ ] RED missing/wrong secret → 403 with no job mutation/send.
-- [ ] RED global CSRF remains mandatory for every other POST.
-- [ ] GREEN exact-path CSRF exemption only for `/cron/notifications`; route validates secret with `hash_equals` before work.
-- [ ] Route calls `generateReminders()` then `processDue()` with a bounded batch.
-- [ ] Response contains only safe counts, never recipient/secrets/errors.
-- [ ] Run cron/CSRF/auth focused tests.
+- [x] RED missing/wrong secret → 403 with no job mutation/send.
+- [x] RED global CSRF remains mandatory for every other POST.
+- [x] GREEN exact-path CSRF exemption only for `/cron/notifications`; route validates secret with `hash_equals` before work.
+- [x] Route calls `generateReminders()` then `processDue()` with a bounded batch.
+- [x] Response contains only safe counts, never recipient/secrets/errors.
+- [x] Run cron/CSRF/auth focused tests.
 
 ### Task 4: Architecture freeze + certification
 
 **Files:**
 - Create: `tests/Integration/Notifications/NotificationSecurityRegressionTest.php`
 
-- [ ] Freeze 1 table / 1 service / 1 approved dependency / 0 workers/Redis/rule/template tables.
-- [ ] Prove candidate routes contain no direct PHPMailer/SMTP send.
-- [ ] Environment smoke + fresh review before final CI.
-- [ ] `composer validate --strict`, `git diff --check`, affected focused suite.
-- [ ] Define `F16_PRODUCT_HEAD`; closure docs-only.
+- [x] Freeze 1 table / 1 service / 1 approved dependency / 0 workers/Redis/rule/template tables.
+- [x] Prove candidate routes contain no direct PHPMailer/SMTP send.
+- [x] Environment smoke + fresh review; repair all 3 Important findings before final CI.
+- [x] `composer validate --strict`, `git diff --check`, PHP lint and affected focused suites.
+- [x] Define `F16_PRODUCT_HEAD` (`7b5118b`); closure remains docs-only.
 - [ ] One push; stacked PR against F15 closure branch; one PHP 8.3/8.4/8.5 PR CI.
 - [ ] Record merge-ref/counts in batch checkpoint and stop on any blocker.
