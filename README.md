@@ -462,7 +462,7 @@ Autoridad técnica de cierre:
 - F15 — Agenda + visitas
 - F16 — Recordatorios + cron + email
 - F17 — WhatsApp asistido
-- F18 — Documentos + manual + inventarios
+- F18 — Documentos + manual + inventarios ✅ PRODUCT COMPLETE / LOCAL FOCUSED QA PASS / PR CI PENDING
 - F19 — Convivencia + contenido legal
 - F20 — Membresías/servicios
 - F21 — Bono + liquidación
@@ -473,6 +473,12 @@ Autoridad técnica de cierre:
 - F26 — Hostinger + smoke test
 
 La configuración de SMTP y el scheduler de F16 está en [F16 SMTP y cron](docs/deployment/F16_SMTP_CRON.md).
+
+### F18 — Documentos privados e inventarios
+
+F18 usa una sola tabla `documents`, una autoridad `DocumentService` y los permisos `documents.view` / `documents.manage`. Las versiones son inmutables; los archivos PNG/JPEG/WebP/PDF se verifican por bytes, tamaño y SHA-256 y se sirven solo por rutas autenticadas. Los inventarios son snapshots JSON limitados, sin cargos automáticos.
+
+El almacenamiento predeterminado queda fuera de la raíz de la aplicación. En despliegues, `ALQUILAPRO_DOCUMENT_DIRECTORY` permite indicar una carpeta privada persistente con acceso de escritura para PHP; no se debe apuntar a una carpeta servida por HTTP.
 
 ---
 
