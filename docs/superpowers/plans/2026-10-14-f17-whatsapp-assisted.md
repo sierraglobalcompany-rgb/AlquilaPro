@@ -57,12 +57,12 @@ maintenance_request
 
 Initial template keys remain code constants and must have allowlisted variables. Exact Spanish copy can be concise and operational; no DB template CMS.
 
-- [ ] RED schema: exact columns, no delivery/read/provider fields.
-- [ ] RED phone normalization to digits/E.164-style wa.me destination; reject malformed/empty.
-- [ ] RED template allowlist + missing/extra variable rejection.
-- [ ] GREEN snapshot of phone/message/URL at preparation time.
-- [ ] `markOpened()` records authenticated actor/time but never sent/delivery state.
-- [ ] Run schema/service focused tests.
+- [x] RED schema: exact columns, no delivery/read/provider fields.
+- [x] RED phone normalization to digits/E.164-style wa.me destination; reject malformed/empty.
+- [x] RED template allowlist + missing/extra variable rejection.
+- [x] GREEN snapshot of phone/message/URL at preparation time.
+- [x] `markOpened()` records authenticated actor/time but never sent/delivery state.
+- [x] Run schema/service focused tests.
 
 ### Task 2: Permissions + routes + UI
 

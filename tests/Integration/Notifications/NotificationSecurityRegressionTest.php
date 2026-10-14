@@ -42,8 +42,13 @@ final class NotificationSecurityRegressionTest extends TestCase
 
         $notificationFiles = glob(dirname(__DIR__, 3) . '/app/Notifications/*.php') ?: [];
         $notificationFiles = array_map('basename', $notificationFiles);
+        $expectedFiles = ['NotificationService.php', 'routes.php'];
+        if (is_file(dirname(__DIR__, 3) . '/database/migrations/017_create_whatsapp_actions.sql')) {
+            $expectedFiles[] = 'WhatsAppService.php';
+        }
+        sort($expectedFiles);
         sort($notificationFiles);
-        self::assertSame(['NotificationService.php', 'routes.php'], $notificationFiles);
+        self::assertSame($expectedFiles, $notificationFiles);
 
         $composer = json_decode((string) file_get_contents(dirname(__DIR__, 3) . '/composer.json'), true);
         self::assertIsArray($composer);
