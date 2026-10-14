@@ -107,7 +107,11 @@ final class ContractPdfTest extends TestCase
 
         $pdf = $service->privatePdf((int) $draft['id']);
         self::assertNotNull($pdf);
-        self::assertSame($this->contractDirectory . '/' . $generated['pdf_stored_name'], $pdf['path']);
+        $expectedPdfPath = realpath($this->contractDirectory . '/' . $generated['pdf_stored_name']);
+        $actualPdfPath = realpath($pdf['path']);
+        self::assertIsString($expectedPdfPath);
+        self::assertIsString($actualPdfPath);
+        self::assertSame($expectedPdfPath, $actualPdfPath);
         self::assertSame($generated['pdf_stored_name'], $pdf['stored_name']);
         self::assertSame((int) $generated['pdf_size_bytes'], $pdf['size_bytes']);
         self::assertSame($generated['pdf_sha256'], $pdf['sha256']);
