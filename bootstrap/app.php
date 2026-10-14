@@ -18,6 +18,7 @@ use AlquilaPro\Foundation\RuntimeRequirements;
 use AlquilaPro\Finance\FinanceService;
 use AlquilaPro\Finance\ObligationService;
 use AlquilaPro\Finance\PaymentMethodService;
+use AlquilaPro\Insurance\InsuranceService;
 use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\Properties\PropertyService;
 use AlquilaPro\Properties\UnitMediaService;
@@ -51,6 +52,9 @@ return static function (array $settings): App {
     );
     $obligationSupportDirectory = (string) (
         $settings['obligation_support_directory'] ?? dirname(__DIR__) . '/storage/obligation-supports'
+    );
+    $insuranceDocumentDirectory = (string) (
+        $settings['insurance_document_directory'] ?? dirname(__DIR__) . '/storage/insurance-documents'
     );
 
     $lock = new InstallationLock($lockPath);
@@ -169,6 +173,7 @@ return static function (array $settings): App {
             $paymentMethods = new PaymentMethodService($pdo, $paymentMethodQrDirectory);
             $finance = new FinanceService($pdo, $paymentMethods, $paymentReceiptDirectory);
             $obligations = new ObligationService($pdo, $finance, $obligationSupportDirectory);
+            $insurance = new InsuranceService($pdo, $insuranceDocumentDirectory);
 
             $currentUser = static function () use ($session, $auth): ?array {
                 $userId = $session->userId(time());
@@ -196,6 +201,7 @@ return static function (array $settings): App {
                 'current_user' => $currentUser,
                 'finance' => $finance,
                 'obligations' => $obligations,
+                'insurance' => $insurance,
                 'payment_methods' => $paymentMethods,
                 'properties' => $properties,
                 'today' => $settings['today'] ?? null,
@@ -237,6 +243,9 @@ return static function (array $settings): App {
 
             $financeRoutes = require dirname(__DIR__) . '/app/Finance/routes.php';
             $financeRoutes($app, $shared);
+
+            $insuranceRoutes = require dirname(__DIR__) . '/app/Insurance/routes.php';
+            $insuranceRoutes($app, $shared);
         }
     }
 
