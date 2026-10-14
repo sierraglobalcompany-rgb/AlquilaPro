@@ -399,6 +399,34 @@ final class ObligationServiceTest extends TestCase
         self::assertNotNull($service->privateSourceSupport($created['id']));
     }
 
+    public function testPrivateSupportRejectsOversizedFileEvenWhenStoredMetadataMatches(): void
+    {
+        $lease = $this->createLease();
+        $service = $this->service();
+        $png = (string) base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/y0kAAAAASUVORK5CYII=',
+            true,
+        );
+        $created = $service->create($lease['lease_id'], [
+            'type' => 'fine_ph', 'description' => 'Tamaño privado', 'amount' => '10',
+        ], $this->upload($png, 'image/png'), $lease['actor_id'], 1792000000);
+        $support = $service->privateSourceSupport($created['id']);
+        self::assertIsArray($support);
+
+        $oversizedBytes = $png . str_repeat('x', 5 * 1024 * 1024 + 1 - strlen($png));
+        file_put_contents($support['path'], $oversizedBytes);
+        self::assertSame('image/png', (new \finfo(FILEINFO_MIME_TYPE))->file($support['path']));
+        $this->pdo->prepare(
+            'UPDATE lease_obligations SET source_support_size_bytes = :size, source_support_sha256 = :sha256 WHERE id = :id',
+        )->execute([
+            'size' => strlen($oversizedBytes),
+            'sha256' => hash('sha256', $oversizedBytes),
+            'id' => $created['id'],
+        ]);
+
+        self::assertNull($service->privateSourceSupport($created['id']));
+    }
+
     private function service(): ObligationService
     {
         $paymentMethods = new PaymentMethodService($this->pdo, $this->supportDirectory . '-qrs');

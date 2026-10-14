@@ -17,6 +17,9 @@ final class LeaseSecurityRegressionTest extends TestCase
 
     public function testF8KeepsSingleLeaseArchitectureWithoutParallelTenantStacks(): void
     {
+        $f12Migration = $this->root . '/database/migrations/012_create_lease_obligations.sql';
+        $f12Exists = is_file($f12Migration)
+            && preg_match('/CREATE TABLE\s+lease_obligations\b/i', (string) file_get_contents($f12Migration)) === 1;
         $migration = $this->file('database/migrations/008_create_leases.sql');
         preg_match_all('/CREATE TABLE\s+([a-z_]+)/i', $migration, $tables);
         self::assertSame(['leases'], $tables[1] ?? []);
@@ -33,16 +36,22 @@ final class LeaseSecurityRegressionTest extends TestCase
 
         $routes = $this->file('app/Leases/routes.php');
         preg_match_all('/\$app->(?:get|post)\(\'([^\']+)\'/', $routes, $routeMatches);
-        self::assertSame([
+        $expectedRoutes = [
             '/admin/contracts/{id:[0-9]+}/lease',
             '/admin/leases/{id:[0-9]+}/end',
             '/tenant',
             '/tenant/leases/{id:[0-9]+}',
+        ];
+        if ($f12Exists) {
+            $expectedRoutes[] = '/tenant/leases/{leaseId:[0-9]+}/obligations/{obligationId:[0-9]+}/source-support';
+        }
+        array_push($expectedRoutes,
             '/tenant/leases/{id:[0-9]+}/payments',
             '/tenant/leases/{leaseId:[0-9]+}/payments/{paymentId:[0-9]+}/receipt',
             '/tenant/leases/{leaseId:[0-9]+}/payment-methods/{methodId:[0-9]+}/qr',
             '/tenant/leases/{id:[0-9]+}/contract',
-        ], $routeMatches[1] ?? []);
+        );
+        self::assertSame($expectedRoutes, $routeMatches[1] ?? []);
 
         $leaseCore = implode("\n", [
             $this->file('app/Leases/LeaseService.php'),

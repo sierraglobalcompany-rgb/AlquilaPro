@@ -9,7 +9,10 @@ $pendingPayments = $pendingPayments ?? [];
     <p class="eyebrow">Administración</p>
     <h1>Cartera</h1>
     <p class="hint">Cargos y saldos pendientes por arrendamiento.</p>
-    <p><a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/finance/payment-methods">Configurar medios de pago</a></p>
+    <p>
+        <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/finance/payment-methods">Configurar medios de pago</a>
+        <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/finance/obligations">Servicios y obligaciones</a>
+    </p>
 
     <?php if ($pendingPayments !== []): ?>
         <h2>Pendientes de conciliación</h2>

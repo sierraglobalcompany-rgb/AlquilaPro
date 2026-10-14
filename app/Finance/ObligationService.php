@@ -222,13 +222,47 @@ final readonly class ObligationService
     {
         $this->parseDate($today);
         $statement = $this->pdo->query(
-            'SELECT * FROM lease_obligations ORDER BY due_on IS NULL ASC, due_on ASC, id ASC',
+            'SELECT o.*, l.contract_id, l.ended_at AS lease_ended_at, tenant.full_name AS tenant_name, '
+            . 'property.name AS property_name, property.address AS property_address, property.city AS property_city, '
+            . 'unit.code AS unit_code '
+            . 'FROM lease_obligations o INNER JOIN leases l ON l.id = o.lease_id '
+            . 'INNER JOIN users tenant ON tenant.id = l.user_id '
+            . 'INNER JOIN contracts c ON c.id = l.contract_id '
+            . 'INNER JOIN units unit ON unit.id = c.unit_id '
+            . 'INNER JOIN properties property ON property.id = unit.property_id '
+            . 'ORDER BY o.due_on IS NULL ASC, o.due_on ASC, o.id ASC',
         );
 
         return array_map(
             fn (array $row): array => $this->normalizeRow($row, $today),
             $statement->fetchAll(PDO::FETCH_ASSOC),
         );
+    }
+
+    /** @return list<array{lease_id:int,tenant_name:string,property_name:string,unit_code:string,is_active:bool}> */
+    public function listLeaseOptions(): array
+    {
+        $statement = $this->pdo->query(
+            'SELECT l.id AS lease_id, tenant.full_name AS tenant_name, property.name AS property_name, '
+            . 'unit.code AS unit_code, l.ended_at '
+            . 'FROM leases l INNER JOIN users tenant ON tenant.id = l.user_id '
+            . 'INNER JOIN contracts c ON c.id = l.contract_id '
+            . 'INNER JOIN units unit ON unit.id = c.unit_id '
+            . 'INNER JOIN properties property ON property.id = unit.property_id '
+            . 'ORDER BY l.ended_at IS NOT NULL ASC, property.name ASC, unit.code ASC, tenant.full_name ASC, l.id ASC',
+        );
+        $options = [];
+        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $options[] = [
+                'lease_id' => (int) $row['lease_id'],
+                'tenant_name' => (string) $row['tenant_name'],
+                'property_name' => (string) $row['property_name'],
+                'unit_code' => (string) $row['unit_code'],
+                'is_active' => $row['ended_at'] === null,
+            ];
+        }
+
+        return $options;
     }
 
     public function privateSourceSupport(int $obligationId): ?array
@@ -360,6 +394,137 @@ final readonly class ObligationService
         }
 
         return $result;
+    }
+
+    public function generateCharge(int $obligationId, string $chargeDueDate, int $actorUserId): array
+    {
+        if ($obligationId <= 0 || $actorUserId <= 0) {
+            throw new RuntimeException('No fue posible generar el cargo financiero.');
+        }
+        $this->parseDate($chargeDueDate);
+
+        try {
+            $this->pdo->beginTransaction();
+            $row = $this->lockObligation($obligationId);
+            if (!is_array($row)
+                || !in_array((string) $row['type'], ['utility', 'fine_ph'], true)
+                || $row['voided_at'] !== null
+                || $row['charge_id'] !== null
+            ) {
+                throw new RuntimeException('La obligación no admite generar otro cargo.');
+            }
+
+            $description = $this->chargeDescription((string) $row['description']);
+            $type = $row['type'] === 'utility' ? 'service' : 'fine';
+            $charge = $this->financeService->createManualCharge(
+                (int) $row['lease_id'],
+                $type,
+                (string) $row['amount'],
+                $chargeDueDate,
+                $description,
+                $row['period_month'] === null ? null : (string) $row['period_month'],
+                $actorUserId,
+            );
+
+            $link = $this->pdo->prepare(
+                'UPDATE lease_obligations SET charge_id = :charge_id, updated_at = CURRENT_TIMESTAMP '
+                . 'WHERE id = :id AND charge_id IS NULL AND voided_at IS NULL',
+            );
+            $link->execute(['charge_id' => (int) $charge['id'], 'id' => $obligationId]);
+            if ($link->rowCount() !== 1) {
+                throw new RuntimeException('No fue posible vincular el cargo a la obligación.');
+            }
+            $this->pdo->commit();
+        } catch (Throwable $exception) {
+            $this->rollbackIfNeeded();
+            if ($exception instanceof RuntimeException) {
+                throw $exception;
+            }
+            throw new RuntimeException('No fue posible generar el cargo financiero.', 0, $exception);
+        }
+
+        $result = $this->find($obligationId, $this->todayInBogota());
+        if ($result === null) {
+            throw new RuntimeException('No fue posible confirmar el cargo financiero.');
+        }
+
+        return $result;
+    }
+
+    public function linkAdministrationCharge(int $obligationId, int $chargeId, int $actorUserId): array
+    {
+        if ($obligationId <= 0 || $chargeId <= 0 || $actorUserId <= 0) {
+            throw new RuntimeException('No fue posible vincular el cargo de administración.');
+        }
+
+        try {
+            $this->pdo->beginTransaction();
+            $row = $this->lockObligation($obligationId);
+            if (!is_array($row)
+                || $row['type'] !== 'administration_ph'
+                || $row['voided_at'] !== null
+                || $row['charge_id'] !== null
+            ) {
+                throw new RuntimeException('La obligación no admite vincular ese cargo.');
+            }
+
+            $chargeStatement = $this->pdo->prepare(
+                'SELECT id, lease_id, type, period_month, voided_at FROM charges WHERE id = :id FOR UPDATE',
+            );
+            $chargeStatement->execute(['id' => $chargeId]);
+            $charge = $chargeStatement->fetch(PDO::FETCH_ASSOC);
+            if (!is_array($charge)
+                || (int) $charge['lease_id'] !== (int) $row['lease_id']
+                || $charge['type'] !== 'administration'
+                || $charge['voided_at'] !== null
+                || $charge['period_month'] === null
+                || (string) $charge['period_month'] !== (string) $row['period_month']
+            ) {
+                throw new RuntimeException('El cargo no corresponde a esta obligación de administración.');
+            }
+
+            $link = $this->pdo->prepare(
+                'UPDATE lease_obligations SET charge_id = :charge_id, updated_at = CURRENT_TIMESTAMP '
+                . 'WHERE id = :id AND charge_id IS NULL AND voided_at IS NULL',
+            );
+            $link->execute(['charge_id' => $chargeId, 'id' => $obligationId]);
+            if ($link->rowCount() !== 1) {
+                throw new RuntimeException('No fue posible vincular el cargo a la obligación.');
+            }
+            $this->pdo->commit();
+        } catch (Throwable $exception) {
+            $this->rollbackIfNeeded();
+            if ($exception instanceof RuntimeException) {
+                throw $exception;
+            }
+            throw new RuntimeException('No fue posible vincular el cargo de administración.', 0, $exception);
+        }
+
+        $result = $this->find($obligationId, $this->todayInBogota());
+        if ($result === null) {
+            throw new RuntimeException('No fue posible confirmar el vínculo del cargo.');
+        }
+
+        return $result;
+    }
+
+    private function chargeDescription(string $description): string
+    {
+        $visible = strip_tags($description);
+        $visible = html_entity_decode($visible, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $visible = strip_tags($visible);
+        $visible = preg_replace('/[\x00-\x1F\x7F]+/', ' ', $visible) ?? '';
+        $visible = preg_replace('/\s+/u', ' ', trim($visible)) ?? '';
+        if ($visible === '' || mb_strlen($visible, 'UTF-8') > 500) {
+            throw new RuntimeException('La descripción no puede usarse para generar un cargo.');
+        }
+
+        return $visible;
+    }
+
+    private function todayInBogota(): string
+    {
+        return (new DateTimeImmutable('now', new DateTimeZone('America/Bogota')))->format('Y-m-d');
     }
 
     private function normalizeInput(array $input): array
@@ -591,6 +756,8 @@ final readonly class ObligationService
             || $mime !== $mimeType
             || pathinfo($storedName, PATHINFO_EXTENSION) !== self::SUPPORT_EXTENSIONS[$mime]
             || !is_int($size)
+            || $size < 1
+            || $size > self::MAX_SUPPORT_BYTES
             || $size !== (int) $sizeBytes
             || !is_string($hash)
             || preg_match('/\A[a-f0-9]{64}\z/', $sha256) !== 1

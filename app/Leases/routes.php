@@ -7,6 +7,7 @@ use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Contracts\ContractService;
 use AlquilaPro\Finance\FinanceService;
+use AlquilaPro\Finance\ObligationService;
 use AlquilaPro\Finance\PaymentMethodService;
 use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\UI\View;
@@ -21,6 +22,8 @@ return static function (App $app, array $deps): void {
     $contracts = $deps['contracts'];
     /** @var FinanceService $finance */
     $finance = $deps['finance'];
+    /** @var ObligationService $obligations */
+    $obligations = $deps['obligations'];
     /** @var PaymentMethodService $paymentMethods */
     $paymentMethods = $deps['payment_methods'];
     /** @var View $view */
@@ -84,6 +87,31 @@ return static function (App $app, array $deps): void {
         }
 
         return $user;
+    };
+
+    $supportResponse = static function (
+        ResponseInterface $response,
+        ?array $support,
+        ?string $expectedHash,
+    ): ResponseInterface {
+        if ($support === null || !is_string($expectedHash)) {
+            return $response->withStatus(404);
+        }
+        $bytes = @file_get_contents($support['path']);
+        if (!is_string($bytes)
+            || strlen($bytes) !== $support['size_bytes']
+            || (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes) !== $support['mime']
+            || !hash_equals($expectedHash, hash('sha256', $bytes))
+        ) {
+            return $response->withStatus(404);
+        }
+        $response->getBody()->write($bytes);
+
+        return $response
+            ->withHeader('Content-Type', $support['mime'])
+            ->withHeader('Content-Length', (string) strlen($bytes))
+            ->withHeader('Cache-Control', 'private, no-store')
+            ->withHeader('X-Content-Type-Options', 'nosniff');
     };
 
     $app->post('/admin/contracts/{id:[0-9]+}/lease', static function (
@@ -164,7 +192,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($tenantGuard, $leases, $finance, $paymentMethods, $view, $csrf, $todayProvider, $path): ResponseInterface {
+    ) use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $view, $csrf, $todayProvider, $path): ResponseInterface {
         $user = $tenantGuard($response);
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -178,6 +206,35 @@ return static function (App $app, array $deps): void {
         $today = $todayProvider();
         $financeSummary = $finance->summaryForLease((int) $lease['id'], $today);
         $charges = $finance->listForLease((int) $lease['id'], $today);
+        $chargesById = [];
+        foreach ($charges as $charge) {
+            $chargesById[(int) $charge['id']] = $charge;
+        }
+        $tenantObligations = [];
+        foreach ($obligations->listForLease((int) $lease['id'], $today) as $obligation) {
+            $linkedCharge = $obligation['charge_id'] === null
+                ? null
+                : ($chargesById[(int) $obligation['charge_id']] ?? null);
+            $tenantObligations[] = [
+                'id' => (int) $obligation['id'],
+                'type' => (string) $obligation['type'],
+                'service_name' => $obligation['service_name'],
+                'description' => (string) $obligation['description'],
+                'period_month' => $obligation['period_month'],
+                'issued_on' => $obligation['issued_on'],
+                'due_on' => $obligation['due_on'],
+                'amount' => (string) $obligation['amount'],
+                'external_state' => (string) $obligation['external_state'],
+                'external_overdue' => (bool) $obligation['external_overdue'],
+                'is_charged' => (bool) $obligation['is_charged'],
+                'linked_charge_state' => is_array($linkedCharge) ? (string) $linkedCharge['state'] : null,
+                'linked_charge_type' => is_array($linkedCharge) ? (string) $linkedCharge['type'] : null,
+                'linked_charge_due_date' => is_array($linkedCharge) ? (string) $linkedCharge['due_date'] : null,
+                'source_support_url' => $obligation['has_source_support'] && $obligation['voided_at'] === null
+                    ? $path('/tenant/leases/' . (int) $lease['id'] . '/obligations/' . (int) $obligation['id'] . '/source-support')
+                    : null,
+            ];
+        }
         $paymentHistory = $finance->listPaymentsForLease((int) $lease['id']);
         $tenantPaymentMethods = array_map(static function (array $method) use ($paymentMethods, $lease, $path): array {
             $qrUrl = null;
@@ -211,12 +268,45 @@ return static function (App $app, array $deps): void {
             'lease' => $lease,
             'financeSummary' => $financeSummary,
             'charges' => $charges,
+            'obligations' => $tenantObligations,
             'paymentMethods' => $tenantPaymentMethods,
             'paymentHistory' => $paymentHistory,
             'today' => $today,
         ]));
 
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    });
+
+    $app->get('/tenant/leases/{leaseId:[0-9]+}/obligations/{obligationId:[0-9]+}/source-support', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($tenantGuard, $leases, $obligations, $todayProvider, $supportResponse): ResponseInterface {
+        $user = $tenantGuard($response);
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $leaseId = (int) $args['leaseId'];
+        $lease = $leases->findForUser($leaseId, (int) $user['id']);
+        if ($lease === null) {
+            return $response->withStatus(404);
+        }
+
+        $obligation = $obligations->find((int) $args['obligationId'], $todayProvider());
+        if ($obligation === null
+            || (int) $obligation['lease_id'] !== $leaseId
+            || $obligation['voided_at'] !== null
+            || !$obligation['has_source_support']
+        ) {
+            return $response->withStatus(404);
+        }
+
+        return $supportResponse(
+            $response,
+            $obligations->privateSourceSupport((int) $obligation['id']),
+            $obligation['source_support_sha256'],
+        );
     });
 
     $app->post('/tenant/leases/{id:[0-9]+}/payments', static function (

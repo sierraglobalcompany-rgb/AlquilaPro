@@ -34,6 +34,7 @@ final class FinanceSecurityRegressionTest extends TestCase
 
     public function testF9ArchitectureRemainsWithinTheApprovedBudget(): void
     {
+        $f12Exists = $this->f12IsPresent();
         $migration = $this->file('database/migrations/009_create_charges.sql');
         preg_match_all('/CREATE TABLE\s+([a-z_]+)/i', $migration, $tables);
         self::assertSame(['charges'], $tables[1] ?? []);
@@ -59,19 +60,29 @@ final class FinanceSecurityRegressionTest extends TestCase
         $serviceFiles = glob($this->root . '/app/Finance/*Service.php') ?: [];
         $serviceFiles = array_map(static fn (string $path): string => str_replace('\\', '/', $path), $serviceFiles);
         sort($serviceFiles);
-        self::assertSame([
+        $expectedFinanceServices = [
             str_replace('\\', '/', $this->root) . '/app/Finance/FinanceService.php',
             str_replace('\\', '/', $this->root) . '/app/Finance/PaymentMethodService.php',
-        ], $serviceFiles);
+        ];
+        if ($f12Exists) {
+            $expectedFinanceServices[] = str_replace('\\', '/', $this->root) . '/app/Finance/ObligationService.php';
+        }
+        sort($expectedFinanceServices);
+        self::assertSame($expectedFinanceServices, $serviceFiles);
 
         $financePhpFiles = glob($this->root . '/app/Finance/*.php') ?: [];
         $financePhpFiles = array_map(static fn (string $path): string => str_replace('\\', '/', $path), $financePhpFiles);
         sort($financePhpFiles);
-        self::assertSame([
+        $expectedFinanceFiles = [
             str_replace('\\', '/', $this->root) . '/app/Finance/FinanceService.php',
             str_replace('\\', '/', $this->root) . '/app/Finance/PaymentMethodService.php',
             str_replace('\\', '/', $this->root) . '/app/Finance/routes.php',
-        ], $financePhpFiles);
+        ];
+        if ($f12Exists) {
+            $expectedFinanceFiles[] = str_replace('\\', '/', $this->root) . '/app/Finance/ObligationService.php';
+        }
+        sort($expectedFinanceFiles);
+        self::assertSame($expectedFinanceFiles, $financePhpFiles);
 
         $routeFiles = glob($this->root . '/app/Finance/routes.php') ?: [];
         self::assertCount(1, $routeFiles);
@@ -148,18 +159,25 @@ final class FinanceSecurityRegressionTest extends TestCase
 
     public function testTenantPortfolioReusesOwnedLeaseRouteAndResolvesOwnershipBeforeFinance(): void
     {
+        $f12Exists = $this->f12IsPresent();
         $routes = $this->file('app/Leases/routes.php');
         preg_match_all('/\$app->(?:get|post)\(\'([^\']+)\'/i', $routes, $routeMatches);
-        self::assertSame([
+        $expectedRoutes = [
             '/admin/contracts/{id:[0-9]+}/lease',
             '/admin/leases/{id:[0-9]+}/end',
             '/tenant',
             '/tenant/leases/{id:[0-9]+}',
+        ];
+        if ($f12Exists) {
+            $expectedRoutes[] = '/tenant/leases/{leaseId:[0-9]+}/obligations/{obligationId:[0-9]+}/source-support';
+        }
+        array_push($expectedRoutes,
             '/tenant/leases/{id:[0-9]+}/payments',
             '/tenant/leases/{leaseId:[0-9]+}/payments/{paymentId:[0-9]+}/receipt',
             '/tenant/leases/{leaseId:[0-9]+}/payment-methods/{methodId:[0-9]+}/qr',
             '/tenant/leases/{id:[0-9]+}/contract',
-        ], $routeMatches[1] ?? []);
+        );
+        self::assertSame($expectedRoutes, $routeMatches[1] ?? []);
         foreach (['/tenant/finance', '/tenant/charges', '/tenant/payments'] as $forbiddenRoute) {
             self::assertStringNotContainsString($forbiddenRoute, $routes);
         }
@@ -189,10 +207,10 @@ final class FinanceSecurityRegressionTest extends TestCase
             $ownership < $notFound && $notFound < $todayProvider && $todayProvider < $summary
             && $summary < $list && $list < $paymentMethodScope && $paymentMethodScope < $render,
         );
-        self::assertStringContainsString(
-            'use ($tenantGuard, $leases, $finance, $paymentMethods, $view, $csrf, $todayProvider, $path)',
-            $detailRoute,
-        );
+        $expectedTenantDetailUse = $f12Exists
+            ? 'use ($tenantGuard, $leases, $finance, $obligations, $paymentMethods, $view, $csrf, $todayProvider, $path)'
+            : 'use ($tenantGuard, $leases, $finance, $paymentMethods, $view, $csrf, $todayProvider, $path)';
+        self::assertStringContainsString($expectedTenantDetailUse, $detailRoute);
 
         $qrStart = strpos($routes, "\$app->get('/tenant/leases/{leaseId:[0-9]+}/payment-methods/");
         $qrEnd = strpos($routes, "\$app->get('/tenant/leases/{id:[0-9]+}/contract'", $qrStart === false ? 0 : $qrStart);
@@ -256,5 +274,12 @@ final class FinanceSecurityRegressionTest extends TestCase
         self::assertIsString($contents, 'Missing F9 security regression source: ' . $path);
 
         return $contents;
+    }
+
+    private function f12IsPresent(): bool
+    {
+        $migration = $this->root . '/database/migrations/012_create_lease_obligations.sql';
+        return is_file($migration)
+            && preg_match('/CREATE TABLE\s+lease_obligations\b/i', (string) file_get_contents($migration)) === 1;
     }
 }
