@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace AlquilaPro\Tests\Integration\Foundation;
 
+use FilesystemIterator;
+use ParseError;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use RuntimeException;
 use Slim\App;
 use Slim\Psr7\Factory\ServerRequestFactory;
@@ -69,6 +73,43 @@ final class SecurityBoundaryTest extends TestCase
         self::assertStringContainsString("'samesite' => 'Lax'", $index);
         self::assertStringContainsString('$requestPath !== $healthPath', $index);
         self::assertStringContainsString('$requestPath !== $notificationCronPath', $index);
+    }
+
+    public function testProjectPhpSurfaceParsesWithNativePhpParser(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+        );
+        $checked = 0;
+
+        foreach ($iterator as $file) {
+            if (!$file->isFile() || strtolower($file->getExtension()) !== 'php') {
+                continue;
+            }
+
+            $path = $file->getPathname();
+            $relative = str_replace('\\', '/', substr($path, strlen($root) + 1));
+            if (str_starts_with($relative, 'vendor/')
+                || str_starts_with($relative, 'storage/')
+                || str_starts_with($relative, '.git/')
+            ) {
+                continue;
+            }
+
+            $source = file_get_contents($path);
+            self::assertIsString($source, 'Unable to read PHP source: ' . $relative);
+
+            try {
+                token_get_all($source, TOKEN_PARSE);
+            } catch (ParseError $exception) {
+                self::fail('PHP syntax error in ' . $relative . ': ' . $exception->getMessage());
+            }
+
+            $checked++;
+        }
+
+        self::assertGreaterThan(0, $checked, 'No project PHP files were linted.');
     }
 
     private function app(): App
