@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use AlquilaPro\Audit\AuditService;
 use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
@@ -24,6 +25,8 @@ return static function (App $app, array $deps): void {
     $paymentMethods = $deps['payment_methods'];
     /** @var PropertyService $properties */
     $properties = $deps['properties'];
+    /** @var AuditService $audit */
+    $audit = $deps['audit'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -59,6 +62,21 @@ return static function (App $app, array $deps): void {
         $charges = $finance->listForLease($leaseId, $today());
 
         return $charges === [] ? null : (int) $charges[0]['contract_id'];
+    };
+
+    $auditChargeCreated = static function (
+        ServerRequestInterface $request,
+        array $user,
+        array $charge,
+    ) use ($audit): void {
+        $audit->record(
+            (int) $user['id'],
+            'charge.created',
+            'charge',
+            (int) $charge['id'],
+            'Cargo financiero creado.',
+            $request->getServerParams()['REMOTE_ADDR'] ?? null,
+        );
     };
 
     $allocationsFromForm = static function (mixed $input): array {
@@ -624,15 +642,16 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($staffGuard, $finance, $path, $allocationsFromForm): ResponseInterface {
+    ) use ($staffGuard, $finance, $audit, $path, $allocationsFromForm): ResponseInterface {
         $user = $staffGuard($response, 'finance.manage');
         if ($user instanceof ResponseInterface) {
             return $user;
         }
         $form = (array) ($request->getParsedBody() ?? []);
+        $paymentId = (int) $args['id'];
         try {
             $finance->reconcilePayment(
-                (int) $args['id'],
+                $paymentId,
                 $allocationsFromForm($form['allocations'] ?? null),
                 (int) $user['id'],
                 time(),
@@ -643,8 +662,17 @@ return static function (App $app, array $deps): void {
             return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
         }
 
+        $audit->record(
+            (int) $user['id'],
+            'payment.reconciled',
+            'payment',
+            $paymentId,
+            'Pago conciliado.',
+            $request->getServerParams()['REMOTE_ADDR'] ?? null,
+        );
+
         return $response
-            ->withHeader('Location', $path('/admin/finance/payments/' . (int) $args['id']))
+            ->withHeader('Location', $path('/admin/finance/payments/' . $paymentId))
             ->withStatus(303);
     });
 
@@ -652,15 +680,16 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($staffGuard, $finance, $path): ResponseInterface {
+    ) use ($staffGuard, $finance, $audit, $path): ResponseInterface {
         $user = $staffGuard($response, 'finance.manage');
         if ($user instanceof ResponseInterface) {
             return $user;
         }
         $form = (array) ($request->getParsedBody() ?? []);
+        $paymentId = (int) $args['id'];
         try {
             $finance->rejectPayment(
-                (int) $args['id'],
+                $paymentId,
                 (string) ($form['reason'] ?? ''),
                 (int) $user['id'],
                 time(),
@@ -671,8 +700,17 @@ return static function (App $app, array $deps): void {
             return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
         }
 
+        $audit->record(
+            (int) $user['id'],
+            'payment.rejected',
+            'payment',
+            $paymentId,
+            'Pago rechazado.',
+            $request->getServerParams()['REMOTE_ADDR'] ?? null,
+        );
+
         return $response
-            ->withHeader('Location', $path('/admin/finance/payments/' . (int) $args['id']))
+            ->withHeader('Location', $path('/admin/finance/payments/' . $paymentId))
             ->withStatus(303);
     });
 
@@ -680,7 +718,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($staffGuard, $finance, $contractContext, $path): ResponseInterface {
+    ) use ($staffGuard, $finance, $contractContext, $auditChargeCreated, $path): ResponseInterface {
         $user = $staffGuard($response, 'finance.manage');
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -689,7 +727,7 @@ return static function (App $app, array $deps): void {
         $leaseId = (int) $args['id'];
         $form = (array) ($request->getParsedBody() ?? []);
         try {
-            $finance->createMonthlyCharges(
+            $createdCharges = $finance->createMonthlyCharges(
                 $leaseId,
                 (string) ($form['period_month'] ?? ''),
                 (string) ($form['due_date'] ?? ''),
@@ -705,6 +743,10 @@ return static function (App $app, array $deps): void {
             return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
         }
 
+        foreach ($createdCharges as $charge) {
+            $auditChargeCreated($request, $user, $charge);
+        }
+
         return $response
             ->withHeader('Location', $path('/admin/contracts/' . $contractId))
             ->withStatus(303);
@@ -714,7 +756,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($staffGuard, $finance, $contractContext, $path): ResponseInterface {
+    ) use ($staffGuard, $finance, $contractContext, $auditChargeCreated, $path): ResponseInterface {
         $user = $staffGuard($response, 'finance.manage');
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -724,7 +766,7 @@ return static function (App $app, array $deps): void {
         $form = (array) ($request->getParsedBody() ?? []);
         $periodMonth = trim((string) ($form['period_month'] ?? ''));
         try {
-            $finance->createManualCharge(
+            $createdCharge = $finance->createManualCharge(
                 $leaseId,
                 (string) ($form['type'] ?? ''),
                 (string) ($form['amount'] ?? ''),
@@ -743,6 +785,8 @@ return static function (App $app, array $deps): void {
             return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
         }
 
+        $auditChargeCreated($request, $user, $createdCharge);
+
         return $response
             ->withHeader('Location', $path('/admin/contracts/' . $contractId))
             ->withStatus(303);
@@ -752,7 +796,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($staffGuard, $finance, $contractContext, $path): ResponseInterface {
+    ) use ($staffGuard, $finance, $audit, $contractContext, $path): ResponseInterface {
         $user = $staffGuard($response, 'finance.manage');
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -775,6 +819,15 @@ return static function (App $app, array $deps): void {
 
             return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
         }
+
+        $audit->record(
+            (int) $user['id'],
+            'charge.voided',
+            'charge',
+            (int) $args['id'],
+            'Cargo financiero anulado.',
+            $request->getServerParams()['REMOTE_ADDR'] ?? null,
+        );
 
         return $response
             ->withHeader('Location', $path('/admin/contracts/' . $contractId))

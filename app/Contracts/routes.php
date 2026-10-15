@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use AlquilaPro\Audit\AuditService;
 use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
@@ -20,6 +21,8 @@ return static function (App $app, array $deps): void {
     $leases = $deps['leases'];
     /** @var FinanceService $finance */
     $finance = $deps['finance'];
+    /** @var AuditService $audit */
+    $audit = $deps['audit'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -269,7 +272,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($adminGuard, $contracts, $jsonField, $path): ResponseInterface {
+    ) use ($adminGuard, $contracts, $audit, $jsonField, $path): ResponseInterface {
         $user = $adminGuard($response, 'contracts.manage');
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -311,6 +314,17 @@ return static function (App $app, array $deps): void {
         } catch (RuntimeException $exception) {
             $response->getBody()->write($exception->getMessage());
             return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+
+        if ($action === 'finalize') {
+            $audit->record(
+                (int) $user['id'],
+                'contract.finalized',
+                'contract',
+                $contractId,
+                'Contrato finalizado.',
+                $request->getServerParams()['REMOTE_ADDR'] ?? null,
+            );
         }
 
         return $response

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use AlquilaPro\Audit\AuditService;
 use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
@@ -17,6 +18,8 @@ return static function (App $app, array $deps): void {
     $memberships = $deps['memberships'];
     /** @var LeaseService $leases */
     $leases = $deps['leases'];
+    /** @var AuditService $audit */
+    $audit = $deps['audit'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -151,7 +154,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($staffGuard, $memberships, $redirect): ResponseInterface {
+    ) use ($staffGuard, $memberships, $audit, $redirect): ResponseInterface {
         $user = $staffGuard($response, 'memberships.manage');
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -160,11 +163,24 @@ return static function (App $app, array $deps): void {
         $decision = is_string($body['decision'] ?? null) ? $body['decision'] : '';
         $dueDate = is_string($body['due_date'] ?? null) && $body['due_date'] !== '' ? $body['due_date'] : null;
         $description = is_string($body['description'] ?? null) && $body['description'] !== '' ? $body['description'] : null;
+        $membershipId = (int) $args['id'];
         try {
-            $memberships->decideCharge((int) $args['id'], $decision, $dueDate, $description, (int) $user['id'], time());
+            $result = $memberships->decideCharge($membershipId, $decision, $dueDate, $description, (int) $user['id'], time());
         } catch (Throwable) {
             return $response->withStatus(422);
         }
+
+        $created = $decision === 'create';
+        $audit->record(
+            (int) $user['id'],
+            $created ? 'membership.charge_created' : 'membership.charge_skipped',
+            'membership',
+            $membershipId,
+            $created ? 'Cargo de membresía creado.' : 'Cargo de membresía omitido.',
+            $request->getServerParams()['REMOTE_ADDR'] ?? null,
+            $created && isset($result['charge_id']) ? ['charge_id' => (int) $result['charge_id']] : [],
+        );
+
         return $redirect($response, '/admin/memberships');
     });
 

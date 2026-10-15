@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use AlquilaPro\Audit\AuditService;
 use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\UI\Branding;
@@ -16,6 +17,8 @@ return static function (App $app, array $deps): void {
     $view = $deps['view'];
     /** @var Branding $branding */
     $branding = $deps['branding'];
+    /** @var AuditService $audit */
+    $audit = $deps['audit'];
     /** @var SessionGuard $session */
     $session = $deps['session'];
     /** @var Csrf $csrf */
@@ -94,7 +97,7 @@ return static function (App $app, array $deps): void {
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
     });
 
-    $app->post('/admin/appearance', static function (ServerRequestInterface $request, ResponseInterface $response) use ($guard, $view, $branding, $csrf, $path): ResponseInterface {
+    $app->post('/admin/appearance', static function (ServerRequestInterface $request, ResponseInterface $response) use ($guard, $view, $branding, $audit, $csrf, $path): ResponseInterface {
         $user = $guard($response);
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -131,6 +134,15 @@ return static function (App $app, array $deps): void {
                 ->withHeader('Content-Type', 'text/html; charset=utf-8')
                 ->withStatus(422);
         }
+
+        $audit->record(
+            (int) $user['id'],
+            'appearance.updated',
+            'appearance',
+            null,
+            'Apariencia de la aplicación actualizada.',
+            $request->getServerParams()['REMOTE_ADDR'] ?? null,
+        );
 
         return $response
             ->withHeader('Location', $path('/admin/appearance?saved=1'))
