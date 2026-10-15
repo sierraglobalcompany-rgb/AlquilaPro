@@ -1,0 +1,63 @@
+# AlquilaPro
+
+AlquilaPro es una aplicación web SSR para gestión de arriendos residenciales y parqueaderos, con catálogo público, operación privada para administración e inquilinos y despliegue objetivo en `https://alquilapro.sierraglobalcompany.com`.
+
+**Stack:** PHP 8.3–8.5, Slim 4, PDO, MariaDB/MySQL, HTML/CSS y JavaScript mínimo, sin SPA ni infraestructura innecesaria.
+
+## Autoridad y estado
+
+La autoridad factual es, en este orden: GitHub real (código, migraciones y tests), CI del SHA exacto, checkpoint de fase, SPEC/PLAN y por último documentación narrativa.
+
+- F0→F21: **CLOSED / VERIFIED / MERGED**.
+- `main`: `7c0f0c75c665b9888d26bfdbfd5be9bec4df3b82` — F21 merged.
+- F22 — Security / Privacy / Audit: **Task 1→5 CLOSED; Task 6 convergence active** en PR #27.
+- F22 GREEN candidate antes de convergencia: `edbac36b5033446ae710f97e3b81659abc24c0cc`.
+- F23→F26: **FROZEN / NOT STARTED** hasta cerrar y mergear F22.
+- No existe F27 en el roadmap aprobado.
+
+Para continuidad F22 usar:
+- `docs/specs/F21_F22_SPEC_BATCH_V1_2026-10-14.md`
+- `docs/plans/F22_SECURITY_PRIVACY_AUDIT_IMPLEMENTATION_PLAN.md` — contrato de ejecución, no tablero vivo.
+- `docs/checkpoints/F22_CHECKPOINT_2026-10-15.md` — checkpoint canónico de cierre de fase.
+- PR #27 — estado operativo remoto.
+
+Para lo siguiente usar `docs/specs/F23_F26_UX_RELEASE_SPEC_V1_2026-10-14.md` solo después del merge F22.
+
+## Leyes obligatorias
+
+### KISS
+Arquitectura directa, simple, eficiente, optimizada y eficaz. No agregar capas, tablas, servicios, permisos, rutas, dependencias o frameworks si una autoridad existente resuelve el problema.
+
+### Cero Ruido / Convergencia
+Orden de decisión: **ELIMINAR → UNIR/CONVERGER → SIMPLIFICAR → MEJORAR/OPTIMIZAR → AGREGAR**. Toda eliminación debe demostrar que no destruye una autoridad, contrato, evidencia o recuperación necesaria.
+
+### Anti-parche
+**REPRODUCE → ROOT CAUSE → OWNING AUTHORITY → SEARCH DUPLICATION → RED → MINIMAL GREEN → REMOVE SUPERSEDED LOGIC → REGRESSION**. No reparar síntomas con parches acumulativos.
+
+## Flujo de trabajo
+
+`SCOPE → PRE-KISS → SPEC/DESIGN → PLAN → AUDIT10 → RED → VERIFY RED → MINIMAL GREEN → REGRESSION → CI → FORENSIC AUDIT → CHECKPOINT → MERGE`.
+
+Los checkpoints temporales deben preferir ramas `checkpoint/...`; el HEAD de implementación debe converger a un único checkpoint final de fase, evitando documentos de estado duplicados.
+
+## Contratos arquitectónicos que no deben romperse
+
+- El tenant resuelve ownership del lease antes de consultar recursos hijos.
+- `FinanceService` conserva la autoridad financiera; módulos auxiliares no crean una pila financiera paralela.
+- `NotificationService` conserva la cola/retención automática y reutiliza el cron protegido existente.
+- WhatsApp es una salida asistida basada en snapshot; no es un segundo motor de entrega.
+- `DocumentService` y los owners de almacenamiento privado mantienen verificación de MIME por bytes, integridad, límites y fail-closed.
+- F22 usa un único `AuditService` y una única tabla `audit_log`; la evidencia de auditoría no debe contener secretos, tokens, contraseñas ni payloads privados.
+- La decisión de auditoría de Memberships usa el `charge_outcome` canónico retornado por `MembershipService`, no el input HTTP.
+
+## Deuda / guardrails conocidos
+
+No deben convertirse en arquitectura nueva dentro de F22:
+- algunas listas/escaneos históricos tienen límites fijos o carecen de paginación;
+- la prueba de symlink de F18 fue certificada en Linux CI aunque no en Windows local;
+- limpieza de ramas históricas se hace en gate separado después del merge F22;
+- `main` sigue sin protección/required checks en la evidencia remota actual: **GOVERNANCE_ACTION_REQUIRED** hasta que GitHub demuestre lo contrario.
+
+## QA
+
+La CI canónica usa PHP 8.3, 8.4 y 8.5, `composer validate --strict`, lint de PHP y PHPUnit. No declarar una fase cerrada reutilizando CI de un SHA anterior.
