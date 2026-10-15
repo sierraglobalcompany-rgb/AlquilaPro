@@ -13,6 +13,7 @@ use AlquilaPro\Finance\ObligationService;
 use AlquilaPro\Finance\PaymentMethodService;
 use AlquilaPro\Insurance\InsuranceService;
 use AlquilaPro\Leases\LeaseService;
+use AlquilaPro\Leases\TerminationService;
 use AlquilaPro\Maintenance\MaintenanceService;
 use AlquilaPro\Maintenance\VisitService;
 use AlquilaPro\Memberships\MembershipService;
@@ -44,6 +45,8 @@ return static function (App $app, array $deps): void {
     $community = $deps['community'];
     /** @var MembershipService $memberships */
     $memberships = $deps['memberships'];
+    /** @var TerminationService $termination */
+    $termination = $deps['termination'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -52,6 +55,7 @@ return static function (App $app, array $deps): void {
     $csrf = $deps['csrf'];
     /** @var Closure(): ?array $currentUser */
     $currentUser = $deps['current_user'];
+    $bonusEnabled = (bool) ($deps['good_conduct_bonus_enabled'] ?? false);
     $basePath = (string) ($deps['base_path'] ?? '');
     $todayProvider = $deps['today'] ?? static fn (): string =>
         (new DateTimeImmutable('now', new DateTimeZone('America/Bogota')))->format('Y-m-d');
@@ -76,6 +80,66 @@ return static function (App $app, array $deps): void {
 
         return $allocations;
     };
+    $tenantLiquidationProjection = static function (array $liquidation): array {
+        $snapshot = is_array($liquidation['snapshot'] ?? null) ? $liquidation['snapshot'] : [];
+        $handover = is_array($snapshot['handover'] ?? null) ? $snapshot['handover'] : [];
+        $finance = is_array($snapshot['finance']['summary'] ?? null) ? $snapshot['finance']['summary'] : null;
+        $bonus = is_array($snapshot['bonus'] ?? null) ? $snapshot['bonus'] : null;
+
+        return [
+            'summary_note' => $liquidation['summary_note'] ?? null,
+            'finalized_at' => (string) ($liquidation['finalized_at'] ?? ''),
+            'handover' => [
+                'property_returned' => is_bool($handover['property_returned'] ?? null)
+                    ? $handover['property_returned'] : null,
+                'keys_returned_count' => is_int($handover['keys_returned_count'] ?? null)
+                    ? $handover['keys_returned_count'] : null,
+                'notes' => is_string($handover['notes'] ?? null) ? $handover['notes'] : null,
+            ],
+            'finance' => $finance === null ? null : [
+                'outstanding' => (string) ($finance['outstanding'] ?? '0.00'),
+                'overdue' => (string) ($finance['overdue'] ?? '0.00'),
+                'oldest_due_date' => is_string($finance['oldest_due_date'] ?? null) ? $finance['oldest_due_date'] : null,
+            ],
+            'obligations' => array_map(static fn (array $item): array => [
+                'type' => (string) ($item['type'] ?? ''),
+                'description' => (string) ($item['description'] ?? ''),
+                'amount' => (string) ($item['amount'] ?? '0.00'),
+                'external_state' => (string) ($item['external_state'] ?? ''),
+            ], array_values(array_filter($snapshot['obligations'] ?? [], 'is_array'))),
+            'claims' => array_map(static function (array $entry): array {
+                $policy = is_array($entry['policy'] ?? null) ? $entry['policy'] : [];
+                return [
+                    'provider_name' => (string) ($policy['provider_name'] ?? ''),
+                    'product_name' => (string) ($policy['product_name'] ?? ''),
+                    'status' => (string) ($policy['status'] ?? ''),
+                    'claims' => array_map(static fn (array $claim): array => [
+                        'incident_on' => (string) ($claim['incident_on'] ?? ''),
+                        'description' => (string) ($claim['description'] ?? ''),
+                        'status' => (string) ($claim['status'] ?? ''),
+                    ], array_values(array_filter($entry['claims'] ?? [], 'is_array'))),
+                ];
+            }, array_values(array_filter($snapshot['claims'] ?? [], 'is_array'))),
+            'community' => array_map(static fn (array $item): array => [
+                'category' => (string) ($item['category'] ?? ''),
+                'occurred_on' => (string) ($item['occurred_on'] ?? ''),
+                'description' => (string) ($item['description'] ?? ''),
+                'status' => (string) ($item['status'] ?? ''),
+            ], array_values(array_filter($snapshot['community'] ?? [], 'is_array'))),
+            'memberships' => array_map(static fn (array $item): array => [
+                'service_name' => (string) ($item['service_name'] ?? 'Servicio'),
+                'price_snapshot' => (string) ($item['price_snapshot'] ?? '0.00'),
+                'starts_on' => (string) ($item['starts_on'] ?? ''),
+                'ends_on' => (string) ($item['ends_on'] ?? ''),
+                'charge_outcome' => (string) ($item['charge_outcome'] ?? ''),
+            ], array_values(array_filter($snapshot['memberships'] ?? [], 'is_array'))),
+            'bonus' => $bonus === null ? null : [
+                'decision' => is_string($bonus['decision'] ?? null) ? $bonus['decision'] : null,
+                'amount' => (string) ($bonus['amount'] ?? '0.00'),
+                'note' => is_string($bonus['note'] ?? null) ? $bonus['note'] : null,
+            ],
+        ];
+    };
 
     $adminGuard = static function (ResponseInterface $response) use ($currentUser, $session, $path): array|ResponseInterface {
         $user = $currentUser();
@@ -86,6 +150,21 @@ return static function (App $app, array $deps): void {
             return $response->withHeader('Location', $path('/account/password'))->withStatus(302);
         }
         if (!Permissions::allows($user, 'contracts.manage')) {
+            return $response->withStatus(403);
+        }
+
+        return $user;
+    };
+
+    $adminViewGuard = static function (ResponseInterface $response) use ($currentUser, $session, $path): array|ResponseInterface {
+        $user = $currentUser();
+        if ($user === null) {
+            return $response->withHeader('Location', $path('/login'))->withStatus(302);
+        }
+        if ($session->mustChangePassword()) {
+            return $response->withHeader('Location', $path('/account/password'))->withStatus(302);
+        }
+        if (!Permissions::allows($user, 'contracts.view')) {
             return $response->withStatus(403);
         }
 
@@ -186,6 +265,140 @@ return static function (App $app, array $deps): void {
             ->withStatus(303);
     });
 
+    $app->get('/admin/leases/{id:[0-9]+}/termination', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminViewGuard, $termination, $view, $csrf, $todayProvider, $bonusEnabled): ResponseInterface {
+        $user = $adminViewGuard($response);
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+        $leaseId = (int) $args['id'];
+        try {
+            $preview = $termination->preview($leaseId, $todayProvider());
+        } catch (RuntimeException) {
+            return $response->withStatus(404);
+        }
+        $canViewFinance = Permissions::allows($user, 'finance.view');
+        if (!$canViewFinance) {
+            $preview['finance'] = null;
+        }
+        $response->getBody()->write($view->renderApp('lease_termination', [
+            'pageTitle' => 'Liquidación contractual',
+            'user' => $user,
+            'activeNav' => 'apps',
+            'csrfToken' => $csrf->token(),
+            'lease' => $preview['lease'],
+            'preview' => $preview,
+            'liquidation' => $termination->liquidationForLease($leaseId),
+            'tenantMode' => false,
+            'canViewFinance' => $canViewFinance,
+            'canManage' => Permissions::allows($user, 'contracts.manage'),
+            'bonusEnabled' => $bonusEnabled,
+        ]));
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8')
+            ->withHeader('Cache-Control', 'private, no-store');
+    });
+
+    $app->post('/admin/leases/{id:[0-9]+}/bonus', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminGuard, $termination, $path): ResponseInterface {
+        $user = $adminGuard($response);
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+        $form = (array) ($request->getParsedBody() ?? []);
+        try {
+            $termination->configureBonus(
+                (int) $args['id'],
+                (string) ($form['amount'] ?? ''),
+                isset($form['note']) ? (string) $form['note'] : null,
+                (int) $user['id'],
+                time(),
+            );
+        } catch (RuntimeException $exception) {
+            $response->getBody()->write($exception->getMessage());
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+        return $response->withHeader(
+            'Location',
+            $path('/admin/leases/' . (int) $args['id'] . '/termination'),
+        )->withStatus(303);
+    });
+
+    $app->post('/admin/leases/{id:[0-9]+}/bonus/decision', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminGuard, $termination, $path): ResponseInterface {
+        $user = $adminGuard($response);
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+        $form = (array) ($request->getParsedBody() ?? []);
+        try {
+            $termination->decideBonus(
+                (int) $args['id'],
+                (string) ($form['decision'] ?? ''),
+                (int) $user['id'],
+                time(),
+            );
+        } catch (RuntimeException $exception) {
+            $response->getBody()->write($exception->getMessage());
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+        return $response->withHeader(
+            'Location',
+            $path('/admin/leases/' . (int) $args['id'] . '/termination'),
+        )->withStatus(303);
+    });
+
+    $app->post('/admin/leases/{id:[0-9]+}/liquidation', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminGuard, $termination, $todayProvider, $path): ResponseInterface {
+        $user = $adminGuard($response);
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+        if (!Permissions::allows($user, 'finance.view')) {
+            return $response->withStatus(403);
+        }
+        $form = (array) ($request->getParsedBody() ?? []);
+        $keysRaw = $form['keys_returned_count'] ?? null;
+        $keys = $keysRaw === null || $keysRaw === ''
+            ? null
+            : filter_var($keysRaw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]);
+        if ($keys === false) {
+            return $response->withStatus(422);
+        }
+        try {
+            $termination->finalizeLiquidation(
+                (int) $args['id'],
+                [
+                    'property_returned' => array_key_exists('property_returned', $form),
+                    'keys_returned_count' => $keys,
+                    'notes' => isset($form['handover_notes']) ? (string) $form['handover_notes'] : null,
+                ],
+                isset($form['summary_note']) ? (string) $form['summary_note'] : null,
+                (int) $user['id'],
+                $todayProvider(),
+                time(),
+            );
+        } catch (RuntimeException $exception) {
+            $response->getBody()->write($exception->getMessage());
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+        return $response->withHeader(
+            'Location',
+            $path('/admin/leases/' . (int) $args['id'] . '/termination'),
+        )->withStatus(303);
+    });
+
     $app->get('/tenant', static function (
         ServerRequestInterface $request,
         ResponseInterface $response,
@@ -211,7 +424,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($tenantGuard, $leases, $documents, $community, $memberships, $finance, $obligations, $paymentMethods, $insurance, $maintenance, $visits, $view, $csrf, $todayProvider, $path): ResponseInterface {
+    ) use ($tenantGuard, $leases, $documents, $community, $memberships, $finance, $obligations, $paymentMethods, $insurance, $maintenance, $visits, $termination, $view, $csrf, $todayProvider, $path): ResponseInterface {
         $user = $tenantGuard($response);
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -452,6 +665,9 @@ return static function (App $app, array $deps): void {
                 'qr_url' => $qrUrl,
             ];
         }, $paymentMethods->listForProperty((int) $lease['property_id']));
+        $liquidationUrl = $termination->liquidationForLease((int) $lease['id']) === null
+            ? null
+            : $path('/tenant/leases/' . (int) $lease['id'] . '/liquidation');
 
         $response->getBody()->write($view->renderApp('tenant_lease_detail', [
             'pageTitle' => 'Arrendamiento #' . (int) $lease['id'],
@@ -472,9 +688,41 @@ return static function (App $app, array $deps): void {
             'propertyLegalNotices' => $propertyLegalNotices,
             'digitalServices' => $availableServices,
             'digitalServiceMemberships' => $tenantMemberships,
+            'liquidationUrl' => $liquidationUrl,
             'today' => $today,
         ]));
 
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8')
+            ->withHeader('Cache-Control', 'private, no-store');
+    });
+
+    $app->get('/tenant/leases/{id:[0-9]+}/liquidation', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($tenantGuard, $leases, $termination, $tenantLiquidationProjection, $view, $csrf): ResponseInterface {
+        $user = $tenantGuard($response);
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+        $leaseId = (int) $args['id'];
+        $lease = $leases->findForUser($leaseId, (int) $user['id']);
+        if ($lease === null) {
+            return $response->withStatus(404);
+        }
+        $liquidation = $termination->liquidationForLease($leaseId);
+        if ($liquidation === null) {
+            return $response->withStatus(404);
+        }
+        $response->getBody()->write($view->renderApp('lease_termination', [
+            'pageTitle' => 'Liquidación contractual',
+            'user' => $user,
+            'activeNav' => 'home',
+            'csrfToken' => $csrf->token(),
+            'lease' => $lease,
+            'tenantMode' => true,
+            'tenantLiquidation' => $tenantLiquidationProjection($liquidation),
+        ]));
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8')
             ->withHeader('Cache-Control', 'private, no-store');
     });
