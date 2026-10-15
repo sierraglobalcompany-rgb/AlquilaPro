@@ -2,8 +2,16 @@
     const dialog = document.getElementById('apps-dialog');
     const opener = document.querySelector('[data-apps-open]');
 
-    if (dialog instanceof HTMLDialogElement && opener instanceof HTMLElement) {
-        opener.addEventListener('click', () => dialog.showModal());
+    if (dialog instanceof HTMLDialogElement && opener instanceof HTMLButtonElement) {
+        opener.addEventListener('click', () => {
+            dialog.showModal();
+            opener.setAttribute('aria-expanded', 'true');
+        });
+        dialog.addEventListener('cancel', () => opener.focus());
+        dialog.addEventListener('close', () => {
+            opener.setAttribute('aria-expanded', 'false');
+            opener.focus();
+        });
         dialog.addEventListener('click', (event) => {
             if (event.target === dialog) {
                 dialog.close();

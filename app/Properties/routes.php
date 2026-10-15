@@ -55,11 +55,30 @@ return static function (App $app, array $deps): void {
             return $response->withHeader('Location', $path('/tenant'))->withStatus(302);
         }
 
+        $quickActionDefinitions = [
+            ['permission' => 'properties.view', 'label' => 'Propiedades', 'description' => 'Consulta propiedades y unidades.', 'href' => '/admin/properties'],
+            ['permission' => 'candidates.view', 'label' => 'Candidatos', 'description' => 'Revisa las solicitudes recibidas.', 'href' => '/admin/candidates'],
+            ['permission' => 'contracts.view', 'label' => 'Contratos', 'description' => 'Consulta contratos y plantillas.', 'href' => '/admin/contract-templates'],
+            ['permission' => 'finance.view', 'label' => 'Cartera', 'description' => 'Revisa pagos y obligaciones.', 'href' => '/admin/finance'],
+            ['permission' => 'maintenance.view', 'label' => 'Mantenimiento', 'description' => 'Revisa solicitudes de mantenimiento.', 'href' => '/admin/maintenance'],
+        ];
+        $quickActions = [];
+        foreach ($quickActionDefinitions as $action) {
+            if (!Permissions::allows($user, $action['permission'])) {
+                continue;
+            }
+
+            $action['href'] = $path($action['href']);
+            unset($action['permission']);
+            $quickActions[] = $action;
+        }
+
         $response->getBody()->write($view->renderApp('home', [
             'pageTitle' => 'Inicio',
             'user' => $user,
             'activeNav' => 'home',
             'csrfToken' => $csrf->token(),
+            'quickActions' => $quickActions,
         ]));
 
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');

@@ -153,12 +153,12 @@ final class FinanceSecurityRegressionTest extends TestCase
         self::assertStringNotContainsString('Cartera', $home);
         self::assertStringContainsString('Cartera', $tenantDetail);
 
+        $navigation = $this->file('app/UI/View.php');
         $layout = $this->file('resources/views/layouts/app.php');
         $financeRoutes = $this->file('app/Finance/routes.php');
-        self::assertStringContainsString(
-            '\\AlquilaPro\\Auth\\Permissions::allows($user, \'finance.view\')',
-            $layout,
-        );
+        self::assertStringContainsString("'permission' => 'finance.view'", $navigation);
+        self::assertStringContainsString("Permissions::allows(\$user, (string) \$item['permission'])", $navigation);
+        self::assertStringNotContainsString('Permissions::allows', $layout);
         self::assertStringContainsString("\$isTenant = (\$user['role'] ?? null) === 'tenant';", $layout);
         self::assertStringNotContainsString("new SessionGuard(", $financeRoutes);
         self::assertStringNotContainsString("new Csrf(", $financeRoutes);
