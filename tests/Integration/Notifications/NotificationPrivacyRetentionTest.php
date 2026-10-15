@@ -111,8 +111,11 @@ final class NotificationPrivacyRetentionTest extends TestCase
         self::assertSame(0, $payload['generated']);
         self::assertSame(1, $payload['sent']);
         self::assertSame(0, $payload['failed']);
+        self::assertArrayHasKey('redacted', $payload);
         self::assertSame(1, $payload['redacted']);
-        self::assertSame(['failed', 'generated', 'redacted', 'sent'], array_values(array_unique(array_keys($payload))));
+        $keys = array_keys($payload);
+        sort($keys);
+        self::assertSame(['failed', 'generated', 'redacted', 'sent'], $keys);
         self::assertNull($this->row($oldId)['recipient_email']);
         self::assertNull($this->row($oldId)['recipient_name']);
         self::assertSame('recipient10@example.test', $this->row($dueId)['recipient_email']);
