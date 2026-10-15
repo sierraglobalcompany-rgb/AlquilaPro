@@ -17,6 +17,11 @@ final class Installer
     ) {
     }
 
+    public function testDatabase(array $database): void
+    {
+        DatabaseConnector::connect(DatabaseConfig::fromArray($database));
+    }
+
     public function install(array $input): array
     {
         if ($this->lock->isInstalled()) {

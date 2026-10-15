@@ -111,6 +111,39 @@ final class CandidateService
         return $candidate;
     }
 
+    public function firstIncompleteWizardStep(string $rawToken, int $now): ?string
+    {
+        $row = $this->candidateRowByToken($rawToken, $now);
+        if ($row === null) {
+            return null;
+        }
+
+        if (!in_array((string) $row['status'], self::EDITABLE_STATUSES, true)
+            || $row['submitted_at'] !== null) {
+            return 'review';
+        }
+
+        try {
+            $this->assertBasicCompleteness($row);
+        } catch (RuntimeException) {
+            return 'personal';
+        }
+
+        try {
+            $this->assertLaborCompleteness($row);
+        } catch (RuntimeException) {
+            return 'work';
+        }
+
+        try {
+            $this->assertDocumentCompleteness($row);
+        } catch (RuntimeException) {
+            return 'documents';
+        }
+
+        return 'review';
+    }
+
     public function updateByToken(string $rawToken, array $input, int $now): array
     {
         $row = $this->candidateRowByToken($rawToken, $now);

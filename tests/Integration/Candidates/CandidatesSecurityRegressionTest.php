@@ -83,7 +83,7 @@ final class CandidatesSecurityRegressionTest extends TestCase
         $expired = $service->startCandidate($unit['public_key'], $this->candidateInput('SEC-TOKEN-2'), $now);
         $app = $this->app('/sub');
 
-        $app->get('/apply/continue/{token}/explode', static function (
+        $app->get('/apply/continue/{token}/explode/test', static function (
             ServerRequestInterface $request,
             ResponseInterface $response,
         ): ResponseInterface {
@@ -100,7 +100,7 @@ final class CandidatesSecurityRegressionTest extends TestCase
 
         $newToken = $service->regenerateToken((int) $started['candidate_id'], $now + 1);
         self::assertSame(404, $this->request($app, 'GET', '/sub/apply/continue/' . $started['continuation_token'])->getStatusCode());
-        self::assertSame(200, $this->request($app, 'GET', '/sub/apply/continue/' . $newToken)->getStatusCode());
+        self::assertSame(200, $this->request($app, 'GET', '/sub/apply/continue/' . $newToken . '/personal')->getStatusCode());
 
         $logPath = $this->directory . '/error.log';
         $oldErrorLog = ini_get('error_log');
@@ -108,7 +108,7 @@ final class CandidatesSecurityRegressionTest extends TestCase
         ini_set('log_errors', '1');
         ini_set('error_log', $logPath);
         try {
-            self::assertSame(500, $this->request($app, 'GET', '/sub/apply/continue/' . $newToken . '/explode')->getStatusCode());
+            self::assertSame(500, $this->request($app, 'GET', '/sub/apply/continue/' . $newToken . '/explode/test')->getStatusCode());
         } finally {
             ini_set('error_log', is_string($oldErrorLog) ? $oldErrorLog : '');
             ini_set('log_errors', is_string($oldLogErrors) ? $oldLogErrors : '1');
@@ -117,7 +117,7 @@ final class CandidatesSecurityRegressionTest extends TestCase
         $log = is_file($logPath) ? (string) file_get_contents($logPath) : '';
         self::assertNotSame('', $log);
         self::assertStringNotContainsString($newToken, $log, 'Raw continuation capability token must never be logged.');
-        self::assertStringContainsString('/sub/apply/continue/[redacted]/explode', $log);
+        self::assertStringContainsString('/sub/apply/continue/[redacted]/explode/test', $log);
     }
 
     public function testDuplicateIdentityIsGenericAndThrottle429DoesNotMutate(): void
@@ -199,7 +199,7 @@ final class CandidatesSecurityRegressionTest extends TestCase
         self::assertSame($beforeRequirementCount, (int) $this->pdo->query('SELECT COUNT(*) FROM unit_application_requirements')->fetchColumn());
         self::assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM candidates')->fetchColumn());
 
-        $continue = $this->request($app, 'GET', '/sub/apply/continue/' . $started['continuation_token']);
+        $continue = $this->request($app, 'GET', '/sub/apply/continue/' . $started['continuation_token'] . '/personal');
         self::assertSame(200, $continue->getStatusCode());
         $html = (string) $continue->getBody();
         self::assertStringContainsString('action="/sub/apply/continue/' . $started['continuation_token'] . '"', $html);

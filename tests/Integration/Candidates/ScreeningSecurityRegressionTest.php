@@ -40,7 +40,7 @@ final class ScreeningSecurityRegressionTest extends TestCase
     public function testCandidatePortalUsesSafeProjectionAndExternalReferrerProtection(): void
     {
         $routes = (string) file_get_contents($this->root . '/app/Candidates/routes.php');
-        $view = (string) file_get_contents($this->root . '/resources/views/public_candidate_continue.php');
+        $view = (string) file_get_contents($this->root . '/resources/views/public_candidate_wizard.php');
 
         self::assertStringContainsString(
             "'screening' => \$screening->publicForCandidate((int) \$candidate['id'])",

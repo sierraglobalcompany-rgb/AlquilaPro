@@ -98,10 +98,49 @@ return static function (array $settings): App {
     $homePath = $basePath . '/';
     $installerView = $viewsPath . '/install.php';
 
-    $renderInstaller = static function (?string $error = null) use ($runtime, $installPath, $installerView, $csrf, $basePath): string {
-        $action = $installPath;
+    $wizardSessionKey = 'alquilapro_installer_wizard';
+    $readWizardState = static function () use ($wizardSessionKey): array {
+        $state = $_SESSION[$wizardSessionKey] ?? null;
+        if (!is_array($state)) {
+            $state = ['step' => 0];
+            $_SESSION[$wizardSessionKey] = $state;
+        }
+
+        return $state;
+    };
+    $saveWizardState = static function (array $state) use ($wizardSessionKey): void {
+        $_SESSION[$wizardSessionKey] = $state;
+    };
+    $databaseFingerprint = static function (array $database) use ($csrf): string {
+        $canonical = [
+            (string) ($database['host'] ?? ''),
+            (string) ($database['port'] ?? ''),
+            (string) ($database['database'] ?? ''),
+            (string) ($database['username'] ?? ''),
+            (string) ($database['password'] ?? ''),
+        ];
+
+        return hash_hmac('sha256', serialize($canonical), $csrf->token());
+    };
+    $renderInstaller = static function (array $state, ?string $error = null) use (
+        $runtime,
+        $installPath,
+        $installerView,
+        $csrf,
+        $basePath,
+    ): string {
+        $step = (int) ($state['step'] ?? 0);
         $csrfToken = $csrf->token();
         $assetHref = $basePath . '/assets/app.css';
+        $continuePath = $basePath . '/install/continue';
+        $testDatabasePath = $basePath . '/install/test-database';
+        $backDatabasePath = $basePath . '/install/back-database';
+        $loginPath = $basePath . '/login';
+        $viewState = $state;
+        if (isset($viewState['database']) && is_array($viewState['database'])) {
+            unset($viewState['database']['password']);
+        }
+        unset($viewState['owner_password'], $viewState['tested_fingerprint']);
         ob_start();
         require $installerView;
         return (string) ob_get_clean();
@@ -113,50 +152,220 @@ return static function (array $settings): App {
         });
     }
 
-    $app->get('/install', static function (ServerRequestInterface $request, ResponseInterface $response) use ($lock, $renderInstaller): ResponseInterface {
+    $app->get('/install', static function (ServerRequestInterface $request, ResponseInterface $response) use ($lock, $renderInstaller, $readWizardState): ResponseInterface {
         if ($lock->isInstalled()) {
             return $response->withStatus(404);
         }
 
-        $response->getBody()->write($renderInstaller());
+        $response->getBody()->write($renderInstaller($readWizardState()));
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
     });
 
-    $app->post('/install', static function (ServerRequestInterface $request, ResponseInterface $response) use ($lock, $installer, $baseUrl, $homePath, $renderInstaller): ResponseInterface {
+    $app->post('/install/continue', static function (ServerRequestInterface $request, ResponseInterface $response) use (
+        $lock,
+        $runtime,
+        $readWizardState,
+        $saveWizardState,
+        $renderInstaller,
+    ): ResponseInterface {
         if ($lock->isInstalled()) {
             return $response->withStatus(404);
         }
 
+        $state = $readWizardState();
         $form = (array) ($request->getParsedBody() ?? []);
+        $step = (int) ($state['step'] ?? 0);
 
-        try {
-            $installer->install([
-                'database' => [
-                    'host' => $form['db_host'] ?? '',
-                    'port' => $form['db_port'] ?? '3306',
-                    'database' => $form['db_name'] ?? '',
-                    'username' => $form['db_user'] ?? '',
-                    'password' => $form['db_password'] ?? '',
-                ],
-                'app_name' => $form['app_name'] ?? 'Alquila Pro',
-                'owner_name' => $form['owner_name'] ?? '',
-                'owner_email' => $form['owner_email'] ?? '',
-                'owner_password' => $form['owner_password'] ?? '',
-                'base_url' => $baseUrl,
-            ]);
-        } catch (RuntimeException $exception) {
-            $response->getBody()->write($renderInstaller($exception->getMessage()));
-            return $response
-                ->withHeader('Content-Type', 'text/html; charset=utf-8')
-                ->withStatus(422);
-        } catch (Throwable) {
-            $response->getBody()->write($renderInstaller('No fue posible completar la instalación.'));
+        if (!$runtime['ok']) {
+            $state['step'] = 0;
+            $saveWizardState($state);
+            $response->getBody()->write($renderInstaller($state, 'El servidor no cumple los requisitos de Alquila Pro.'));
+            return $response->withHeader('Content-Type', 'text/html; charset=utf-8')->withStatus(422);
+        }
+
+        if ($step === 0) {
+            $state['step'] = 1;
+        } elseif ($step === 2) {
+            $appName = trim((string) ($form['app_name'] ?? ''));
+            if ($appName === '') {
+                $response->getBody()->write($renderInstaller($state, 'El nombre de la empresa es obligatorio.'));
+                return $response->withHeader('Content-Type', 'text/html; charset=utf-8')->withStatus(422);
+            }
+            $state['app_name'] = $appName;
+            $state['step'] = 3;
+        } elseif ($step === 3) {
+            $ownerName = trim((string) ($form['owner_name'] ?? ''));
+            $ownerEmail = strtolower(trim((string) ($form['owner_email'] ?? '')));
+            $ownerPassword = (string) ($form['owner_password'] ?? '');
+            if ($ownerName === '' || filter_var($ownerEmail, FILTER_VALIDATE_EMAIL) === false || strlen($ownerPassword) < 12) {
+                $response->getBody()->write($renderInstaller($state, 'Los datos del propietario no son válidos.'));
+                return $response->withHeader('Content-Type', 'text/html; charset=utf-8')->withStatus(422);
+            }
+            $state['owner_name'] = $ownerName;
+            $state['owner_email'] = $ownerEmail;
+            $state['owner_password'] = $ownerPassword;
+            $state['step'] = 4;
+        } elseif ($step === 4) {
+            $state['step'] = 5;
+        } else {
+            $response->getBody()->write($renderInstaller($state, 'Completa el paso actual antes de continuar.'));
             return $response
                 ->withHeader('Content-Type', 'text/html; charset=utf-8')
                 ->withStatus(422);
         }
 
-        return $response->withHeader('Location', $homePath)->withStatus(303);
+        $saveWizardState($state);
+        $response->getBody()->write($renderInstaller($state));
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    });
+
+    $app->post('/install/test-database', static function (ServerRequestInterface $request, ResponseInterface $response) use (
+        $lock,
+        $runtime,
+        $installer,
+        $databaseFingerprint,
+        $readWizardState,
+        $saveWizardState,
+        $renderInstaller,
+    ): ResponseInterface {
+        if ($lock->isInstalled()) {
+            return $response->withStatus(404);
+        }
+
+        $state = $readWizardState();
+        if ((int) ($state['step'] ?? 0) !== 1) {
+            $response->getBody()->write($renderInstaller($state, 'Completa los requisitos antes de probar la base de datos.'));
+            return $response->withHeader('Content-Type', 'text/html; charset=utf-8')->withStatus(422);
+        }
+        if (!$runtime['ok']) {
+            $state['step'] = 0;
+            $saveWizardState($state);
+            $response->getBody()->write($renderInstaller($state, 'El servidor no cumple los requisitos de Alquila Pro.'));
+            return $response->withHeader('Content-Type', 'text/html; charset=utf-8')->withStatus(422);
+        }
+
+        $form = (array) ($request->getParsedBody() ?? []);
+        $database = [
+            'host' => $form['db_host'] ?? '',
+            'port' => $form['db_port'] ?? '3306',
+            'database' => $form['db_name'] ?? '',
+            'username' => $form['db_user'] ?? '',
+            'password' => $form['db_password'] ?? '',
+        ];
+        $state['database'] = $database;
+        $state['database_tested'] = false;
+        unset($state['tested_fingerprint']);
+        $state['step'] = 1;
+        $saveWizardState($state);
+
+        try {
+            $installer->testDatabase($database);
+        } catch (Throwable $exception) {
+            $error = $exception instanceof RuntimeException
+                ? $exception->getMessage()
+                : 'No fue posible validar la configuración de la base de datos.';
+            unset($state['database']['password']);
+            $saveWizardState($state);
+            $response->getBody()->write($renderInstaller($state, $error));
+            return $response
+                ->withHeader('Content-Type', 'text/html; charset=utf-8')
+                ->withStatus(422);
+        }
+
+        $state['database_tested'] = true;
+        $state['tested_fingerprint'] = $databaseFingerprint($database);
+        $state['step'] = 2;
+        $saveWizardState($state);
+        $response->getBody()->write($renderInstaller($state));
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    });
+
+    $app->post('/install/back-database', static function (ServerRequestInterface $request, ResponseInterface $response) use (
+        $lock,
+        $readWizardState,
+        $saveWizardState,
+        $renderInstaller,
+    ): ResponseInterface {
+        if ($lock->isInstalled()) {
+            return $response->withStatus(404);
+        }
+
+        $state = $readWizardState();
+        $step = (int) ($state['step'] ?? 0);
+        if ($step < 2 || $step > 5) {
+            $response->getBody()->write($renderInstaller($state, 'No hay una prueba de base de datos que modificar.'));
+            return $response->withHeader('Content-Type', 'text/html; charset=utf-8')->withStatus(422);
+        }
+
+        $state['step'] = 1;
+        $state['database_tested'] = false;
+        unset($state['tested_fingerprint']);
+        if (isset($state['database']) && is_array($state['database'])) {
+            unset($state['database']['password']);
+        }
+        $saveWizardState($state);
+        $response->getBody()->write($renderInstaller($state));
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    });
+
+    $app->post('/install', static function (ServerRequestInterface $request, ResponseInterface $response) use (
+        $lock,
+        $installer,
+        $runtime,
+        $baseUrl,
+        $wizardSessionKey,
+        $databaseFingerprint,
+        $readWizardState,
+        $renderInstaller,
+    ): ResponseInterface {
+        if ($lock->isInstalled()) {
+            return $response->withStatus(404);
+        }
+
+        $state = $readWizardState();
+        $database = $state['database'] ?? null;
+        $testedFingerprint = $state['tested_fingerprint'] ?? null;
+        if ((int) ($state['step'] ?? 0) !== 5
+            || !$runtime['ok']
+            || !is_array($database)
+            || ($state['database_tested'] ?? false) !== true
+            || !is_string($testedFingerprint)
+            || !hash_equals($testedFingerprint, $databaseFingerprint($database))
+        ) {
+            if (!$runtime['ok']) {
+                $state['step'] = 0;
+            } else {
+                $state['step'] = 1;
+            }
+            $state['database_tested'] = false;
+            unset($state['tested_fingerprint']);
+            if (isset($state['database']) && is_array($state['database'])) {
+                unset($state['database']['password']);
+            }
+            $_SESSION[$wizardSessionKey] = $state;
+            $response->getBody()->write($renderInstaller($state, 'Vuelve a probar la conexión antes de instalar.'));
+            return $response->withHeader('Content-Type', 'text/html; charset=utf-8')->withStatus(422);
+        }
+
+        try {
+            $installer->install([
+                'database' => $database,
+                'app_name' => (string) ($state['app_name'] ?? ''),
+                'owner_name' => (string) ($state['owner_name'] ?? ''),
+                'owner_email' => (string) ($state['owner_email'] ?? ''),
+                'owner_password' => (string) ($state['owner_password'] ?? ''),
+                'base_url' => $baseUrl,
+            ]);
+        } catch (Throwable) {
+            $response->getBody()->write($renderInstaller($state, 'No fue posible completar la instalación.'));
+            return $response
+                ->withHeader('Content-Type', 'text/html; charset=utf-8')
+                ->withStatus(422);
+        }
+
+        unset($_SESSION[$wizardSessionKey]);
+        $response->getBody()->write($renderInstaller(['step' => 6]));
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
     });
 
     $app->get('/health', static function (ServerRequestInterface $request, ResponseInterface $response): ResponseInterface {

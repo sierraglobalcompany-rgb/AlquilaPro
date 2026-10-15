@@ -145,7 +145,7 @@ final class PublicCandidateApplyTest extends TestCase
         ]);
         self::assertSame(404, $this->request($app, 'GET', '/apply/continue/' . $second['continuation_token'])->getStatusCode());
 
-        $response = $this->request($app, 'GET', '/apply/continue/' . $first['continuation_token']);
+        $response = $this->request($app, 'GET', '/apply/continue/' . $first['continuation_token'] . '/personal');
         self::assertSame(200, $response->getStatusCode());
         $html = (string) $response->getBody();
         self::assertStringContainsString('Candidato Uno', $html);
@@ -269,13 +269,13 @@ final class PublicCandidateApplyTest extends TestCase
         self::assertSame(404, $this->request($app, 'POST', '/apply/' . $unit['public_key'], $this->candidateInput('cc', 'F57-LIFECYCLE-2') + [
             'csrf_token' => $this->csrfToken(),
         ])->getStatusCode());
-        self::assertSame(200, $this->request($app, 'GET', $continuePath)->getStatusCode());
+        self::assertSame(200, $this->request($app, 'GET', $continuePath . '/personal')->getStatusCode());
 
         $submitted = $this->request($app, 'POST', $continuePath . '/submit', [
             'csrf_token' => $this->csrfToken(),
         ]);
         self::assertSame(303, $submitted->getStatusCode());
-        self::assertSame($continuePath, $submitted->getHeaderLine('Location'));
+        self::assertSame($continuePath . '/review', $submitted->getHeaderLine('Location'));
         self::assertSame('verification', $this->candidateRowByDocument('F57-LIFECYCLE-1')['status']);
         self::assertSame('occupied', $this->unitStatus($unit['id']));
         self::assertSame(2, (int) $this->pdo->query('SELECT COUNT(*) FROM notification_jobs')->fetchColumn());
@@ -347,7 +347,11 @@ final class PublicCandidateApplyTest extends TestCase
         self::assertMatchesRegularExpression('#^/sub/apply/continue/[a-f0-9]{64}$#', $location);
         self::assertStringNotContainsString('/sub/sub/', $location);
 
-        $continue = $this->request($app, 'GET', $location);
+        $compatibility = $this->request($app, 'GET', $location);
+        self::assertSame(303, $compatibility->getStatusCode());
+        self::assertSame($location . '/review', $compatibility->getHeaderLine('Location'));
+
+        $continue = $this->request($app, 'GET', $location . '/personal');
         self::assertSame(200, $continue->getStatusCode());
         self::assertStringContainsString('action="' . $location . '"', (string) $continue->getBody());
         self::assertStringNotContainsString('/sub/sub/', (string) $continue->getBody());

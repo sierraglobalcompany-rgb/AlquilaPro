@@ -240,22 +240,29 @@ final class CandidateReferencesTest extends TestCase
 
         $app = $this->app('/sub');
         $continuePath = '/sub/apply/continue/' . $started['continuation_token'];
-        $response = $this->request($app, 'GET', $continuePath);
+        $response = $this->request($app, 'GET', $continuePath . '/references');
         self::assertSame(200, $response->getStatusCode());
         $html = (string) $response->getBody();
 
-        foreach (['monthly_income', 'occupants_count', 'occupants_notes', 'pets_declared', 'pets_notes'] as $field) {
-            self::assertStringContainsString('name="' . $field . '"', $html);
-        }
         self::assertStringContainsString('action="' . $continuePath . '/references"', $html);
-        self::assertStringContainsString('action="' . $continuePath . '/unit"', $html);
         self::assertStringContainsString('name="references[0][name]"', $html);
-        self::assertStringContainsString('value="' . $target['public_key'] . '"', $html);
         self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
         self::assertStringNotContainsString('reference_id', $html);
         self::assertStringNotContainsString('candidate_id', $html);
         self::assertStringNotContainsString('/sub/sub/', $html);
+
+        $work = $this->request($app, 'GET', $continuePath . '/work');
+        $occupants = $this->request($app, 'GET', $continuePath . '/occupants');
+        $personal = $this->request($app, 'GET', $continuePath . '/personal');
+        foreach (['monthly_income'] as $field) {
+            self::assertStringContainsString('name="' . $field . '"', (string) $work->getBody());
+        }
+        foreach (['occupants_count', 'occupants_notes', 'pets_declared', 'pets_notes'] as $field) {
+            self::assertStringContainsString('name="' . $field . '"', (string) $occupants->getBody());
+        }
+        self::assertStringContainsString('action="' . $continuePath . '/unit"', (string) $personal->getBody());
+        self::assertStringContainsString('value="' . $target['public_key'] . '"', (string) $personal->getBody());
 
         $beforeReferences = $this->referenceRows((int) $started['candidate_id']);
         $withoutCsrf = $this->request($app, 'POST', $continuePath . '/references', [
@@ -286,7 +293,7 @@ final class CandidateReferencesTest extends TestCase
             'public_key' => $target['public_key'],
         ]);
         self::assertSame(303, $unitChanged->getStatusCode());
-        self::assertSame($continuePath, $unitChanged->getHeaderLine('Location'));
+        self::assertSame($continuePath . '/personal', $unitChanged->getHeaderLine('Location'));
         self::assertSame($target['id'], $this->candidateRow((int) $started['candidate_id'])['unit_id']);
         self::assertSame(1, $this->candidateCount());
     }
