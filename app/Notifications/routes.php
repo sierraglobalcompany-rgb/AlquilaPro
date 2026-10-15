@@ -177,7 +177,7 @@ return static function (App $app, array $deps): void {
         }
 
         $rawId = (string) ($args['id'] ?? '');
-        $actionId = preg_match('/\A[1-9][0-9]{7,14}\z/D', $rawId) === 1
+        $actionId = preg_match('/\A[1-9][0-9]{0,17}\z/D', $rawId) === 1
             ? filter_var($rawId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])
             : false;
         $action = $actionId === false ? null : $whatsApp->find((int) $actionId);
