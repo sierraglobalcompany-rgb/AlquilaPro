@@ -13,18 +13,6 @@ foreach (array_slice($nameParts, 0, 2) as $part) {
 $initials = $initials !== '' ? $initials : 'AP';
 $isTenant = ($user['role'] ?? null) === 'tenant';
 $homeHref = $isTenant ? '/tenant' : '/';
-$canViewUsers = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'users.view');
-$canViewProperties = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'properties.view');
-$canViewCandidates = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'candidates.view');
-$canViewContracts = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'contracts.view');
-$canViewFinance = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'finance.view');
-$canViewInsurance = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'insurance.view');
-$canViewMaintenance = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'maintenance.view');
-$canUseWhatsApp = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'whatsapp.use');
-$canViewDocuments = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'documents.view');
-$canViewCommunity = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'community.view');
-$canViewMemberships = !$isTenant && \AlquilaPro\Auth\Permissions::allows($user, 'memberships.view');
-$isOwner = !$isTenant && ($user['role'] ?? null) === 'owner';
 ?>
 <!doctype html>
 <html lang="es">
@@ -66,79 +54,13 @@ $isOwner = !$isTenant && ($user['role'] ?? null) === 'owner';
                 <form method="dialog"><button class="button button--quiet" type="submit">Cerrar</button></form>
             </div>
             <div class="apps-grid">
-                <?php if ($canViewUsers): ?>
-                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/users">
-                        <strong>Usuarios</strong>
-                        <span>Administración de accesos</span>
+                <?php foreach ($navigation as $item): ?>
+                    <a class="app-card" href="<?= $escape($basePath . $item['href']) ?>" data-nav-key="<?= $escape($item['key']) ?>" data-nav-icon="<?= $escape($item['icon']) ?>">
+                        <strong><?= $escape($item['label']) ?></strong>
+                        <span><?= $escape($item['group']) ?></span>
                     </a>
-                <?php endif; ?>
-                <?php if ($canViewProperties): ?>
-                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/properties">
-                        <strong>Propiedades</strong>
-                        <span>Inventario y publicación</span>
-                    </a>
-                <?php endif; ?>
-                <?php if ($canViewCandidates): ?>
-                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/candidates">
-                        <strong>Candidatos</strong>
-                        <span>Candidaturas y documentación</span>
-                    </a>
-                <?php endif; ?>
-                <?php if ($canViewContracts): ?>
-                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/contract-templates">
-                        <strong>Contratos</strong>
-                        <span>Plantillas y versiones</span>
-                    </a>
-                <?php endif; ?>
-                <?php if ($canViewFinance): ?>
-                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/finance">
-                        <strong>Cartera</strong>
-                        <span>Cargos y saldos de arrendamientos</span>
-                    </a>
-                <?php endif; ?>
-                <?php if ($canViewInsurance): ?>
-                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/insurance">
-                        <strong>Seguros</strong>
-                        <span>Pólizas y reclamaciones</span>
-                    </a>
-                <?php endif; ?>
-                <?php if ($canViewMaintenance): ?>
-                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/maintenance">
-                        <strong>Mantenimiento</strong>
-                        <span>Solicitudes y reparaciones</span>
-                    </a>
-                <?php endif; ?>
-                <?php if ($canUseWhatsApp): ?>
-                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/whatsapp">
-                        <strong>WhatsApp</strong>
-                        <span>Acciones asistidas e historial</span>
-                    </a>
-                <?php endif; ?>
-                <?php if ($canViewDocuments): ?>
-                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/documents">
-                        <strong>Documentos</strong>
-                        <span>Archivos privados, manuales e inventarios</span>
-                    </a>
-                <?php endif; ?>
-                <?php if ($canViewCommunity): ?>
-                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/community">
-                        <strong>Convivencia y avisos legales</strong>
-                        <span>Incidentes y avisos vigentes de propiedades</span>
-                    </a>
-                <?php endif; ?>
-                <?php if ($canViewMemberships): ?>
-                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/memberships">
-                        <strong>Servicios digitales</strong>
-                        <span>Catálogo y decisiones de cargo</span>
-                    </a>
-                <?php endif; ?>
-                <?php if ($isOwner): ?>
-                    <a class="app-card" href="<?= $escape($basePath) ?>/admin/appearance">
-                        <strong>Apariencia</strong>
-                        <span>Nombre, color y logo</span>
-                    </a>
-                <?php endif; ?>
-                <?php if (!$canViewUsers && !$canViewProperties && !$canViewCandidates && !$canViewContracts && !$canViewFinance && !$canViewInsurance && !$canViewMaintenance && !$canUseWhatsApp && !$canViewDocuments && !$canViewCommunity && !$canViewMemberships && !$isOwner): ?>
+                <?php endforeach; ?>
+                <?php if ($navigation === []): ?>
                     <p class="empty-state">No tienes aplicaciones disponibles.</p>
                 <?php endif; ?>
             </div>
