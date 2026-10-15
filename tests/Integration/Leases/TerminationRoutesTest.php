@@ -297,7 +297,7 @@ final class TerminationRoutesTest extends TestCase
 
         $tracedPdo = $this->tracedPdo();
         $app = $this->app('/sub', $tracedPdo);
-        $this->login($app, 'tenant-owner@example.com', 'TenantPassword123', '/sub', '/sub/tenant');
+        $this->login($app, 'tenant-owner@example.com', 'TenantPassword123', '/sub');
 
         $own = $this->request($app, 'GET', '/sub/tenant/leases/' . $owned['lease_id'] . '/liquidation');
         self::assertSame(200, $own->getStatusCode());
@@ -363,7 +363,7 @@ final class TerminationRoutesTest extends TestCase
 
         $_SESSION = [];
         $tenantApp = $this->app('/sub');
-        $this->login($tenantApp, 'link-tenant@example.com', 'TenantPassword123', '/sub', '/sub/tenant');
+        $this->login($tenantApp, 'link-tenant@example.com', 'TenantPassword123', '/sub');
         $tenantHtml = (string) $this->request(
             $tenantApp,
             'GET',
