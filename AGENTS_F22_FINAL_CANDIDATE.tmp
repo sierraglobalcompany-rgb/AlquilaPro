@@ -1,0 +1,90 @@
+# AGENTS.md — AlquilaPro
+
+Este archivo define reglas durables de trabajo. **No es un tablero de estado de fases**. Para el estado actual leer `README.md`, el checkpoint canónico de la fase activa y la PR/CI del SHA exacto.
+
+## Autoridad
+
+Orden obligatorio cuando haya contradicción:
+1. GitHub real: código, migraciones, tests, diff y SHA.
+2. CI del SHA exacto.
+3. Checkpoint canónico de fase.
+4. SPEC / PLAN aprobados.
+5. README y notas narrativas.
+6. Chat previo.
+
+Nunca declarar trabajo hecho porque un handoff lo diga si GitHub no lo demuestra.
+
+## Ley 1 — KISS
+
+Todo cambio debe ser simple, directo, eficiente, optimizado y eficaz.
+
+- Reutilizar owners existentes antes de crear nuevas autoridades.
+- No agregar tabla, clase, servicio, permiso, ruta, scheduler, dependencia o framework sin necesidad demostrada.
+- Ir de A a B; evitar cadenas de abstracciones que solo redistribuyen complejidad.
+- El presupuesto arquitectónico de cada fase es un límite, no un objetivo a consumir.
+
+## Ley 2 — Cero Ruido / Convergencia
+
+Aplicar en este orden:
+
+`ELIMINAR → UNIR/CONVERGER → SIMPLIFICAR → MEJORAR/OPTIMIZAR → AGREGAR`
+
+Antes de eliminar, demostrar que el elemento está supersedido y que no contiene autoridad, evidencia o recuperación única. No arrastrar históricos o checkpoints transitorios dentro del HEAD final solo por precaución; preservar recuperación en ramas `checkpoint/...` cuando sea suficiente.
+
+## Ley 3 — Anti-parche
+
+Secuencia obligatoria para defectos:
+
+`REPRODUCE → ROOT CAUSE → OWNING AUTHORITY → SEARCH DUPLICATION → RED → MINIMAL GREEN → REMOVE SUPERSEDED LOGIC → REGRESSION`
+
+No aplicar arreglos especulativos. Un cambio de producto necesita un RED que reproduzca el problema, salvo cambios puramente documentales/tooling de cierre que no alteren runtime.
+
+## Método de ejecución
+
+1. Confirmar base, branch, HEAD, PR y working scope.
+2. PRE-KISS: identificar owner canónico, presupuesto y cosas prohibidas.
+3. Escribir/confirmar SPEC y PLAN antes de producto cuando la fase lo requiera.
+4. Auditar diez pasadas antes de implementar y antes de cerrar.
+5. TDD por tarea: RED verificado → GREEN mínimo → regresión.
+6. CI del SHA exacto; no reutilizar CI de un commit anterior.
+7. Checkpoint antes de abrir el siguiente gate.
+8. Merge solo con base/head/mergeability y CI nuevamente verificados.
+
+## Política de checkpoints
+
+- Crear checkpoints frecuentes para evitar pérdida de continuidad.
+- Preferir ramas `checkpoint/<fase>-<gate>-<fecha>` para estados transitorios.
+- Un checkpoint RED debe preservar el RED, no mezclar GREEN.
+- Un checkpoint GREEN candidate se crea antes de CI; uno GREEN certificado solo después de CI completa.
+- El HEAD final de una fase debe converger a un checkpoint documental canónico; los checkpoints intermedios pueden vivir solo en ramas.
+
+## QA / CI
+
+- PHP soportado: 8.3, 8.4 y 8.5.
+- `composer validate --strict` obligatorio.
+- Lint PHP obligatorio dentro del CI canónico.
+- PHPUnit completo en la matriz soportada.
+- No declarar PASS mientras un job esté queued/in_progress.
+- Distinguir Product Head de Closure Head cuando un commit posterior sea solo documentación/tooling.
+
+## Contratos durables
+
+- Ownership del tenant se resuelve antes de lookups hijos.
+- CSRF global se mantiene para mutaciones autenticadas; excepciones deben ser exactas y protegidas.
+- Archivos privados validan contención, tamaño, MIME por bytes e integridad según su owner; fallan cerrados.
+- `FinanceService` conserva la autoridad financiera compartida.
+- `NotificationService` conserva la autoridad de cola/proceso/retención automática; no crear segundo scheduler.
+- WhatsApp sigue siendo salida asistida, no proveedor de estado de entrega paralelo.
+- Auditoría F22 usa un solo `AuditService`/`audit_log`; no event bus, segunda pila de logs o framework de seguridad.
+- Nunca registrar passwords, raw tokens, cookies/sesiones, documentos, receipts/payment bodies, SQL o exception traces en auditoría.
+- `REMOTE_ADDR` validado es la fuente F22 de IP; no confiar ciegamente en forwarding headers.
+
+## Roadmap guardrail
+
+No implementar una fase futura antes de que la fase precedente esté cerrada y mergeada. Para F23–F26 usar la SPEC aprobada; no inventar F27.
+
+## Preferencias de entrega
+
+- Respuestas y reportes operativos: directos, con estado, evidencia, bloqueo y siguiente acción.
+- Explicar por qué un cambio es necesario; no generar arquitectura por estética.
+- Mantener GitHub actualizado al cerrar cada gate importante.
