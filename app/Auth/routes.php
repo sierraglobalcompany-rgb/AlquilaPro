@@ -9,6 +9,7 @@ use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Auth\UserService;
 use AlquilaPro\UI\View;
+use PDO;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\App;
@@ -20,6 +21,8 @@ return static function (App $app, array $deps): void {
     $users = $deps['users'];
     /** @var AuditService $audit */
     $audit = $deps['audit'];
+    /** @var PDO $pdo */
+    $pdo = $deps['pdo'];
     /** @var SessionGuard $session */
     $session = $deps['session'];
     /** @var Csrf $csrf */
@@ -189,7 +192,7 @@ return static function (App $app, array $deps): void {
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
     });
 
-    $app->post('/admin/users', static function (ServerRequestInterface $request, ResponseInterface $response) use ($guard, $users, $audit, $path): ResponseInterface {
+    $app->post('/admin/users', static function (ServerRequestInterface $request, ResponseInterface $response) use ($guard, $users, $audit, $pdo, $path): ResponseInterface {
         $authorized = $guard($response, 'users.manage');
         if ($authorized instanceof ResponseInterface) {
             return $authorized;
@@ -201,6 +204,10 @@ return static function (App $app, array $deps): void {
             return $response->withStatus(403);
         }
 
+        if ($pdo->inTransaction() || !$pdo->beginTransaction()) {
+            throw new RuntimeException('No fue posible iniciar la operación.');
+        }
+
         try {
             $createdUserId = $users->create(
                 (string) ($form['full_name'] ?? ''),
@@ -210,17 +217,30 @@ return static function (App $app, array $deps): void {
                 $requestedPermissions,
             );
         } catch (Throwable) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             return $response->withStatus(422);
         }
 
-        $audit->record(
-            (int) $authorized['id'],
-            'user.created',
-            'user',
-            $createdUserId,
-            'Usuario administrativo creado.',
-            $request->getServerParams()['REMOTE_ADDR'] ?? null,
-        );
+        try {
+            $audit->record(
+                (int) $authorized['id'],
+                'user.created',
+                'user',
+                $createdUserId,
+                'Usuario administrativo creado.',
+                $request->getServerParams()['REMOTE_ADDR'] ?? null,
+            );
+            if (!$pdo->commit()) {
+                throw new RuntimeException('No fue posible completar la operación.');
+            }
+        } catch (Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $exception;
+        }
 
         return $response->withHeader('Location', $path('/admin/users'))->withStatus(303);
     });
