@@ -266,6 +266,100 @@ final readonly class TerminationService
         ];
     }
 
+    public function liquidationForLease(int $leaseId): ?array
+    {
+        if ($leaseId <= 0) {
+            return null;
+        }
+
+        $statement = $this->pdo->prepare(
+            'SELECT id, lease_id, snapshot_json, summary_note, finalized_by_user_id, finalized_at '
+            . 'FROM lease_liquidations WHERE lease_id = :lease_id LIMIT 1',
+        );
+        $statement->execute(['lease_id' => $leaseId]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $this->normalizeLiquidation($row) : null;
+    }
+
+    public function finalizeLiquidation(
+        int $leaseId,
+        array $handover,
+        ?string $summaryNote,
+        int $actorUserId,
+        string $today,
+        int $now,
+    ): array {
+        if ($leaseId <= 0 || $actorUserId <= 0 || $now <= 0) {
+            throw new RuntimeException('No fue posible finalizar la liquidación.');
+        }
+        $summaryNote = $this->normalizeSummaryNote($summaryNote);
+        $finalizedAt = gmdate('Y-m-d H:i:s', $now);
+
+        try {
+            $this->pdo->beginTransaction();
+            $lockedLease = $this->lockLease($leaseId);
+            if ($lockedLease['ended_at'] === null) {
+                throw new RuntimeException('El arrendamiento debe estar finalizado antes de liquidarlo.');
+            }
+
+            $existing = $this->pdo->prepare(
+                'SELECT id FROM lease_liquidations WHERE lease_id = :lease_id LIMIT 1',
+            );
+            $existing->execute(['lease_id' => $leaseId]);
+            if ($existing->fetchColumn() !== false) {
+                throw new RuntimeException('La liquidación ya fue finalizada.');
+            }
+
+            $snapshot = $this->preview($leaseId, $today, $handover);
+            if ($snapshot['blockers'] !== []) {
+                throw new RuntimeException('La liquidación tiene bloqueos pendientes.');
+            }
+            unset($snapshot['blockers']);
+            if ($snapshot['bonus'] !== null && $snapshot['bonus']['decision'] === 'denied') {
+                $snapshot['bonus']['amount'] = '0.00';
+            }
+            $snapshot = ['schema_version' => 1] + $snapshot;
+            $snapshot['finalized_context'] = [
+                'finalized_by_user_id' => $actorUserId,
+                'finalized_at' => $finalizedAt,
+            ];
+
+            $insert = $this->pdo->prepare(
+                'INSERT INTO lease_liquidations '
+                . '(lease_id, snapshot_json, summary_note, finalized_by_user_id, finalized_at) '
+                . 'VALUES (:lease_id, :snapshot_json, :summary_note, :actor, :finalized_at)',
+            );
+            $insert->execute([
+                'lease_id' => $leaseId,
+                'snapshot_json' => json_encode(
+                    $snapshot,
+                    JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+                ),
+                'summary_note' => $summaryNote,
+                'actor' => $actorUserId,
+                'finalized_at' => $finalizedAt,
+            ]);
+            $liquidation = [
+                'id' => (int) $this->pdo->lastInsertId(),
+                'lease_id' => $leaseId,
+                'snapshot' => $snapshot,
+                'summary_note' => $summaryNote,
+                'finalized_by_user_id' => $actorUserId,
+                'finalized_at' => $finalizedAt,
+            ];
+
+            $this->pdo->commit();
+            return $liquidation;
+        } catch (RuntimeException $exception) {
+            $this->rollbackIfNeeded();
+            throw $exception;
+        } catch (Throwable) {
+            $this->rollbackIfNeeded();
+            throw new RuntimeException('No fue posible finalizar la liquidación.');
+        }
+    }
+
     private function requireBonusEnabled(): void
     {
         if (!$this->bonusEnabled) {
@@ -273,13 +367,20 @@ final readonly class TerminationService
         }
     }
 
-    private function lockLease(int $leaseId): void
+    /** @return array{id:int,ended_at:?string} */
+    private function lockLease(int $leaseId): array
     {
-        $statement = $this->pdo->prepare('SELECT id FROM leases WHERE id = :id FOR UPDATE');
+        $statement = $this->pdo->prepare('SELECT id, ended_at FROM leases WHERE id = :id FOR UPDATE');
         $statement->execute(['id' => $leaseId]);
-        if ($statement->fetchColumn() === false) {
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
             throw new RuntimeException('El arrendamiento no existe.');
         }
+
+        return [
+            'id' => (int) $row['id'],
+            'ended_at' => $row['ended_at'] === null ? null : (string) $row['ended_at'],
+        ];
     }
 
     private function lockBonus(int $leaseId): ?array
@@ -324,6 +425,23 @@ final readonly class TerminationService
         }
         if (mb_strlen($normalized) > 1000) {
             throw new RuntimeException('La nota del bono es demasiado larga.');
+        }
+
+        return $normalized;
+    }
+
+    private function normalizeSummaryNote(?string $note): ?string
+    {
+        if ($note === null) {
+            return null;
+        }
+
+        $normalized = trim($note);
+        if ($normalized === '') {
+            return null;
+        }
+        if (mb_strlen($normalized) > 2000) {
+            throw new RuntimeException('La nota de liquidación es demasiado larga.');
         }
 
         return $normalized;
@@ -485,6 +603,27 @@ final readonly class TerminationService
             'updated_at' => $row['updated_at'] === null ? null : (string) $row['updated_at'],
             'decided_by_user_id' => $row['decided_by_user_id'] === null ? null : (int) $row['decided_by_user_id'],
             'decided_at' => $row['decided_at'] === null ? null : (string) $row['decided_at'],
+        ];
+    }
+
+    private function normalizeLiquidation(array $row): array
+    {
+        try {
+            $snapshot = json_decode((string) $row['snapshot_json'], true, 512, JSON_THROW_ON_ERROR);
+        } catch (Throwable) {
+            throw new RuntimeException('No fue posible cargar la liquidación.');
+        }
+        if (!is_array($snapshot)) {
+            throw new RuntimeException('No fue posible cargar la liquidación.');
+        }
+
+        return [
+            'id' => (int) $row['id'],
+            'lease_id' => (int) $row['lease_id'],
+            'snapshot' => $snapshot,
+            'summary_note' => $row['summary_note'] === null ? null : (string) $row['summary_note'],
+            'finalized_by_user_id' => (int) $row['finalized_by_user_id'],
+            'finalized_at' => (string) $row['finalized_at'],
         ];
     }
 
