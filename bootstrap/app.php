@@ -312,7 +312,10 @@ return static function (array $settings): App {
             ];
 
             $authRoutes = require dirname(__DIR__) . '/app/Auth/routes.php';
-            $authRoutes($app, $shared + ['users' => $users]);
+            $authRoutes($app, $shared + [
+                'users' => $users,
+                'pdo' => $pdo,
+            ]);
 
             $uiRoutes = require dirname(__DIR__) . '/app/UI/routes.php';
             $uiRoutes($app, $shared);
