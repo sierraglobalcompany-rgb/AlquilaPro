@@ -102,6 +102,7 @@ function buildPackage(string $sourceArgument, string $outputArgument, string $ve
         }
 
         installProductionDependencies($stage);
+        removeVendorTestDirectories($stage . '/vendor');
 
         $files = [];
         $directories = [];
@@ -249,6 +250,23 @@ function installProductionDependencies(string $stage): void
     }
     if (!is_file($stage . '/vendor/autoload.php')) {
         throw new RuntimeException('Composer did not create the production autoloader.');
+    }
+}
+
+function removeVendorTestDirectories(string $vendor): void
+{
+    $testDirectories = [];
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($vendor, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST,
+    );
+    foreach ($iterator as $entry) {
+        if ($entry->isDir() && strtolower($entry->getBasename()) === 'tests') {
+            $testDirectories[] = $entry->getPathname();
+        }
+    }
+    foreach ($testDirectories as $directory) {
+        removeTree($directory);
     }
 }
 

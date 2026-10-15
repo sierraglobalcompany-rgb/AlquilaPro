@@ -205,11 +205,11 @@ final class ServerReadyBuilderTest extends TestCase
     /** @param list<string> $command
      *  @return array{exit_code: int, output: string}
      */
-    private function runProcess(array $command, string $workingDirectory): array
+    private function runProcess(array|string $command, string $workingDirectory): array
     {
         $descriptors = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
         $process = proc_open($command, $descriptors, $pipes, $workingDirectory);
-        self::assertIsResource($process, 'Could not start command: ' . implode(' ', $command));
+        self::assertIsResource($process, 'Could not start command: ' . (is_array($command) ? implode(' ', $command) : $command));
         fclose($pipes[0]);
         $stdout = stream_get_contents($pipes[1]);
         $stderr = stream_get_contents($pipes[2]);
@@ -222,6 +222,9 @@ final class ServerReadyBuilderTest extends TestCase
     /** @param list<string> $command */
     private function runSuccessfulProcess(array $command, string $workingDirectory): void
     {
+        if ($command[0] === 'composer') {
+            $command = 'composer ' . implode(' ', array_slice($command, 1));
+        }
         $result = $this->runProcess($command, $workingDirectory);
         self::assertSame(0, $result['exit_code'], $result['output']);
     }
