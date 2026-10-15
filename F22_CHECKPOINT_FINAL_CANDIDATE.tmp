@@ -1,0 +1,95 @@
+# F22 — FINAL CHECKPOINT CANDIDATE — 2026-10-15
+
+## Authority
+
+- Repository: `sierraglobalcompany-rgb/AlquilaPro`
+- Base `main`: `7c0f0c75c665b9888d26bfdbfd5be9bec4df3b82` — F21 merged.
+- PR: #27 `F22: security privacy and audit hardening`.
+- Certified pre-convergence Product Head: `edbac36b5033446ae710f97e3b81659abc24c0cc` once CI #996 is all-success.
+- This file belongs to the docs/tooling Closure Head. GitHub Actions attached to the exact Closure Head is the final CI authority; do not amend this file merely to paste a run number after success.
+
+## Phase state
+
+- PRE-KISS: CLOSED.
+- Task 1 — migration 022 + canonical `AuditService`: CLOSED / GREEN; CI #973 PHP 8.3/8.4/8.5.
+- Task 2 — owner-only audit viewer + centralized safe response headers: CLOSED / GREEN; CI #975 PHP 8.3/8.4/8.5.
+- Task 3 — explicit high-value audit events: PRODUCT GREEN.
+- Task 3A — behavioral certification + atomicity repair for `user.created`: CLOSED / GREEN; CI #982 PHP 8.3/8.4/8.5.
+- Task 4 — terminal notification recipient retention: CLOSED / GREEN; CI #988 PHP 8.3/8.4/8.5.
+- Task 5 — security/privacy hardening matrix: CLOSED / GREEN / TEST-ONLY; Product Head `0f1211fb457c9092d3de808a5081e866ada740ad`; CI #993 PHP 8.3/8.4/8.5; PHP 8.3 = 598 tests / 6407 assertions.
+- Task 6 — convergence/governance/final closure: PRODUCT AUDIT GREEN; docs/tooling convergence in this Closure Head; final CI required before merge.
+- F23: FROZEN until F22 is merged.
+
+## Task 6 proven repair — Membership audit authority
+
+Fresh audit found that `app/Memberships/routes.php` selected the audit event from HTTP input `$decision` while the frozen F22 contract requires the canonical returned `charge_outcome`.
+
+- RED commit: `4aec788ec4805b5008e5fc7dd96bed0f37f430c8`.
+- CI #995 PHP 8.3: 599 tests / 6410 assertions / exactly 1 failure.
+- Failure: expected `membership.charge_skipped`; actual `membership.charge_created` when request input and service outcome intentionally diverged.
+- GREEN commit: `edbac36b5033446ae710f97e3b81659abc24c0cc`.
+- Minimal repair: event authority now derives from `($result['charge_outcome'] ?? null) === 'created'`.
+- PHP 8.3 on CI #996: 599 tests / 6412 assertions / 0 failures / 0 errors.
+- Merge still requires #996 all-success on PHP 8.3/8.4/8.5 before this Closure Head is published.
+
+## F22 architectural budget
+
+- `NEW_TABLES = 1`: only `audit_log`.
+- `NEW_DOMAIN_CLASSES = 1`: only `AuditService`.
+- `NEW_PERMISSIONS = 0`.
+- `NEW_PUBLIC_ROUTES = 0`.
+- `NEW_RUNTIME_DEPENDENCIES = 0`.
+- `NEW_EVENT_BUS = 0`.
+- `NEW_SECURITY_FRAMEWORK = 0`.
+- `NEW_AUTH_STACK = 0`.
+- `NEW_SCHEDULER = 0`.
+- Migration 022 creates `audit_log` and changes only `notification_jobs.recipient_email` / `recipient_name` to nullable for the approved retention rule.
+
+## 10-pass closure audit
+
+1. **Scope:** PASS — F22 only; no F23 product work.
+2. **KISS budget:** PASS — one table, one domain class, no new permission/dependency/event bus/auth stack/scheduler.
+3. **Authority uniqueness:** PASS — `AuditService` owns audit persistence; existing business services remain owners; `NotificationService` owns notification retention.
+4. **Anti-fanout:** PASS — audit is explicit at approved route owners; no cross-domain event infrastructure.
+5. **Secrets/privacy:** PASS — audit metadata is bounded and rejects secret-shaped keys; password/reset token/temp credential/document/payment bodies are not recorded.
+6. **Tenant IDOR:** PASS — ownership-first lease resolution remains before child lookups across tenant surfaces.
+7. **Auth/CSRF/session:** PASS — global boundaries preserved; exact protected cron exception remains bounded; production cookie policy is tested.
+8. **Storage/headers/external URLs:** PASS — private storage stays fail-closed; common headers remain centralized; audit viewer is `private, no-store`; WhatsApp provider URL remains HTTPS-only and isolated from candidate continuation capability.
+9. **Retention/evidence:** PASS — terminal recipient name/email redaction is strict `< 90 days`, idempotent and preserves operational evidence.
+10. **Governance:** PRODUCT PASS / REPOSITORY ACTION REQUIRED — `main` reports unprotected and no required checks in current remote evidence.
+
+## Zero Noise convergence
+
+The implementation HEAD must contain one canonical F22 closure checkpoint. Task 5 preflight/partial-CI checkpoint files are superseded and may be removed from the implementation tree because their recovery branches preserve the exact earlier states. Do not delete recovery branches in this PR.
+
+`docs/plans/F22_SECURITY_PRIVACY_AUDIT_IMPLEMENTATION_PLAN.md` remains the execution contract. Its task checklist is not the live status board; this checkpoint + GitHub/CI are authoritative for closure state.
+
+## CI / syntax gate
+
+The existing single `.github/workflows/ci.yml` is extended with one PHP lint step on PHP 8.3. No parallel workflow or dependency is introduced. Final Closure Head must pass:
+
+- `composer validate --strict`;
+- tracked PHP lint;
+- PHPUnit on PHP 8.3, 8.4 and 8.5.
+
+## Governance ruling
+
+`main` currently reports `protected: false` and required checks disabled. Repository rulesets were also observed empty; detailed branch-protection mutation/read is not available through the current integration path.
+
+**GOVERNANCE_ACTION_REQUIRED**
+
+Recommended repository governance after/alongside F22 closure: require PRs, require the canonical CI check(s), block force-push to `main`, and keep direct product work off `main`. Do not represent these controls as enabled until GitHub proves they are enabled.
+
+## Merge gate
+
+Status at commit creation: **MERGE HOLD — FINAL CLOSURE CI REQUIRED**.
+
+Merge PR #27 only if all remain true without another product change:
+
+1. base is still `main@7c0f0c75c665b9888d26bfdbfd5be9bec4df3b82` or an explicitly re-audited successor;
+2. PR head is exactly the Closure Head containing this checkpoint;
+3. PR remains mergeable and has no unresolved review thread;
+4. final CI on that exact head is `success` for PHP 8.3, 8.4 and 8.5, including Composer and lint;
+5. no F23 implementation appears in the diff.
+
+After merge, create a separate branch-hygiene gate for obsolete historical/scratch branches. Then F23 may start from fresh `main` using `docs/specs/F23_F26_UX_RELEASE_SPEC_V1_2026-10-14.md`.
