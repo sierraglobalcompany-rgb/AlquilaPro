@@ -9,7 +9,6 @@ use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Auth\UserService;
 use AlquilaPro\UI\View;
-use PDO;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\App;
@@ -21,7 +20,7 @@ return static function (App $app, array $deps): void {
     $users = $deps['users'];
     /** @var AuditService $audit */
     $audit = $deps['audit'];
-    /** @var PDO $pdo */
+    /** @var \PDO $pdo */
     $pdo = $deps['pdo'];
     /** @var SessionGuard $session */
     $session = $deps['session'];
