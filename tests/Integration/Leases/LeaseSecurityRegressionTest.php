@@ -46,9 +46,22 @@ final class LeaseSecurityRegressionTest extends TestCase
         $expectedRoutes = [
             '/admin/contracts/{id:[0-9]+}/lease',
             '/admin/leases/{id:[0-9]+}/end',
+        ];
+        if ($f21Exists) {
+            array_push($expectedRoutes,
+                '/admin/leases/{id:[0-9]+}/termination',
+                '/admin/leases/{id:[0-9]+}/bonus',
+                '/admin/leases/{id:[0-9]+}/bonus/decision',
+                '/admin/leases/{id:[0-9]+}/liquidation',
+            );
+        }
+        array_push($expectedRoutes,
             '/tenant',
             '/tenant/leases/{id:[0-9]+}',
-        ];
+        );
+        if ($f21Exists) {
+            $expectedRoutes[] = '/tenant/leases/{id:[0-9]+}/liquidation';
+        }
         if ($f15Exists) {
             $expectedRoutes[] = '/tenant/leases/{leaseId:[0-9]+}/maintenance/{id:[0-9]+}/visits/{visitId:[0-9]+}/select';
         }
