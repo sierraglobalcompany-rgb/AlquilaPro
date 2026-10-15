@@ -205,6 +205,33 @@ final readonly class TerminationService
             ];
         }
 
+        $payments = array_map(
+            fn (array $payment): array => $this->paymentEvidence($payment),
+            $this->finance->listPaymentsForLease($leaseId),
+        );
+        $memberships = $this->memberships->listForLease($leaseId);
+        $bonus = $this->bonusEnabled ? $this->bonusForLease($leaseId) : null;
+        $blockers = [];
+
+        foreach ($payments as $payment) {
+            if ($payment['state'] === 'pending_reconciliation') {
+                $blockers[] = 'payment_pending_reconciliation';
+                break;
+            }
+        }
+        foreach ($memberships as $membership) {
+            if ($membership['charge_decision_required'] === true) {
+                $blockers[] = 'membership_charge_decision_pending';
+                break;
+            }
+        }
+        if ($bonus !== null && $bonus['decision'] === null) {
+            $blockers[] = 'bonus_decision_pending';
+        }
+        if ($inventories['initial'] !== [] && $inventories['final'] === []) {
+            $blockers[] = 'final_inventory_missing';
+        }
+
         return [
             'lease' => $lease,
             'contract' => [
@@ -220,10 +247,7 @@ final readonly class TerminationService
             'finance' => [
                 'summary' => $this->finance->summaryForLease($leaseId, $today),
                 'charges' => $this->finance->listForLease($leaseId, $today),
-                'payments' => array_map(
-                    fn (array $payment): array => $this->paymentEvidence($payment),
-                    $this->finance->listPaymentsForLease($leaseId),
-                ),
+                'payments' => $payments,
             ],
             'obligations' => array_map(
                 fn (array $obligation): array => $this->obligationEvidence($obligation),
@@ -236,9 +260,9 @@ final readonly class TerminationService
                 fn (array $incident): array => $this->communityEvidence($incident),
                 $this->community->listForLease($leaseId),
             ),
-            'memberships' => $this->memberships->listForLease($leaseId),
-            'bonus' => $this->bonusEnabled ? $this->bonusForLease($leaseId) : null,
-            'blockers' => [],
+            'memberships' => $memberships,
+            'bonus' => $bonus,
+            'blockers' => $blockers,
         ];
     }
 
