@@ -1,209 +1,194 @@
-# F22 — Security + Privacy + Audit Log Implementation Plan
+# F22 — Security, Privacy & Audit Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: use `superpowers:executing-plans` task-by-task. TDD is mandatory; every product task begins RED and closes GREEN before the next task.
 
-**Goal:** Close AlquilaPro V1 security/privacy gaps and add a small append-only audit log without introducing a second auth stack, event bus, SIEM, scheduler or security framework.
+**Goal:** Close AlquilaPro V1 security/privacy hardening with one append-only audit log, explicit high-value audit events, 90-day terminal notification-recipient redaction, centralized safe response headers, and evidence-driven regression hardening without adding a second auth/security/logging architecture.
 
-**Architecture:** Add one `AuditService` backed by one `audit_log` table. High-value domain owners write audit rows explicitly on the same PDO connection and, where the owner already has a transaction, before commit so business mutation + audit are atomic; non-transactional audited mutations receive the smallest local transaction needed. Cross-cutting hardening remains test-driven: reproduce each issue first, then modify only the owning file.
+**Architecture:** `AuditService` is the only new F22 domain class and the only authority for `audit_log`. High-value mutation routes call it explicitly only after the existing domain mutation succeeds, using the canonical entity id and validated `REMOTE_ADDR`; existing domain services remain owners of business state. `NotificationService` remains owner of notification-recipient retention and reuses the existing protected F16 cron. Common security headers live in bootstrap middleware, not route-by-route.
 
-**Tech Stack:** PHP >=8.3 <8.6, Slim 4, PDO/MySQL, PHPUnit 11.5, existing SSR/auth/session/CSRF/storage architecture.
+**Tech Stack:** PHP >=8.3 <8.6, Slim 4, PDO/MySQL, PHPUnit 11.5, existing SSR/view/session/CSRF stack.
 
-**Spec:** `docs/specs/F21_F22_SPEC_BATCH_V1_2026-10-14.md` — sections F22 / 16–29.
+**Spec:** `docs/specs/F21_F22_SPEC_BATCH_V1_2026-10-14.md` sections F22 / 16–30.
 
 ## Global Constraints
 
-- `NEW_TABLES = 1`: `audit_log`.
-- `NEW_DOMAIN_CLASSES = 1`: `AuditService`.
+- Canonical base: `main@7c0f0c75c665b9888d26bfdbfd5be9bec4df3b82` (F21 merged).
+- `NEW_TABLES = 1`: only `audit_log`.
+- `NEW_DOMAIN_CLASSES = 1`: only `AuditService`.
 - `NEW_PERMISSIONS = 0`; audit viewer is owner-only in V1.
+- `NEW_PUBLIC_ROUTES = 0`.
 - `NEW_RUNTIME_DEPENDENCIES = 0`.
-- `NEW_EVENT_BUS = 0`, `NEW_SECURITY_FRAMEWORK = 0`, `NEW_AUTH_STACK = 0`, `NEW_SCHEDULER = 0`.
-- Audit log is append-only; no product update/delete endpoint.
-- Audit metadata max 2048 bytes and never stores passwords, tokens, cookies, session dumps, document/payment payloads, SQL or exception traces.
-- IP source is validated `REMOTE_ADDR`; do not trust arbitrary `X-Forwarded-For`.
+- `NEW_EVENT_BUS = 0`; `NEW_SECURITY_FRAMEWORK = 0`; `NEW_AUTH_STACK = 0`; `NEW_SCHEDULER = 0`.
+- Expected migration: `022_*`; migration may also make only `notification_jobs.recipient_email` and `recipient_name` nullable for the frozen retention rule.
+- Audit log is append-only. No functional update/delete API.
+- Audit metadata never contains request dumps, cookies, sessions, tokens, passwords, document/payment bodies, SQL, exception traces, SMTP/cron secrets, or equivalent payloads.
+- Remote IP comes only from validated `REMOTE_ADDR`; ignore raw forwarding headers.
 - Tenant child lookups happen only after `LeaseService::findForUser()`.
 - F16 recipient retention is 90 days after terminal `sent_at`/`failed_at`, using the existing F16 cron.
 - Security fixes require a reproducing RED; no speculative refactor.
 - No F23 implementation until F22 closes.
 
-## Pre-Execution Gate
+## PRE-KISS Decisions
 
-- [ ] F21 product and closure checkpoints exist and F21 focal/integrated/full suites are GREEN.
-- [ ] Fetch the final F20/F21 heads so constructor signatures and route wiring in this plan are reconciled before code.
-- [ ] Record base SHA and confirm worktree is clean.
-- [ ] Confirm migration 022 is the next migration number after final F21.
+1. **Audit integration point:** route-level, immediately after successful domain mutation. This is the smallest place that already has actor, canonical entity id and HTTP `REMOTE_ADDR`; do not inject `AuditService` into Finance/Lease/Documents/Membership/etc. constructors.
+2. **Audit failure behavior:** `AuditService::record()` is explicit and may throw; do not silently swallow audit-write failures. No hidden fallback/file logger.
+3. **Audit read API:** same class may expose `listRecent(int $limit = 100): array` solely for the owner-only viewer; no repository class/table gateway.
+4. **AuditService transaction rule:** `record()` never begins/commits/rolls back a business transaction. F22 does not retrofit cross-domain atomicity through an event bus.
+5. **Metadata shape:** associative machine-key map; scalar/null values or small scalar lists only; no nested object graph. Service enforces bounded strings/lists and total encoded JSON <= 2048 bytes. Secret-shaped keys/unsafe values fail closed rather than being silently stored.
+6. **Security headers:** one common response middleware sets `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and `X-Frame-Options: SAMEORIGIN`. Existing route-specific `Cache-Control: private, no-store` remains authoritative for sensitive responses. Do not add CSP nonce infrastructure. Do not force HSTS merely for aesthetics.
+7. **Notification retention:** `NotificationService::redactTerminalRecipients(string $now): int` owns the operation, uses a fixed internal 90-day retention constant, nulls only recipient name/email on terminal rows older than cutoff, and leaves operational fields intact.
+8. **High-value event mapping:** routes record only the frozen baseline events. Do not audit every GET, download, cron heartbeat, failed public form, or ordinary CRUD not listed by the SPEC.
 
 ## Review Focus
 
-1. Audit insert failure must not leave a committed high-value mutation without its audit row — covered by Task 2 atomicity tests.
-2. Recipient redaction must never affect pending/retryable jobs — covered by Task 3.
-3. Tenant IDOR must resolve ownership before every child lookup across all modules — covered by Task 5.
-4. Upload/path hardening must reject traversal, symlink and spoofed PHP without weakening valid files — covered by Task 6.
-5. HTTPS-only headers/cookie behavior must not break local HTTP development — covered by Task 7.
+1. Audit metadata containing secret-shaped keys/oversize JSON must fail closed and leave no row.
+2. Owner-only audit viewer must reject non-owner users without creating a new permission catalog entry.
+3. Notification recipients newer than/equal to the 90-day threshold must not be prematurely redacted; older terminal rows must be redacted without breaking history/processing.
+4. Tenant child lookups must remain ownership-first across finance/payments/obligations/maintenance/documents/community/memberships/liquidation.
+5. Common security middleware must not weaken the exact protected-cron CSRF exception, private response cache controls, installer flow, or local HTTP development.
 
 ---
 
-### Task 1: Audit schema, service and owner-only viewer
+### Task 1: Migration 022 + canonical AuditService
 
 **Files:**
-- Create: `database/migrations/022_create_audit_log_and_privacy_retention.sql`
+- Create: `database/migrations/022_create_audit_log.sql`
 - Create: `app/Audit/AuditService.php`
+- Create: `tests/Integration/Audit/AuditSchemaTest.php`
+- Create: `tests/Integration/Audit/AuditServiceTest.php`
+- Modify: `tests/Integration/Foundation/MigrationRunnerTest.php`
+
+**Interfaces:**
+- Produces `AuditService::__construct(PDO $pdo)`.
+- Produces `record(?int $actorUserId, string $action, string $entityType, ?int $entityId, string $summary, ?string $remoteIp, array $metadata = []): void`.
+- Produces `listRecent(int $limit = 100): array` for the owner-only viewer in Task 2.
+
+- [ ] **Step 1 — RED schema:** assert migration 022 creates exactly one new table `audit_log` with the frozen columns/FK and no status/history/child metadata table; assert `notification_jobs.recipient_email` and `recipient_name` become nullable and no other F16 columns are relaxed.
+- [ ] **Step 2 — Verify RED:** CI must fail because migration 022 and `AuditService` are absent, not from fixture/syntax errors.
+- [ ] **Step 3 — Minimal migration GREEN:** create `audit_log`; alter only the two terminal recipient snapshot columns to NULL-compatible.
+- [ ] **Step 4 — RED service contract:** test valid append, immutable surface, machine-key validation, summary 1..255, optional entity id, valid/invalid IP behavior, safe metadata, secret-shaped/oversize metadata rejection, deterministic recent ordering and bounded list limit.
+- [ ] **Step 5 — Minimal `AuditService` GREEN:** one class, direct PDO, no domain calls, no transaction ownership, no update/delete methods.
+- [ ] **Step 6 — GREEN matrix:** certify PHP 8.3/8.4/8.5 before Task 2.
+
+### Task 2: Owner-only viewer + centralized response headers
+
+**Files:**
 - Create: `app/Audit/routes.php`
 - Create: `resources/views/audit_log.php`
 - Modify: `bootstrap/app.php`
-- Create: `tests/Integration/Security/AuditSchemaTest.php`
-- Create: `tests/Integration/Security/AuditServiceTest.php`
-- Create: `tests/Integration/Security/AuditRoutesTest.php`
+- Create: `tests/Integration/Audit/AuditRoutesTest.php`
+- Create/modify focused security-header regression test under existing Foundation/Auth security test owner.
 
 **Interfaces:**
-- Constructor: `AuditService::__construct(PDO $pdo)`.
-- Produces:
-  - `record(?int $actorUserId, string $action, string $entityType, ?int $entityId, string $summary, ?string $remoteIp, array $metadata = []): void`
-  - `listRecent(int $limit = 100, ?int $beforeId = null): array`
-- Owner route: `GET /admin/audit` — owner role only, cursor by `before_id`, max page size 100.
+- Authenticated route: `GET /admin/audit`.
+- Owner role only; no new permission string.
+- Bootstrap wires one `AuditService` and passes it through shared dependencies.
 
-- [ ] **Step 1: Write RED schema test** asserting one new table only, required columns, no update/delete/status columns, and F16 recipient columns become nullable in the same migration without adding a privacy table.
-- [ ] **Step 2: Run RED** with `vendor/bin/phpunit tests/Integration/Security/AuditSchemaTest.php`.
-- [ ] **Step 3: Implement migration 022**: create `audit_log`; `ALTER notification_jobs` so `recipient_email` and `recipient_name` accept `NULL`.
-- [ ] **Step 4: Write RED service tests** for action/entity validation, summary bounds, metadata <=2048 bytes, secret-shaped/unsupported metadata rejection, invalid IP -> `NULL`, and bounded cursor listing.
-- [ ] **Step 5: Implement `AuditService`** as one explicit PDO writer/reader; it starts no transaction of its own so it participates in the caller's transaction when one exists.
-- [ ] **Step 6: Write RED route tests** proving unauthenticated redirect, non-owner 403, owner 200, no new permission key and no audit mutation routes.
-- [ ] **Step 7: Wire service + route once** in `bootstrap/app.php`; add minimal owner-only SSR table.
-- [ ] **Step 8: Run GREEN** for Task 1 tests.
-- [ ] **Step 9: Commit** `feat(f22): add append only audit log`.
+- [ ] **Step 1 — RED viewer:** anonymous -> login redirect; forced-password-change -> password route; non-owner -> 403; owner -> rows rendered from `listRecent()`; no raw metadata payload beyond safe rendered fields.
+- [ ] **Step 2 — RED common headers:** normal public/authenticated responses receive `nosniff`, strict referrer policy and SAMEORIGIN; existing private-file `private, no-store` behavior remains unchanged.
+- [ ] **Step 3 — GREEN wiring:** instantiate `AuditService` once, add one authenticated Audit route tree, add one SSR view, add one common response-header middleware.
+- [ ] **Step 4 — Regression:** installer, login, cron, public catalog and private file routes continue working with existing auth/CSRF/cache contracts.
+- [ ] **Step 5 — GREEN matrix:** PHP 8.3/8.4/8.5.
 
-### Task 2: Atomic high-value audit integration
+### Task 3: Explicit high-value audit events
 
-**Files:**
-- Modify: `bootstrap/app.php`
-- Modify: `app/Auth/UserService.php`
-- Modify if it owns the reset mutation: `app/Auth/AuthService.php`
-- Modify: `app/UI/Branding.php`
-- Modify: `app/Contracts/ContractService.php`
-- Modify: `app/Leases/LeaseService.php`
-- Modify: `app/Finance/FinanceService.php`
-- Modify: `app/Documents/DocumentService.php`
-- Modify: `app/Memberships/MembershipService.php`
-- Modify: `app/Leases/TerminationService.php`
-- Create: `tests/Integration/Security/AuditIntegrationTest.php`
-- Create: `tests/Integration/Security/AuditAtomicityTest.php`
+**Files (modify only existing route owners):**
+- `app/Auth/routes.php`
+- `app/UI/routes.php`
+- `app/Contracts/routes.php`
+- `app/Leases/routes.php`
+- `app/Finance/routes.php`
+- `app/Documents/routes.php`
+- `app/Memberships/routes.php`
+- plus focused Audit integration test(s); no new business service class.
 
-**Interfaces:**
-- Each audited owner receives the same `AuditService` instance through constructor injection; no service locator/global/static bus.
-- Allowlisted actions: `user.created`, `user.permissions_changed`, `user.active_changed`, `user.password_reset_issued`, `appearance.updated`, `contract.finalized`, `lease.activated`, `lease.ended`, `charge.created`, `charge.voided`, `payment.reconciled`, `payment.rejected`, `document.version_created`, `membership.charge_created`, `membership.charge_skipped`, `bonus.decided`, `liquidation.finalized`.
+**Interfaces / frozen event mapping:**
+- `user.created` — after `UserService::create()`; entity `user`, created user id.
+- `user.permissions_changed` — after `setPermissions()`; entity `user`, route id.
+- `user.active_changed` — after `setActive()`; entity `user`, route id; metadata only `active` boolean.
+- `user.password_reset_issued` — after `AuthService::issueResetToken()`; entity `user`, route id; **never log token/link**.
+- `appearance.updated` — after `Branding::update()`; entity `appearance`, null id; no logo bytes/path metadata.
+- `contract.finalized` — after `ContractService::finalize()`; entity `contract`, contract id.
+- `lease.activated` — after `LeaseService::activate()`; entity `lease`, returned lease id; do not log temporary password.
+- `lease.ended` — after `LeaseService::end()`; entity `lease`, returned lease id.
+- `charge.created` — direct Finance route charge creation. Capture returned charge id(s); monthly generation may emit one row per actually created charge. Do not duplicate this event for membership-generated charges; membership has its own event below.
+- `charge.voided` — after `FinanceService::voidCharge()`; entity `charge`, charge id; no raw reason if unnecessary.
+- `payment.reconciled` / `payment.rejected` — after canonical Finance mutations; entity `payment`, payment id; do not log allocations/receipt/rejection body.
+- `document.version_created` — capture returned document from `createFileVersion()` / `createContentVersion()`; entity `document`, document id; metadata may contain only safe `type` + scope kind/id, never content/file hash/path/bytes.
+- `membership.charge_created` / `membership.charge_skipped` — after `MembershipService::decideCharge()`; entity `membership`, membership id; choose action from returned `charge_outcome`; metadata may contain `charge_id` only when created.
+- `bonus.decided` — after `TerminationService::decideBonus()`; entity `lease`, lease id; metadata only terminal decision, not amount/note.
+- `liquidation.finalized` — after `TerminationService::finalizeLiquidation()`; entity `liquidation`, returned liquidation id; metadata may contain lease id only.
 
-- [ ] **Step 1: Write RED integration tests** that execute one real mutation per allowlisted action and assert exactly one corresponding audit row with bounded safe metadata.
-- [ ] **Step 2: Write RED atomicity tests** using an audit-table failure fixture/constraint so an audited mutation that has not committed cannot commit without its audit row.
-- [ ] **Step 3: Inject `AuditService` explicitly** into only the owners listed above; keep it dependency-free beyond PDO.
-- [ ] **Step 4: For existing transactional mutations**, call `AuditService::record()` after all domain validation/writes and before commit.
-- [ ] **Step 5: For audited non-transactional mutations**, add the smallest local transaction around the existing mutation + audit insert; do not add a transaction abstraction.
-- [ ] **Step 6: Keep summaries/metadata minimal**: entity ids, safe machine-state labels and no financial/document payload copies.
-- [ ] **Step 7: Run GREEN** for audit integration/atomicity plus affected module suites.
-- [ ] **Step 8: Commit** `feat(f22): audit high value mutations atomically`.
+**Remote IP:** every route passes only `$request->getServerParams()['REMOTE_ADDR'] ?? null`; never forwarding headers.
 
-### Task 3: F16 recipient privacy retention using the existing cron
+- [ ] **Step 1 — RED integration tests:** one representative test per route owner plus a complete allowlist/coverage assertion that every frozen action appears exactly at its approved mutation surface and no GET/download/cron heartbeat is audited.
+- [ ] **Step 2 — Verify RED:** fail because route owners do not yet receive/use AuditService.
+- [ ] **Step 3 — Minimal GREEN:** add AuditService dependency from shared deps and explicit `record()` calls only after successful canonical mutations. Capture existing return values instead of re-querying when possible.
+- [ ] **Step 4 — Leak regression:** password reset token, temporary password, document payload, receipt/payment allocations and F21 financial snapshot never appear in `audit_log`.
+- [ ] **Step 5 — GREEN matrix:** PHP 8.3/8.4/8.5.
+
+### Task 4: F16 terminal recipient retention
 
 **Files:**
 - Modify: `app/Notifications/NotificationService.php`
 - Modify: `app/Notifications/routes.php`
-- Create: `tests/Integration/Notifications/NotificationPrivacyRetentionTest.php`
+- Modify/create focused notification retention integration test; reuse existing Notification test architecture.
 
 **Interfaces:**
-- Produces: `redactTerminalRecipients(string $now): int`.
-- Constant: `TERMINAL_RECIPIENT_RETENTION_DAYS = 90`.
+- `NotificationService::redactTerminalRecipients(string $now): int`.
+- Existing `/cron/notifications` calls retention in the same execution; no new route, cron, scheduler or table.
 
-- [ ] **Step 1: Write RED tests** proving rows terminal for >90 days get `recipient_email=NULL` and `recipient_name=NULL`; rows at/below threshold remain intact; pending/claimed/retryable rows are never redacted.
-- [ ] **Step 2: Add RED operational-history test** proving type/template/dedupe/schedule/attempt/sent-or-failed/safe-error fields remain readable after redaction.
-- [ ] **Step 3: Run RED** with `vendor/bin/phpunit tests/Integration/Notifications/NotificationPrivacyRetentionTest.php`.
-- [ ] **Step 4: Implement `redactTerminalRecipients()`** with one bounded UPDATE predicate on terminal timestamps; no new table/hash/copy of recipient data.
-- [ ] **Step 5: Invoke it from the existing protected `/cron/notifications` execution**; do not add another cron route or scheduler.
-- [ ] **Step 6: Run GREEN** for Notifications suite.
-- [ ] **Step 7: Commit** `feat(f22): redact terminal notification recipients`.
+- [ ] **Step 1 — RED:** sent/failed terminal rows older than 90 days redact `recipient_name` + `recipient_email`; rows newer than/equal to threshold and non-terminal rows remain unchanged; type/template/dedupe/scheduled/terminal timestamp/attempt_count/safe error remain readable.
+- [ ] **Step 2 — Verify RED:** method absent and schema previously non-nullable are the expected causes.
+- [ ] **Step 3 — GREEN owner method:** calculate UTC cutoff from validated `now`; one bounded UPDATE on terminal rows; set only the two recipient fields to NULL; return affected row count.
+- [ ] **Step 4 — Reuse cron:** invoke redaction from the existing protected notification cron and add returned count to its safe JSON response if useful; do not audit cron heartbeat.
+- [ ] **Step 5 — Regression:** `processDue()` behavior for live jobs unchanged; terminal history remains operational after redaction.
+- [ ] **Step 6 — GREEN matrix:** PHP 8.3/8.4/8.5.
 
-### Task 4: Public catalog and candidate surface hardening
-
-**Files:**
-- Create: `tests/Integration/Security/PublicSurfaceSecurityTest.php`
-- Create: `tests/Integration/Security/CandidateSecurityRegressionTest.php`
-- Modify only if a RED proves a defect: `app/Properties/routes.php`, `app/Properties/PropertyService.php`, `app/Candidates/routes.php`, `app/Candidates/CandidateService.php`, `app/Candidates/CandidateDocumentService.php`, `bootstrap/app.php`.
-
-**Interfaces:** existing public routes only; no new public endpoint.
-
-- [ ] **Step 1: Write regression tests** for public allowlist, unpublished media 404, no internal address/notes leakage, non-enumerable candidate flow, raw token absent from logs/responses except the intended one-time continuation URL, expiry/rotation fail closed, and generic duplicate identity response.
-- [ ] **Step 2: Run the new tests before product edits** and classify every failure as `PRODUCT DEFECT`, `STALE TEST`, or `NO DEFECT`.
-- [ ] **Step 3: For each real RED only**, repair the owning authority minimally; do not create new token/auth/rate-limit framework.
-- [ ] **Step 4: Re-run focused tests until GREEN**, then run affected Properties/Candidates suites once.
-- [ ] **Step 5: Commit only if product code changed**: `fix(f22): harden public candidate surfaces`.
-
-### Task 5: Tenant IDOR ordering matrix
+### Task 5: Security/privacy hardening matrix — repair only proven gaps
 
 **Files:**
-- Create: `tests/Integration/Security/TenantIdorMatrixTest.php`
-- Modify only on proven RED: `app/Leases/routes.php`, `app/Finance/routes.php`, `app/Documents/routes.php`, `app/Maintenance/routes.php`, `app/Community/routes.php`, F20 membership routes, F21 termination routes.
+- Prefer existing security regression tests in Auth/Candidates/Properties/Documents/Finance/Leases/Foundation.
+- Product files may change only when a RED demonstrates a concrete SPEC gap.
 
-**Interfaces:** mandatory sequence `current user -> LeaseService::findForUser() -> child lookup`.
+- [ ] **Step 1 — Public/catalog RED checks:** no private address/internal notes leakage, unpublished media 404, public identifiers do not expose private internals.
+- [ ] **Step 2 — Candidate/token RED checks:** raw continuation token absent from persistent/log surfaces except intended one-time URL; expiration/rotation/non-enumeration preserved.
+- [ ] **Step 3 — Tenant IDOR ordering checks:** finance, payments, obligations, maintenance/visits, documents, community, memberships and liquidation resolve current tenant lease ownership before child lookup.
+- [ ] **Step 4 — Upload/storage checks:** size before unbounded read where applicable, MIME from bytes, hashes where owner supports them, spoof/traversal/symlink/path containment, private file `no-store` + `nosniff`.
+- [ ] **Step 5 — Auth/session/CSRF/errors checks:** login rotates session, forced password change/inactivity preserved, every authenticated mutation uses global CSRF except exact protected cron, generic 500 boundary, safe candidate-token path logging, production cookie flags derived from HTTPS.
+- [ ] **Step 6 — Redirect/external URL checks:** no open redirect; WhatsApp snapshot URL integrity preserved; provider URLs do not leak continuation token through new F22 behavior.
+- [ ] **Step 7 — Minimal repair pass:** max one product repair pass for proven failures; no speculative hardening framework.
+- [ ] **Step 8 — GREEN matrix:** PHP 8.3/8.4/8.5 after repairs (or test-only closure if no product gap exists).
 
-- [ ] **Step 1: Build RED/green matrix** for finance, payments, obligations, maintenance/visits, documents, community, memberships and liquidation using two tenants and cross-lease ids.
-- [ ] **Step 2: Add structural regression assertions only where semantic behavior alone cannot prove lookup order; assert the ownership call precedes child-service calls, not exact callback capture lists.**
-- [ ] **Step 3: Run matrix before edits**; do not patch passing modules.
-- [ ] **Step 4: Repair only failing route owners** by moving ownership resolution before child lookup.
-- [ ] **Step 5: Run GREEN** and affected module suites.
-- [ ] **Step 6: Commit only if needed**: `fix(f22): enforce tenant ownership before child lookups`.
-
-### Task 6: Storage/upload/path security matrix
-
-**Files:**
-- Create: `tests/Integration/Security/StorageSecurityMatrixTest.php`
-- Reuse existing module-specific storage security tests.
-- Modify only on proven RED: candidate document, property media, contract, payment receipt, obligation support, insurance, maintenance photo, F18 DocumentService storage owners.
-
-- [ ] **Step 1: Test every private upload/storage authority** for physical-size bound, bounded read, MIME-from-bytes, unsupported/PHP spoof rejection, traversal rejection, symlink rejection, canonical containment, integrity/hash enforcement where applicable, and `private, no-store` + `nosniff` on private downloads.
-- [ ] **Step 2: Run matrix before edits** and record each failing authority separately.
-- [ ] **Step 3: Repair each owner minimally**; converge duplicated safe helpers only when two or more copies are demonstrably identical and merging reduces code without creating a framework.
-- [ ] **Step 4: Run GREEN** including the existing Linux symlink CI path.
-- [ ] **Step 5: Commit only if needed**: `fix(f22): close private storage regressions`.
-
-### Task 7: Session, CSRF, headers, errors and secrets
-
-**Files:**
-- Create: `tests/Integration/Security/SessionCsrfHeadersTest.php`
-- Create: `tests/Integration/Security/SecretsErrorsRegressionTest.php`
-- Modify only where RED proves need: `index.php`, `bootstrap/app.php`, authenticated route files, `.htaccess`, `.gitignore`.
-
-**Interfaces / required behavior:**
-- Login rotates session id; existing forced-password/inactivity controls remain.
-- Every authenticated POST has CSRF except exact `POST /cron/notifications`.
-- Baseline dynamic headers: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: SAMEORIGIN`.
-- HSTS only when detected base URL is HTTPS; no HSTS on local HTTP.
-- Sensitive authenticated/private responses remain `Cache-Control: private, no-store`.
-
-- [ ] **Step 1: Write tests** for session fixation, exact CSRF exemption, production cookie flags, baseline headers, HTTPS-only HSTS, generic 500/422 boundaries, redacted candidate token path logging, and absence of SMTP/cron/session/document secrets in logs/responses.
-- [ ] **Step 2: Run before edits**; classify stale structural tests separately from product defects.
-- [ ] **Step 3: Centralize common security headers in the existing bootstrap middleware** only if tests prove gaps; keep private-file headers at their current owner.
-- [ ] **Step 4: Apply minimal owner fixes for any other RED**; do not add CSP nonce framework, WAF, OAuth/OIDC or new auth middleware stack.
-- [ ] **Step 5: Run GREEN** plus Auth/Foundation integration suites.
-- [ ] **Step 6: Commit only if needed**: `fix(f22): harden session csrf headers and error boundaries`.
-
-### Task 8: Governance, convergence and checkpoint
+### Task 6: Convergence, governance and final checkpoint
 
 **Files:**
 - Create: `docs/checkpoints/F22_CHECKPOINT_2026-10-14.md`
-- Modify only for verified operator instructions: `README.md`
+- Modify README/plan only if factual state needs convergence.
 
-- [ ] **Step 1: Run focal F22 tests** under `tests/Integration/Security` plus `NotificationPrivacyRetentionTest`.
-- [ ] **Step 2: Run affected integrated suites** once: Auth, Candidates, Properties, Leases, Finance, Documents, Notifications, Memberships/F20, Termination/F21.
-- [ ] **Step 3: Run full suite once** with `composer test`.
-- [ ] **Step 4: Run `composer validate --strict` and PHP lint** for changed PHP files.
-- [ ] **Step 5: Fresh-review entire F22 diff** for KISS/zero-noise/antipatch, secret leakage, audit payloads and duplicate security/auth abstractions; allow one evidence-based repair pass.
-- [ ] **Step 6: Verify GitHub `main` protection state**. If still unprotected and no administrative connector is available, record `GOVERNANCE_ACTION_REQUIRED` with exact desired controls: PR required, CI required, force-push blocked. Do not claim it is enabled.
-- [ ] **Step 7: Write checkpoint** with base/product/closure SHAs, exact test counts, security matrix outcome, governance state and `MERGE_AUTHORIZED: NO`.
-- [ ] **Step 8: Commit** `docs(f22): close security privacy checkpoint`.
+- [ ] **Step 1 — Full affected suites:** Audit/Auth/UI/Contracts/Leases/Finance/Documents/Memberships/Notifications plus Candidates/Properties/Foundation security regressions.
+- [ ] **Step 2 — Full suite once:** `composer test`; capture exact test/assertion/skip counts.
+- [ ] **Step 3 — Syntax/Composer gates:** `composer validate --strict` + PHP lint on changed PHP files.
+- [ ] **Step 4 — Fresh 10-pass audit:** KISS, Zero Noise, Anti-patch, audit-table budget, auth-stack uniqueness, secret/privacy leakage, IDOR ordering, upload/storage, CSRF/headers/errors, retention/governance.
+- [ ] **Step 5 — Governance truth:** re-read `main` protection. If still unprotected and admin mutation is unavailable, checkpoint exactly `GOVERNANCE_ACTION_REQUIRED`; do not fake success.
+- [ ] **Step 6 — Final docs-only checkpoint + fresh CI matrix:** only after product head is certified.
+- [ ] **Step 7 — Merge gate:** merge F22 only if head/base/mergeability unchanged and PHP 8.3/8.4/8.5 all `success`. F23 is next only after F22 closes.
 
-## Self-Review Result
+## Self-review — 10 passes
 
-- Spec coverage: PASS — audit, privacy retention, public/candidate, IDOR, storage, auth/session/CSRF, headers/errors/secrets and governance all map to tasks.
-- Step scan: PASS — security repairs are conditional on reproducing REDs; no speculative patch task.
-- Type consistency: PASS — one `AuditService`, one PDO-backed audit writer, explicit owner injection, no event bus.
-- Review Focus: PASS — atomicity, retention safety, IDOR ordering, storage spoof/traversal/symlink and HTTPS/local behavior are each pinned to a task.
-- Proportion: PASS — the plan specifies contracts/tests/gates without transcribing implementations.
+1. **Scope:** PASS — only F22; F23–F26 untouched.
+2. **KISS budget:** PASS — 1 table, 1 domain class, 0 permission/runtime/event-bus/auth/scheduler additions.
+3. **Authority duplication:** PASS — business owners unchanged; AuditService only records evidence, NotificationService owns retention.
+4. **Constructor fanout:** PASS — route-level explicit audit avoids injecting AuditService into all domain constructors.
+5. **Secret/privacy:** PASS — metadata bounded/allowlisted; token/password/document/payment payloads forbidden.
+6. **IDOR:** PASS — task explicitly re-certifies ownership-first tenant access.
+7. **CSRF/auth:** PASS — existing global middleware preserved; exact cron exemption remains singular.
+8. **Storage/headers:** PASS — common safe headers centralized; private cache/storage guards retained.
+9. **Retention:** PASS — one existing cron, one owner method, no recipient backup/hash table.
+10. **Governance/noise:** PASS — branch protection reported truthfully; repair only proven RED gaps; no speculative framework.
 
-**Execution status:** `PLAN WRITTEN / USER REVIEW REQUIRED / F21 GREEN REQUIRED / IMPLEMENTATION NOT AUTHORIZED / MERGE NOT AUTHORIZED`.
+## Execution state
+
+`PLAN_F22: READY / AUDITED`  
+`PRODUCT_IMPLEMENTATION: NOT STARTED`  
+`NEXT: create F22 implementation branch from canonical main and execute Task 1 RED only.`

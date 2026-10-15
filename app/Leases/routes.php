@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use AlquilaPro\Audit\AuditService;
 use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
@@ -47,6 +48,8 @@ return static function (App $app, array $deps): void {
     $memberships = $deps['memberships'];
     /** @var TerminationService $termination */
     $termination = $deps['termination'];
+    /** @var AuditService $audit */
+    $audit = $deps['audit'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -215,7 +218,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($adminGuard, $leases, $view, $csrf): ResponseInterface {
+    ) use ($adminGuard, $leases, $audit, $view, $csrf): ResponseInterface {
         $user = $adminGuard($response);
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -229,6 +232,14 @@ return static function (App $app, array $deps): void {
         }
 
         $lease = $activated['lease'];
+        $audit->record(
+            (int) $user['id'],
+            'lease.activated',
+            'lease',
+            (int) $lease['id'],
+            'Arrendamiento activado.',
+            $request->getServerParams()['REMOTE_ADDR'] ?? null,
+        );
         $response->getBody()->write($view->renderApp('lease_activation_credential', [
             'pageTitle' => 'Arrendamiento activado',
             'user' => $user,
@@ -247,7 +258,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($adminGuard, $leases, $path): ResponseInterface {
+    ) use ($adminGuard, $leases, $audit, $path): ResponseInterface {
         $user = $adminGuard($response);
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -259,6 +270,15 @@ return static function (App $app, array $deps): void {
             $response->getBody()->write($exception->getMessage());
             return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
         }
+
+        $audit->record(
+            (int) $user['id'],
+            'lease.ended',
+            'lease',
+            (int) $lease['id'],
+            'Arrendamiento finalizado.',
+            $request->getServerParams()['REMOTE_ADDR'] ?? null,
+        );
 
         return $response
             ->withHeader('Location', $path('/admin/contracts/' . (int) $lease['contract_id']))
@@ -333,16 +353,18 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($adminGuard, $termination, $path): ResponseInterface {
+    ) use ($adminGuard, $termination, $audit, $path): ResponseInterface {
         $user = $adminGuard($response);
         if ($user instanceof ResponseInterface) {
             return $user;
         }
         $form = (array) ($request->getParsedBody() ?? []);
+        $leaseId = (int) $args['id'];
+        $decision = (string) ($form['decision'] ?? '');
         try {
             $termination->decideBonus(
-                (int) $args['id'],
-                (string) ($form['decision'] ?? ''),
+                $leaseId,
+                $decision,
                 (int) $user['id'],
                 time(),
             );
@@ -350,9 +372,20 @@ return static function (App $app, array $deps): void {
             $response->getBody()->write($exception->getMessage());
             return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
         }
+
+        $audit->record(
+            (int) $user['id'],
+            'bonus.decided',
+            'lease',
+            $leaseId,
+            'Decisión de bono registrada.',
+            $request->getServerParams()['REMOTE_ADDR'] ?? null,
+            ['decision' => $decision],
+        );
+
         return $response->withHeader(
             'Location',
-            $path('/admin/leases/' . (int) $args['id'] . '/termination'),
+            $path('/admin/leases/' . $leaseId . '/termination'),
         )->withStatus(303);
     });
 
@@ -360,7 +393,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($adminGuard, $termination, $todayProvider, $path): ResponseInterface {
+    ) use ($adminGuard, $termination, $audit, $todayProvider, $path): ResponseInterface {
         $user = $adminGuard($response);
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -369,6 +402,7 @@ return static function (App $app, array $deps): void {
             return $response->withStatus(403);
         }
         $form = (array) ($request->getParsedBody() ?? []);
+        $leaseId = (int) $args['id'];
         $keysRaw = $form['keys_returned_count'] ?? null;
         $keys = $keysRaw === null || $keysRaw === ''
             ? null
@@ -377,8 +411,8 @@ return static function (App $app, array $deps): void {
             return $response->withStatus(422);
         }
         try {
-            $termination->finalizeLiquidation(
-                (int) $args['id'],
+            $liquidation = $termination->finalizeLiquidation(
+                $leaseId,
                 [
                     'property_returned' => array_key_exists('property_returned', $form),
                     'keys_returned_count' => $keys,
@@ -393,9 +427,20 @@ return static function (App $app, array $deps): void {
             $response->getBody()->write($exception->getMessage());
             return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
         }
+
+        $audit->record(
+            (int) $user['id'],
+            'liquidation.finalized',
+            'liquidation',
+            (int) $liquidation['id'],
+            'Liquidación contractual finalizada.',
+            $request->getServerParams()['REMOTE_ADDR'] ?? null,
+            ['lease_id' => $leaseId],
+        );
+
         return $response->withHeader(
             'Location',
-            $path('/admin/leases/' . (int) $args['id'] . '/termination'),
+            $path('/admin/leases/' . $leaseId . '/termination'),
         )->withStatus(303);
     });
 

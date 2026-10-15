@@ -1,57 +1,30 @@
 # AGENTS.md — AlquilaPro
 
-Este archivo define cómo debe trabajar cualquier agente/IA en este repositorio.
+Este archivo define reglas durables de trabajo para cualquier agente/IA. **No es un tablero de estado de fases**. Para estado actual leer `README.md`, el checkpoint canónico de la fase activa y la PR/CI del SHA exacto.
 
-## 1. Autoridad
+## Autoridad
 
-Antes de actuar:
+Si hay contradicción, usar este orden:
 
-1. `README.md`;
-2. último `docs/checkpoints/ALQUILAPRO_HANDOFF_FORENSIC_*`;
-3. SPEC/PLAN maestro;
-4. último checkpoint `*_MERGED_*`;
-5. checkpoint/spec/plan de la fase activa;
-6. GitHub real: branch, PR, diff, CI y código.
+1. GitHub real: código, migraciones, tests, diff y SHA.
+2. CI del SHA exacto.
+3. Checkpoint canónico de fase.
+4. SPEC / PLAN aprobados.
+5. README y documentación narrativa.
+6. Chat / memoria.
 
-```text
-GitHub/code/tests/CI = estado factual
-checkpoint activo      = continuidad operativa
-SPEC/PLAN              = intención/contrato
-chat/memoria           = contexto auxiliar
-```
+Nunca declarar trabajo hecho porque un handoff lo diga si GitHub no lo demuestra.
 
-Si existe contradicción, verificar y registrar ruling. No asumir que una frase histórica invalida evidencia posterior.
+## Ley 1 — KISS
 
-## 2. Ley 1 — KISS / arquitectura simple
+Todo cambio debe ser simple, directo, eficiente, optimizado y eficaz.
 
-La solución debe ser:
+- Reutilizar owners existentes antes de crear nuevas autoridades.
+- No agregar tabla, clase, servicio, permiso, ruta, scheduler, dependencia o framework sin necesidad demostrada.
+- Ir de A a B; evitar abstracciones que solo redistribuyen complejidad.
+- El presupuesto arquitectónico de cada fase es un límite, no un objetivo a consumir.
 
-```text
-simple
-eficiente
-optimizada
-eficaz
-auditable
-mantenible
-```
-
-Usar el mínimo razonable de:
-
-```text
-tablas
-clases
-estados
-rutas
-capas
-dependencias
-fuentes de verdad
-```
-
-No arquitectura compleja ni piezas “por si acaso”.
-
-## 3. Ley 2 — Cero Ruido / Convergencia
-
-Antes de agregar:
+## Ley 2 — Cero Ruido / Convergencia
 
 ```text
 ELIMINAR
@@ -61,22 +34,9 @@ ELIMINAR
 → AGREGAR
 ```
 
-Antes de eliminar:
+Antes de eliminar, demostrar que el elemento está supersedido y que no contiene autoridad, evidencia o recuperación única. No arrastrar checkpoints transitorios dentro del HEAD final solo por precaución; preservar recuperación en ramas `checkpoint/...` cuando sea suficiente.
 
-```text
-REFERENCIAS
-→ AUTORIDAD
-→ REEMPLAZO
-→ TEST
-→ ELIMINAR
-→ REGRESIÓN / CI
-```
-
-No arrastrar código muerto, duplicados, fuentes paralelas, módulos futuros, branches/checkpoints/reportes redundantes o dependencias no usadas.
-
-## 4. Ley 3 — Antiparches
-
-Ante un defecto:
+## Ley 3 — Anti-parche
 
 ```text
 REPRODUCE
@@ -89,231 +49,95 @@ REPRODUCE
 → REGRESSION
 ```
 
-Pregunta obligatoria:
+No aplicar arreglos especulativos. Un cambio de producto necesita un RED que reproduzca el problema, salvo cambios puramente documentales/tooling de cierre que no alteren runtime.
 
-> ¿Dónde debería vivir esta regla si el sistema hubiese sido diseñado correctamente desde cero?
+## Método obligatorio
 
-Prohibido salvo prueba de necesidad:
+1. Confirmar base, branch, HEAD, PR y scope.
+2. PRE-KISS: owner canónico, presupuesto y prohibiciones.
+3. Confirmar SPEC/DESIGN y PLAN antes de producto cuando la fase lo requiera.
+4. Auditar diez pasadas antes de implementar y antes de cerrar.
+5. TDD por tarea: RED verificado → GREEN mínimo → regresión.
+6. CI del SHA exacto; no reutilizar CI de un commit anterior.
+7. Checkpoint antes de abrir el siguiente gate.
+8. Merge solo con base/head/mergeability y CI nuevamente verificados.
 
-- compatibility fallback para conservar callers viejos;
-- optional dependency injection solo para tests;
-- segundo writer financiero/documental/notificaciones;
-- special-case lateral cuando puede corregirse el owner;
-- parche encima de parche;
-- state duplicado para ocultar inconsistencia.
+## Política de checkpoints
 
-## 5. Proceso obligatorio
+- Crear checkpoints frecuentes para evitar pérdida de continuidad.
+- Preferir ramas `checkpoint/<fase>-<gate>-<fecha>` para estados transitorios.
+- Un checkpoint RED preserva el RED y no mezcla GREEN.
+- Un GREEN candidate se guarda antes de CI; un GREEN certificado solo después de CI completa.
+- El HEAD final de una fase converge a un checkpoint documental canónico; los checkpoints intermedios pueden vivir solo en ramas.
 
-```text
-SCOPE
-→ PRE-KISS
-→ SPEC / DESIGN
-→ PLAN
-→ AUDITAR 10 PASADAS
-→ RED
-→ VERIFY RED
-→ MINIMAL GREEN
-→ VERIFY GREEN
-→ CONVERGE
-→ FOCUSED QA
-→ FRESH REVIEW
-→ KISS / ZERO-NOISE / ANTIPATCH GATE
-→ CHECKPOINT
-→ PR CI
-→ FORENSIC AUDIT
-→ MERGE AUTORIZADO
-```
+## QA / CI
 
-Cada gate debe cubrir un riesgo diferente. No duplicar verificaciones por ritual.
+- PHP soportado: 8.3, 8.4 y 8.5.
+- `composer validate --strict` obligatorio.
+- Lint PHP obligatorio dentro del CI canónico.
+- PHPUnit completo en la matriz soportada.
+- No declarar PASS mientras un job esté queued/in_progress.
+- Distinguir Product Head de Closure Head cuando un commit posterior sea solo docs/tooling.
+- Evitar reruns rituales: mismo test + mismo código + mismo entorno no agrega evidencia.
 
-## 6. Preferencias del usuario
+## Contratos durables
 
-- respuestas operativas directas;
-- no pedir información ya resuelta;
-- velocidad sin perder trazabilidad;
-- evitar loops;
-- no arquitectura grande;
-- GitHub debe permitir recuperación entre chats;
-- checkpoints deben permitir retomar sin repetir trabajo;
-- antes de implementar: revisar, diseñar, planificar, auditar 10 pasadas y verificar las tres leyes.
+- Tenant ownership se resuelve antes de lookups hijos.
+- CSRF global se mantiene para mutaciones autenticadas; excepciones deben ser exactas y protegidas.
+- Archivos privados validan contención, tamaño, MIME por bytes e integridad según owner; fallan cerrados.
+- `FinanceService` conserva la autoridad financiera compartida.
+- `NotificationService` conserva la autoridad de cola/proceso/retención automática; no crear segundo scheduler.
+- WhatsApp sigue siendo salida asistida, no proveedor de estado de entrega paralelo.
+- Auditoría F22 usa un solo `AuditService` / `audit_log`; no event bus, segunda pila de logs o framework de seguridad.
+- Nunca registrar passwords, raw tokens, cookies/sesiones, documentos, receipts/payment bodies, SQL o exception traces en auditoría.
+- `REMOTE_ADDR` validado es la fuente F22 de IP; no confiar ciegamente en forwarding headers.
 
-### Codex
-
-Cuando se use Codex:
-
-- entregar al usuario **un Markdown descargable**;
-- no pegar como salida principal el prompt grande en el chat;
-- un contrato claro, específico, optimizado y con hard stops;
-- suficiente autonomía local para no bloquearse;
-- budget arquitectónico explícito;
-- TDD focal;
-- checkpoint recuperable después de Tasks/gates relevantes;
-- informe final detallado en Markdown;
-- no merge por Codex salvo autorización inequívoca;
-- no releer todo el repo si SPEC/PLAN/checkpoint ya fijan la fase;
-- no esperar CI cuando puede avanzar de forma segura y recertificar al final;
-- no full suites locales repetitivas sin riesgo distinto.
+## Roles
 
 ### ChatGPT / Sol
 
-Debe:
+- producto, SPEC, arquitectura, UX, planes, auditoría, GitHub, QA y continuidad;
+- contrastar siempre estado documental con GitHub real;
+- buscar huecos, duplicaciones, ruido y parches;
+- mantener checkpoints y PR actualizados por gate.
 
-- contrastar GitHub real y documentación canónica;
-- buscar huecos/faltantes/ruido;
-- diseñar y planificar;
-- auditar 10 pasadas;
-- verificar KISS, Cero Ruido y Antiparches;
-- implementar o preparar Codex solo después;
-- auditar el resultado de Codex contra GitHub antes del merge.
+### Codex
 
-## 7. QA eficiente / anti-bucles
+Usarlo cuando la implementación local/TDD o tooling del PC aporte valor. Cuando se delegue:
 
-Preferir:
+- un Markdown autocontenido por lote aprobado;
+- hard stops y presupuesto arquitectónico explícitos;
+- TDD focal y checkpoint recuperable;
+- no rediseñar decisiones congeladas;
+- no merge sin autorización inequívoca;
+- no releer todo el repo si checkpoint/SPEC/PLAN ya fijan la fase.
 
-```text
-focused RED/GREEN
-→ focused integrated
-→ fresh review
-→ one repair pass
-→ affected focused
-→ one PR CI matrix
-```
+## Roadmap guardrail
 
-No repetir full suite o CI si el árbol/riesgo probado es demostrablemente equivalente.
-
-Nunca:
-
-```text
-same test + same code + same environment = rerun
-```
-
-Máximo 3 hipótesis razonadas sobre el mismo fallo antes de reevaluar root cause/owner/arquitectura.
-
-## 8. Riesgos críticos aprendidos
-
-Tratar con especial cuidado:
-
-- TOCTOU/concurrencia: lock sobre autoridad canónica;
-- private storage: safe path + no symlink + size cap antes de read + bounded read + MIME/SHA/tamaño + fail-closed;
-- tenant IDOR: ownership antes de lookup lateral;
-- `FinanceService` como único charge writer;
-- auth/session/CSRF únicos;
-- CI de PR suele probar synthetic merge-ref, no PR HEAD;
-- Product Head vs docs-only Closure Head;
-- no optional/fallback constructor para evitar actualizar callers;
-- no duplicar documents/notifications/media/status authority;
-- F16 es el único motor automático de notificaciones;
-- F17 no infiere sent/delivered/read de WhatsApp;
-- F18 es la única autoridad documental genérica;
-- F20 no crea cargo automáticamente al aceptar un servicio;
-- installer wizard, candidate wizard y tenant lifecycle son tres responsabilidades distintas;
-- F23 debe corregir el shell en su owner real, no parchear desktop con media queries aisladas.
-
-## 9. Estado activo F15→F20
-
-F0–F14 cerradas/verificadas; F1–F14 mergeadas.
-
-Estado remoto conocido:
-
-```text
-F15 PR #18 OPEN — local certified; README conflict con main documental pendiente de reconciliación
-F16 PR #19 OPEN — stacked on F15; product complete
-F17 PR #20 OPEN — stacked on F16; product complete + closure
-F18–F20 — Codex todavía trabajando/no visibles remotamente en último corte
-MERGES — NONE
-```
-
-Autoridades:
-
-```text
-docs/checkpoints/F15_F20_DESIGN_CHECKPOINT_2026-10-14.md
-docs/superpowers/plans/2026-10-14-f15-f20-codex-master.md
-docs/checkpoints/F15_F20_BATCH_CHECKPOINT_2026-10-14.md  # en rama activa
-```
-
-Mientras Codex trabaja F15→F20, no abrir implementación paralela sobre ese scope.
-
-## 10. Futuro F21→F26
-
-No existe F27 en el roadmap canónico.
+No implementar una fase futura antes de que la precedente esté cerrada y mergeada.
 
 ```text
 F21 Bono + liquidación
 F22 Seguridad + privacidad + audit log
 F23 Dashboard + Adaptive UX Final
 F24 Release Readiness + installer/candidate wizard + QA
-F25 SERVER_READY ZIP + local exact-artifact rehearsal
-F26 Manual Hostinger Deploy + smoke
+F25 SERVER_READY ZIP + exact-artifact rehearsal
+F26 Manual Hostinger deploy + smoke
 ```
 
-### F23 UX congelada
+No existe F27 en el roadmap aprobado.
 
-- mobile/tablet = touch shell + launcher inferior;
-- PC = sidebar persistente + topbar;
-- una sola definición PHP de navegación;
-- no SPA/frontend framework por rediseño;
-- UI-UX Pro Max es referencia, no dependencia runtime;
-- targets mínimos 375/768/1024/1440;
-- Modern SaaS / Corporate Minimal Fresh.
+Para F23–F26 usar `docs/specs/F23_F26_UX_RELEASE_SPEC_V1_2026-10-14.md` y el checkpoint de la fase vigente; no adelantar módulos futuros para resolver una fase anterior.
 
-### F24 wizards
-
-Installer mejora el existente:
+## Recovery
 
 ```text
-requirements
-→ DB credentials + Test connection
-→ company/settings
-→ owner
-→ summary
-→ install/migrate
-→ success/login
-```
-
-No `companies` table V1; no tenant/candidate/lease/sample property durante instalación.
-
-Candidate wizard mejora el candidate/token existente:
-
-```text
-context/privacy
-→ personal/contact
-→ work/income
-→ occupants/pets
-→ references
-→ documents
-→ review/submit
-```
-
-No wizard/session/progress tables.
-
-### F25/F26
-
-F25 certifica el ZIP exacto en local limpio + BD vacía antes de etiquetarlo SERVER_READY.
-
-F26 es subida manual del ZIP a Hostinger + mismo installer + smoke. No bot/SSH/API de despliegue obligatorio.
-
-Autoridades:
-
-```text
-docs/specs/F23_F26_UX_RELEASE_SPEC_V1_2026-10-14.md
-docs/checkpoints/F23_F26_UX_RELEASE_DECISION_2026-10-14.md
-```
-
-F21/F22 todavía necesitan SPEC/PLAN final antes de un master Codex F21→F26.
-
-## 11. Recovery
-
-```text
-README
+GitHub real + CI del SHA exacto
+→ README
 → AGENTS
-→ último handoff forense
-→ F14_MERGED
-→ F15_F20 design checkpoint
-→ F15_F20 Codex master V4
-→ live F15_F20 batch checkpoint en rama más avanzada
-→ F23_F26 UX/release checkpoint
-→ GitHub main/PR/CI real
-→ continuar NEXT_EXACT_ACTION
+→ checkpoint canónico de fase
+→ SPEC / PLAN de la fase
+→ NEXT_EXACT_ACTION
 ```
 
-No reimplementar trabajo certificado sin evidencia real de regresión o nueva SPEC aprobada.
+No reimplementar trabajo certificado sin evidencia real de regresión o una nueva SPEC aprobada.

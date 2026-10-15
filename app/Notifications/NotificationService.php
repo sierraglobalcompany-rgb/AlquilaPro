@@ -26,6 +26,7 @@ final readonly class NotificationService
     private const MAX_ATTEMPTS = 3;
     private const CLAIM_LEASE_SECONDS = 600;
     private const RETRY_DELAY_SECONDS = 300;
+    private const TERMINAL_RECIPIENT_RETENTION_DAYS = 90;
     private const SAFE_TRANSPORT_ERROR = 'transport_error';
     private const SAFE_INVALID_ERROR = 'invalid_payload';
     private const SAFE_EXHAUSTED_ERROR = 'attempts_exhausted';
@@ -261,6 +262,31 @@ final readonly class NotificationService
             $scheduledAt,
             $dedupeKey,
         ) === null ? 0 : 1;
+    }
+
+    public function redactTerminalRecipients(string $now): int
+    {
+        $now = $this->timestamp($now);
+        $cutoff = gmdate(
+            'Y-m-d H:i:s',
+            $this->timestampEpoch($now) - (self::TERMINAL_RECIPIENT_RETENTION_DAYS * 86400),
+        );
+
+        try {
+            $statement = $this->pdo->prepare(
+                'UPDATE notification_jobs SET recipient_email = NULL, recipient_name = NULL '
+                . 'WHERE (recipient_email IS NOT NULL OR recipient_name IS NOT NULL) '
+                . 'AND ((sent_at IS NOT NULL AND sent_at < :sent_cutoff) '
+                . 'OR (failed_at IS NOT NULL AND failed_at < :failed_cutoff))',
+            );
+            $statement->execute([
+                'sent_cutoff' => $cutoff,
+                'failed_cutoff' => $cutoff,
+            ]);
+            return $statement->rowCount();
+        } catch (Throwable) {
+            throw $this->failure();
+        }
     }
 
     /** @return array{sent:int,failed:int} */

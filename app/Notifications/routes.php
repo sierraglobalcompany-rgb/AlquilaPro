@@ -42,12 +42,14 @@ return static function (App $app, array $deps): void {
 
             $now = gmdate('Y-m-d H:i:s');
             $today = (new DateTimeImmutable('now', new DateTimeZone('America/Bogota')))->format('Y-m-d');
+            $redacted = $notifications->redactTerminalRecipients($now);
             $generated = $notifications->generateReminders($today, $now);
             $processed = $notifications->processDue(50, $now);
             $response->getBody()->write(json_encode([
                 'generated' => $generated,
                 'sent' => $processed['sent'],
                 'failed' => $processed['failed'],
+                'redacted' => $redacted,
             ], JSON_THROW_ON_ERROR));
 
             return $response->withHeader('Content-Type', 'application/json; charset=utf-8');

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use AlquilaPro\Audit\AuditService;
 use AlquilaPro\Auth\AuthService;
 use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\Permissions;
@@ -17,6 +18,10 @@ return static function (App $app, array $deps): void {
     $auth = $deps['auth'];
     /** @var UserService $users */
     $users = $deps['users'];
+    /** @var AuditService $audit */
+    $audit = $deps['audit'];
+    /** @var \PDO $pdo */
+    $pdo = $deps['pdo'];
     /** @var SessionGuard $session */
     $session = $deps['session'];
     /** @var Csrf $csrf */
@@ -186,7 +191,7 @@ return static function (App $app, array $deps): void {
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
     });
 
-    $app->post('/admin/users', static function (ServerRequestInterface $request, ResponseInterface $response) use ($guard, $users, $path): ResponseInterface {
+    $app->post('/admin/users', static function (ServerRequestInterface $request, ResponseInterface $response) use ($guard, $users, $audit, $pdo, $path): ResponseInterface {
         $authorized = $guard($response, 'users.manage');
         if ($authorized instanceof ResponseInterface) {
             return $authorized;
@@ -198,8 +203,12 @@ return static function (App $app, array $deps): void {
             return $response->withStatus(403);
         }
 
+        if ($pdo->inTransaction() || !$pdo->beginTransaction()) {
+            throw new RuntimeException('No fue posible iniciar la operación.');
+        }
+
         try {
-            $users->create(
+            $createdUserId = $users->create(
                 (string) ($form['full_name'] ?? ''),
                 (string) ($form['email'] ?? ''),
                 (string) ($form['role'] ?? ''),
@@ -207,58 +216,112 @@ return static function (App $app, array $deps): void {
                 $requestedPermissions,
             );
         } catch (Throwable) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             return $response->withStatus(422);
+        }
+
+        try {
+            $audit->record(
+                (int) $authorized['id'],
+                'user.created',
+                'user',
+                $createdUserId,
+                'Usuario administrativo creado.',
+                $request->getServerParams()['REMOTE_ADDR'] ?? null,
+            );
+            if (!$pdo->commit()) {
+                throw new RuntimeException('No fue posible completar la operación.');
+            }
+        } catch (Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $exception;
         }
 
         return $response->withHeader('Location', $path('/admin/users'))->withStatus(303);
     });
 
-    $app->post('/admin/users/{id}/status', static function (ServerRequestInterface $request, ResponseInterface $response, array $args) use ($guard, $users, $path): ResponseInterface {
+    $app->post('/admin/users/{id}/status', static function (ServerRequestInterface $request, ResponseInterface $response, array $args) use ($guard, $users, $audit, $path): ResponseInterface {
         $authorized = $guard($response, 'users.manage');
         if ($authorized instanceof ResponseInterface) {
             return $authorized;
         }
 
         $form = (array) ($request->getParsedBody() ?? []);
+        $targetUserId = (int) ($args['id'] ?? 0);
+        $active = (string) ($form['active'] ?? '0') === '1';
         try {
-            $users->setActive((int) ($args['id'] ?? 0), (string) ($form['active'] ?? '0') === '1');
+            $users->setActive($targetUserId, $active);
         } catch (Throwable) {
             return $response->withStatus(422);
         }
 
+        $audit->record(
+            (int) $authorized['id'],
+            'user.active_changed',
+            'user',
+            $targetUserId,
+            'Estado de usuario actualizado.',
+            $request->getServerParams()['REMOTE_ADDR'] ?? null,
+            ['active' => $active],
+        );
+
         return $response->withHeader('Location', $path('/admin/users'))->withStatus(303);
     });
 
-    $app->post('/admin/users/{id}/permissions', static function (ServerRequestInterface $request, ResponseInterface $response, array $args) use ($guard, $users, $path): ResponseInterface {
+    $app->post('/admin/users/{id}/permissions', static function (ServerRequestInterface $request, ResponseInterface $response, array $args) use ($guard, $users, $audit, $path): ResponseInterface {
         $authorized = $guard($response, 'users.permissions');
         if ($authorized instanceof ResponseInterface) {
             return $authorized;
         }
 
         $form = (array) ($request->getParsedBody() ?? []);
+        $targetUserId = (int) ($args['id'] ?? 0);
         try {
             $users->setPermissions(
-                (int) ($args['id'] ?? 0),
+                $targetUserId,
                 is_array($form['permissions'] ?? null) ? $form['permissions'] : [],
             );
         } catch (Throwable) {
             return $response->withStatus(422);
         }
 
+        $audit->record(
+            (int) $authorized['id'],
+            'user.permissions_changed',
+            'user',
+            $targetUserId,
+            'Permisos de usuario actualizados.',
+            $request->getServerParams()['REMOTE_ADDR'] ?? null,
+        );
+
         return $response->withHeader('Location', $path('/admin/users'))->withStatus(303);
     });
 
-    $app->post('/admin/users/{id}/reset-link', static function (ServerRequestInterface $request, ResponseInterface $response, array $args) use ($guard, $auth, $baseUrl, $path): ResponseInterface {
+    $app->post('/admin/users/{id}/reset-link', static function (ServerRequestInterface $request, ResponseInterface $response, array $args) use ($guard, $auth, $audit, $baseUrl, $path): ResponseInterface {
         $authorized = $guard($response, 'users.manage');
         if ($authorized instanceof ResponseInterface) {
             return $authorized;
         }
 
+        $targetUserId = (int) ($args['id'] ?? 0);
         try {
-            $token = $auth->issueResetToken((int) ($args['id'] ?? 0), new DateTimeImmutable());
+            $token = $auth->issueResetToken($targetUserId, new DateTimeImmutable());
         } catch (Throwable) {
             return $response->withStatus(422);
         }
+
+        $audit->record(
+            (int) $authorized['id'],
+            'user.password_reset_issued',
+            'user',
+            $targetUserId,
+            'Enlace de restablecimiento emitido.',
+            $request->getServerParams()['REMOTE_ADDR'] ?? null,
+        );
 
         $link = ($baseUrl !== '' ? $baseUrl : '') . $path('/reset-password') . '?token=' . $token;
         $response->getBody()->write($link);

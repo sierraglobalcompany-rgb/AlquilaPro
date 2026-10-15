@@ -82,7 +82,10 @@ final class NotificationCronRoutesTest extends TestCase
         $response = $this->request($this->app(), self::CRON_SECRET);
 
         self::assertSame(200, $response->getStatusCode());
-        self::assertSame(['generated' => 0, 'sent' => 1, 'failed' => 0], json_decode((string) $response->getBody(), true));
+        self::assertSame(
+            ['generated' => 0, 'sent' => 1, 'failed' => 0, 'redacted' => 0],
+            json_decode((string) $response->getBody(), true),
+        );
         self::assertSame(['recipient@example.test'], $this->sentTo);
         self::assertSame(1, $this->attemptCount());
         self::assertSame('sent', $this->jobState());
@@ -146,7 +149,10 @@ final class NotificationCronRoutesTest extends TestCase
         $response = $app->handle($request);
 
         self::assertSame(200, $response->getStatusCode());
-        self::assertSame(['generated' => 0, 'sent' => 0, 'failed' => 0], json_decode((string) $response->getBody(), true));
+        self::assertSame(
+            ['generated' => 0, 'sent' => 0, 'failed' => 0, 'redacted' => 0],
+            json_decode((string) $response->getBody(), true),
+        );
     }
 
     private function app(): App

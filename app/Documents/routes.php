@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use AlquilaPro\Audit\AuditService;
 use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
@@ -18,6 +19,8 @@ return static function (App $app, array $deps): void {
     $documents = $deps['documents'];
     /** @var LeaseService $leases */
     $leases = $deps['leases'];
+    /** @var AuditService $audit */
+    $audit = $deps['audit'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -117,7 +120,7 @@ return static function (App $app, array $deps): void {
     $app->post('/admin/documents', static function (
         ServerRequestInterface $request,
         ResponseInterface $response,
-    ) use ($staffGuard, $documents, $path): ResponseInterface {
+    ) use ($staffGuard, $documents, $audit, $path): ResponseInterface {
         $user = $staffGuard($response, 'documents.manage');
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -145,7 +148,7 @@ return static function (App $app, array $deps): void {
             $uploads = $request->getUploadedFiles();
             $file = $uploads['document'] ?? null;
             if ($file instanceof UploadedFileInterface && $file->getError() === UPLOAD_ERR_OK) {
-                $documents->createFileVersion(
+                $createdDocument = $documents->createFileVersion(
                     $propertyId,
                     $leaseId,
                     $type,
@@ -164,7 +167,7 @@ return static function (App $app, array $deps): void {
                 if (!is_array($content)) {
                     return $response->withStatus(422);
                 }
-                $documents->createContentVersion(
+                $createdDocument = $documents->createContentVersion(
                     $propertyId,
                     $leaseId,
                     $type,
@@ -178,6 +181,21 @@ return static function (App $app, array $deps): void {
         } catch (Throwable) {
             return $response->withStatus(422);
         }
+
+        $audit->record(
+            (int) $user['id'],
+            'document.version_created',
+            'document',
+            (int) $createdDocument['id'],
+            'Versión de documento creada.',
+            $request->getServerParams()['REMOTE_ADDR'] ?? null,
+            [
+                'type' => $type,
+                'scope_kind' => $scope,
+                'scope_id' => $scopeId,
+            ],
+        );
+
         return $response->withHeader('Location', $path('/admin/documents?scope=' . $scope . '&id=' . $scopeId))
             ->withStatus(303);
     });

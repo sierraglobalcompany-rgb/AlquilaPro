@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use AlquilaPro\Audit\AuditService;
 use AlquilaPro\Auth\AuthService;
 use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\SessionGuard;
@@ -234,6 +235,7 @@ return static function (array $settings): App {
                 $notificationService = null;
             }
             $whatsApp = new WhatsAppService($pdo);
+            $audit = new AuditService($pdo);
 
             $auth = new AuthService($pdo);
             $session = new SessionGuard();
@@ -297,6 +299,7 @@ return static function (array $settings): App {
                 'branding' => $branding,
                 'view' => $view,
                 'current_user' => $currentUser,
+                'audit' => $audit,
                 'finance' => $finance,
                 'obligations' => $obligations,
                 'insurance' => $insurance,
@@ -309,10 +312,16 @@ return static function (array $settings): App {
             ];
 
             $authRoutes = require dirname(__DIR__) . '/app/Auth/routes.php';
-            $authRoutes($app, $shared + ['users' => $users]);
+            $authRoutes($app, $shared + [
+                'users' => $users,
+                'pdo' => $pdo,
+            ]);
 
             $uiRoutes = require dirname(__DIR__) . '/app/UI/routes.php';
             $uiRoutes($app, $shared);
+
+            $auditRoutes = require dirname(__DIR__) . '/app/Audit/routes.php';
+            $auditRoutes($app, $shared);
 
             $propertyRoutes = require dirname(__DIR__) . '/app/Properties/routes.php';
             $propertyRoutes($app, $shared + [
@@ -436,6 +445,13 @@ return static function (array $settings): App {
             return $response->withHeader('Content-Type', 'text/plain; charset=utf-8');
         },
     );
+
+    $app->add(static function (ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface {
+        return $handler->handle($request)
+            ->withHeader('X-Content-Type-Options', 'nosniff')
+            ->withHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+            ->withHeader('X-Frame-Options', 'SAMEORIGIN');
+    });
 
     return $app;
 };
