@@ -105,6 +105,7 @@ final class AuditRoutesTest extends TestCase
         $body = (string) $response->getBody();
 
         self::assertSame(200, $response->getStatusCode());
+        self::assertSame('private, no-store', $response->getHeaderLine('Cache-Control'));
         self::assertStringContainsString('lease.ended', $body);
         self::assertStringContainsString('lease', $body);
         self::assertStringContainsString('77', $body);
