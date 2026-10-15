@@ -93,6 +93,34 @@ final class TerminationPreviewTest extends TestCase
         self::assertSame($beforePayments, $this->countRows('payments'));
     }
 
+    public function testPreviewClassifiesOnlyCriticalDerivedBlockers(): void
+    {
+        $this->seedCriticalAndNonBlockingContext();
+
+        $preview = $this->service()->preview($this->leaseId, '2026-10-14');
+
+        foreach ([
+            'payment_pending_reconciliation',
+            'membership_charge_decision_pending',
+            'bonus_decision_pending',
+            'final_inventory_missing',
+        ] as $blocker) {
+            self::assertContains($blocker, $preview['blockers']);
+        }
+
+        foreach ([
+            'outstanding_balance',
+            'community_incident_open',
+            'insurance_claim_open',
+        ] as $nonBlocker) {
+            self::assertNotContains($nonBlocker, $preview['blockers']);
+        }
+
+        self::assertSame('250000.00', $preview['finance']['summary']['outstanding']);
+        self::assertSame('open', $preview['community'][0]['status']);
+        self::assertSame('filed', $preview['claims'][0]['claims'][0]['status']);
+    }
+
     private function service(): TerminationService
     {
         $paymentMethods = new PaymentMethodService($this->pdo, $this->directory);
@@ -109,6 +137,114 @@ final class TerminationPreviewTest extends TestCase
             new MembershipService($this->pdo, $finance),
             true,
         );
+    }
+
+    private function seedCriticalAndNonBlockingContext(): void
+    {
+        $lease = $this->pdo->prepare(
+            'SELECT user_id, activated_by_user_id FROM leases WHERE id = :id LIMIT 1',
+        );
+        $lease->execute(['id' => $this->leaseId]);
+        $leaseRow = $lease->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($leaseRow);
+        $tenantId = (int) $leaseRow['user_id'];
+        $actorId = (int) $leaseRow['activated_by_user_id'];
+
+        $paymentMethod = $this->pdo->prepare(
+            'INSERT INTO payment_methods (type, label, sort_order, is_active) '
+            . 'VALUES (\'cash\', :label, 1, 1)',
+        );
+        $paymentMethod->execute(['label' => 'F21 pending payment ' . bin2hex(random_bytes(2))]);
+        $paymentMethodId = (int) $this->pdo->lastInsertId();
+
+        $payment = $this->pdo->prepare(
+            'INSERT INTO payments '
+            . '(lease_id, payment_method_id, amount, paid_on, payment_method_snapshot_json, reported_at) '
+            . 'VALUES (:lease_id, :method_id, \'100000.00\', \'2026-10-13\', \'{}\', \'2026-10-13 12:00:00\')',
+        );
+        $payment->execute(['lease_id' => $this->leaseId, 'method_id' => $paymentMethodId]);
+
+        $service = $this->pdo->prepare(
+            'INSERT INTO digital_services '
+            . '(name, description, current_price, duration_days, active, created_by_user_id, created_at) '
+            . 'VALUES (:name, \'Servicio F21 pendiente\', \'45000.00\', 30, 1, :actor, \'2026-10-01 09:00:00\')',
+        );
+        $service->execute([
+            'name' => 'Servicio F21 ' . bin2hex(random_bytes(2)),
+            'actor' => $actorId,
+        ]);
+        $serviceId = (int) $this->pdo->lastInsertId();
+
+        $membership = $this->pdo->prepare(
+            'INSERT INTO service_memberships '
+            . '(service_id, lease_id, accepted_by_user_id, price_snapshot, duration_days_snapshot, starts_on, ends_on, accepted_at) '
+            . 'VALUES (:service_id, :lease_id, :tenant_id, \'45000.00\', 30, \'2026-10-01\', \'2026-10-30\', \'2026-10-01 09:05:00\')',
+        );
+        $membership->execute([
+            'service_id' => $serviceId,
+            'lease_id' => $this->leaseId,
+            'tenant_id' => $tenantId,
+        ]);
+
+        $bonus = $this->pdo->prepare(
+            'INSERT INTO good_conduct_bonuses '
+            . '(lease_id, amount, note, decision, created_by_user_id, created_at) '
+            . 'VALUES (:lease_id, \'120000.00\', \'Pendiente de decisión\', NULL, :actor, \'2026-10-14 08:00:00\')',
+        );
+        $bonus->execute(['lease_id' => $this->leaseId, 'actor' => $actorId]);
+
+        $inventory = $this->pdo->prepare(
+            'INSERT INTO documents '
+            . '(property_id, lease_id, community_incident_id, type, title, content_json, created_by_user_id, created_at) '
+            . 'VALUES (NULL, :lease_id, NULL, \'inventory_initial\', \'Inventario inicial F21\', :content, :actor, \'2026-10-01 08:00:00\')',
+        );
+        $inventory->execute([
+            'lease_id' => $this->leaseId,
+            'content' => '{"general_notes":null,"items":[]}',
+            'actor' => $actorId,
+        ]);
+
+        $charge = $this->pdo->prepare(
+            'INSERT INTO charges '
+            . '(lease_id, type, due_date, amount, description, created_by_user_id) '
+            . 'VALUES (:lease_id, \'other\', \'2026-10-10\', \'250000.00\', \'Saldo pendiente no bloqueante\', :actor)',
+        );
+        $charge->execute(['lease_id' => $this->leaseId, 'actor' => $actorId]);
+
+        $incident = $this->pdo->prepare(
+            'INSERT INTO community_incidents '
+            . '(lease_id, category, occurred_on, description, status, created_by_user_id, created_at, updated_at) '
+            . 'VALUES (:lease_id, \'noise\', \'2026-10-12\', \'Incidente abierto no bloqueante\', \'open\', :actor, '
+            . '\'2026-10-12 08:00:00\', \'2026-10-12 08:00:00\')',
+        );
+        $incident->execute(['lease_id' => $this->leaseId, 'actor' => $actorId]);
+
+        $policy = $this->pdo->prepare(
+            'INSERT INTO insurance_policies '
+            . '(lease_id, provider_name, product_name, policy_number, coverage_start, coverage_end, coverage_snapshot_json, '
+            . 'documents_json, created_by_user_id, created_at) '
+            . 'VALUES (:lease_id, \'Aseguradora F21\', \'Hogar\', :number, \'2026-01-01\', \'2026-12-31\', '
+            . '\'[]\', \'[]\', :actor, \'2026-01-01 08:00:00\')',
+        );
+        $policy->execute([
+            'lease_id' => $this->leaseId,
+            'number' => 'F21-' . bin2hex(random_bytes(3)),
+            'actor' => $actorId,
+        ]);
+        $policyId = (int) $this->pdo->lastInsertId();
+
+        $claim = $this->pdo->prepare(
+            'INSERT INTO insurance_claims '
+            . '(policy_id, incident_on, description, claimed_amount, status, radicado, filed_on, checklist_snapshot_json, '
+            . 'documents_json, created_by_user_id, created_at) '
+            . 'VALUES (:policy_id, \'2026-10-11\', \'Claim abierto no bloqueante\', \'300000.00\', \'filed\', :radicado, '
+            . '\'2026-10-12\', \'[]\', \'[]\', :actor, \'2026-10-12 09:00:00\')',
+        );
+        $claim->execute([
+            'policy_id' => $policyId,
+            'radicado' => 'RAD-' . bin2hex(random_bytes(3)),
+            'actor' => $actorId,
+        ]);
     }
 
     private function countRows(string $table): int
