@@ -42,12 +42,14 @@ return static function (App $app, array $deps): void {
 
             $now = gmdate('Y-m-d H:i:s');
             $today = (new DateTimeImmutable('now', new DateTimeZone('America/Bogota')))->format('Y-m-d');
+            $redacted = $notifications->redactTerminalRecipients($now);
             $generated = $notifications->generateReminders($today, $now);
             $processed = $notifications->processDue(50, $now);
             $response->getBody()->write(json_encode([
                 'generated' => $generated,
                 'sent' => $processed['sent'],
                 'failed' => $processed['failed'],
+                'redacted' => $redacted,
             ], JSON_THROW_ON_ERROR));
 
             return $response->withHeader('Content-Type', 'application/json; charset=utf-8');
@@ -175,7 +177,7 @@ return static function (App $app, array $deps): void {
         }
 
         $rawId = (string) ($args['id'] ?? '');
-        $actionId = preg_match('/\A[1-9][0-9]{0,17}\z/D', $rawId) === 1
+        $actionId = preg_match('/\A[1-9][0-9]{7,14}\z/D', $rawId) === 1
             ? filter_var($rawId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])
             : false;
         $action = $actionId === false ? null : $whatsApp->find((int) $actionId);
