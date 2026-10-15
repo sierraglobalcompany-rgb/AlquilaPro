@@ -54,6 +54,23 @@ final class SecurityBoundaryTest extends TestCase
         );
     }
 
+    public function testProductionSessionCookiePolicyIsStrictAndHttpsAware(): void
+    {
+        $index = file_get_contents(dirname(__DIR__, 3) . '/index.php');
+        self::assertIsString($index);
+
+        self::assertStringContainsString("ini_set('session.use_strict_mode', '1');", $index);
+        self::assertStringContainsString("ini_set('session.use_only_cookies', '1');", $index);
+        self::assertStringContainsString("session_name('alquilapro_session');", $index);
+        self::assertStringContainsString("'lifetime' => 0", $index);
+        self::assertStringContainsString("'path' => \$basePath === '' ? '/' : rtrim(\$basePath, '/') . '/'", $index);
+        self::assertStringContainsString("'secure' => str_starts_with(\$baseUrl, 'https://')", $index);
+        self::assertStringContainsString("'httponly' => true", $index);
+        self::assertStringContainsString("'samesite' => 'Lax'", $index);
+        self::assertStringContainsString('$requestPath !== $healthPath', $index);
+        self::assertStringContainsString('$requestPath !== $notificationCronPath', $index);
+    }
+
     private function app(): App
     {
         $directory = sys_get_temp_dir() . '/alquila_security_' . bin2hex(random_bytes(6));
