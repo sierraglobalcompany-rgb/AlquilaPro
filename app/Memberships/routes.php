@@ -170,7 +170,7 @@ return static function (App $app, array $deps): void {
             return $response->withStatus(422);
         }
 
-        $created = $decision === 'create';
+        $created = ($result['charge_outcome'] ?? null) === 'created';
         $audit->record(
             (int) $user['id'],
             $created ? 'membership.charge_created' : 'membership.charge_skipped',
