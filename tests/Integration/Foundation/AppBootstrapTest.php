@@ -76,11 +76,12 @@ final class AppBootstrapTest extends TestCase
 
         self::assertSame(200, $response->getStatusCode());
         self::assertStringContainsString('Instalar Alquila Pro', $body);
-        self::assertStringContainsString('Diagnóstico del servidor', $body);
+        self::assertStringContainsString('Requisitos del servidor', $body);
         self::assertStringContainsString('dom:', $body);
         self::assertStringContainsString('gd:', $body);
-        self::assertStringContainsString('Base de datos', $body);
-        self::assertStringContainsString('Propietario inicial', $body);
+        self::assertStringContainsString('Paso 0 de 7', $body);
+        self::assertStringNotContainsString('name="db_password"', $body);
+        self::assertStringNotContainsString('name="owner_password"', $body);
         self::assertStringContainsString('name="csrf_token"', $body);
     }
 
@@ -112,31 +113,61 @@ final class AppBootstrapTest extends TestCase
     public function testFailedPostDoesNotEchoPasswords(): void
     {
         $app = $this->app();
+        $app->handle((new ServerRequestFactory())->createServerRequest('GET', 'https://alquilapro.sierraglobalcompany.com/install'));
+        $app->handle(
+            (new ServerRequestFactory())
+                ->createServerRequest('POST', 'https://alquilapro.sierraglobalcompany.com/install/continue')
+                ->withParsedBody(['csrf_token' => (new Csrf())->token()]),
+        );
+        $databasePassword = 'secret-' . bin2hex(random_bytes(12));
         $request = (new ServerRequestFactory())
-            ->createServerRequest('POST', 'https://alquilapro.sierraglobalcompany.com/install')
-            ->withParsedBody($this->form(['db_password' => 'supersecretfailure']));
+            ->createServerRequest('POST', 'https://alquilapro.sierraglobalcompany.com/install/test-database')
+            ->withParsedBody($this->form(['db_password' => $databasePassword]));
 
         $response = $app->handle($request);
         $body = (string) $response->getBody();
 
         self::assertSame(422, $response->getStatusCode());
         self::assertStringContainsString('No fue posible conectar con la base de datos.', $body);
-        self::assertStringNotContainsString('supersecretfailure', $body);
+        self::assertStringNotContainsString($databasePassword, $body);
         self::assertStringNotContainsString('correct-horse-battery', $body);
         self::assertFileDoesNotExist($this->lockPath);
     }
 
-    public function testSuccessfulPostLocksInstallerAndRedirectsHome(): void
+    public function testSuccessfulWizardLocksInstallerAndShowsLoginLink(): void
     {
         $app = $this->app();
-        $request = (new ServerRequestFactory())
-            ->createServerRequest('POST', 'https://alquilapro.sierraglobalcompany.com/install')
-            ->withParsedBody($this->form());
+        $server = new ServerRequestFactory();
+        $app->handle($server->createServerRequest('GET', 'https://alquilapro.sierraglobalcompany.com/install'));
+        $app->handle(
+            $server->createServerRequest('POST', 'https://alquilapro.sierraglobalcompany.com/install/continue')
+                ->withParsedBody(['csrf_token' => (new Csrf())->token()]),
+        );
+        $form = $this->form();
+        $databaseForm = array_intersect_key($form, array_flip(['csrf_token', 'db_host', 'db_port', 'db_name', 'db_user', 'db_password']));
+        $app->handle(
+            $server->createServerRequest('POST', 'https://alquilapro.sierraglobalcompany.com/install/test-database')
+                ->withParsedBody($databaseForm),
+        );
+        $app->handle(
+            $server->createServerRequest('POST', 'https://alquilapro.sierraglobalcompany.com/install/continue')
+                ->withParsedBody(['csrf_token' => (new Csrf())->token(), 'app_name' => $form['app_name']]),
+        );
+        $app->handle(
+            $server->createServerRequest('POST', 'https://alquilapro.sierraglobalcompany.com/install/continue')
+                ->withParsedBody(array_intersect_key($form, array_flip(['csrf_token', 'owner_name', 'owner_email', 'owner_password']))),
+        );
+        $app->handle(
+            $server->createServerRequest('POST', 'https://alquilapro.sierraglobalcompany.com/install/continue')
+                ->withParsedBody(['csrf_token' => (new Csrf())->token()]),
+        );
+        $response = $app->handle(
+            $server->createServerRequest('POST', 'https://alquilapro.sierraglobalcompany.com/install')
+                ->withParsedBody(['csrf_token' => (new Csrf())->token()]),
+        );
 
-        $response = $app->handle($request);
-
-        self::assertSame(303, $response->getStatusCode());
-        self::assertSame('/', $response->getHeaderLine('Location'));
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringContainsString('Paso 6 de 7', (string) $response->getBody());
         self::assertFileExists($this->lockPath);
 
         $blocked = $app->handle(
