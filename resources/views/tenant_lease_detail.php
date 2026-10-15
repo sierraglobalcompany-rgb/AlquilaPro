@@ -74,6 +74,9 @@ $visitStatusLabels = [
     <p class="hint">Estado: <?= $lease['is_active'] ? 'Activo' : 'Finalizado' ?></p>
     <a class="button button--quiet" href="<?= $escape($basePath) ?>/tenant">Volver</a>
     <a class="button button--quiet" href="<?= $escape($basePath) ?>/tenant/leases/<?= $escape($lease['id']) ?>/contract">Descargar contrato</a>
+    <?php if (is_string($liquidationUrl ?? null)): ?>
+        <a class="button button--quiet" href="<?= $escape($liquidationUrl) ?>">Ver liquidación final</a>
+    <?php endif; ?>
 </section>
 
 <section class="surface" id="digital-services">
