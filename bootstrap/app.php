@@ -22,6 +22,7 @@ use AlquilaPro\Finance\ObligationService;
 use AlquilaPro\Finance\PaymentMethodService;
 use AlquilaPro\Insurance\InsuranceService;
 use AlquilaPro\Leases\LeaseService;
+use AlquilaPro\Leases\TerminationService;
 use AlquilaPro\Maintenance\MaintenanceService;
 use AlquilaPro\Maintenance\VisitService;
 use AlquilaPro\Memberships\MembershipService;
@@ -259,6 +260,18 @@ return static function (array $settings): App {
             $insurance = new InsuranceService($pdo, $insuranceDocumentDirectory);
             $maintenance = new MaintenanceService($pdo, $finance, $maintenancePhotoDirectory);
             $visits = new VisitService($pdo);
+            $bonusEnabled = (bool) ($settings['good_conduct_bonus_enabled'] ?? false);
+            $termination = new TerminationService(
+                $pdo,
+                $leases,
+                $finance,
+                $obligations,
+                $insurance,
+                $documents,
+                $community,
+                $memberships,
+                $bonusEnabled,
+            );
 
             $currentUser = static function () use ($session, $auth): ?array {
                 $userId = $session->userId(time());
@@ -330,6 +343,8 @@ return static function (array $settings): App {
                 'documents' => $documents,
                 'community' => $community,
                 'memberships' => $memberships,
+                'termination' => $termination,
+                'good_conduct_bonus_enabled' => $bonusEnabled,
             ]);
 
             $membershipRoutes = require dirname(__DIR__) . '/app/Memberships/routes.php';

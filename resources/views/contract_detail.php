@@ -75,6 +75,7 @@ $currentPeriodMonth = (string) ($currentPeriodMonth ?? '');
                 <div>Inquilino: <?= $escape($lease['tenant_name']) ?></div>
                 <div>Correo: <?= $escape($lease['tenant_email']) ?></div>
                 <div>Activado: <?= $escape($lease['activated_at']) ?></div>
+                <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/leases/<?= $escape($lease['id']) ?>/termination">Liquidación contractual</a>
                 <?php if ($lease['is_active']): ?>
                     <p class="hint">Arrendamiento activo.</p>
                     <?php if ($canManage): ?>

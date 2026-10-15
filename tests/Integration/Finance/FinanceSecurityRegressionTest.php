@@ -169,14 +169,28 @@ final class FinanceSecurityRegressionTest extends TestCase
         $f12Exists = $this->f12IsPresent();
         $f15Exists = is_file($this->root . '/database/migrations/015_create_maintenance_visits.sql');
         $f18Exists = is_file($this->root . '/database/migrations/018_create_documents.sql');
+        $f21Exists = is_file($this->root . '/database/migrations/021_create_lease_termination.sql');
         $routes = $this->file('app/Leases/routes.php');
         preg_match_all('/\$app->(?:get|post)\(\'([^\']+)\'/i', $routes, $routeMatches);
         $expectedRoutes = [
             '/admin/contracts/{id:[0-9]+}/lease',
             '/admin/leases/{id:[0-9]+}/end',
+        ];
+        if ($f21Exists) {
+            array_push($expectedRoutes,
+                '/admin/leases/{id:[0-9]+}/termination',
+                '/admin/leases/{id:[0-9]+}/bonus',
+                '/admin/leases/{id:[0-9]+}/bonus/decision',
+                '/admin/leases/{id:[0-9]+}/liquidation',
+            );
+        }
+        array_push($expectedRoutes,
             '/tenant',
             '/tenant/leases/{id:[0-9]+}',
-        ];
+        );
+        if ($f21Exists) {
+            $expectedRoutes[] = '/tenant/leases/{id:[0-9]+}/liquidation';
+        }
         if ($f15Exists) {
             $expectedRoutes[] = '/tenant/leases/{leaseId:[0-9]+}/maintenance/{id:[0-9]+}/visits/{visitId:[0-9]+}/select';
         }

@@ -183,6 +183,19 @@ final readonly class LeaseService
         return is_array($row) ? $this->normalizeLease($row) : null;
     }
 
+    public function find(int $leaseId): ?array
+    {
+        if ($leaseId <= 0) {
+            return null;
+        }
+
+        $statement = $this->pdo->prepare($this->leaseSelect() . ' WHERE l.id = :id LIMIT 1');
+        $statement->execute(['id' => $leaseId]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $this->normalizeLease($row) : null;
+    }
+
     /** @return list<array<string,mixed>> */
     public function listForUser(int $userId): array
     {
