@@ -1,0 +1,15 @@
+<?php
+
+declare(strict_types=1);
+
+/*
+ * Ejemplo documental; no es configuración activa ni contiene secretos.
+ * El instalador crea config/database.php con valores privados del servidor.
+ */
+return [
+    'host' => 'YOUR_DATABASE_HOST',
+    'port' => 3306,
+    'database' => 'YOUR_DATABASE_NAME',
+    'username' => 'YOUR_DATABASE_USER',
+    'password' => 'SET_A_PRIVATE_PASSWORD',
+];
