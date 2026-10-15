@@ -92,4 +92,15 @@ final class WhatsAppSecurityRegressionTest extends TestCase
         ], $registered);
         self::assertStringContainsString('Permissions::allows($user, \'whatsapp.use\')', $routes);
     }
+
+    public function testWhatsAppProviderSurfaceCannotEmbedCandidateContinuationCapabilities(): void
+    {
+        $service = (string) file_get_contents(dirname(__DIR__, 3) . '/app/Notifications/WhatsAppService.php');
+        $routes = (string) file_get_contents(dirname(__DIR__, 3) . '/app/Notifications/routes.php');
+        $surface = $service . "\n" . $routes;
+
+        self::assertStringNotContainsString('continuation_token', $surface);
+        self::assertStringNotContainsString('/apply/continue/', $surface);
+        self::assertStringNotContainsString('token=', $surface);
+    }
 }
