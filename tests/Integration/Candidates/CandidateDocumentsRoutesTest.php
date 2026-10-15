@@ -285,6 +285,10 @@ final class CandidateDocumentsRoutesTest extends TestCase
         $app = $this->app('/sub');
         $path = '/sub/apply/continue/' . $started['continuation_token'];
         $response = $this->request($app, 'GET', $path);
+        self::assertSame(303, $response->getStatusCode());
+        self::assertSame($path . '/documents', $response->getHeaderLine('Location'));
+
+        $response = $this->request($app, 'GET', $path . '/documents');
         self::assertSame(200, $response->getStatusCode());
         $html = (string) $response->getBody();
 
@@ -297,7 +301,7 @@ final class CandidateDocumentsRoutesTest extends TestCase
             $html,
         );
         self::assertStringContainsString('enctype="multipart/form-data"', $html);
-        self::assertStringContainsString('action="' . $path . '/submit"', $html);
+        self::assertStringContainsString('href="' . $path . '/review"', $html);
         foreach (['candidate_id', 'requirement_id', 'document_id', 'stored_name', 'storage/', $this->documentDirectory] as $secret) {
             self::assertStringNotContainsString($secret, $html);
         }
@@ -345,14 +349,14 @@ final class CandidateDocumentsRoutesTest extends TestCase
             ['document' => $this->upload($this->pdfBytes(), 'identity.pdf', 'application/pdf')],
         );
         self::assertSame(303, $upload->getStatusCode());
-        self::assertSame($continuePath, $upload->getHeaderLine('Location'));
+        self::assertSame($continuePath . '/documents', $upload->getHeaderLine('Location'));
         self::assertSame(1, $this->documentCount());
         $storedName = (string) $this->pdo->query('SELECT stored_name FROM candidate_documents LIMIT 1')->fetchColumn();
         self::assertFileExists($this->documentDirectory . '/' . $storedName);
 
         $submit = $this->request($app, 'POST', $continuePath . '/submit');
         self::assertSame(303, $submit->getStatusCode());
-        self::assertSame($continuePath, $submit->getHeaderLine('Location'));
+        self::assertSame($continuePath . '/review', $submit->getHeaderLine('Location'));
         self::assertSame('verification', $this->candidateStatus($started['candidate_id']));
 
         $after = $this->request(

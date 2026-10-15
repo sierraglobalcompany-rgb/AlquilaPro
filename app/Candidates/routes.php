@@ -40,6 +40,17 @@ return static function (App $app, array $deps): void {
 
     $path = static fn (string $value): string => $basePath . $value;
 
+    $wizardSteps = [
+        ['key' => 'start', 'label' => 'Inicio'],
+        ['key' => 'personal', 'label' => 'Datos personales'],
+        ['key' => 'work', 'label' => 'Trabajo'],
+        ['key' => 'occupants', 'label' => 'Ocupantes'],
+        ['key' => 'references', 'label' => 'Referencias'],
+        ['key' => 'documents', 'label' => 'Documentos'],
+        ['key' => 'review', 'label' => 'Revisión'],
+    ];
+    $continuationStepKeys = array_column(array_slice($wizardSteps, 1), 'key');
+
     $allowAttempt = static function (string $bucket, int $limit, int $now): bool {
         if (!isset($_SESSION) || !is_array($_SESSION)) {
             $_SESSION = [];
@@ -104,11 +115,12 @@ return static function (App $app, array $deps): void {
         array $unit,
         ?string $error = null,
         int $status = 200,
-    ) use ($view, $csrf, $path): ResponseInterface {
+    ) use ($view, $csrf, $path, $wizardSteps): ResponseInterface {
         $response->getBody()->write($view->renderPublic('public_apply_start', [
             'pageTitle' => 'Aplicar',
             'unit' => $unit,
             'action' => $path('/apply/' . $unit['public_key']),
+            'wizardSteps' => $wizardSteps,
             'csrfToken' => $csrf->token(),
             'error' => $error,
         ]));
@@ -118,13 +130,14 @@ return static function (App $app, array $deps): void {
             ->withStatus($status);
     };
 
-    $renderContinue = static function (
+    $renderWizard = static function (
         ResponseInterface $response,
         array $candidate,
         string $token,
+        string $step,
         ?string $error = null,
         int $status = 200,
-    ) use ($view, $csrf, $path, $properties, $candidateDocuments, $screening): ResponseInterface {
+    ) use ($view, $csrf, $path, $properties, $candidateDocuments, $screening, $wizardSteps): ResponseInterface {
         $continuePath = '/apply/continue/' . $token;
         $documentsByRequirement = [];
         foreach ($candidateDocuments->listDocumentsForCandidate((int) $candidate['id']) as $document) {
@@ -133,17 +146,35 @@ return static function (App $app, array $deps): void {
             }
         }
 
-        $response->getBody()->write($view->renderPublic('public_candidate_continue', [
-            'pageTitle' => 'Continuar solicitud',
+        $stepKeys = array_column($wizardSteps, 'key');
+        $stepIndex = array_search($step, $stepKeys, true);
+        $stepIndex = is_int($stepIndex) ? $stepIndex : 1;
+        $editable = in_array((string) ($candidate['status'] ?? ''), ['new', 'incomplete'], true)
+            && ($candidate['submitted_at'] ?? null) === null;
+        $previousStep = $stepIndex > 1 ? $stepKeys[$stepIndex - 1] : null;
+        $nextStep = $stepKeys[$stepIndex + 1] ?? null;
+        $stepLabel = $wizardSteps[$stepIndex]['label'] ?? 'Datos personales';
+
+        $response->getBody()->write($view->renderPublic('public_candidate_wizard', [
+            'pageTitle' => $stepLabel,
             'candidate' => $candidate,
             'action' => $path($continuePath),
             'referencesAction' => $path($continuePath . '/references'),
             'unitAction' => $path($continuePath . '/unit'),
             'submitAction' => $path($continuePath . '/submit'),
             'documentActionBase' => $path($continuePath . '/documents'),
+            'token' => $token,
+            'step' => $step,
+            'wizardSteps' => $wizardSteps,
+            'stepIndex' => $stepIndex,
+            'previousStep' => $previousStep,
+            'nextStep' => $nextStep,
+            'editable' => $editable,
             'applicationRequirements' => $candidateDocuments->listRequirementsForUnit((int) $candidate['unit_id'], true),
             'documentsByRequirement' => $documentsByRequirement,
-            'availableUnits' => $properties->listPublicUnits(null, null, null),
+            'availableUnits' => $step === 'personal' && $editable
+                ? $properties->listPublicUnits(null, null, null)
+                : [],
             'screening' => $screening->publicForCandidate((int) $candidate['id']),
             'csrfToken' => $csrf->token(),
             'error' => $error,
@@ -152,6 +183,16 @@ return static function (App $app, array $deps): void {
         return $response
             ->withHeader('Content-Type', 'text/html; charset=utf-8')
             ->withStatus($status);
+    };
+
+    $nextWizardStep = static function (mixed $step) use ($continuationStepKeys): ?string {
+        if (!is_string($step)) {
+            return null;
+        }
+
+        $index = array_search($step, $continuationStepKeys, true);
+
+        return is_int($index) ? ($continuationStepKeys[$index + 1] ?? null) : null;
     };
 
     $app->post('/admin/units/{id:[0-9]+}/application-requirements', static function (
@@ -442,21 +483,50 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($candidates, $renderContinue): ResponseInterface {
+    ) use ($candidates, $path): ResponseInterface {
         $token = (string) ($args['token'] ?? '');
+        $step = $candidates->firstIncompleteWizardStep($token, time());
+        if ($step === null) {
+            return $response->withStatus(404);
+        }
+
+        return $response
+            ->withHeader('Location', $path('/apply/continue/' . $token . '/' . $step))
+            ->withStatus(303);
+    });
+
+    $app->get('/apply/continue/{token}/{step}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($candidates, $renderWizard, $path, $continuationStepKeys): ResponseInterface {
+        $token = (string) ($args['token'] ?? '');
+        $step = (string) ($args['step'] ?? '');
+        if (!in_array($step, $continuationStepKeys, true)) {
+            return $response->withStatus(404);
+        }
+
         $candidate = $candidates->findByToken($token, time());
         if ($candidate === null) {
             return $response->withStatus(404);
         }
 
-        return $renderContinue($response, $candidate, $token);
+        if ((!in_array((string) ($candidate['status'] ?? ''), ['new', 'incomplete'], true)
+                || ($candidate['submitted_at'] ?? null) !== null)
+            && $step !== 'review') {
+            return $response
+                ->withHeader('Location', $path('/apply/continue/' . $token . '/review'))
+                ->withStatus(303);
+        }
+
+        return $renderWizard($response, $candidate, $token, $step);
     });
 
     $app->post('/apply/continue/{token}', static function (
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($candidates, $allowAttempt, $tooMany, $renderContinue, $path): ResponseInterface {
+    ) use ($candidates, $allowAttempt, $tooMany, $renderWizard, $path, $nextWizardStep, $continuationStepKeys): ResponseInterface {
         $token = (string) ($args['token'] ?? '');
         $candidate = $candidates->findByToken($token, time());
         if ($candidate === null) {
@@ -468,16 +538,29 @@ return static function (App $app, array $deps): void {
         }
 
         $input = (array) ($request->getParsedBody() ?? []);
+        $step = $input['wizard_step'] ?? null;
         unset($input['csrf_token']);
+        unset($input['wizard_step']);
 
         try {
             $candidates->updateByToken($token, $input, time());
         } catch (RuntimeException $exception) {
-            return $renderContinue($response, $candidate, $token, $exception->getMessage(), 422);
+            $errorStep = is_string($step) && in_array($step, $continuationStepKeys, true) ? $step : 'personal';
+            return $renderWizard($response, $candidate, $token, $errorStep, $exception->getMessage(), 422);
+        }
+
+        $nextStep = $nextWizardStep($step);
+        if ($step === 'work' && $candidates->firstIncompleteWizardStep($token, time()) === 'work') {
+            $nextStep = 'work';
+        }
+        if ($nextStep === null) {
+            return $response
+                ->withHeader('Location', $path('/apply/continue/' . $token))
+                ->withStatus(303);
         }
 
         return $response
-            ->withHeader('Location', $path('/apply/continue/' . $token))
+            ->withHeader('Location', $path('/apply/continue/' . $token . '/' . $nextStep))
             ->withStatus(303);
     });
 
@@ -485,7 +568,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($candidates, $allowAttempt, $tooMany, $renderContinue, $path): ResponseInterface {
+    ) use ($candidates, $allowAttempt, $tooMany, $renderWizard, $path, $nextWizardStep): ResponseInterface {
         $token = (string) ($args['token'] ?? '');
         $candidate = $candidates->findByToken($token, time());
         if ($candidate === null) {
@@ -499,17 +582,24 @@ return static function (App $app, array $deps): void {
         $body = (array) ($request->getParsedBody() ?? []);
         $references = $body['references'] ?? [];
         if (!is_array($references)) {
-            return $renderContinue($response, $candidate, $token, 'Las referencias no son válidas.', 422);
+            return $renderWizard($response, $candidate, $token, 'references', 'Las referencias no son válidas.', 422);
         }
 
         try {
             $candidates->replaceReferencesByToken($token, $references, time());
         } catch (RuntimeException $exception) {
-            return $renderContinue($response, $candidate, $token, $exception->getMessage(), 422);
+            return $renderWizard($response, $candidate, $token, 'references', $exception->getMessage(), 422);
+        }
+
+        $nextStep = $nextWizardStep($body['wizard_step'] ?? null);
+        if ($nextStep === null) {
+            return $response
+                ->withHeader('Location', $path('/apply/continue/' . $token))
+                ->withStatus(303);
         }
 
         return $response
-            ->withHeader('Location', $path('/apply/continue/' . $token))
+            ->withHeader('Location', $path('/apply/continue/' . $token . '/' . $nextStep))
             ->withStatus(303);
     });
 
@@ -517,7 +607,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($candidates, $allowAttempt, $tooMany, $renderContinue, $path): ResponseInterface {
+    ) use ($candidates, $allowAttempt, $tooMany, $renderWizard, $path): ResponseInterface {
         $token = (string) ($args['token'] ?? '');
         $candidate = $candidates->findByToken($token, time());
         if ($candidate === null) {
@@ -532,11 +622,11 @@ return static function (App $app, array $deps): void {
         try {
             $candidates->changeUnitByToken($token, (string) ($body['public_key'] ?? ''), time());
         } catch (RuntimeException $exception) {
-            return $renderContinue($response, $candidate, $token, $exception->getMessage(), 422);
+            return $renderWizard($response, $candidate, $token, 'personal', $exception->getMessage(), 422);
         }
 
         return $response
-            ->withHeader('Location', $path('/apply/continue/' . $token))
+            ->withHeader('Location', $path('/apply/continue/' . $token . '/personal'))
             ->withStatus(303);
     });
 
@@ -544,7 +634,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($candidates, $candidateDocuments, $allowAttempt, $tooMany, $renderContinue, $path): ResponseInterface {
+    ) use ($candidates, $candidateDocuments, $allowAttempt, $tooMany, $renderWizard, $path): ResponseInterface {
         $token = (string) ($args['token'] ?? '');
         $candidate = $candidates->findByToken($token, time());
         if ($candidate === null) {
@@ -557,7 +647,7 @@ return static function (App $app, array $deps): void {
 
         $upload = $request->getUploadedFiles()['document'] ?? null;
         if (!$upload instanceof UploadedFileInterface || $upload->getError() === UPLOAD_ERR_NO_FILE) {
-            return $renderContinue($response, $candidate, $token, 'Selecciona un documento.', 422);
+            return $renderWizard($response, $candidate, $token, 'documents', 'Selecciona un documento.', 422);
         }
 
         try {
@@ -567,11 +657,11 @@ return static function (App $app, array $deps): void {
                 $upload,
             );
         } catch (RuntimeException $exception) {
-            return $renderContinue($response, $candidate, $token, $exception->getMessage(), 422);
+            return $renderWizard($response, $candidate, $token, 'documents', $exception->getMessage(), 422);
         }
 
         return $response
-            ->withHeader('Location', $path('/apply/continue/' . $token))
+            ->withHeader('Location', $path('/apply/continue/' . $token . '/documents'))
             ->withStatus(303);
     });
 
@@ -579,7 +669,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($candidates, $allowAttempt, $tooMany, $renderContinue, $path): ResponseInterface {
+    ) use ($candidates, $allowAttempt, $tooMany, $renderWizard, $path): ResponseInterface {
         $token = (string) ($args['token'] ?? '');
         $candidate = $candidates->findByToken($token, time());
         if ($candidate === null) {
@@ -593,11 +683,11 @@ return static function (App $app, array $deps): void {
         try {
             $candidates->submitByToken($token, time());
         } catch (RuntimeException $exception) {
-            return $renderContinue($response, $candidate, $token, $exception->getMessage(), 422);
+            return $renderWizard($response, $candidate, $token, 'review', $exception->getMessage(), 422);
         }
 
         return $response
-            ->withHeader('Location', $path('/apply/continue/' . $token))
+            ->withHeader('Location', $path('/apply/continue/' . $token . '/review'))
             ->withStatus(303);
     });
 };

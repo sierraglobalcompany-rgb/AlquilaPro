@@ -73,7 +73,7 @@ final class PublicCandidateScreeningTest extends TestCase
         ], 1791813600);
         $service->updateForCandidate($candidateId, ['status' => 'in_progress'], 1791813610);
 
-        $response = $this->get($this->app('/sub'), '/sub/apply/continue/' . $rawToken);
+        $response = $this->get($this->app('/sub'), '/sub/apply/continue/' . $rawToken . '/review');
         self::assertSame(200, $response->getStatusCode());
         $html = (string) $response->getBody();
 
@@ -104,7 +104,7 @@ final class PublicCandidateScreeningTest extends TestCase
             'support_reference' => 'PRIVATE-SUPPORT-SENTINEL',
         ], 1791813600);
 
-        $html = (string) $this->get($this->app(), '/apply/continue/' . $rawToken)->getBody();
+        $html = (string) $this->get($this->app(), '/apply/continue/' . $rawToken . '/review')->getBody();
 
         self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
         self::assertStringContainsString('&lt;b&gt;Producto visible&lt;/b&gt;', $html);
@@ -124,7 +124,7 @@ final class PublicCandidateScreeningTest extends TestCase
             'provider' => 'SURA',
         ], 1791813600);
 
-        $html = (string) $this->get($this->app(), '/apply/continue/' . $rawToken)->getBody();
+        $html = (string) $this->get($this->app(), '/apply/continue/' . $rawToken . '/review')->getBody();
         self::assertStringContainsString('Estudio de aseguradora', $html);
         self::assertStringContainsString('Pendiente', $html);
         self::assertStringContainsString('No hay enlace externo disponible para este estudio.', $html);
@@ -144,7 +144,7 @@ final class PublicCandidateScreeningTest extends TestCase
             'result' => '<strong>Aprobado final</strong>',
         ], 1791813620);
 
-        $html = (string) $this->get($this->app(), '/apply/continue/' . $rawToken)->getBody();
+        $html = (string) $this->get($this->app(), '/apply/continue/' . $rawToken . '/review')->getBody();
         self::assertStringContainsString('Aprobado', $html);
         self::assertStringContainsString('&lt;strong&gt;Aprobado final&lt;/strong&gt;', $html);
         self::assertStringNotContainsString('href="https://aseguradora.example/study/terminal"', $html);
@@ -161,7 +161,7 @@ final class PublicCandidateScreeningTest extends TestCase
         ], 1791813600);
         $this->pdo->exec("UPDATE candidates SET status = 'withdrawn' WHERE id = " . $candidateId);
 
-        $html = (string) $this->get($this->app(), '/apply/continue/' . $rawToken)->getBody();
+        $html = (string) $this->get($this->app(), '/apply/continue/' . $rawToken . '/review')->getBody();
         self::assertStringContainsString('Estudio de aseguradora', $html);
         self::assertStringContainsString('Visible tras retiro', $html);
         self::assertStringNotContainsString('href="https://aseguradora.example/study/withdrawn"', $html);
@@ -176,7 +176,7 @@ final class PublicCandidateScreeningTest extends TestCase
         $responsibleUserId = $this->insertUser('responsible-public-5@example.com');
         $this->screening()->createForCandidate($candidateId, $responsibleUserId, ['provider' => 'SURA'], 1791813600);
 
-        $html = (string) $this->get($app, '/sub/apply/continue/' . $rawToken)->getBody();
+        $html = (string) $this->get($app, '/sub/apply/continue/' . $rawToken . '/review')->getBody();
         self::assertStringContainsString('href="/sub/catalog"', $html);
     }
 

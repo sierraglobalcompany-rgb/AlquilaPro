@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 $unit = is_array($unit ?? null) ? $unit : [];
+$wizardSteps = is_array($wizardSteps ?? null) ? array_values($wizardSteps) : [];
 $action = (string) ($action ?? '');
 $csrfToken = (string) ($csrfToken ?? '');
 $error = is_string($error ?? null) ? $error : null;
@@ -12,6 +13,17 @@ $error = is_string($error ?? null) ? $error : null;
     <p class="eyebrow">Solicitud de arrendamiento</p>
     <h1>Inicia tu solicitud</h1>
     <p class="hint">Completa tus datos básicos para recibir un enlace seguro de continuación.</p>
+
+    <?php if ($wizardSteps !== []): ?>
+        <nav aria-label="Progreso de la solicitud">
+            <p class="hint">Paso 1 de <?= $escape(count($wizardSteps)) ?></p>
+            <ol>
+                <?php foreach ($wizardSteps as $index => $step): ?>
+                    <li <?= $index === 0 ? 'aria-current="step"' : '' ?>><?= $escape($step['label'] ?? '') ?></li>
+                <?php endforeach; ?>
+            </ol>
+        </nav>
+    <?php endif; ?>
 
     <article class="surface">
         <h2><?= $escape($unit['property_name'] ?? 'Unidad disponible') ?></h2>

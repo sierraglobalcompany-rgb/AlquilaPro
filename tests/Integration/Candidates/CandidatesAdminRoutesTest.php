@@ -269,7 +269,7 @@ final class CandidatesAdminRoutesTest extends TestCase
         self::assertSame(hash('sha256', $newToken), $hash);
         self::assertNotSame($newToken, $hash);
         self::assertSame(404, $this->request($app, 'GET', '/sub/apply/continue/' . $oldToken)->getStatusCode());
-        self::assertSame(200, $this->request($app, 'GET', '/sub/apply/continue/' . $newToken)->getStatusCode());
+        self::assertSame(200, $this->request($app, 'GET', '/sub/apply/continue/' . $newToken . '/personal')->getStatusCode());
 
         $detailHtml = (string) $this->request($app, 'GET', '/sub/admin/candidates/' . $candidateId)->getBody();
         self::assertStringNotContainsString($newToken, $detailHtml);
