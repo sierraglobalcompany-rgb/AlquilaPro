@@ -42,6 +42,10 @@ $app = $factory([
     'base_url' => $baseUrl,
     'base_path' => $basePath,
     'document_directory' => $environmentValue('ALQUILAPRO_DOCUMENT_DIRECTORY'),
+    'good_conduct_bonus_enabled' => filter_var(
+        $environmentValue('ALQUILAPRO_GOOD_CONDUCT_BONUS_ENABLED'),
+        FILTER_VALIDATE_BOOLEAN,
+    ),
     'notification_settings' => [
         'host' => $environmentValue('ALQUILAPRO_SMTP_HOST'),
         'port' => $environmentValue('ALQUILAPRO_SMTP_PORT'),
