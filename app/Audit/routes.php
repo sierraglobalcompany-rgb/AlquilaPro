@@ -57,6 +57,8 @@ return static function (App $app, array $deps): void {
             'auditRows' => $audit->listRecent(100),
         ]));
 
-        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+        return $response
+            ->withHeader('Content-Type', 'text/html; charset=utf-8')
+            ->withHeader('Cache-Control', 'private, no-store');
     });
 };
