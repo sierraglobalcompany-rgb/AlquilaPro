@@ -172,6 +172,76 @@ final readonly class TerminationService
         }
     }
 
+    public function preview(int $leaseId, string $today, array $handover = []): array
+    {
+        $lease = $this->leases->find($leaseId);
+        if ($lease === null) {
+            throw new RuntimeException('El arrendamiento no existe.');
+        }
+
+        $documents = $this->documents->listCurrentForLease($leaseId);
+        $inventories = ['initial' => [], 'final' => []];
+        $currentDocuments = [];
+        foreach ($documents as $document) {
+            $evidence = $this->documentEvidence($document);
+            if ($document['type'] === 'inventory_initial') {
+                $inventories['initial'][] = $evidence;
+            } elseif ($document['type'] === 'inventory_final') {
+                $inventories['final'][] = $evidence;
+            } else {
+                $currentDocuments[] = $evidence;
+            }
+        }
+
+        $claimEvidence = [];
+        foreach ($this->insurance->listPoliciesForLease($leaseId, $today) as $policy) {
+            $claims = array_map(
+                fn (array $claim): array => $this->claimEvidence($claim),
+                $this->insurance->listClaims((int) $policy['id']),
+            );
+            $claimEvidence[] = [
+                'policy' => $this->policyEvidence($policy),
+                'claims' => $claims,
+            ];
+        }
+
+        return [
+            'lease' => $lease,
+            'contract' => [
+                'id' => $lease['contract_id'],
+                'document_type' => $lease['document_type'],
+                'start_date' => $lease['start_date'],
+                'end_date' => $lease['end_date'],
+                'duration_text' => $lease['duration_text'],
+                'monthly_rent' => $lease['monthly_rent'],
+                'administration_fee' => $lease['administration_fee'],
+            ],
+            'handover' => $this->normalizeHandover($handover),
+            'finance' => [
+                'summary' => $this->finance->summaryForLease($leaseId, $today),
+                'charges' => $this->finance->listForLease($leaseId, $today),
+                'payments' => array_map(
+                    fn (array $payment): array => $this->paymentEvidence($payment),
+                    $this->finance->listPaymentsForLease($leaseId),
+                ),
+            ],
+            'obligations' => array_map(
+                fn (array $obligation): array => $this->obligationEvidence($obligation),
+                $this->obligations->listForLease($leaseId, $today),
+            ),
+            'claims' => $claimEvidence,
+            'inventories' => $inventories,
+            'current_documents' => $currentDocuments,
+            'community' => array_map(
+                fn (array $incident): array => $this->communityEvidence($incident),
+                $this->community->listForLease($leaseId),
+            ),
+            'memberships' => $this->memberships->listForLease($leaseId),
+            'bonus' => $this->bonusEnabled ? $this->bonusForLease($leaseId) : null,
+            'blockers' => [],
+        ];
+    }
+
     private function requireBonusEnabled(): void
     {
         if (!$this->bonusEnabled) {
@@ -233,6 +303,149 @@ final readonly class TerminationService
         }
 
         return $normalized;
+    }
+
+    private function normalizeHandover(array $handover): array
+    {
+        $allowed = ['property_returned', 'keys_returned_count', 'notes'];
+        if (array_diff(array_keys($handover), $allowed) !== []) {
+            throw new RuntimeException('La entrega contiene campos no permitidos.');
+        }
+
+        $propertyReturned = $handover['property_returned'] ?? null;
+        if ($propertyReturned !== null && !is_bool($propertyReturned)) {
+            throw new RuntimeException('La entrega física no es válida.');
+        }
+
+        $keysReturned = $handover['keys_returned_count'] ?? null;
+        if ($keysReturned !== null && (!is_int($keysReturned) || $keysReturned < 0 || $keysReturned > 100)) {
+            throw new RuntimeException('La cantidad de llaves no es válida.');
+        }
+
+        $notes = $handover['notes'] ?? null;
+        if ($notes !== null && !is_string($notes)) {
+            throw new RuntimeException('La nota de entrega no es válida.');
+        }
+        $notes = $notes === null ? null : trim($notes);
+        if ($notes === '') {
+            $notes = null;
+        }
+        if ($notes !== null && mb_strlen($notes) > 2000) {
+            throw new RuntimeException('La nota de entrega es demasiado larga.');
+        }
+
+        return [
+            'property_returned' => $propertyReturned,
+            'keys_returned_count' => $keysReturned,
+            'notes' => $notes,
+        ];
+    }
+
+    private function documentEvidence(array $document): array
+    {
+        return [
+            'id' => (int) $document['id'],
+            'type' => (string) $document['type'],
+            'title' => (string) $document['title'],
+            'mime_type' => $document['mime_type'] === null ? null : (string) $document['mime_type'],
+            'sha256' => $document['sha256'] === null ? null : (string) $document['sha256'],
+            'size_bytes' => $document['size_bytes'] === null ? null : (int) $document['size_bytes'],
+            'supersedes_document_id' => $document['supersedes_document_id'] === null
+                ? null
+                : (int) $document['supersedes_document_id'],
+            'created_at' => (string) $document['created_at'],
+        ];
+    }
+
+    private function paymentEvidence(array $payment): array
+    {
+        return [
+            'id' => (int) $payment['id'],
+            'amount' => (string) $payment['amount'],
+            'paid_on' => (string) $payment['paid_on'],
+            'paid_time' => $payment['paid_time'] === null ? null : (string) $payment['paid_time'],
+            'reported_at' => (string) $payment['reported_at'],
+            'state' => (string) $payment['state'],
+            'has_receipt' => (bool) $payment['has_receipt'],
+            'receipt_mime_type' => $payment['receipt_mime_type'] === null ? null : (string) $payment['receipt_mime_type'],
+            'reconciled_at' => $payment['reconciled_at'] === null ? null : (string) $payment['reconciled_at'],
+            'rejected_at' => $payment['rejected_at'] === null ? null : (string) $payment['rejected_at'],
+            'rejection_reason' => $payment['rejection_reason'] === null ? null : (string) $payment['rejection_reason'],
+            'allocations' => $payment['allocations'],
+        ];
+    }
+
+    private function obligationEvidence(array $obligation): array
+    {
+        return [
+            'id' => (int) $obligation['id'],
+            'type' => (string) $obligation['type'],
+            'service_name' => $obligation['service_name'] === null ? null : (string) $obligation['service_name'],
+            'description' => (string) $obligation['description'],
+            'period_month' => $obligation['period_month'] === null ? null : (string) $obligation['period_month'],
+            'issued_on' => $obligation['issued_on'] === null ? null : (string) $obligation['issued_on'],
+            'due_on' => $obligation['due_on'] === null ? null : (string) $obligation['due_on'],
+            'amount' => (string) $obligation['amount'],
+            'external_reference' => $obligation['external_reference'] === null
+                ? null
+                : (string) $obligation['external_reference'],
+            'charge_id' => $obligation['charge_id'] === null ? null : (int) $obligation['charge_id'],
+            'settled_at' => $obligation['settled_at'] === null ? null : (string) $obligation['settled_at'],
+            'voided_at' => $obligation['voided_at'] === null ? null : (string) $obligation['voided_at'],
+            'external_state' => (string) $obligation['external_state'],
+            'has_source_support' => (bool) $obligation['has_source_support'],
+            'has_settlement_support' => (bool) $obligation['has_settlement_support'],
+        ];
+    }
+
+    private function policyEvidence(array $policy): array
+    {
+        return [
+            'id' => (int) $policy['id'],
+            'provider_name' => (string) $policy['provider_name'],
+            'product_name' => (string) $policy['product_name'],
+            'policy_number' => (string) $policy['policy_number'],
+            'coverage_start' => (string) $policy['coverage_start'],
+            'coverage_end' => (string) $policy['coverage_end'],
+            'coverage' => $policy['coverage'],
+            'documents' => $policy['documents'],
+            'status' => (string) $policy['status'],
+        ];
+    }
+
+    private function claimEvidence(array $claim): array
+    {
+        return [
+            'id' => (int) $claim['id'],
+            'policy_id' => (int) $claim['policy_id'],
+            'incident_on' => (string) $claim['incident_on'],
+            'description' => (string) $claim['description'],
+            'claimed_amount' => $claim['claimed_amount'] === null ? null : (string) $claim['claimed_amount'],
+            'status' => (string) $claim['status'],
+            'radicado' => $claim['radicado'] === null ? null : (string) $claim['radicado'],
+            'filed_on' => $claim['filed_on'] === null ? null : (string) $claim['filed_on'],
+            'resolved_on' => $claim['resolved_on'] === null ? null : (string) $claim['resolved_on'],
+            'resolution_notes' => $claim['resolution_notes'] === null ? null : (string) $claim['resolution_notes'],
+            'checklist' => $claim['checklist'],
+            'documents' => $claim['documents'],
+        ];
+    }
+
+    private function communityEvidence(array $incident): array
+    {
+        return [
+            'id' => (int) $incident['id'],
+            'category' => (string) $incident['category'],
+            'occurred_on' => (string) $incident['occurred_on'],
+            'description' => (string) $incident['description'],
+            'status' => (string) $incident['status'],
+            'resolution_notes' => $incident['resolution_notes'] === null
+                ? null
+                : (string) $incident['resolution_notes'],
+            'closed_at' => $incident['closed_at'] === null ? null : (string) $incident['closed_at'],
+            'voided_at' => $incident['voided_at'] === null ? null : (string) $incident['voided_at'],
+            'void_reason' => $incident['void_reason'] === null ? null : (string) $incident['void_reason'],
+        ];
     }
 
     private function normalizeBonus(array $row): array
