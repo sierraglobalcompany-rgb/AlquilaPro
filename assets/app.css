@@ -135,6 +135,17 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .hint { color: var(--color-muted); }
 ul { padding-left: 22px; }
 
+.public-page { min-height: 100dvh; }
+.public-shell {
+    width: 100%;
+    min-height: 100dvh;
+}
+.public-main {
+    width: min(100%, 1440px);
+    margin: 0 auto;
+    padding: 24px 16px 40px;
+}
+
 .app-page { min-height: 100dvh; }
 .app-shell {
     width: min(100%, 1440px);
@@ -451,6 +462,7 @@ ul { padding-left: 22px; }
 }
 
 @media (min-width: 768px) and (max-width: 1199px) {
+    .public-main { padding: 28px 28px 44px; }
     .topbar { padding-right: 28px; padding-left: 28px; }
     .app-main { padding: 24px 28px 32px; }
     .bottom-nav { width: min(100%, 900px); }
@@ -477,6 +489,7 @@ ul { padding-left: 22px; }
 .desktop-sidebar { display: none; }
 
 @media (min-width: 1200px) {
+    .public-main { padding: 32px clamp(24px, 4vw, 56px) 48px; }
     .app-shell {
         display: grid;
         grid-template-columns: 260px minmax(0, 1fr);

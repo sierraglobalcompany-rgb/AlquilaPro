@@ -18,9 +18,9 @@ $title = $pageTitle !== '' ? $pageTitle . ' · ' . $branding['app_name'] : $bran
     <title><?= $escape($title) ?></title>
     <link rel="stylesheet" href="<?= $escape($basePath) ?>/assets/app.css">
 </head>
-<body class="auth-page" style="--brand-primary: <?= $escape($branding['primary_color']) ?>;">
-<main class="auth-shell" data-public-shell>
-    <section class="auth-card">
+<body class="public-page" style="--brand-primary: <?= $escape($branding['primary_color']) ?>;">
+<div class="public-shell" data-public-shell>
+    <main class="public-main">
         <a class="auth-brand" href="<?= $escape($basePath) ?>/" aria-label="<?= $escape($branding['app_name']) ?>">
             <?php if ($branding['logo_path'] !== null): ?>
                 <img class="auth-brand__logo" src="<?= $escape($basePath) ?>/brand/logo" alt="<?= $escape($branding['app_name']) ?>">
@@ -30,7 +30,7 @@ $title = $pageTitle !== '' ? $pageTitle . ' · ' . $branding['app_name'] : $bran
             <?php endif; ?>
         </a>
         <?= $content ?>
-    </section>
-</main>
+    </main>
+</div>
 </body>
 </html>
