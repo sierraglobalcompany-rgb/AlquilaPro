@@ -2,52 +2,21 @@
 
 AlquilaPro es un sistema web SSR en PHP para administrar alquileres residenciales: propiedades y unidades, candidatos, contratos, arrendamientos, cartera, pagos, mantenimiento, documentos, seguros, comunidad, membresías, notificaciones y auditoría.
 
-## Estado vigente — recuperación post-UAT
+## Estado vivo
 
-La autoridad viva es GitHub + CI + el checkpoint canónico de la fase activa.
+El README no es un snapshot por SHA ni por PR. El estado operativo vigente se mantiene en:
 
-- `main`: `b45f625e68622702335f5e606ae34d7410a2b7e6`
-- Rama de recuperación R1: `impl/r1-r3-post-uat-recovery-20261015`
-- PR de recuperación: `#31` — DRAFT / NO MERGE sin autorización explícita del owner.
+`docs/CURRENT_CHECKPOINT.md`
+
+Para recuperar el proyecto después de un cambio de chat, contexto o sesión, leer primero ese archivo y después contrastar sus refs contra GitHub + CI.
+
+Situación durable post-UAT:
+
 - Pre-F26 owner UAT: **REJECTED**.
 - F26: **FROZEN**.
 - Deployment: **NO autorizado**.
 - El artefacto F25 anterior es evidencia histórica; no es candidato de despliegue después de los cambios post-UAT.
-
-### R0
-
-Baseline visual público aprobado y bloqueado en:
-
-`docs/design/APPROVED_PUBLIC_UI_BASELINE_2026-10-15.md`
-
-### R1 — Auth recovery
-
-El código funcional de R1 está GREEN certificado en:
-
-`25bf8a97002495f3288bf23de02c563d7a1e39c4`
-
-CI #1037 / run `38851445594`:
-- PHP 8.3: SUCCESS — 642 tests / 7.659 assertions / 1 skipped;
-- PHP 8.4: SUCCESS;
-- PHP 8.5: SUCCESS.
-
-Contrato R1 vigente:
-- un solo `AuthService` para email / username / documento;
-- identificadores ambiguos fallan cerrados;
-- `PasswordPolicy` es la única autoridad del mínimo de contraseña: 6 caracteres;
-- admin/gestor: email obligatorio, username y documento opcionales;
-- campos opcionales vacíos convergen a `NULL`;
-- username gestionado: lower + trim;
-- documento gestionado: upper + trim;
-- tenant conserva exactamente el documento canónico proveniente del candidato tras `trim` y lo usa como contraseña inicial hasheada;
-- `must_change_password = 0` para tenant;
-- una sola comprobación cruzada de colisiones en `UserService` + índices `UNIQUE` como segunda barrera;
-- el login público usa `identifier`;
-- queda un fallback interno transitorio `email -> identifier` para helpers/tests legados; su gate de eliminación es R3, cuando se reabre la superficie pública de login. No es una segunda autoridad de autenticación.
-
-Checkpoint canónico de recuperación R1:
-
-`docs/checkpoints/R1_AUTH_GREEN_CHECKPOINT_2026-10-16.md`
+- R0 baseline visual público aprobado: `docs/design/APPROVED_PUBLIC_UI_BASELINE_2026-10-15.md`.
 
 ## Roadmap post-UAT vigente
 
@@ -69,7 +38,7 @@ R13 reconstrucción F25
 R14 Hostinger / F26
 ```
 
-No abrir una fase nueva antes de cerrar la anterior conforme al checkpoint y CI. Merge y despliegue requieren autorización explícita del owner.
+No abrir una fase nueva antes de cerrar la anterior conforme al checkpoint y CI. Merge y despliegue son gates separados; despliegue no se infiere de un merge.
 
 ## Leyes de desarrollo
 
@@ -83,7 +52,7 @@ Orden obligatorio antes de agregar algo:
 
 `ELIMINAR -> UNIR/CONVERGER -> SIMPLIFICAR -> MEJORAR/OPTIMIZAR -> AGREGAR`
 
-No mantener autoridades duplicadas ni estados documentales supersedidos en el HEAD activo.
+No mantener autoridades duplicadas ni estados documentales supersedidos como estado vivo. La historia queda en Git; el puntero operativo queda en `docs/CURRENT_CHECKPOINT.md`.
 
 ### 3. Anti-parche
 
@@ -93,17 +62,31 @@ Para bugs o gaps:
 
 No resolver fallos con excepciones laterales o parches sobre parches.
 
+## Human-First UI/UX
+
+La recuperación visual y de experiencia sigue el programa Human-First aprobado. Su auditoría viva y prioridades están enlazadas desde `docs/CURRENT_CHECKPOINT.md`.
+
+Reglas durables:
+
+- preservar verdad de negocio y permisos;
+- traducir estados/datos técnicos a lenguaje humano sin crear una segunda autoridad;
+- reducir densidad mediante progressive disclosure, no SPA ni frameworks paralelos;
+- conservar un solo `assets/app.css` y un solo `assets/app.js`;
+- no inventar KPIs para el dashboard;
+- Browser real es gate obligatorio para cerrar QA visual cuando aplique.
+
 ## Método de trabajo
 
 1. Contrato pequeño y verificable.
-2. RED que falle por la causa esperada.
+2. Para cambios funcionales: RED causal primero.
 3. GREEN mínimo dentro del owner existente.
 4. Suite focal.
 5. Suite completa.
-6. Matriz CI PHP 8.3 / 8.4 / 8.5 sobre SHA exacto.
+6. Matriz CI PHP 8.3 / 8.4 / 8.5 sobre SHA exacto cuando aplique.
 7. Auditoría KISS / ruido / parches.
-8. Checkpoint canónico.
-9. Merge solo con autorización explícita.
+8. Actualizar `docs/CURRENT_CHECKPOINT.md` y checkpoint ref en gates relevantes.
+9. Merge sólo en su gate autorizado.
+10. Deployment sólo con autorización explícita independiente.
 
 ## Stack validado
 
@@ -120,9 +103,9 @@ Orden operativo:
 
 1. GitHub del repositorio canónico.
 2. CI del SHA exacto.
-3. Checkpoint canónico de la fase activa.
-4. Specs y planes aprobados.
-5. README / AGENTS para identidad, leyes y orientación.
-6. Chats y handoffs solo como recuperación cuando no contradicen las fuentes anteriores.
+3. `docs/CURRENT_CHECKPOINT.md` y checkpoint ref canónico de la fase activa.
+4. SPEC / PLAN aprobado aplicable.
+5. `AGENTS.md` y README para metodología, identidad y guardrails durables.
+6. Handoffs/chats sólo como recuperación cuando no contradicen las fuentes superiores.
 
-Los documentos y artefactos históricos no sustituyen el estado vivo del repositorio y de CI.
+Los documentos y artefactos históricos no sustituyen el estado vivo del repositorio, CI y checkpoint canónico.
