@@ -85,6 +85,16 @@ final class PublicCatalogListTest extends TestCase
         self::assertStringContainsString('Parqueaderos Oriente', $html);
         self::assertStringContainsString('href="/catalog/' . str_repeat('a', 24) . '"', $html);
         self::assertStringContainsString('href="/catalog/' . str_repeat('b', 24) . '"', $html);
+        self::assertStringContainsString('class="public-catalog-grid"', $html);
+        self::assertGreaterThanOrEqual(2, substr_count($html, 'class="public-property-card"'));
+        self::assertStringContainsString('class="public-property-card__media"', $html);
+        self::assertStringContainsString('class="public-property-card__body"', $html);
+        self::assertStringContainsString('class="public-property-card__facts"', $html);
+        self::assertStringContainsString('src="/catalog/' . str_repeat('a', 24) . '/photo/1"', $html);
+        self::assertStringContainsString('$1.200.000', $html);
+        self::assertStringContainsString('2 hab.', $html);
+        self::assertStringContainsString('2 baños', $html);
+        self::assertStringContainsString('class="button" href="/catalog/' . str_repeat('a', 24) . '">Ver detalle</a>', $html);
         self::assertStringNotContainsString(str_repeat('c', 24), $html);
         self::assertStringNotContainsString(str_repeat('d', 24), $html);
         self::assertStringNotContainsString(str_repeat('e', 24), $html);
@@ -127,6 +137,7 @@ final class PublicCatalogListTest extends TestCase
 
         $html = (string) $this->request($this->app('/miapp'), '/miapp/catalog')->getBody();
         self::assertStringContainsString('href="/miapp/catalog/' . str_repeat('f', 24) . '"', $html);
+        self::assertStringContainsString('src="/miapp/catalog/' . str_repeat('f', 24) . '/photo/1"', $html);
         self::assertStringContainsString('href="/miapp/"', $html);
         self::assertStringNotContainsString('/miapp/miapp/', $html);
     }

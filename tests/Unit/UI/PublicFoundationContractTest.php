@@ -43,4 +43,19 @@ final class PublicFoundationContractTest extends TestCase
         self::assertStringContainsString('/catalog', $this->landing);
         self::assertStringContainsString('/login', $this->landing);
     }
+
+    public function testPublicLayoutLoadsExistingApplicationJavascriptDeferredOnce(): void
+    {
+        self::assertSame(1, substr_count($this->layout, '/assets/app.js'));
+        self::assertStringContainsString('/assets/app.js', $this->layout);
+        self::assertStringContainsString('defer', $this->layout);
+    }
+
+    public function testLandingKeepsServerRenderedCarouselProgressiveEnhancementMarkers(): void
+    {
+        self::assertStringContainsString('data-public-carousel', $this->landing);
+        self::assertStringContainsString('public-carousel__track', $this->landing);
+        self::assertStringContainsString('data-public-featured-unit', $this->landing);
+        self::assertStringContainsString('public-login-panel', $this->landing);
+    }
 }

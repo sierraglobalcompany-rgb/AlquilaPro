@@ -36,12 +36,26 @@ return static function (App $app, array $deps): void {
     $app->get('/', static function (
         ServerRequestInterface $request,
         ResponseInterface $response,
-    ) use ($properties, $view, $currentUser, $session, $csrf, $path): ResponseInterface {
+    ) use ($properties, $media, $view, $currentUser, $session, $csrf, $path): ResponseInterface {
         $user = $currentUser();
         if ($user === null) {
+            $featuredUnits = array_map(
+                static function (array $unit) use ($media): array {
+                    $unit['photo_positions'] = array_slice(
+                        $media->publicPhotoPositions((string) $unit['public_key']),
+                        0,
+                        5,
+                    );
+
+                    return $unit;
+                },
+                array_slice($properties->listPublicUnits(null, null, null), 0, 8),
+            );
+
             $response->getBody()->write($view->renderPublic('public_landing', [
                 'pageTitle' => 'Inicio',
-                'availabilityCount' => count($properties->listPublicUnits(null, null, null)),
+                'featuredUnits' => $featuredUnits,
+                'csrfToken' => $csrf->token(),
             ]));
 
             return $response->withHeader('Content-Type', 'text/html; charset=utf-8');

@@ -69,7 +69,7 @@ final class ShellRoutesTest extends TestCase
         self::assertSame(200, $response->getStatusCode());
         self::assertStringContainsString('data-public-shell', $body);
         self::assertStringContainsString('href="/catalog"', $body);
-        self::assertStringContainsString('href="/login"', $body);
+        self::assertStringContainsString('action="/login"', $body);
         self::assertStringNotContainsString('data-f3-app-shell', $body);
     }
 
