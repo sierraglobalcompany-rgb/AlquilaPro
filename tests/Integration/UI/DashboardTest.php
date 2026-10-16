@@ -137,6 +137,23 @@ final class DashboardTest extends TestCase
         self::assertStringNotContainsString('2 solicitudes de mantenimiento abiertas', $restrictedBody);
     }
 
+    public function testDashboardUsesScalarOwnerCountsInsteadOfHydratingQueues(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $routes = (string) file_get_contents($root . '/app/Properties/routes.php');
+        $finance = (string) file_get_contents($root . '/app/Finance/FinanceService.php');
+        $maintenance = (string) file_get_contents($root . '/app/Maintenance/MaintenanceService.php');
+
+        self::assertStringContainsString('$finance->countPendingPayments()', $routes);
+        self::assertStringNotContainsString('count($finance->listPendingPayments())', $routes);
+        self::assertStringContainsString('public function countPendingPayments(): int', $finance);
+
+        self::assertStringContainsString('$maintenance->countActionableRequests()', $routes);
+        self::assertStringNotContainsString("count($maintenance->listForStaff('open'))", $routes);
+        self::assertStringNotContainsString("count($maintenance->listForStaff('in_progress'))", $routes);
+        self::assertStringContainsString('public function countActionableRequests(): int', $maintenance);
+    }
+
     private function insertOperationalSignals(): void
     {
         $suffix = bin2hex(random_bytes(5));
