@@ -96,6 +96,42 @@ final class AuthRoutesTest extends TestCase
         self::assertSame(302, $this->request('GET', '/admin/users')->getStatusCode());
     }
 
+    public function testLoginUsesUnifiedIdentifierFieldAndAcceptsUsernameOrDocument(): void
+    {
+        $userId = $this->insertUser('staff@example.com', 'StaffPassword123', 'admin');
+        $statement = $this->pdo->prepare(
+            'UPDATE users SET username = :username, document_number = :document_number WHERE id = :id',
+        );
+        $statement->execute([
+            'id' => $userId,
+            'username' => 'staff.user',
+            'document_number' => 'CC123456',
+        ]);
+
+        $loginPage = $this->request('GET', '/login');
+        self::assertSame(200, $loginPage->getStatusCode());
+        $body = (string) $loginPage->getBody();
+        self::assertStringContainsString('Usuario, correo o cédula', $body);
+        self::assertStringContainsString('name="identifier"', $body);
+        self::assertStringNotContainsString('name="email"', $body);
+
+        $usernameLogin = $this->request('POST', '/login', [
+            'identifier' => 'staff.user',
+            'password' => 'StaffPassword123',
+        ]);
+        self::assertSame(303, $usernameLogin->getStatusCode());
+        self::assertSame('/', $usernameLogin->getHeaderLine('Location'));
+
+        self::assertSame(303, $this->request('POST', '/logout')->getStatusCode());
+
+        $documentLogin = $this->request('POST', '/login', [
+            'identifier' => 'CC123456',
+            'password' => 'StaffPassword123',
+        ]);
+        self::assertSame(303, $documentLogin->getStatusCode());
+        self::assertSame('/', $documentLogin->getHeaderLine('Location'));
+    }
+
     public function testSuccessfulLoginRotatesCsrfToken(): void
     {
         $this->insertUser('owner@example.com', 'OwnerPassword123', 'owner');
