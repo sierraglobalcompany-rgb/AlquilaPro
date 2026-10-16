@@ -300,6 +300,7 @@ final class PropertyService
 
         $statement = $this->pdo->prepare(
             'SELECT u.*, p.name AS property_name, p.city AS property_city, p.sector AS property_sector, '
+            . "(SELECT COUNT(*) FROM units parking WHERE parking.type = 'parking' AND parking.linked_apartment_id = u.id) AS linked_parking_count, "
             . "EXISTS (SELECT 1 FROM unit_media pm WHERE pm.unit_id = u.id AND pm.type = 'photo') AS has_photo "
             . 'FROM units u INNER JOIN properties p ON p.id = u.property_id '
             . 'WHERE ' . implode(' AND ', $where) . ' ORDER BY u.id ASC',
@@ -323,6 +324,7 @@ final class PropertyService
 
         $statement = $this->pdo->prepare(
             'SELECT u.*, p.name AS property_name, p.city AS property_city, p.sector AS property_sector, '
+            . "(SELECT COUNT(*) FROM units parking WHERE parking.type = 'parking' AND parking.linked_apartment_id = u.id) AS linked_parking_count, "
             . "EXISTS (SELECT 1 FROM unit_media pm WHERE pm.unit_id = u.id AND pm.type = 'photo') AS has_photo "
             . 'FROM units u INNER JOIN properties p ON p.id = u.property_id '
             . "WHERE u.public_key = :public_key AND p.is_active = 1 AND u.status = 'available' AND u.is_public = 1 "
@@ -616,6 +618,7 @@ final class PropertyService
         return [
             'public_key' => (string) $row['public_key'],
             'type' => (string) $row['type'],
+            'linked_parking_count' => (int) $row['linked_parking_count'],
             'location_label' => $row['location_label'] !== null ? (string) $row['location_label'] : null,
             'monthly_price' => $row['monthly_price'] !== null ? (string) $row['monthly_price'] : null,
             'description' => $row['description'] !== null ? (string) $row['description'] : null,
