@@ -10,6 +10,6 @@ declare(strict_types=1);
     <label for="current_password">Contraseña actual</label>
     <input id="current_password" type="password" name="current_password" autocomplete="current-password" required>
     <label for="new_password">Nueva contraseña</label>
-    <input id="new_password" type="password" name="new_password" minlength="12" autocomplete="new-password" required>
+    <input id="new_password" type="password" name="new_password" minlength="6" autocomplete="new-password" required>
     <button type="submit">Guardar contraseña</button>
 </form>

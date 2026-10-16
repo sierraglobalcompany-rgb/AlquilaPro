@@ -13,15 +13,14 @@ final readonly class AuthService
     private const MAX_FAILED_ATTEMPTS = 5;
     private const LOCK_MINUTES = 15;
     private const RESET_MINUTES = 30;
-    private const MIN_PASSWORD_LENGTH = 12;
 
     public function __construct(private PDO $pdo)
     {
     }
 
-    public function authenticate(string $email, string $password, DateTimeImmutable $now): ?array
+    public function authenticate(string $identifier, string $password, DateTimeImmutable $now): ?array
     {
-        $user = $this->findAuthenticationRecord($this->normalizeEmail($email));
+        $user = $this->findAuthenticationRecord(trim($identifier));
 
         if ($user === null || (int) $user['is_active'] !== 1) {
             return null;
@@ -51,7 +50,7 @@ final readonly class AuthService
 
     public function changePassword(int $userId, string $currentPassword, string $newPassword): bool
     {
-        if (strlen($newPassword) < self::MIN_PASSWORD_LENGTH) {
+        if (!PasswordPolicy::accepts($newPassword)) {
             return false;
         }
 
@@ -102,7 +101,7 @@ final readonly class AuthService
 
     public function resetPassword(string $token, string $newPassword, DateTimeImmutable $now): bool
     {
-        if ($token === '' || strlen($newPassword) < self::MIN_PASSWORD_LENGTH) {
+        if ($token === '' || !PasswordPolicy::accepts($newPassword)) {
             return false;
         }
 
@@ -161,16 +160,24 @@ final readonly class AuthService
         ];
     }
 
-    private function findAuthenticationRecord(string $email): ?array
+    private function findAuthenticationRecord(string $identifier): ?array
     {
+        if ($identifier === '') {
+            return null;
+        }
+
         $statement = $this->pdo->prepare(
             'SELECT id, password_hash, is_active, failed_login_attempts, locked_until '
-            . 'FROM users WHERE email = :email LIMIT 1',
+            . 'FROM users WHERE email = :email OR username = :username OR document_number = :document_number LIMIT 2',
         );
-        $statement->execute(['email' => $email]);
-        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        $statement->execute([
+            'email' => $this->normalizeEmail($identifier),
+            'username' => $identifier,
+            'document_number' => $identifier,
+        ]);
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
 
-        return is_array($row) ? $row : null;
+        return count($rows) === 1 && is_array($rows[0]) ? $rows[0] : null;
     }
 
     private function recordFailure(int $userId, int $currentAttempts, DateTimeImmutable $now): void

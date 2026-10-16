@@ -64,8 +64,9 @@ return static function (App $app, array $deps): void {
 
     $app->post('/login', static function (ServerRequestInterface $request, ResponseInterface $response) use ($auth, $session, $view, $csrf, $path): ResponseInterface {
         $form = (array) ($request->getParsedBody() ?? []);
+        $identifier = (string) ($form['identifier'] ?? $form['email'] ?? '');
         $user = $auth->authenticate(
-            (string) ($form['email'] ?? ''),
+            $identifier,
             (string) ($form['password'] ?? ''),
             new DateTimeImmutable(),
         );
@@ -214,6 +215,8 @@ return static function (App $app, array $deps): void {
                 (string) ($form['role'] ?? ''),
                 (string) ($form['temporary_password'] ?? ''),
                 $requestedPermissions,
+                isset($form['username']) ? (string) $form['username'] : null,
+                isset($form['document_number']) ? (string) $form['document_number'] : null,
             );
         } catch (Throwable) {
             if ($pdo->inTransaction()) {

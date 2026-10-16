@@ -9,6 +9,6 @@ declare(strict_types=1);
     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string) $csrfToken, ENT_QUOTES, 'UTF-8') ?>">
     <input type="hidden" name="token" value="<?= htmlspecialchars((string) ($token ?? ''), ENT_QUOTES, 'UTF-8') ?>">
     <label for="new_password">Nueva contraseña</label>
-    <input id="new_password" type="password" name="new_password" minlength="12" autocomplete="new-password" required>
+    <input id="new_password" type="password" name="new_password" minlength="6" autocomplete="new-password" required>
     <button type="submit">Restablecer contraseña</button>
 </form>

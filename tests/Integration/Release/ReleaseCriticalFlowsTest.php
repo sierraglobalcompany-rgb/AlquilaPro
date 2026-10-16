@@ -41,8 +41,6 @@ final class ReleaseCriticalFlowsTest extends TestCase
     private array $temporaryFiles = [];
     private array $sentEmails = [];
     private string $cronSecret;
-    private string $tenantEmail = '';
-    private string $tenantPassword = '';
     private ?NotificationService $notifications = null;
 
     protected function setUp(): void
@@ -159,9 +157,10 @@ final class ReleaseCriticalFlowsTest extends TestCase
 
         $candidateName = 'María Gómez Ñ';
         $candidateEmail = 'maria-' . bin2hex(random_bytes(4)) . '@example.test';
+        $candidateDocument = 'REL-' . bin2hex(random_bytes(4));
         $started = $this->request($app, 'POST', '/apply/' . $publicKey, [
             'document_type' => 'cc',
-            'document_number' => 'REL-' . bin2hex(random_bytes(4)),
+            'document_number' => $candidateDocument,
             'full_name' => $candidateName,
             'phone' => '3001234567',
             'email' => $candidateEmail,
@@ -175,6 +174,10 @@ final class ReleaseCriticalFlowsTest extends TestCase
         $candidateLookup->execute([hash('sha256', $token)]);
         $candidateId = (int) $candidateLookup->fetchColumn();
         self::assertGreaterThan(0, $candidateId);
+        $candidateDocument = (string) $this->pdo->query(
+            'SELECT document_number FROM candidates WHERE id = ' . $candidateId,
+        )->fetchColumn();
+        self::assertNotSame('', $candidateDocument);
 
         $personal = $this->request($app, 'POST', '/apply/continue/' . $token, [
             'wizard_step' => 'personal',
@@ -284,12 +287,19 @@ final class ReleaseCriticalFlowsTest extends TestCase
         $activation = $this->request($app, 'POST', '/admin/contracts/' . $contractId . '/lease');
         self::assertSame(200, $activation->getStatusCode());
         self::assertSame('private, no-store', $activation->getHeaderLine('Cache-Control'));
-        preg_match('/<code[^>]*data-temporary-password[^>]*>([^<]{12,})<\/code>/', (string) $activation->getBody(), $matches);
-        $this->tenantPassword = html_entity_decode((string) ($matches[1] ?? ''), ENT_QUOTES, 'UTF-8');
-        self::assertGreaterThanOrEqual(12, strlen($this->tenantPassword));
-        $this->tenantEmail = $candidateEmail;
+        preg_match('/<code[^>]*data-temporary-password[^>]*>([^<]{6,})<\/code>/', (string) $activation->getBody(), $matches);
+        $tenantPassword = html_entity_decode((string) ($matches[1] ?? ''), ENT_QUOTES, 'UTF-8');
+        self::assertSame($candidateDocument, $tenantPassword);
         $leaseId = (int) $this->pdo->query('SELECT id FROM leases WHERE contract_id = ' . $contractId)->fetchColumn();
         self::assertGreaterThan(0, $leaseId);
+        $tenant = $this->pdo->query(
+            'SELECT document_number, password_hash, must_change_password FROM users WHERE role = \'tenant\' AND document_number = '
+            . $this->pdo->quote($candidateDocument),
+        )->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($tenant);
+        self::assertSame($candidateDocument, $tenant['document_number']);
+        self::assertSame(0, (int) $tenant['must_change_password']);
+        self::assertTrue(password_verify($candidateDocument, (string) $tenant['password_hash']));
 
         $this->queueFakeEmail();
         $cron = $this->cronRequest($app);
@@ -305,17 +315,11 @@ final class ReleaseCriticalFlowsTest extends TestCase
 
         $_SESSION = [];
         $tenantLogin = $this->request($app, 'POST', '/login', [
-            'email' => $this->tenantEmail,
-            'password' => $this->tenantPassword,
+            'email' => $candidateDocument,
+            'password' => $tenantPassword,
         ]);
         self::assertSame(303, $tenantLogin->getStatusCode());
-        self::assertSame('/account/password', $tenantLogin->getHeaderLine('Location'));
-        $newTenantPassword = bin2hex(random_bytes(16));
-        $changedPassword = $this->request($app, 'POST', '/account/password', [
-            'current_password' => $this->tenantPassword,
-            'new_password' => $newTenantPassword,
-        ]);
-        self::assertSame(303, $changedPassword->getStatusCode());
+        self::assertSame('/', $tenantLogin->getHeaderLine('Location'));
         $tenantHome = $this->request($app, 'GET', '/tenant');
         self::assertSame(200, $tenantHome->getStatusCode());
         self::assertStringContainsString('A-204', (string) $tenantHome->getBody());

@@ -11,7 +11,6 @@ use RuntimeException;
 
 final readonly class UserService
 {
-    private const MIN_PASSWORD_LENGTH = 12;
     private const ALLOWED_ROLES = ['admin', 'gestor'];
 
     public function __construct(private PDO $pdo)
@@ -21,7 +20,7 @@ final readonly class UserService
     public function listUsers(): array
     {
         $statement = $this->pdo->query(
-            'SELECT id, role, full_name, email, is_active, permissions_json, must_change_password, created_at, updated_at '
+            'SELECT id, role, full_name, email, username, document_number, is_active, permissions_json, must_change_password, created_at, updated_at '
             . 'FROM users ORDER BY id ASC',
         );
 
@@ -39,9 +38,13 @@ final readonly class UserService
         string $role,
         string $temporaryPassword,
         array $permissions,
+        ?string $username = null,
+        ?string $documentNumber = null,
     ): int {
         $name = trim($name);
         $email = strtolower(trim($email));
+        $username = $this->normalizeUsername($username);
+        $documentNumber = $this->normalizeDocumentNumber($documentNumber);
 
         if ($name === '') {
             throw new InvalidArgumentException('El nombre es obligatorio.');
@@ -55,8 +58,12 @@ final readonly class UserService
             throw new InvalidArgumentException('El rol no es válido.');
         }
 
-        if (strlen($temporaryPassword) < self::MIN_PASSWORD_LENGTH) {
-            throw new InvalidArgumentException('La contraseña temporal debe tener al menos 12 caracteres.');
+        if (!PasswordPolicy::accepts($temporaryPassword)) {
+            throw new InvalidArgumentException('La contraseña temporal debe tener al menos 6 caracteres.');
+        }
+
+        if ($this->identifierCollisionExists($email, $username, $documentNumber)) {
+            throw new RuntimeException('El correo, usuario o documento ya está registrado.');
         }
 
         $sanitizedPermissions = Permissions::sanitize($permissions);
@@ -64,19 +71,21 @@ final readonly class UserService
         try {
             $statement = $this->pdo->prepare(
                 'INSERT INTO users '
-                . '(role, full_name, email, password_hash, is_active, permissions_json, must_change_password) '
-                . 'VALUES (:role, :full_name, :email, :password_hash, 1, :permissions_json, 1)',
+                . '(role, full_name, email, username, document_number, password_hash, is_active, permissions_json, must_change_password) '
+                . 'VALUES (:role, :full_name, :email, :username, :document_number, :password_hash, 1, :permissions_json, 1)',
             );
             $statement->execute([
                 'role' => $role,
                 'full_name' => $name,
                 'email' => $email,
+                'username' => $username,
+                'document_number' => $documentNumber,
                 'password_hash' => password_hash($temporaryPassword, PASSWORD_DEFAULT),
                 'permissions_json' => $this->encodePermissions($sanitizedPermissions),
             ]);
         } catch (PDOException $exception) {
             if ((string) $exception->getCode() === '23000') {
-                throw new RuntimeException('El correo ya está registrado.');
+                throw new RuntimeException('El correo, usuario o documento ya está registrado.');
             }
 
             throw new RuntimeException('No fue posible crear el usuario.');
@@ -86,10 +95,11 @@ final readonly class UserService
     }
 
     /** @return array{id:int,temporary_password:string} */
-    public function createTenantIdentity(string $name, string $email): array
+    public function createTenantIdentity(string $name, string $email, string $documentNumber): array
     {
         $name = trim($name);
         $email = strtolower(trim($email));
+        $documentNumber = trim($documentNumber);
 
         if ($name === '') {
             throw new InvalidArgumentException('El nombre es obligatorio.');
@@ -99,22 +109,29 @@ final readonly class UserService
             throw new InvalidArgumentException('El correo no es válido.');
         }
 
-        $temporaryPassword = bin2hex(random_bytes(16));
+        if (!PasswordPolicy::accepts($documentNumber)) {
+            throw new InvalidArgumentException('El documento debe tener al menos 6 caracteres.');
+        }
+
+        if ($this->identifierCollisionExists($email, null, $documentNumber)) {
+            throw new RuntimeException('El correo o documento ya está registrado.');
+        }
 
         try {
             $statement = $this->pdo->prepare(
                 'INSERT INTO users '
-                . '(role, full_name, email, password_hash, is_active, permissions_json, must_change_password) '
-                . "VALUES ('tenant', :full_name, :email, :password_hash, 1, NULL, 1)",
+                . '(role, full_name, email, document_number, password_hash, is_active, permissions_json, must_change_password) '
+                . "VALUES ('tenant', :full_name, :email, :document_number, :password_hash, 1, NULL, 0)",
             );
             $statement->execute([
                 'full_name' => $name,
                 'email' => $email,
-                'password_hash' => password_hash($temporaryPassword, PASSWORD_DEFAULT),
+                'document_number' => $documentNumber,
+                'password_hash' => password_hash($documentNumber, PASSWORD_DEFAULT),
             ]);
         } catch (PDOException $exception) {
             if ((string) $exception->getCode() === '23000') {
-                throw new RuntimeException('El correo ya está registrado.');
+                throw new RuntimeException('El correo o documento ya está registrado.');
             }
 
             throw new RuntimeException('No fue posible crear el usuario.');
@@ -122,7 +139,7 @@ final readonly class UserService
 
         return [
             'id' => (int) $this->pdo->lastInsertId(),
-            'temporary_password' => $temporaryPassword,
+            'temporary_password' => $documentNumber,
         ];
     }
 
@@ -183,6 +200,40 @@ final readonly class UserService
         ]);
     }
 
+    private function identifierCollisionExists(string $email, ?string $username, ?string $documentNumber): bool
+    {
+        $identifiers = [$email, $username, $documentNumber];
+        $statement = $this->pdo->prepare(
+            'SELECT id FROM users '
+            . 'WHERE email IN (?, ?, ?) OR username IN (?, ?, ?) OR document_number IN (?, ?, ?) LIMIT 1',
+        );
+        $statement->execute([...$identifiers, ...$identifiers, ...$identifiers]);
+
+        return $statement->fetchColumn() !== false;
+    }
+
+    private function normalizeUsername(?string $username): ?string
+    {
+        if ($username === null) {
+            return null;
+        }
+
+        $username = strtolower(trim($username));
+
+        return $username === '' ? null : $username;
+    }
+
+    private function normalizeDocumentNumber(?string $documentNumber): ?string
+    {
+        if ($documentNumber === null) {
+            return null;
+        }
+
+        $documentNumber = mb_strtoupper(trim($documentNumber));
+
+        return $documentNumber === '' ? null : $documentNumber;
+    }
+
     private function normalizeUser(array $row): array
     {
         $permissions = [];
@@ -198,6 +249,8 @@ final readonly class UserService
             'role' => (string) $row['role'],
             'full_name' => (string) $row['full_name'],
             'email' => strtolower((string) $row['email']),
+            'username' => is_string($row['username'] ?? null) ? (string) $row['username'] : null,
+            'document_number' => is_string($row['document_number'] ?? null) ? (string) $row['document_number'] : null,
             'is_active' => (int) $row['is_active'] === 1,
             'permissions' => $permissions,
             'must_change_password' => (int) $row['must_change_password'] === 1,

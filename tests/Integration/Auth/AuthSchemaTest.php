@@ -50,4 +50,27 @@ final class AuthSchemaTest extends TestCase
             self::assertContains($column, $columns, sprintf('Missing F2 auth column: %s', $column));
         }
     }
+
+    public function testUnifiedLoginIdentifierColumnsAndUniqueIndexesExistAfterMigrations(): void
+    {
+        MigrationRunner::migrate($this->pdo, dirname(__DIR__, 3) . '/database/migrations');
+
+        $columns = $this->pdo->query(
+            "SELECT column_name FROM information_schema.columns "
+            . "WHERE table_schema = DATABASE() AND table_name = 'users' ORDER BY ordinal_position",
+        )->fetchAll(PDO::FETCH_COLUMN);
+
+        self::assertContains('username', $columns);
+        self::assertContains('document_number', $columns);
+
+        $uniqueIndexes = $this->pdo->query(
+            "SELECT index_name, GROUP_CONCAT(column_name ORDER BY seq_in_index) AS indexed_columns "
+            . "FROM information_schema.statistics "
+            . "WHERE table_schema = DATABASE() AND table_name = 'users' AND non_unique = 0 "
+            . "GROUP BY index_name ORDER BY index_name",
+        )->fetchAll(PDO::FETCH_KEY_PAIR);
+
+        self::assertContains('username', $uniqueIndexes);
+        self::assertContains('document_number', $uniqueIndexes);
+    }
 }

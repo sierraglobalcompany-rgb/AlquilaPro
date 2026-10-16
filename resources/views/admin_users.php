@@ -20,6 +20,12 @@ $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, 
                 </span>
             </div>
             <div class="user-card__email"><?= $escape($listedUser['email']) ?></div>
+            <?php if (($listedUser['username'] ?? null) !== null): ?>
+                <div class="user-card__username">Usuario: <?= $escape($listedUser['username']) ?></div>
+            <?php endif; ?>
+            <?php if (($listedUser['document_number'] ?? null) !== null): ?>
+                <div class="user-card__document">Documento: <?= $escape($listedUser['document_number']) ?></div>
+            <?php endif; ?>
             <div class="user-card__role"><?= $escape($listedUser['role']) ?></div>
         </article>
     <?php endforeach; ?>
@@ -32,13 +38,15 @@ $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, 
             <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
             <label>Nombre <input name="full_name" autocomplete="name" required></label>
             <label>Correo <input type="email" name="email" autocomplete="email" required></label>
+            <label>Usuario (opcional) <input name="username" autocomplete="username"></label>
+            <label>Documento (opcional) <input name="document_number" autocomplete="off"></label>
             <label>Rol
                 <select name="role">
                     <option value="admin">Administrador</option>
                     <option value="gestor">Gestor</option>
                 </select>
             </label>
-            <label>Contraseña temporal <input type="password" name="temporary_password" minlength="12" autocomplete="new-password" required></label>
+            <label>Contraseña temporal <input type="password" name="temporary_password" minlength="6" autocomplete="new-password" required></label>
             <button type="submit">Crear usuario</button>
         </form>
     </section>

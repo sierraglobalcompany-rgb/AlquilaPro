@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AlquilaPro\Foundation;
 
+use AlquilaPro\Auth\PasswordPolicy;
 use PDO;
 use RuntimeException;
 use Throwable;
@@ -34,7 +35,7 @@ final class Installer
         $ownerEmail = strtolower(trim((string) ($input['owner_email'] ?? '')));
         $ownerPassword = (string) ($input['owner_password'] ?? '');
 
-        if ($ownerName === '' || filter_var($ownerEmail, FILTER_VALIDATE_EMAIL) === false || strlen($ownerPassword) < 12) {
+        if ($ownerName === '' || filter_var($ownerEmail, FILTER_VALIDATE_EMAIL) === false || !PasswordPolicy::accepts($ownerPassword)) {
             throw new RuntimeException('Los datos del propietario no son válidos.');
         }
 

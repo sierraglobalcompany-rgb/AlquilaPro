@@ -7,8 +7,9 @@ $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, 
 <section class="surface">
     <p class="eyebrow">Arrendamientos</p>
     <h1>Arrendamiento activado</h1>
-    <p>Correo de acceso: <strong><?= $escape($lease['tenant_email']) ?></strong></p>
-    <p class="hint">Esta contraseña temporal se muestra una sola vez. El inquilino deberá cambiarla al ingresar.</p>
-    <p><code data-temporary-password><?= $escape($temporaryPassword) ?></code></p>
+    <p>Usuario / cédula: <strong data-tenant-identifier><?= $escape($temporaryPassword) ?></strong></p>
+    <p>Contraseña inicial: <code data-temporary-password><?= $escape($temporaryPassword) ?></code></p>
+    <p class="hint">El inquilino puede cambiar su contraseña después si lo desea.</p>
+    <p>Correo de contacto: <strong><?= $escape($lease['tenant_email']) ?></strong></p>
     <a class="button" href="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($lease['contract_id']) ?>">Volver al contrato</a>
 </section>

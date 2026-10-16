@@ -96,6 +96,42 @@ final class AuthRoutesTest extends TestCase
         self::assertSame(302, $this->request('GET', '/admin/users')->getStatusCode());
     }
 
+    public function testLoginUsesUnifiedIdentifierFieldAndAcceptsUsernameOrDocument(): void
+    {
+        $userId = $this->insertUser('staff@example.com', 'StaffPassword123', 'admin');
+        $statement = $this->pdo->prepare(
+            'UPDATE users SET username = :username, document_number = :document_number WHERE id = :id',
+        );
+        $statement->execute([
+            'id' => $userId,
+            'username' => 'staff.user',
+            'document_number' => 'CC123456',
+        ]);
+
+        $loginPage = $this->request('GET', '/login');
+        self::assertSame(200, $loginPage->getStatusCode());
+        $body = (string) $loginPage->getBody();
+        self::assertStringContainsString('Usuario, correo o cédula', $body);
+        self::assertStringContainsString('name="identifier"', $body);
+        self::assertStringNotContainsString('name="email"', $body);
+
+        $usernameLogin = $this->request('POST', '/login', [
+            'identifier' => 'staff.user',
+            'password' => 'StaffPassword123',
+        ]);
+        self::assertSame(303, $usernameLogin->getStatusCode());
+        self::assertSame('/', $usernameLogin->getHeaderLine('Location'));
+
+        self::assertSame(303, $this->request('POST', '/logout')->getStatusCode());
+
+        $documentLogin = $this->request('POST', '/login', [
+            'identifier' => 'CC123456',
+            'password' => 'StaffPassword123',
+        ]);
+        self::assertSame(303, $documentLogin->getStatusCode());
+        self::assertSame('/', $documentLogin->getHeaderLine('Location'));
+    }
+
     public function testSuccessfulLoginRotatesCsrfToken(): void
     {
         $this->insertUser('owner@example.com', 'OwnerPassword123', 'owner');
@@ -140,6 +176,42 @@ final class AuthRoutesTest extends TestCase
         $status = $this->request('POST', '/admin/users/' . $userId . '/status', ['active' => '0']);
         self::assertSame(303, $status->getStatusCode());
         self::assertSame(0, (int) $this->pdo->query('SELECT is_active FROM users WHERE id = ' . $userId)->fetchColumn());
+    }
+
+    public function testOwnerCanCreateManagedUserWithOptionalIdentifiers(): void
+    {
+        $this->insertUser('owner@example.com', 'OwnerPassword123', 'owner');
+        $this->login('owner@example.com', 'OwnerPassword123');
+
+        $page = $this->request('GET', '/admin/users');
+        self::assertSame(200, $page->getStatusCode());
+        $body = (string) $page->getBody();
+        self::assertStringContainsString('name="username"', $body);
+        self::assertStringContainsString('name="document_number"', $body);
+
+        $create = $this->request('POST', '/admin/users', [
+            'full_name' => 'Route Staff',
+            'email' => 'route-staff@example.com',
+            'username' => ' Route.Staff ',
+            'document_number' => ' cc-555555 ',
+            'role' => 'gestor',
+            'temporary_password' => '123456',
+        ]);
+        self::assertSame(303, $create->getStatusCode());
+
+        $row = $this->pdo->query(
+            "SELECT username, document_number FROM users WHERE email = 'route-staff@example.com' LIMIT 1",
+        )->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($row);
+        self::assertSame('route.staff', $row['username']);
+        self::assertSame('CC-555555', $row['document_number']);
+
+        $_SESSION = [];
+        $login = $this->request('POST', '/login', [
+            'identifier' => 'route.staff',
+            'password' => '123456',
+        ]);
+        self::assertSame(303, $login->getStatusCode());
     }
 
     public function testUserWithoutManagePermissionReceivesForbidden(): void

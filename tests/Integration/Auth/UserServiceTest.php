@@ -164,19 +164,82 @@ final class UserServiceTest extends TestCase
         $service->create('Other Admin', 'NATALIA@example.com', 'admin', 'AnotherPass123', []);
     }
 
-    public function testTenantIdentityIsCreatedOnlyByDedicatedPathWithRandomHashOnlyPassword(): void
+    public function testManagedUserPersistsOptionalLoginIdentifiersAndListsThem(): void
     {
         $service = $this->service();
 
-        $first = $service->createTenantIdentity('  Ana Tenant  ', '  ANA@Example.COM ');
-        $second = $service->createTenantIdentity('Luis Tenant', 'luis@example.com');
+        $id = $service->create(
+            'Identifier Staff',
+            'Staff@Example.com',
+            'gestor',
+            '123456',
+            [],
+            ' Staff.User ',
+            ' cc-123456 ',
+        );
+
+        $row = $this->pdo->query('SELECT username, document_number FROM users WHERE id = ' . $id)->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($row);
+        self::assertSame('staff.user', $row['username']);
+        self::assertSame('CC-123456', $row['document_number']);
+
+        $listed = array_values(array_filter(
+            $service->listUsers(),
+            static fn (array $user): bool => $user['id'] === $id,
+        ));
+        self::assertCount(1, $listed);
+        self::assertSame('staff.user', $listed[0]['username']);
+        self::assertSame('CC-123456', $listed[0]['document_number']);
+    }
+
+    public function testUserCreationRejectsCrossFieldIdentifierCollisionsAcrossUsers(): void
+    {
+        $service = $this->service();
+        $service->create(
+            'Existing Staff',
+            'existing@example.com',
+            'admin',
+            '123456',
+            [],
+            'staff.user',
+            'CC-900001',
+        );
+
+        try {
+            $service->create(
+                'Colliding Staff',
+                'other@example.com',
+                'gestor',
+                '123456',
+                [],
+                ' EXISTING@EXAMPLE.COM ',
+                null,
+            );
+            self::fail('Managed user creation must reject an identifier already owned by another identity column.');
+        } catch (RuntimeException) {
+            self::assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM users')->fetchColumn());
+        }
+
+        try {
+            $service->createTenantIdentity('Tenant Collision', 'tenant@example.com', ' staff.user ');
+            self::fail('Tenant creation must reject a document already owned as another user username.');
+        } catch (RuntimeException) {
+            self::assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM users')->fetchColumn());
+        }
+    }
+
+    public function testTenantIdentityUsesDocumentAsInitialPasswordWithoutForcedChange(): void
+    {
+        $service = $this->service();
+
+        $first = $service->createTenantIdentity('  Ana Tenant  ', '  ANA@Example.COM ', '1037654321');
+        $second = $service->createTenantIdentity('Luis Tenant', 'luis@example.com', '9876543210');
 
         self::assertGreaterThan(0, $first['id']);
         self::assertGreaterThan(0, $second['id']);
         self::assertNotSame($first['id'], $second['id']);
-        self::assertIsString($first['temporary_password']);
-        self::assertGreaterThanOrEqual(12, strlen($first['temporary_password']));
-        self::assertNotSame($first['temporary_password'], $second['temporary_password']);
+        self::assertSame('1037654321', $first['temporary_password']);
+        self::assertSame('9876543210', $second['temporary_password']);
 
         $statement = $this->pdo->prepare('SELECT * FROM users WHERE id = :id LIMIT 1');
         $statement->execute(['id' => $first['id']]);
@@ -184,12 +247,14 @@ final class UserServiceTest extends TestCase
         self::assertIsArray($row);
         self::assertSame('Ana Tenant', $row['full_name']);
         self::assertSame('ana@example.com', $row['email']);
+        self::assertSame('1037654321', $row['document_number']);
+        self::assertNull($row['username']);
         self::assertSame('tenant', $row['role']);
         self::assertSame(1, (int) $row['is_active']);
-        self::assertSame(1, (int) $row['must_change_password']);
+        self::assertSame(0, (int) $row['must_change_password']);
         self::assertNull($row['permissions_json']);
-        self::assertTrue(password_verify($first['temporary_password'], (string) $row['password_hash']));
-        self::assertNotSame($first['temporary_password'], $row['password_hash']);
+        self::assertTrue(password_verify('1037654321', (string) $row['password_hash']));
+        self::assertNotSame('1037654321', $row['password_hash']);
 
         $listed = array_values(array_filter(
             $service->listUsers(),
@@ -207,10 +272,32 @@ final class UserServiceTest extends TestCase
         $service->create('Admin', 'existing@example.com', 'admin', 'TemporaryPass123', []);
 
         try {
-            $service->createTenantIdentity('Tenant Collision', ' EXISTING@EXAMPLE.COM ');
+            $service->createTenantIdentity('Tenant Collision', ' EXISTING@EXAMPLE.COM ', '1037654321');
             self::fail('Tenant identity must not auto-link an existing user email.');
         } catch (RuntimeException $exception) {
-            self::assertSame('El correo ya está registrado.', $exception->getMessage());
+            self::assertSame('El correo o documento ya está registrado.', $exception->getMessage());
+        }
+
+        self::assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM users')->fetchColumn());
+    }
+
+    public function testTenantIdentityRejectsShortOrDuplicateDocument(): void
+    {
+        $service = $this->service();
+
+        try {
+            $service->createTenantIdentity('Short Document', 'short-document@example.com', '12345');
+            self::fail('Tenant document used as initial password must satisfy PasswordPolicy.');
+        } catch (InvalidArgumentException) {
+            self::assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM users')->fetchColumn());
+        }
+
+        $service->createTenantIdentity('First Tenant', 'first-tenant@example.com', '100000001');
+        try {
+            $service->createTenantIdentity('Second Tenant', 'second-tenant@example.com', '100000001');
+            self::fail('Tenant document must remain unique across user identities.');
+        } catch (RuntimeException $exception) {
+            self::assertSame('El correo o documento ya está registrado.', $exception->getMessage());
         }
 
         self::assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM users')->fetchColumn());
