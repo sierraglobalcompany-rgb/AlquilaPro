@@ -6,6 +6,8 @@ use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Candidates\CandidateDocumentService;
+use AlquilaPro\Finance\FinanceService;
+use AlquilaPro\Maintenance\MaintenanceService;
 use AlquilaPro\Properties\PropertyService;
 use AlquilaPro\Properties\UnitMediaService;
 use AlquilaPro\UI\View;
@@ -21,6 +23,10 @@ return static function (App $app, array $deps): void {
     $media = $deps['unit_media'];
     /** @var CandidateDocumentService $candidateDocuments */
     $candidateDocuments = $deps['candidate_documents'];
+    /** @var FinanceService $finance */
+    $finance = $deps['finance'];
+    /** @var MaintenanceService $maintenance */
+    $maintenance = $deps['maintenance'];
     /** @var View $view */
     $view = $deps['view'];
     /** @var SessionGuard $session */
@@ -36,7 +42,7 @@ return static function (App $app, array $deps): void {
     $app->get('/', static function (
         ServerRequestInterface $request,
         ResponseInterface $response,
-    ) use ($properties, $view, $currentUser, $session, $csrf, $path): ResponseInterface {
+    ) use ($properties, $finance, $maintenance, $view, $currentUser, $session, $csrf, $path): ResponseInterface {
         $user = $currentUser();
         if ($user === null) {
             $response->getBody()->write($view->renderPublic('public_landing', [
@@ -73,12 +79,40 @@ return static function (App $app, array $deps): void {
             $quickActions[] = $action;
         }
 
+        $attentionSignals = [];
+        if (Permissions::allows($user, 'finance.view')) {
+            $pendingPayments = count($finance->listPendingPayments());
+            if ($pendingPayments > 0) {
+                $attentionSignals[] = [
+                    'key' => 'finance',
+                    'label' => $pendingPayments === 1
+                        ? '1 pago por conciliar'
+                        : $pendingPayments . ' pagos por conciliar',
+                    'href' => $path('/admin/finance'),
+                ];
+            }
+        }
+        if (Permissions::allows($user, 'maintenance.view')) {
+            $openMaintenance = count($maintenance->listForStaff('open'))
+                + count($maintenance->listForStaff('in_progress'));
+            if ($openMaintenance > 0) {
+                $attentionSignals[] = [
+                    'key' => 'maintenance',
+                    'label' => $openMaintenance === 1
+                        ? '1 solicitud de mantenimiento abierta'
+                        : $openMaintenance . ' solicitudes de mantenimiento abiertas',
+                    'href' => $path('/admin/maintenance'),
+                ];
+            }
+        }
+
         $response->getBody()->write($view->renderApp('home', [
             'pageTitle' => 'Inicio',
             'user' => $user,
             'activeNav' => 'home',
             'csrfToken' => $csrf->token(),
             'quickActions' => $quickActions,
+            'attentionSignals' => $attentionSignals,
         ]));
 
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
