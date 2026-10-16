@@ -94,6 +94,173 @@ final class DashboardTest extends TestCase
         self::assertStringContainsString('No hay acciones rápidas disponibles para tu cuenta.', $restrictedBody);
     }
 
+    public function testDashboardShowsOnlyRealPermissionScopedAttentionSignals(): void
+    {
+        $this->insertOperationalSignals();
+        $this->insertUser(
+            'dashboard-ops@example.com',
+            'OperationalPass123',
+            'gestor',
+            ['finance.view', 'maintenance.view'],
+            'Operaciones',
+        );
+        $app = $this->app();
+        $this->login($app, 'dashboard-ops@example.com', 'OperationalPass123');
+
+        $body = (string) $this->request($app, 'GET', '/')->getBody();
+
+        self::assertStringContainsString('Atención requerida', $body);
+        self::assertStringContainsString('data-dashboard-attention', $body);
+        self::assertStringContainsString('data-dashboard-signal="finance"', $body);
+        self::assertStringContainsString('1 pago por conciliar', $body);
+        self::assertStringContainsString('href="/admin/finance"', $body);
+        self::assertStringContainsString('data-dashboard-signal="maintenance"', $body);
+        self::assertStringContainsString('2 solicitudes de mantenimiento abiertas', $body);
+        self::assertStringContainsString('href="/admin/maintenance"', $body);
+        self::assertStringNotContainsString('data-dashboard-metric', $body);
+
+        $_SESSION = [];
+        $this->insertUser(
+            'dashboard-no-ops@example.com',
+            'NoOperationalPass123',
+            'gestor',
+            ['properties.view'],
+            'Sin señales operativas',
+        );
+        $restrictedApp = $this->app();
+        $this->login($restrictedApp, 'dashboard-no-ops@example.com', 'NoOperationalPass123');
+        $restrictedBody = (string) $this->request($restrictedApp, 'GET', '/')->getBody();
+
+        self::assertStringNotContainsString('data-dashboard-signal="finance"', $restrictedBody);
+        self::assertStringNotContainsString('data-dashboard-signal="maintenance"', $restrictedBody);
+        self::assertStringNotContainsString('1 pago por conciliar', $restrictedBody);
+        self::assertStringNotContainsString('2 solicitudes de mantenimiento abiertas', $restrictedBody);
+    }
+
+    private function insertOperationalSignals(): void
+    {
+        $suffix = bin2hex(random_bytes(5));
+        $tenantId = $this->insertUser(
+            'tenant-' . $suffix . '@example.com',
+            'TenantPassword123',
+            'tenant',
+            [],
+            'Inquilino Dashboard',
+        );
+        $actorId = $this->insertUser(
+            'actor-' . $suffix . '@example.com',
+            'ActorPassword123',
+            'admin',
+            [],
+            'Actor Dashboard',
+        );
+
+        $property = $this->pdo->prepare('INSERT INTO properties (name, address, city) VALUES (?, ?, ?)');
+        $property->execute(['Propiedad Dashboard', 'Calle 1', 'Medellín']);
+        $propertyId = (int) $this->pdo->lastInsertId();
+
+        $unit = $this->pdo->prepare(
+            'INSERT INTO units (property_id, public_key, type, code, status) VALUES (?, ?, ?, ?, ?)',
+        );
+        $unit->execute([$propertyId, bin2hex(random_bytes(12)), 'apartment', 'APT-' . $suffix, 'occupied']);
+        $unitId = (int) $this->pdo->lastInsertId();
+
+        $candidate = $this->pdo->prepare(
+            'INSERT INTO candidates (unit_id, document_type, document_number, full_name, phone, email, status, '
+            . 'continuation_token_hash, continuation_token_expires_at, consent_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        );
+        $candidate->execute([
+            $unitId,
+            'cc',
+            'DOC-' . $suffix,
+            'Candidato Dashboard',
+            '3001234567',
+            'candidate-' . $suffix . '@example.com',
+            'approved',
+            hash('sha256', 'candidate-' . $suffix),
+            '2027-01-01 00:00:00',
+            '2026-10-16 10:00:00',
+        ]);
+        $candidateId = (int) $this->pdo->lastInsertId();
+
+        $template = $this->pdo->prepare('INSERT INTO contract_templates (name, document_type) VALUES (?, ?)');
+        $template->execute(['Plantilla Dashboard ' . $suffix, 'urban_housing']);
+        $templateId = (int) $this->pdo->lastInsertId();
+
+        $version = $this->pdo->prepare(
+            'INSERT INTO contract_template_versions (template_id, version_number, body_template, variables_json) '
+            . 'VALUES (?, 1, ?, ?)',
+        );
+        $version->execute([$templateId, 'Contrato dashboard', '[]']);
+        $versionId = (int) $this->pdo->lastInsertId();
+
+        $contract = $this->pdo->prepare(
+            'INSERT INTO contracts '
+            . '(candidate_id, unit_id, template_version_id, document_type, status, monthly_rent, start_date, end_date, duration_text) '
+            . 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        );
+        $contract->execute([
+            $candidateId,
+            $unitId,
+            $versionId,
+            'urban_housing',
+            'finalized',
+            '1200000.00',
+            '2026-01-01',
+            '2026-12-31',
+            '12 meses',
+        ]);
+        $contractId = (int) $this->pdo->lastInsertId();
+
+        $lease = $this->pdo->prepare(
+            'INSERT INTO leases (contract_id, user_id, activated_by_user_id, activated_at) VALUES (?, ?, ?, ?)',
+        );
+        $lease->execute([$contractId, $tenantId, $actorId, '2026-01-01 10:00:00']);
+        $leaseId = (int) $this->pdo->lastInsertId();
+
+        $paymentMethod = $this->pdo->prepare(
+            'INSERT INTO payment_methods (property_id, type, label, recipient_name) VALUES (?, ?, ?, ?)',
+        );
+        $paymentMethod->execute([$propertyId, 'bank_transfer', 'Cuenta Dashboard', 'Sierra Global']);
+        $paymentMethodId = (int) $this->pdo->lastInsertId();
+
+        $pendingPayment = $this->pdo->prepare(
+            'INSERT INTO payments '
+            . '(lease_id, payment_method_id, amount, paid_on, payment_method_snapshot_json) VALUES (?, ?, ?, ?, ?)',
+        );
+        $pendingPayment->execute([
+            $leaseId,
+            $paymentMethodId,
+            '100000.00',
+            '2026-10-15',
+            json_encode(['type' => 'bank_transfer', 'label' => 'Cuenta Dashboard'], JSON_THROW_ON_ERROR),
+        ]);
+
+        $reconciledPayment = $this->pdo->prepare(
+            'INSERT INTO payments '
+            . '(lease_id, payment_method_id, amount, paid_on, payment_method_snapshot_json, reconciled_by_user_id, reconciled_at) '
+            . 'VALUES (?, ?, ?, ?, ?, ?, ?)',
+        );
+        $reconciledPayment->execute([
+            $leaseId,
+            $paymentMethodId,
+            '50000.00',
+            '2026-10-14',
+            json_encode(['type' => 'bank_transfer', 'label' => 'Cuenta Dashboard'], JSON_THROW_ON_ERROR),
+            $actorId,
+            '2026-10-15 10:00:00',
+        ]);
+
+        $maintenance = $this->pdo->prepare(
+            'INSERT INTO maintenance_requests '
+            . '(lease_id, category, priority, description, photos_json, status, created_by_user_id) '
+            . 'VALUES (?, ?, ?, ?, ?, ?, ?)',
+        );
+        $maintenance->execute([$leaseId, 'Plomería', 'urgent', 'Fuga activa', '[]', 'open', $actorId]);
+        $maintenance->execute([$leaseId, 'Electricidad', 'high', 'Revisión requerida', '[]', 'in_progress', $actorId]);
+        $maintenance->execute([$leaseId, 'Pintura', 'low', 'Caso cerrado', '[]', 'resolved', $actorId]);
+    }
+
     private function app(string $basePath = ''): App
     {
         $brandingDirectory = $this->directory . '/branding';
@@ -147,7 +314,7 @@ final class DashboardTest extends TestCase
         string $role,
         array $permissions,
         string $name,
-    ): void {
+    ): int {
         $statement = $this->pdo->prepare(
             'INSERT INTO users '
             . '(role, full_name, email, password_hash, is_active, permissions_json, must_change_password) '
@@ -160,5 +327,7 @@ final class DashboardTest extends TestCase
             'password_hash' => password_hash($password, PASSWORD_DEFAULT),
             'permissions_json' => json_encode($permissions, JSON_THROW_ON_ERROR),
         ]);
+
+        return (int) $this->pdo->lastInsertId();
     }
 }
