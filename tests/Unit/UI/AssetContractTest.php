@@ -80,6 +80,25 @@ final class AssetContractTest extends TestCase
         }
     }
 
+    public function testPublicFoundationHasOwnNamespacedLayoutContract(): void
+    {
+        foreach (['.public-page', '.public-shell', '.public-main'] as $selector) {
+            self::assertStringContainsString($selector, $this->css);
+        }
+    }
+
+    public function testPublicFoundationIsNotLimitedToAuthCardWidth(): void
+    {
+        self::assertDoesNotMatchRegularExpression(
+            '/\.public-shell\s*\{[^}]*max-width\s*:\s*520px/s',
+            $this->css,
+        );
+        self::assertDoesNotMatchRegularExpression(
+            '/\.public-main\s*\{[^}]*max-width\s*:\s*520px/s',
+            $this->css,
+        );
+    }
+
     public function testAppsJavascriptUsesNativeDialogWithoutExternalDependency(): void
     {
         self::assertStringContainsString('HTMLDialogElement', $this->js);
