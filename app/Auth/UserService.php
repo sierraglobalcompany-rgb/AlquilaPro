@@ -11,7 +11,6 @@ use RuntimeException;
 
 final readonly class UserService
 {
-    private const MIN_PASSWORD_LENGTH = 12;
     private const ALLOWED_ROLES = ['admin', 'gestor'];
 
     public function __construct(private PDO $pdo)
@@ -55,8 +54,8 @@ final readonly class UserService
             throw new InvalidArgumentException('El rol no es válido.');
         }
 
-        if (strlen($temporaryPassword) < self::MIN_PASSWORD_LENGTH) {
-            throw new InvalidArgumentException('La contraseña temporal debe tener al menos 12 caracteres.');
+        if (!PasswordPolicy::accepts($temporaryPassword)) {
+            throw new InvalidArgumentException('La contraseña temporal debe tener al menos 6 caracteres.');
         }
 
         $sanitizedPermissions = Permissions::sanitize($permissions);
