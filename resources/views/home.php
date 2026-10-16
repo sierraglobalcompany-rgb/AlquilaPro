@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use AlquilaPro\UI\HumanLabels;
+
 $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 $quickActions = is_array($quickActions ?? null) ? $quickActions : [];
 ?>
@@ -9,7 +11,7 @@ $quickActions = is_array($quickActions ?? null) ? $quickActions : [];
     <p class="eyebrow">Inicio</p>
     <h1>Hola, <?= $escape($user['full_name'] ?? '') ?></h1>
     <p class="hint">Accede a las funciones disponibles para tu cuenta desde estos accesos directos o desde Apps.</p>
-    <p class="role-pill"><?= $escape($user['role'] ?? '') ?></p>
+    <p class="role-pill"><?= $escape(HumanLabels::role((string) ($user['role'] ?? ''))) ?></p>
 </section>
 
 <section class="page-stack" aria-labelledby="dashboard-actions-title">

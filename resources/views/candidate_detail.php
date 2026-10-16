@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use AlquilaPro\UI\HumanLabels;
+
 $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 $allowedTransitions = match ((string) $candidate['status']) {
     'new' => ['incomplete', 'withdrawn'],
@@ -36,7 +38,7 @@ $canCreateContract = $contractContext !== null && (bool) ($contractContext['can_
 <section class="surface">
     <h2>Solicitud</h2>
     <dl>
-        <dt>Estado</dt><dd><?= $escape($candidate['status']) ?></dd>
+        <dt>Estado</dt><dd><?= $escape(HumanLabels::candidateStatus((string) $candidate['status'])) ?></dd>
         <dt>Documento</dt><dd><?= $escape(strtoupper((string) $candidate['document_type'])) ?> <?= $escape($candidate['document_number']) ?></dd>
         <dt>Unidad</dt><dd><?= $escape($candidate['property_name'] ?? '') ?> · <?= $escape($candidate['unit_code'] ?? $candidate['unit_id']) ?></dd>
         <dt>Teléfono</dt><dd><?= $escape($candidate['phone']) ?></dd>
@@ -144,7 +146,7 @@ $canCreateContract = $contractContext !== null && (bool) ($contractContext['can_
             <label>Estado
                 <select name="status" required>
                     <?php foreach ($screeningTransitions as $status): ?>
-                        <option value="<?= $escape($status) ?>"<?= $status === $screeningStatus ? ' selected' : '' ?>><?= $escape($status) ?></option>
+                        <option value="<?= $escape($status) ?>"<?= $status === $screeningStatus ? ' selected' : '' ?>><?= $escape(HumanLabels::screeningStatus((string) $status)) ?></option>
                     <?php endforeach; ?>
                 </select>
             </label>
@@ -169,7 +171,7 @@ $canCreateContract = $contractContext !== null && (bool) ($contractContext['can_
         <dl>
             <dt>Proveedor</dt><dd><?= $escape($screening['provider']) ?></dd>
             <dt>Producto</dt><dd><?= $escape($screening['product'] ?? '') ?></dd>
-            <dt>Estado</dt><dd><?= $escape($screening['status']) ?></dd>
+            <dt>Estado</dt><dd><?= $escape(HumanLabels::screeningStatus((string) $screening['status'])) ?></dd>
             <dt>Correo de contacto</dt><dd><?= $escape($screening['contact_email'] ?? '') ?></dd>
             <dt>URL</dt><dd><?= $escape($screening['portal_url'] ?? '') ?></dd>
             <dt>Resultado</dt><dd><?= $escape($screening['result'] ?? '') ?></dd>
@@ -218,7 +220,7 @@ $canCreateContract = $contractContext !== null && (bool) ($contractContext['can_
                 <label>Nuevo estado
                     <select name="status" required>
                         <?php foreach ($allowedTransitions as $status): ?>
-                            <option value="<?= $escape($status) ?>"><?= $escape($status) ?></option>
+                            <option value="<?= $escape($status) ?>"><?= $escape(HumanLabels::candidateStatus((string) $status)) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </label>
