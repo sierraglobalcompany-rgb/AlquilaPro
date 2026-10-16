@@ -13,7 +13,6 @@ final readonly class AuthService
     private const MAX_FAILED_ATTEMPTS = 5;
     private const LOCK_MINUTES = 15;
     private const RESET_MINUTES = 30;
-    private const MIN_PASSWORD_LENGTH = 12;
 
     public function __construct(private PDO $pdo)
     {
@@ -51,7 +50,7 @@ final readonly class AuthService
 
     public function changePassword(int $userId, string $currentPassword, string $newPassword): bool
     {
-        if (strlen($newPassword) < self::MIN_PASSWORD_LENGTH) {
+        if (!PasswordPolicy::accepts($newPassword)) {
             return false;
         }
 
@@ -102,7 +101,7 @@ final readonly class AuthService
 
     public function resetPassword(string $token, string $newPassword, DateTimeImmutable $now): bool
     {
-        if ($token === '' || strlen($newPassword) < self::MIN_PASSWORD_LENGTH) {
+        if ($token === '' || !PasswordPolicy::accepts($newPassword)) {
             return false;
         }
 
