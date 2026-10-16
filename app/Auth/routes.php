@@ -64,8 +64,9 @@ return static function (App $app, array $deps): void {
 
     $app->post('/login', static function (ServerRequestInterface $request, ResponseInterface $response) use ($auth, $session, $view, $csrf, $path): ResponseInterface {
         $form = (array) ($request->getParsedBody() ?? []);
+        $identifier = (string) ($form['identifier'] ?? $form['email'] ?? '');
         $user = $auth->authenticate(
-            (string) ($form['email'] ?? ''),
+            $identifier,
             (string) ($form['password'] ?? ''),
             new DateTimeImmutable(),
         );
