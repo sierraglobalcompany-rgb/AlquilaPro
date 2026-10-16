@@ -164,6 +164,70 @@ final class UserServiceTest extends TestCase
         $service->create('Other Admin', 'NATALIA@example.com', 'admin', 'AnotherPass123', []);
     }
 
+    public function testManagedUserPersistsOptionalLoginIdentifiersAndListsThem(): void
+    {
+        $service = $this->service();
+
+        $id = $service->create(
+            'Identifier Staff',
+            'Staff@Example.com',
+            'gestor',
+            '123456',
+            [],
+            ' Staff.User ',
+            ' cc-123456 ',
+        );
+
+        $row = $this->pdo->query('SELECT username, document_number FROM users WHERE id = ' . $id)->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($row);
+        self::assertSame('staff.user', $row['username']);
+        self::assertSame('CC-123456', $row['document_number']);
+
+        $listed = array_values(array_filter(
+            $service->listUsers(),
+            static fn (array $user): bool => $user['id'] === $id,
+        ));
+        self::assertCount(1, $listed);
+        self::assertSame('staff.user', $listed[0]['username']);
+        self::assertSame('CC-123456', $listed[0]['document_number']);
+    }
+
+    public function testUserCreationRejectsCrossFieldIdentifierCollisionsAcrossUsers(): void
+    {
+        $service = $this->service();
+        $service->create(
+            'Existing Staff',
+            'existing@example.com',
+            'admin',
+            '123456',
+            [],
+            'staff.user',
+            'CC-900001',
+        );
+
+        try {
+            $service->create(
+                'Colliding Staff',
+                'other@example.com',
+                'gestor',
+                '123456',
+                [],
+                ' EXISTING@EXAMPLE.COM ',
+                null,
+            );
+            self::fail('Managed user creation must reject an identifier already owned by another identity column.');
+        } catch (RuntimeException) {
+            self::assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM users')->fetchColumn());
+        }
+
+        try {
+            $service->createTenantIdentity('Tenant Collision', 'tenant@example.com', ' staff.user ');
+            self::fail('Tenant creation must reject a document already owned as another user username.');
+        } catch (RuntimeException) {
+            self::assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM users')->fetchColumn());
+        }
+    }
+
     public function testTenantIdentityUsesDocumentAsInitialPasswordWithoutForcedChange(): void
     {
         $service = $this->service();
