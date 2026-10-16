@@ -99,7 +99,7 @@ final readonly class UserService
     {
         $name = trim($name);
         $email = strtolower(trim($email));
-        $documentNumber = $this->normalizeDocumentNumber($documentNumber);
+        $documentNumber = trim($documentNumber);
 
         if ($name === '') {
             throw new InvalidArgumentException('El nombre es obligatorio.');
@@ -109,7 +109,7 @@ final readonly class UserService
             throw new InvalidArgumentException('El correo no es válido.');
         }
 
-        if ($documentNumber === null || !PasswordPolicy::accepts($documentNumber)) {
+        if (!PasswordPolicy::accepts($documentNumber)) {
             throw new InvalidArgumentException('El documento debe tener al menos 6 caracteres.');
         }
 
