@@ -35,6 +35,7 @@ final class ReleaseMigrationTest extends TestCase
         '020_create_digital_services_memberships.sql',
         '021_create_lease_termination.sql',
         '022_create_audit_log.sql',
+        '023_extend_users_login_identifiers.sql',
     ];
 
     private const FINAL_TABLES = [
@@ -155,7 +156,7 @@ final class ReleaseMigrationTest extends TestCase
         }
     }
 
-    public function testF16F20F21AndF22SchemaCoexistsAfterUpgrade(): void
+    public function testCurrentReleaseSchemaCoexistsAfterUpgrade(): void
     {
         $result = MigrationRunner::migrate($this->pdo, $this->migrationDirectory);
 
@@ -164,6 +165,7 @@ final class ReleaseMigrationTest extends TestCase
         self::assertContains('020_create_digital_services_memberships.sql', $result['migrations']);
         self::assertContains('021_create_lease_termination.sql', $result['migrations']);
         self::assertContains('022_create_audit_log.sql', $result['migrations']);
+        self::assertContains('023_extend_users_login_identifiers.sql', $result['migrations']);
         $this->assertFinalSchema();
 
         self::assertTrue($this->columnIsNullable('notification_jobs', 'recipient_email'));
@@ -175,6 +177,8 @@ final class ReleaseMigrationTest extends TestCase
             ['lease_liquidations', 'snapshot_json'],
             ['audit_log', 'metadata_json'],
             ['documents', 'community_incident_id'],
+            ['users', 'username'],
+            ['users', 'document_number'],
         ] as [$table, $column]) {
             self::assertTrue($this->columnExists($table, $column), $table . '.' . $column . ' must be present.');
         }
