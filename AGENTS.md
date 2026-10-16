@@ -1,143 +1,151 @@
 # AGENTS.md — AlquilaPro
 
-Este archivo define reglas durables de trabajo para cualquier agente/IA. **No es un tablero de estado de fases**. Para estado actual leer `README.md`, el checkpoint canónico de la fase activa y la PR/CI del SHA exacto.
+Este archivo define reglas durables de trabajo. No es un tablero de estado por commit; el estado vivo se consulta en GitHub, CI y el checkpoint canónico de la fase activa.
 
-## Autoridad
+## 1. Autoridad
 
-Si hay contradicción, usar este orden:
+Orden único de autoridad:
 
-1. GitHub real: código, migraciones, tests, diff y SHA.
+1. GitHub del repositorio canónico.
 2. CI del SHA exacto.
-3. Checkpoint canónico de fase.
-4. SPEC / PLAN aprobados.
-5. README y documentación narrativa.
-6. Chat / memoria.
+3. Checkpoint canónico de la fase activa.
+4. SPEC / PLAN aprobado aplicable.
+5. README y este AGENTS para identidad, metodología y guardrails durables.
+6. Handoffs y chats como apoyo de recuperación, nunca por encima del repo/CI/checkpoint.
 
-Nunca declarar trabajo hecho porque un handoff lo diga si GitHub no lo demuestra.
+Si dos documentos discrepan, no se promedia ni se interpreta por conveniencia: se conserva la autoridad superior y se converge la inferior.
 
-## Ley 1 — KISS
+## 2. Ley KISS
 
-Todo cambio debe ser simple, directo, eficiente, optimizado y eficaz.
+Arquitectura simple, eficiente, optimizada y eficaz.
 
-- Reutilizar owners existentes antes de crear nuevas autoridades.
-- No agregar tabla, clase, servicio, permiso, ruta, scheduler, dependencia o framework sin necesidad demostrada.
-- Ir de A a B; evitar abstracciones que solo redistribuyen complejidad.
-- El presupuesto arquitectónico de cada fase es un límite, no un objetivo a consumir.
+- Preferir A -> B.
+- Reutilizar owners existentes.
+- No crear servicios, tablas, providers, middlewares, colas, abstracciones o capas nuevas sin una necesidad demostrada por contrato/RED.
+- No anticipar arquitectura futura.
+- No duplicar lógica para resolver una variante local.
 
-## Ley 2 — Cero Ruido / Convergencia
+## 3. Ley Cero Ruido
 
-```text
-ELIMINAR
-→ UNIR / CONVERGER
-→ SIMPLIFICAR
-→ MEJORAR / OPTIMIZAR
-→ AGREGAR
-```
+Antes de agregar:
 
-Antes de eliminar, demostrar que el elemento está supersedido y que no contiene autoridad, evidencia o recuperación única. No arrastrar checkpoints transitorios dentro del HEAD final solo por precaución; preservar recuperación en ramas `checkpoint/...` cuando sea suficiente.
+`ELIMINAR -> UNIR/CONVERGER -> SIMPLIFICAR -> MEJORAR/OPTIMIZAR -> AGREGAR`
 
-## Ley 3 — Anti-parche
+Aplicaciones obligatorias:
+- retirar autoridades duplicadas;
+- no arrastrar checkpoints transitorios ya absorbidos por uno canónico;
+- conservar evidencia única antes de eliminar archivos supersedidos;
+- no conservar compatibilidad temporal sin un gate explícito de eliminación;
+- no convertir documentación histórica en estado vivo.
 
-```text
-REPRODUCE
-→ ROOT CAUSE
-→ OWNING AUTHORITY
-→ SEARCH DUPLICATION
-→ RED
-→ MINIMAL GREEN
-→ REMOVE SUPERSEDED LOGIC
-→ REGRESSION
-```
+## 4. Ley Anti-parche
 
-No aplicar arreglos especulativos. Un cambio de producto necesita un RED que reproduzca el problema, salvo cambios puramente documentales/tooling de cierre que no alteren runtime.
+Para cualquier bug, gap o incompatibilidad:
 
-## Método obligatorio
+`REPRODUCE -> ROOT CAUSE -> OWNER -> BUSCAR DUPLICACIÓN -> RED -> VERIFICAR RED -> MINIMAL GREEN -> RETIRAR SUPERSEDED -> REGRESSION`
 
-1. Confirmar base, branch, HEAD, PR y scope.
-2. PRE-KISS: owner canónico, presupuesto y prohibiciones.
-3. Confirmar SPEC/DESIGN y PLAN antes de producto cuando la fase lo requiera.
-4. Auditar diez pasadas antes de implementar y antes de cerrar.
-5. TDD por tarea: RED verificado → GREEN mínimo → regresión.
-6. CI del SHA exacto; no reutilizar CI de un commit anterior.
-7. Checkpoint antes de abrir el siguiente gate.
-8. Merge solo con base/head/mergeability y CI nuevamente verificados.
+Prohibido:
+- arreglar síntomas sin causa raíz;
+- añadir special-cases laterales;
+- crear una segunda autoridad;
+- modificar tests legítimos solo para hacerlos verdes;
+- afirmar PASS sin observar la evidencia exacta.
 
-## Política de checkpoints
+## 5. TDD y QA
 
-- Crear checkpoints frecuentes para evitar pérdida de continuidad.
-- Preferir ramas `checkpoint/<fase>-<gate>-<fecha>` para estados transitorios.
-- Un checkpoint RED preserva el RED y no mezcla GREEN.
-- Un GREEN candidate se guarda antes de CI; un GREEN certificado solo después de CI completa.
-- El HEAD final de una fase converge a un checkpoint documental canónico; los checkpoints intermedios pueden vivir solo en ramas.
+Para cambio funcional:
+1. escribir/reutilizar RED mínimo;
+2. observar el fallo correcto;
+3. GREEN mínimo;
+4. suite focal;
+5. suite completa;
+6. CI PHP 8.3 / 8.4 / 8.5 sobre SHA exacto;
+7. auditar regresiones, ruido y duplicación.
 
-## QA / CI
+Un focal verde no equivale a una suite verde. Un SHA funcional no queda certificado hasta que la matriz requerida termine.
 
-- PHP soportado: 8.3, 8.4 y 8.5.
-- `composer validate --strict` obligatorio.
-- Lint PHP obligatorio dentro del CI canónico.
-- PHPUnit completo en la matriz soportada.
-- No declarar PASS mientras un job esté queued/in_progress.
-- Distinguir Product Head de Closure Head cuando un commit posterior sea solo docs/tooling.
-- Evitar reruns rituales: mismo test + mismo código + mismo entorno no agrega evidencia.
+## 6. Git / PR / merge
 
-## Contratos durables
+- No trabajar directamente sobre `main` para una fase activa.
+- Mantener PR de la fase como superficie de CI/revisión.
+- No mergear sin autorización explícita del owner.
+- No desplegar por inferencia a partir de un merge.
+- No forzar refs salvo recuperación explícitamente autorizada y verificada.
+- Antes de merge: CI verde del HEAD exacto, checkpoint canónico actualizado, documentación convergida y auditoría final.
 
-- Tenant ownership se resuelve antes de lookups hijos.
-- CSRF global se mantiene para mutaciones autenticadas; excepciones deben ser exactas y protegidas.
-- Archivos privados validan contención, tamaño, MIME por bytes e integridad según owner; fallan cerrados.
-- `FinanceService` conserva la autoridad financiera compartida.
-- `NotificationService` conserva la autoridad de cola/proceso/retención automática; no crear segundo scheduler.
-- WhatsApp sigue siendo salida asistida, no proveedor de estado de entrega paralelo.
-- Auditoría F22 usa un solo `AuditService` / `audit_log`; no event bus, segunda pila de logs o framework de seguridad.
-- Nunca registrar passwords, raw tokens, cookies/sesiones, documentos, receipts/payment bodies, SQL o exception traces en auditoría.
-- `REMOTE_ADDR` validado es la fuente F22 de IP; no confiar ciegamente en forwarding headers.
+## 7. Checkpoints
 
-## Roles
+Crear checkpoint cuando:
+- el owner lo solicite;
+- exista una parada significativa;
+- cierre una fase o gate relevante.
 
-### ChatGPT / Sol
+El checkpoint canónico debe contener:
+- base / branch / PR / HEAD;
+- estado de CI con run y SHA;
+- contratos cerrados;
+- bloqueos reales;
+- siguiente acción exacta;
+- merge/deploy authorization.
 
-- producto, SPEC, arquitectura, UX, planes, auditoría, GitHub, QA y continuidad;
-- contrastar siempre estado documental con GitHub real;
-- buscar huecos, duplicaciones, ruido y parches;
-- mantener checkpoints y PR actualizados por gate.
+Cuando un checkpoint posterior absorbe toda la evidencia única de checkpoints transitorios anteriores, retirar los supersedidos del HEAD activo. Git conserva la historia.
 
-### Codex
+## 8. Roadmap post-UAT vigente
 
-Usarlo cuando la implementación local/TDD o tooling del PC aporte valor. Cuando se delegue:
+Tras el rechazo humano pre-F26, el orden activo de recuperación es:
 
-- un Markdown autocontenido por lote aprobado;
-- hard stops y presupuesto arquitectónico explícitos;
-- TDD focal y checkpoint recuperable;
-- no rediseñar decisiones congeladas;
-- no merge sin autorización inequívoca;
-- no releer todo el repo si checkpoint/SPEC/PLAN ya fijan la fase.
+`R0 -> R1 -> R2 -> R3 -> R4 -> R5 -> R6 -> R7 -> R8 -> R9 -> R10 -> R11 -> R12 -> R13 -> R14`
 
-## Roadmap guardrail
+Interpretación:
+- R0 baseline visual;
+- R1 auth;
+- R2 design foundation;
+- R3 landing/catalog/detail/login;
+- R4 assets demo;
+- R5 dashboard/shell;
+- R6 properties/units/media;
+- R7 candidates/wizard;
+- R8 contracts/tenant;
+- R9 finance;
+- R10 remaining modules;
+- R11 full demo;
+- R12 human owner UAT;
+- R13 rebuild F25;
+- R14 Hostinger/F26.
 
-No implementar una fase futura antes de que la precedente esté cerrada y mergeada.
+La secuencia histórica F21–F26 sigue siendo evidencia del producto anterior, no el roadmap activo después del UAT rechazado.
 
-```text
-F21 Bono + liquidación
-F22 Seguridad + privacidad + audit log
-F23 Dashboard + Adaptive UX Final
-F24 Release Readiness + installer/candidate wizard + QA
-F25 SERVER_READY ZIP + exact-artifact rehearsal
-F26 Manual Hostinger deploy + smoke
-```
+No iniciar la fase siguiente hasta cerrar la anterior según CI/checkpoint y, cuando corresponda al flujo de integración vigente, completar su merge autorizado.
 
-No existe F27 en el roadmap aprobado.
+## 9. Auth durable contracts
 
-Para F23–F26 usar `docs/specs/F23_F26_UX_RELEASE_SPEC_V1_2026-10-14.md` y el checkpoint de la fase vigente; no adelantar módulos futuros para resolver una fase anterior.
+- Una sola autoridad de autenticación: `AuthService`.
+- Una sola política de contraseña: `PasswordPolicy`.
+- Ambigüedad entre email / username / documento falla cerrada.
+- `UserService` es el owner de creación/gestión de identidades de usuario.
+- Los índices únicos son segunda barrera, no sustituto de la validación de dominio.
+- Tenant conserva el documento canónico recibido del candidato; no reinterpretar su casing en Auth.
+- Compatibilidad temporal debe documentar un gate de eliminación; no puede permanecer indefinidamente “por si acaso”.
 
-## Recovery
+## 10. Seguridad y producto
 
-```text
-GitHub real + CI del SHA exacto
-→ README
-→ AGENTS
-→ checkpoint canónico de fase
-→ SPEC / PLAN de la fase
-→ NEXT_EXACT_ACTION
-```
+Mantener:
+- CSRF global en mutaciones web;
+- sesiones y forced-password gate existentes;
+- lockout y reset de contraseña en el AuthService existente;
+- respuestas de error sanitizadas;
+- almacenamiento privado y verificación de integridad donde ya aplica;
+- tenant fail-closed y sin permisos administrativos;
+- SSR como arquitectura pública/privada, sin SPA paralela.
 
-No reimplementar trabajo certificado sin evidencia real de regresión o una nueva SPEC aprobada.
+## 11. Diseño público aprobado
+
+La implementación visual pública debe respetar la spec versionada aprobada. No reinterpretar mockups por memoria. Si una imagen y la spec textual se contradicen, resolver la contradicción y congelar una autoridad antes de implementar la superficie afectada.
+
+## 12. Delegación a Codex
+
+Si se delega un lote:
+- entregar un solo Markdown autocontenido por lote;
+- incluir scope, leyes, owners, RED/GREEN, prohibiciones, comandos de verificación y criterio de parada;
+- Codex no autoriza merge ni deployment;
+- el reporte de Codex nunca sustituye la auditoría directa de GitHub + CI.
