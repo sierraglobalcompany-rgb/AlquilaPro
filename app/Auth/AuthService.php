@@ -169,11 +169,12 @@ final readonly class AuthService
 
         $statement = $this->pdo->prepare(
             'SELECT id, password_hash, is_active, failed_login_attempts, locked_until '
-            . 'FROM users WHERE email = :email OR username = :identifier OR document_number = :identifier LIMIT 2',
+            . 'FROM users WHERE email = :email OR username = :username OR document_number = :document_number LIMIT 2',
         );
         $statement->execute([
             'email' => $this->normalizeEmail($identifier),
-            'identifier' => $identifier,
+            'username' => $identifier,
+            'document_number' => $identifier,
         ]);
         $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
 
