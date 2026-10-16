@@ -68,7 +68,9 @@ final class PublicCatalogDetailTest extends TestCase
         );
         $publicKey = str_repeat('a', 24);
         $unitId = $this->insertUnit($propertyId, $publicKey, 'available', true, true);
-        $this->insertPhoto($unitId);
+        $this->insertPhoto($unitId, 1, true);
+        $this->insertPhoto($unitId, 2, false);
+        $this->insertLinkedParking($propertyId, $unitId);
         $this->insertVideo($unitId, 'https://video.example/watch?a=1&b=2');
 
         $response = $this->request($this->app(), '/catalog/' . $publicKey);
@@ -83,6 +85,19 @@ final class PublicCatalogDetailTest extends TestCase
         self::assertStringContainsString('&lt;b&gt;Descripción pública&lt;/b&gt;', $html);
         self::assertStringContainsString('&lt;img src=x onerror=alert(1)&gt;', $html);
         self::assertStringContainsString('Disponible', $html);
+        self::assertStringContainsString('$1.500.000', $html);
+        self::assertStringContainsString('class="public-detail"', $html);
+        self::assertStringContainsString('class="public-detail__gallery"', $html);
+        self::assertStringContainsString('class="public-detail__gallery-track"', $html);
+        self::assertStringContainsString('id="photo-1"', $html);
+        self::assertStringContainsString('id="photo-2"', $html);
+        self::assertStringContainsString('href="#photo-1"', $html);
+        self::assertStringContainsString('href="#photo-2"', $html);
+        self::assertStringContainsString('class="public-detail__facts"', $html);
+        self::assertStringContainsString('1 parqueadero', $html);
+        self::assertStringContainsString('href="/apply/' . $publicKey . '"', $html);
+        self::assertStringContainsString('class="button" href="/apply/' . $publicKey . '">Aplicar</a>', $html);
+        self::assertStringContainsString('href="/catalog"', $html);
         self::assertStringContainsString('https://video.example/watch?a=1&amp;b=2', $html);
         self::assertStringContainsString('rel="noopener noreferrer"', $html);
 
@@ -94,6 +109,7 @@ final class PublicCatalogDetailTest extends TestCase
             'NO PUBLICAR UNIDAD',
             'MATRICULA-SECRETA',
             'INT-A1',
+            'P-LINKED',
         ] as $privateValue) {
             self::assertStringNotContainsString($privateValue, $html);
         }
@@ -129,6 +145,7 @@ final class PublicCatalogDetailTest extends TestCase
         $response = $this->request($this->app('/miapp'), '/miapp/catalog/' . $publicKey);
         self::assertSame(200, $response->getStatusCode());
         $html = (string) $response->getBody();
+        self::assertStringContainsString('href="/miapp/apply/' . $publicKey . '"', $html);
         self::assertStringContainsString('href="/miapp/catalog"', $html);
         self::assertStringContainsString('href="/miapp/"', $html);
         self::assertStringNotContainsString('/miapp/miapp/', $html);
@@ -220,14 +237,33 @@ final class PublicCatalogDetailTest extends TestCase
         return (int) $this->pdo->lastInsertId();
     }
 
-    private function insertPhoto(int $unitId): void
+    private function insertLinkedParking(int $propertyId, int $apartmentId): void
+    {
+        $statement = $this->pdo->prepare(
+            'INSERT INTO units (property_id, public_key, type, code, status, is_public, linked_apartment_id) '
+            . 'VALUES (:property_id, :public_key, :type, :code, :status, :is_public, :linked_apartment_id)',
+        );
+        $statement->execute([
+            'property_id' => $propertyId,
+            'public_key' => str_repeat('p', 24),
+            'type' => 'parking',
+            'code' => 'P-LINKED',
+            'status' => 'occupied',
+            'is_public' => 0,
+            'linked_apartment_id' => $apartmentId,
+        ]);
+    }
+
+    private function insertPhoto(int $unitId, int $position = 1, bool $isCover = true): void
     {
         $this->pdo->prepare(
             "INSERT INTO unit_media (unit_id, type, stored_name, mime_type, sort_order, is_cover) "
-            . "VALUES (:unit_id, 'photo', :stored_name, 'image/jpeg', 1, 1)",
+            . "VALUES (:unit_id, 'photo', :stored_name, 'image/jpeg', :sort_order, :is_cover)",
         )->execute([
             'unit_id' => $unitId,
-            'stored_name' => 'photo-' . $unitId . '.jpg',
+            'stored_name' => 'photo-' . $unitId . '-' . $position . '.jpg',
+            'sort_order' => $position,
+            'is_cover' => $isCover ? 1 : 0,
         ]);
     }
 
@@ -235,7 +271,7 @@ final class PublicCatalogDetailTest extends TestCase
     {
         $this->pdo->prepare(
             "INSERT INTO unit_media (unit_id, type, external_url, sort_order, is_cover) "
-            . "VALUES (:unit_id, 'video_link', :url, 2, 0)",
+            . "VALUES (:unit_id, 'video_link', :url, 3, 0)",
         )->execute(['unit_id' => $unitId, 'url' => $url]);
     }
 }
