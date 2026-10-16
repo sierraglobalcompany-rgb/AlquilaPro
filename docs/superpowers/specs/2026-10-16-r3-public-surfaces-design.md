@@ -88,7 +88,7 @@ R3 must not add:
 
 ## 5. Landing data flow
 
-The current root route already calls `PropertyService::listPublicUnits(null, null, null)` but reduces the result to a count. R3 will reuse the same result as the landing inventory.
+The current root route already calls `PropertyService::listPublicUnits(null, null, null)` but reduces the result to a count. R3 will reuse the same result as the landing inventory and remove the obsolete count-only presentation.
 
 Required flow:
 
@@ -96,7 +96,6 @@ Required flow:
 GET /
 → PropertyService::listPublicUnits(null, null, null)
 → preserve existing publicability/privacy filtering
-→ total public count retained for optional empty/summary behavior
 → first up to 8 units become featured carousel items
 → UnitMediaService supplies public photo positions for those featured units
 → renderPublic('public_landing', ...)
@@ -127,6 +126,7 @@ The landing must replace the current marketing hero with this hierarchy:
 Explicitly absent:
 
 - `Encuentra tu próximo espacio` or equivalent marketing hero;
+- old availability-count marketing copy;
 - public bottom navigation;
 - Google login;
 - second `Más propiedades` grid;
@@ -172,7 +172,7 @@ No autoplay is required. No remote fetch, timer, animation library, touch librar
 
 ## 8. Public property information
 
-Render only values already authorized by the public domain contract.
+Render only values authorized by the public domain contract.
 
 For apartments, when available:
 
@@ -183,18 +183,17 @@ For apartments, when available:
 - bathrooms;
 - area;
 - floor;
-- linked parking count when it can be derived from the existing parking-to-apartment relation.
+- linked parking count.
+
+The linked parking count is defined exactly as the number of existing `units` rows where `type = 'parking'` and `linked_apartment_id` equals the apartment unit id. Only the numeric count is exposed. Public/private flag and parking detail fields are not exposed through this aggregate. The count must be derived in the existing `PropertyService` public query/normalization path; no schema, table, or new service is permitted.
 
 For parking units, when available:
 
 - property name;
-- safe location;
+- safe location label/city/sector;
 - monthly price;
 - parking level;
-- vehicle type;
-- other already-public parking fields.
-
-If linked parking count is implemented, it must be derived inside the existing `PropertyService` public query/normalization path from the existing `units.linked_apartment_id` relation. No schema or new service is permitted.
+- vehicle type.
 
 Do not expose address, registry number, private notes, administration private contact, internal code, or other fields currently protected by public tests.
 
@@ -370,14 +369,15 @@ Extend `PublicLandingTest` to prove at minimum:
 - real publicable unit data appears on `/`;
 - non-public/occupied/incomplete/private data does not appear;
 - `Propiedades disponibles` and `Ver todas` exist;
-- hero copy `Encuentra tu próximo espacio` is gone;
+- hero copy `Encuentra tu próximo espacio` and obsolete availability summary are gone;
 - detail/photo links respect `basePath`;
 - integrated login posts `identifier` to `/login` with CSRF;
 - literal login copy is `Usuario, correo o cédula`;
 - no Google login;
 - no X/dismiss control;
 - no public bottom nav;
-- empty inventory remains truthful and still exposes login.
+- empty inventory remains truthful and still exposes login;
+- linked parking count is derived without exposing parking private fields.
 
 ### 17.2 Catalog/detail regression
 
@@ -434,7 +434,7 @@ Asset-photo coherence itself is completed in R4, not hidden inside R3.
 Expected R3 owners, subject to RED-driven necessity:
 
 - `app/Properties/routes.php`;
-- possibly `app/Properties/PropertyService.php` only for safe linked-parking aggregate;
+- `app/Properties/PropertyService.php` for the linked-parking aggregate only;
 - `resources/views/public_landing.php`;
 - `resources/views/public_catalog.php`;
 - `resources/views/public_catalog_detail.php`;
@@ -493,6 +493,7 @@ CATALOG_SINGLE_AUTHORITY = PASS
 PUBLIC_DETAIL_SAFE_GALLERY = PASS
 LOGIN_INTEGRATED_NO_X_NO_GOOGLE = PASS
 LOGIN_IDENTIFIER_COPY = Usuario, correo o cédula
+LINKED_PARKING_COUNT = PASS
 BASE_PATH = PASS
 PRIVACY = PASS
 MOBILE_375 = PASS
