@@ -55,84 +55,89 @@ final class PublicLandingTest extends TestCase
         @rmdir($this->directory);
     }
 
-    public function testInstalledVisitorGetsPublicLandingInsteadOfLoginRedirect(): void
+    public function testInstalledVisitorGetsApprovedPublicLandingWithIntegratedLogin(): void
     {
         $this->upsertSetting('app.name', 'Arrienda Fácil');
+        $publicKey = str_repeat('a', 24);
+        $this->seedPublicableApartment($publicKey, 'Edificio Destacado', 'A-401', 'photo-a.jpg');
         $app = $this->app();
 
+        $response = $this->requestRoot($app);
+
+        self::assertSame(200, $response->getStatusCode());
+        $html = (string) $response->getBody();
+        self::assertStringContainsString('Arrienda Fácil', $html);
+        self::assertStringContainsString('Propiedades disponibles', $html);
+        self::assertStringContainsString('href="/catalog"', $html);
+        self::assertStringContainsString('Ver todas', $html);
+        self::assertStringContainsString('Edificio Destacado', $html);
+        self::assertStringContainsString('Medellín', $html);
+        self::assertStringContainsString('Calasanz', $html);
+        self::assertStringContainsString('href="/catalog/' . $publicKey . '"', $html);
+        self::assertStringContainsString('src="/catalog/' . $publicKey . '/photo/1"', $html);
+        self::assertStringContainsString('method="post"', $html);
+        self::assertStringContainsString('action="/login"', $html);
+        self::assertStringContainsString('name="csrf_token"', $html);
+        self::assertStringContainsString('name="identifier"', $html);
+        self::assertStringContainsString('Usuario, correo o cédula', $html);
+        self::assertStringContainsString('Contraseña', $html);
+        self::assertStringContainsString('Iniciar sesión', $html);
+        self::assertStringNotContainsString('Encuentra tu próximo espacio', $html);
+        self::assertStringNotContainsString('unidad disponible ahora', $html);
+        self::assertStringNotContainsString('NO FILTRAR', $html);
+        self::assertStringNotContainsString('Google', $html);
+        self::assertStringNotContainsString('data-login-close', $html);
+        self::assertStringNotContainsString('bottom-nav', $html);
+        self::assertStringNotContainsString('Apps', $html);
+    }
+
+    public function testLandingRendersAtMostEightFeaturedUnitsAndTruthfulEmptyState(): void
+    {
+        for ($index = 1; $index <= 9; $index++) {
+            $this->seedPublicableApartment(
+                str_pad((string) $index, 24, (string) $index),
+                'Edificio ' . $index,
+                'A-' . $index,
+                'photo-' . $index . '.jpg',
+            );
+        }
+        $app = $this->app();
+
+        $html = (string) $this->requestRoot($app)->getBody();
+        self::assertSame(8, substr_count($html, 'data-public-featured-unit'));
+        self::assertStringNotContainsString('Edificio 9', $html);
+
+        $this->pdo->exec("UPDATE units SET status = 'occupied'");
+        $emptyHtml = (string) $this->requestRoot($app)->getBody();
+        self::assertStringContainsString('data-public-empty', $emptyHtml);
+        self::assertStringContainsString('No hay propiedades disponibles por ahora.', $emptyHtml);
+        self::assertStringContainsString('action="/login"', $emptyHtml);
+        self::assertStringContainsString('name="identifier"', $emptyHtml);
+    }
+
+    public function testStandaloneLoginKeepsUnifiedIdentifierAndApprovedSubmitCopy(): void
+    {
+        $app = $this->app();
         $response = $app->handle(
             (new ServerRequestFactory())->createServerRequest(
                 'GET',
-                'https://alquilapro.sierraglobalcompany.com/',
+                'https://alquilapro.sierraglobalcompany.com/login',
             ),
         );
 
         self::assertSame(200, $response->getStatusCode());
         $html = (string) $response->getBody();
-        self::assertStringContainsString('Arrienda Fácil', $html);
-        self::assertStringContainsString('href="/catalog"', $html);
-        self::assertStringContainsString('Ver catálogo', $html);
-        self::assertStringContainsString('href="/login"', $html);
+        self::assertStringContainsString('Usuario, correo o cédula', $html);
+        self::assertStringContainsString('name="identifier"', $html);
+        self::assertStringContainsString('name="csrf_token"', $html);
         self::assertStringContainsString('Iniciar sesión', $html);
-        self::assertStringNotContainsString('data-f3-app-shell', $html);
-        self::assertStringNotContainsString('bottom-nav', $html);
-        self::assertStringNotContainsString('Apps', $html);
-    }
-
-    public function testLandingAvailabilitySummaryAppearsOnlyForLivePublicableInventory(): void
-    {
-        $property = $this->pdo->prepare(
-            'INSERT INTO properties (name, address, city, sector, is_active) '
-            . 'VALUES (:name, :address, :city, :sector, 1)',
-        );
-        $property->execute([
-            'name' => 'Edificio Resumen',
-            'address' => 'Dirección privada',
-            'city' => 'Medellín',
-            'sector' => 'Calasanz',
-        ]);
-        $propertyId = (int) $this->pdo->lastInsertId();
-
-        $unit = $this->pdo->prepare(
-            'INSERT INTO units '
-            . '(property_id, public_key, type, code, status, is_public, monthly_price, description, requirements) '
-            . 'VALUES (:property_id, :public_key, :type, :code, :status, 1, :monthly_price, :description, :requirements)',
-        );
-        $unit->execute([
-            'property_id' => $propertyId,
-            'public_key' => str_repeat('d', 24),
-            'type' => 'apartment',
-            'code' => 'A-RESUMEN',
-            'status' => 'available',
-            'monthly_price' => '1200000.00',
-            'description' => 'Descripción pública',
-            'requirements' => 'Requisitos públicos',
-        ]);
-        $unitId = (int) $this->pdo->lastInsertId();
-        $app = $this->app();
-
-        $withoutPhoto = (string) $this->requestRoot($app)->getBody();
-        self::assertStringNotContainsString('unidad disponible ahora', $withoutPhoto);
-
-        $this->pdo->prepare(
-            "INSERT INTO unit_media (unit_id, type, stored_name, mime_type, sort_order, is_cover) "
-            . "VALUES (:unit_id, 'photo', :stored_name, 'image/jpeg', 1, 1)",
-        )->execute([
-            'unit_id' => $unitId,
-            'stored_name' => 'photo-summary.jpg',
-        ]);
-
-        $withPhoto = (string) $this->requestRoot($app)->getBody();
-        self::assertStringContainsString('1 unidad disponible ahora', $withPhoto);
-
-        $this->pdo->prepare('UPDATE units SET status = :status WHERE id = :id')
-            ->execute(['status' => 'occupied', 'id' => $unitId]);
-        $occupied = (string) $this->requestRoot($app)->getBody();
-        self::assertStringNotContainsString('unidad disponible ahora', $occupied);
+        self::assertStringNotContainsString('>Entrar</button>', $html);
     }
 
     public function testPublicLandingRespectsSubfolderBasePath(): void
     {
+        $publicKey = str_repeat('b', 24);
+        $this->seedPublicableApartment($publicKey, 'Edificio Subfolder', 'B-201', 'photo-subfolder.jpg');
         $app = $this->app('/miapp');
 
         $response = $app->handle(
@@ -145,7 +150,9 @@ final class PublicLandingTest extends TestCase
         self::assertSame(200, $response->getStatusCode());
         $html = (string) $response->getBody();
         self::assertStringContainsString('href="/miapp/catalog"', $html);
-        self::assertStringContainsString('href="/miapp/login"', $html);
+        self::assertStringContainsString('href="/miapp/catalog/' . $publicKey . '"', $html);
+        self::assertStringContainsString('src="/miapp/catalog/' . $publicKey . '/photo/1"', $html);
+        self::assertStringContainsString('action="/miapp/login"', $html);
         self::assertStringContainsString('href="/miapp/assets/app.css"', $html);
         self::assertStringNotContainsString('/miapp/miapp/', $html);
     }
@@ -174,6 +181,58 @@ final class PublicLandingTest extends TestCase
                 'https://alquilapro.sierraglobalcompany.com/',
             ),
         );
+    }
+
+    private function seedPublicableApartment(
+        string $publicKey,
+        string $propertyName,
+        string $code,
+        string $storedName,
+    ): void {
+        $property = $this->pdo->prepare(
+            'INSERT INTO properties (name, address, city, sector, is_active) '
+            . 'VALUES (:name, :address, :city, :sector, 1)',
+        );
+        $property->execute([
+            'name' => $propertyName,
+            'address' => 'Dirección privada',
+            'city' => 'Medellín',
+            'sector' => 'Calasanz',
+        ]);
+        $propertyId = (int) $this->pdo->lastInsertId();
+
+        $unit = $this->pdo->prepare(
+            'INSERT INTO units '
+            . '(property_id, public_key, type, code, location_label, status, is_public, monthly_price, description, requirements, private_notes, unit_number, tower, floor, area_m2, bedrooms, bathrooms) '
+            . 'VALUES (:property_id, :public_key, :type, :code, :location_label, :status, 1, :monthly_price, :description, :requirements, :private_notes, :unit_number, :tower, :floor, :area_m2, :bedrooms, :bathrooms)',
+        );
+        $unit->execute([
+            'property_id' => $propertyId,
+            'public_key' => $publicKey,
+            'type' => 'apartment',
+            'code' => $code,
+            'location_label' => 'Torre 1',
+            'status' => 'available',
+            'monthly_price' => '1200000.00',
+            'description' => 'Descripción pública',
+            'requirements' => 'Requisitos públicos',
+            'private_notes' => 'NO FILTRAR',
+            'unit_number' => '401',
+            'tower' => '1',
+            'floor' => '4',
+            'area_m2' => '58.00',
+            'bedrooms' => 2,
+            'bathrooms' => '2.00',
+        ]);
+        $unitId = (int) $this->pdo->lastInsertId();
+
+        $this->pdo->prepare(
+            "INSERT INTO unit_media (unit_id, type, stored_name, mime_type, sort_order, is_cover) "
+            . "VALUES (:unit_id, 'photo', :stored_name, 'image/jpeg', 1, 1)",
+        )->execute([
+            'unit_id' => $unitId,
+            'stored_name' => $storedName,
+        ]);
     }
 
     private function upsertSetting(string $key, string $value): void
