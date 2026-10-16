@@ -85,10 +85,11 @@ final readonly class UserService
     }
 
     /** @return array{id:int,temporary_password:string} */
-    public function createTenantIdentity(string $name, string $email): array
+    public function createTenantIdentity(string $name, string $email, string $documentNumber): array
     {
         $name = trim($name);
         $email = strtolower(trim($email));
+        $documentNumber = trim($documentNumber);
 
         if ($name === '') {
             throw new InvalidArgumentException('El nombre es obligatorio.');
@@ -98,22 +99,25 @@ final readonly class UserService
             throw new InvalidArgumentException('El correo no es válido.');
         }
 
-        $temporaryPassword = bin2hex(random_bytes(16));
+        if (!PasswordPolicy::accepts($documentNumber)) {
+            throw new InvalidArgumentException('El documento debe tener al menos 6 caracteres.');
+        }
 
         try {
             $statement = $this->pdo->prepare(
                 'INSERT INTO users '
-                . '(role, full_name, email, password_hash, is_active, permissions_json, must_change_password) '
-                . "VALUES ('tenant', :full_name, :email, :password_hash, 1, NULL, 1)",
+                . '(role, full_name, email, document_number, password_hash, is_active, permissions_json, must_change_password) '
+                . "VALUES ('tenant', :full_name, :email, :document_number, :password_hash, 1, NULL, 0)",
             );
             $statement->execute([
                 'full_name' => $name,
                 'email' => $email,
-                'password_hash' => password_hash($temporaryPassword, PASSWORD_DEFAULT),
+                'document_number' => $documentNumber,
+                'password_hash' => password_hash($documentNumber, PASSWORD_DEFAULT),
             ]);
         } catch (PDOException $exception) {
             if ((string) $exception->getCode() === '23000') {
-                throw new RuntimeException('El correo ya está registrado.');
+                throw new RuntimeException('El correo o documento ya está registrado.');
             }
 
             throw new RuntimeException('No fue posible crear el usuario.');
@@ -121,7 +125,7 @@ final readonly class UserService
 
         return [
             'id' => (int) $this->pdo->lastInsertId(),
-            'temporary_password' => $temporaryPassword,
+            'temporary_password' => $documentNumber,
         ];
     }
 
