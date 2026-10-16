@@ -117,8 +117,8 @@ $database = is_array($viewState['database'] ?? null) ? $viewState['database'] : 
                 <input id="owner_email" name="owner_email" type="email" value="<?= $escape($viewState['owner_email'] ?? '') ?>" required>
 
                 <label for="owner_password">Contraseña inicial</label>
-                <input id="owner_password" name="owner_password" type="password" minlength="12" autocomplete="new-password" required>
-                <p class="hint">Usa al menos 12 caracteres. La contraseña no se vuelve a mostrar.</p>
+                <input id="owner_password" name="owner_password" type="password" minlength="6" autocomplete="new-password" required>
+                <p class="hint">Usa al menos 6 caracteres. La contraseña no se vuelve a mostrar.</p>
 
                 <button type="submit">Continuar</button>
             </section>

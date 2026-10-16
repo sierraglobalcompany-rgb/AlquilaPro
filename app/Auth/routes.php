@@ -215,6 +215,8 @@ return static function (App $app, array $deps): void {
                 (string) ($form['role'] ?? ''),
                 (string) ($form['temporary_password'] ?? ''),
                 $requestedPermissions,
+                isset($form['username']) ? (string) $form['username'] : null,
+                isset($form['document_number']) ? (string) $form['document_number'] : null,
             );
         } catch (Throwable) {
             if ($pdo->inTransaction()) {
