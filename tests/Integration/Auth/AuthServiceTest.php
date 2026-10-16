@@ -54,6 +54,55 @@ final class AuthServiceTest extends TestCase
         self::assertSame('2026-10-11 18:00:00', $row['last_login_at']);
     }
 
+    public function testAuthenticatesWithEmailUsernameOrDocumentNumber(): void
+    {
+        $id = $this->insertUser(
+            'identity@example.com',
+            'IdentityPassword123',
+            'admin',
+            [],
+            false,
+            'andres.sierra',
+            '1037654321',
+        );
+        $service = $this->service();
+        $now = new DateTimeImmutable('2026-10-11 18:00:00');
+
+        foreach (['IDENTITY@example.com', 'ANDRES.SIERRA', '1037654321'] as $identifier) {
+            $user = $service->authenticate($identifier, 'IdentityPassword123', $now);
+            self::assertNotNull($user, 'Identifier must authenticate: ' . $identifier);
+            self::assertSame($id, $user['id']);
+        }
+    }
+
+    public function testAmbiguousCrossFieldIdentifierFailsClosed(): void
+    {
+        $this->insertUser(
+            'first@example.com',
+            'FirstPassword123',
+            'admin',
+            [],
+            false,
+            'shared-identity',
+            '10000001',
+        );
+        $this->insertUser(
+            'second@example.com',
+            'SecondPassword123',
+            'admin',
+            [],
+            false,
+            'second-user',
+            'shared-identity',
+        );
+
+        $service = $this->service();
+        $now = new DateTimeImmutable('2026-10-11 18:00:00');
+
+        self::assertNull($service->authenticate('shared-identity', 'FirstPassword123', $now));
+        self::assertNull($service->authenticate('shared-identity', 'SecondPassword123', $now));
+    }
+
     public function testFiveFailedAttemptsLockExistingUserForFifteenMinutes(): void
     {
         $id = $this->insertUser('locked@example.com', 'CorrectHorseBattery1');
@@ -150,15 +199,19 @@ final class AuthServiceTest extends TestCase
         string $role = 'admin',
         array $permissions = [],
         bool $mustChangePassword = false,
+        ?string $username = null,
+        ?string $documentNumber = null,
     ): int {
         $statement = $this->pdo->prepare(
-            'INSERT INTO users (role, full_name, email, password_hash, is_active, permissions_json, must_change_password) '
-            . 'VALUES (:role, :full_name, :email, :password_hash, 1, :permissions_json, :must_change_password)',
+            'INSERT INTO users (role, full_name, email, username, document_number, password_hash, is_active, permissions_json, must_change_password) '
+            . 'VALUES (:role, :full_name, :email, :username, :document_number, :password_hash, 1, :permissions_json, :must_change_password)',
         );
         $statement->execute([
             'role' => $role,
             'full_name' => 'Test User',
             'email' => strtolower($email),
+            'username' => $username === null ? null : strtolower($username),
+            'document_number' => $documentNumber === null ? null : strtolower($documentNumber),
             'password_hash' => password_hash($password, PASSWORD_DEFAULT),
             'permissions_json' => $permissions === [] ? null : json_encode($permissions, JSON_THROW_ON_ERROR),
             'must_change_password' => $mustChangePassword ? 1 : 0,
