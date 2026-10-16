@@ -149,8 +149,8 @@ final class DashboardTest extends TestCase
         self::assertStringContainsString('public function countPendingPayments(): int', $finance);
 
         self::assertStringContainsString('$maintenance->countActionableRequests()', $routes);
-        self::assertStringNotContainsString("count($maintenance->listForStaff('open'))", $routes);
-        self::assertStringNotContainsString("count($maintenance->listForStaff('in_progress'))", $routes);
+        self::assertStringNotContainsString('count($maintenance->listForStaff(\'open\'))', $routes);
+        self::assertStringNotContainsString('count($maintenance->listForStaff(\'in_progress\'))', $routes);
         self::assertStringContainsString('public function countActionableRequests(): int', $maintenance);
     }
 
