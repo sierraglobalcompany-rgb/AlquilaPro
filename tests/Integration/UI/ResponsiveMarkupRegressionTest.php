@@ -63,6 +63,29 @@ final class ResponsiveMarkupRegressionTest extends TestCase
         self::assertStringContainsString('--brand-primary: var(--color-primary);', $css);
     }
 
+    public function testPublicCarouselKeepsMobileFirstSnapTabletAndDesktopContracts(): void
+    {
+        $css = $this->file('assets/app.css');
+
+        self::assertMatchesRegularExpression(
+            '/\.public-carousel__track\s*\{[^}]*overflow-x:\s*auto;[^}]*scroll-snap-type:\s*x\s+mandatory;/s',
+            $css,
+        );
+        self::assertMatchesRegularExpression(
+            '/\.public-property-card\s*\{[^}]*scroll-snap-align:\s*center;/s',
+            $css,
+        );
+        self::assertStringContainsString('.public-login-panel', $css);
+        self::assertMatchesRegularExpression(
+            '/@media \(min-width: 768px\) and \(max-width: 1199px\)[\s\S]*?\.public-property-card/s',
+            $css,
+        );
+        self::assertMatchesRegularExpression(
+            '/@media \(min-width: 1200px\)[\s\S]*?\.public-property-card/s',
+            $css,
+        );
+    }
+
     private function file(string $path): string
     {
         $contents = file_get_contents($this->root . '/' . $path);

@@ -108,6 +108,15 @@ final class AssetContractTest extends TestCase
         self::assertStringNotContainsString('fetch(', $this->js);
     }
 
+    public function testPublicCarouselUsesNativeProgressiveEnhancementWithoutNetworkOrAutoplay(): void
+    {
+        self::assertStringContainsString('[data-public-carousel]', $this->js);
+        self::assertStringContainsString('requestAnimationFrame', $this->js);
+        self::assertStringNotContainsString('setInterval(', $this->js);
+        self::assertStringNotContainsString('fetch(', $this->js);
+        self::assertStringNotContainsString('import ', $this->js);
+    }
+
     public function testAssetsContainNoUnreleasedModuleLabels(): void
     {
         $assets = $this->css . "\n" . $this->js;
