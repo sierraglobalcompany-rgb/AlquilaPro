@@ -174,6 +174,10 @@ final class ReleaseCriticalFlowsTest extends TestCase
         $candidateLookup->execute([hash('sha256', $token)]);
         $candidateId = (int) $candidateLookup->fetchColumn();
         self::assertGreaterThan(0, $candidateId);
+        $candidateDocument = (string) $this->pdo->query(
+            'SELECT document_number FROM candidates WHERE id = ' . $candidateId,
+        )->fetchColumn();
+        self::assertNotSame('', $candidateDocument);
 
         $personal = $this->request($app, 'POST', '/apply/continue/' . $token, [
             'wizard_step' => 'personal',
