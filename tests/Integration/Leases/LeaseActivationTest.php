@@ -54,6 +54,10 @@ final class LeaseActivationTest extends TestCase
                 candidateEmail: 'tenant-' . $unitStatus . '@example.com',
                 suffix: (string) $index,
             );
+            $candidateDocument = (string) $this->pdo->query(
+                'SELECT document_number FROM candidates WHERE id = ' . (int) $fixture['candidate_id'],
+            )->fetchColumn();
+            self::assertNotSame('', $candidateDocument);
 
             $result = $this->service()->activate($fixture['contract_id'], $this->actorId, 1791870100 + $index);
 
@@ -75,19 +79,21 @@ final class LeaseActivationTest extends TestCase
             self::assertSame('2026-11-01', $result['lease']['start_date']);
             self::assertSame('2027-10-31', $result['lease']['end_date']);
             self::assertSame('Doce meses exactos', $result['lease']['duration_text']);
-            self::assertGreaterThanOrEqual(12, strlen($result['temporary_password']));
+            self::assertSame($candidateDocument, $result['temporary_password']);
             self::assertSame('occupied', $this->unitStatus($fixture['unit_id']));
 
             $tenant = $this->pdo->query(
-                'SELECT role, email, password_hash, permissions_json, must_change_password FROM users WHERE id = '
+                'SELECT role, email, document_number, password_hash, permissions_json, must_change_password FROM users WHERE id = '
                 . (int) $result['lease']['user_id'],
             )->fetch(PDO::FETCH_ASSOC);
             self::assertIsArray($tenant);
             self::assertSame('tenant', $tenant['role']);
             self::assertSame('tenant-' . $unitStatus . '@example.com', $tenant['email']);
+            self::assertSame($candidateDocument, $tenant['document_number']);
             self::assertNull($tenant['permissions_json']);
-            self::assertSame(1, (int) $tenant['must_change_password']);
-            self::assertTrue(password_verify($result['temporary_password'], (string) $tenant['password_hash']));
+            self::assertSame(0, (int) $tenant['must_change_password']);
+            self::assertNotSame($candidateDocument, (string) $tenant['password_hash']);
+            self::assertTrue(password_verify($candidateDocument, (string) $tenant['password_hash']));
 
             $found = $this->service()->findByContract($fixture['contract_id']);
             self::assertIsArray($found);

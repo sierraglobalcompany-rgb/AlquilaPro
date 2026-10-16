@@ -140,6 +140,11 @@ final class LeaseAdminRoutesTest extends TestCase
         );
         $tenantEmail = 'tenant-once@example.com';
         $contractId = $this->finalizedContract($managerId, $tenantEmail);
+        $tenantDocument = (string) $this->pdo->query(
+            'SELECT c.document_number FROM candidates c INNER JOIN contracts ct ON ct.candidate_id = c.id WHERE ct.id = '
+            . $contractId,
+        )->fetchColumn();
+        self::assertNotSame('', $tenantDocument);
         $app = $this->app('/sub');
         $this->login($app, 'activate@example.com', 'ManagerPassword123', '/sub');
 
@@ -156,27 +161,33 @@ final class LeaseAdminRoutesTest extends TestCase
         $html = (string) $activated->getBody();
         self::assertStringContainsString('data-f3-app-shell', $html);
         self::assertStringContainsString($tenantEmail, $html);
+        self::assertStringContainsString('data-tenant-identifier', $html);
+        self::assertStringContainsString($tenantDocument, $html);
         self::assertMatchesRegularExpression(
-            '/<code[^>]*data-temporary-password[^>]*>([^<]{12,})<\/code>/',
+            '/<code[^>]*data-temporary-password[^>]*>([^<]{6,})<\/code>/',
             $html,
         );
-        preg_match('/<code[^>]*data-temporary-password[^>]*>([^<]{12,})<\/code>/', $html, $matches);
+        preg_match('/<code[^>]*data-temporary-password[^>]*>([^<]{6,})<\/code>/', $html, $matches);
         $temporaryPassword = html_entity_decode((string) ($matches[1] ?? ''), ENT_QUOTES, 'UTF-8');
-        self::assertGreaterThanOrEqual(12, strlen($temporaryPassword));
+        self::assertSame($tenantDocument, $temporaryPassword);
 
-        $tenant = $this->pdo->prepare('SELECT password_hash FROM users WHERE email = :email AND role = \'tenant\' LIMIT 1');
+        $tenant = $this->pdo->prepare(
+            'SELECT document_number, password_hash, must_change_password FROM users WHERE email = :email AND role = \'tenant\' LIMIT 1',
+        );
         $tenant->execute(['email' => $tenantEmail]);
-        $hash = $tenant->fetchColumn();
-        self::assertIsString($hash);
-        self::assertTrue(password_verify($temporaryPassword, $hash));
+        $tenantRow = $tenant->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($tenantRow);
+        self::assertSame($tenantDocument, $tenantRow['document_number']);
+        self::assertSame(0, (int) $tenantRow['must_change_password']);
+        self::assertTrue(password_verify($tenantDocument, (string) $tenantRow['password_hash']));
         self::assertSame(1, $this->leaseCount());
 
         $revisit = $this->request($app, 'GET', '/sub/admin/contracts/' . $contractId);
         self::assertSame(200, $revisit->getStatusCode());
         $revisitHtml = (string) $revisit->getBody();
         self::assertStringContainsString($tenantEmail, $revisitHtml);
-        self::assertStringNotContainsString($temporaryPassword, $revisitHtml);
         self::assertStringNotContainsString('data-temporary-password', $revisitHtml);
+        self::assertStringNotContainsString('data-tenant-identifier', $revisitHtml);
         self::assertStringNotContainsString('Activar arrendamiento', $revisitHtml);
         self::assertStringContainsString('Finalizar arrendamiento', $revisitHtml);
     }
