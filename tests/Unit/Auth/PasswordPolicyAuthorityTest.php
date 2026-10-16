@@ -32,4 +32,23 @@ final class PasswordPolicyAuthorityTest extends TestCase
             self::assertStringNotContainsString('MIN_PASSWORD_LENGTH', $source, basename($path) . ' must not own a duplicate minimum.');
         }
     }
+
+    public function testPasswordViewsExposeCanonicalSixCharacterMinimum(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $views = [
+            $root . '/resources/views/admin_users.php',
+            $root . '/resources/views/change_password.php',
+            $root . '/resources/views/reset_password.php',
+            $root . '/resources/views/install.php',
+        ];
+
+        foreach ($views as $path) {
+            self::assertFileExists($path);
+            $source = (string) file_get_contents($path);
+            self::assertStringContainsString('minlength="6"', $source, basename($path) . ' must expose the canonical minimum.');
+            self::assertStringNotContainsString('minlength="12"', $source, basename($path) . ' must not keep the superseded minimum.');
+            self::assertStringNotContainsString('12 caracteres', $source, basename($path) . ' must not describe the superseded minimum.');
+        }
+    }
 }
