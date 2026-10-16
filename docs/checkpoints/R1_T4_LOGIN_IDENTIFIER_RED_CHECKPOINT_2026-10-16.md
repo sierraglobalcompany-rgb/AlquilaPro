@@ -1,13 +1,12 @@
-# AlquilaPro — Checkpoint R1-T4 Login Identifier RED
+# AlquilaPro — Checkpoint de continuidad R1-T4 GREEN / R1-T5 READY
 
 **Fecha:** 2026-10-16  
-**Estado:** PARADA CONTROLADA solicitada por Andrés.
+**Estado:** continuidad activa; este archivo es la autoridad durable del punto actual.
 
 ## Autoridad actual
 
 - Repositorio: `sierraglobalcompany-rgb/AlquilaPro`
 - Rama: `impl/r1-r3-post-uat-recovery-20261015`
-- HEAD antes de este checkpoint: `dea18bc6fc05f1fa357d502c3d237d6c275a3c6d`
 - PR draft: `#31`
 - Main base verificado: `b45f625e68622702335f5e606ae34d7410a2b7e6`
 - Merge autorizado: **NO**
@@ -16,22 +15,22 @@
 
 ## Estado R1
 
-### R1-T1
+### R1-T1 — esquema de identificadores
 GREEN / cerrado.
 
-### R1-T2
+### R1-T2 — AuthService email/username/documento
 GREEN / cerrado.
 
-### R1-T3A
+### R1-T3A — PasswordPolicy canónica
 GREEN / cerrado.
 
-- Política canónica de contraseña: `PasswordPolicy`
-- mínimo: **6 caracteres**
+- mínimo canónico: **6 caracteres**
+- AuthService, UserService e Installer reutilizan la misma autoridad.
 
-### R1-T3B
-GREEN / cerrado formalmente.
+### R1-T3B — identidad tenant
+GREEN / cerrado.
 
-Commit test-only final:
+Commit certificado:
 `2670a179784c73b07d96de7ad25d5fa26a3128df`
 
 CI #1025 / run `38844956914`:
@@ -40,89 +39,153 @@ CI #1025 / run `38844956914`:
 - PHP 8.5: SUCCESS
 
 Contrato tenant vigente:
-- `document_number` = identificador principal
-- contraseña inicial = mismo documento
-- contraseña almacenada hasheada
-- `must_change_password = 0`
-- cambio posterior opcional
-- normalización de documento permanece en `CandidateService::normalizeDocumentNumber()`
-- no crear normalización paralela
+- `document_number` = identificador principal;
+- contraseña inicial = mismo documento;
+- contraseña persistida siempre hasheada;
+- `must_change_password = 0`;
+- cambio posterior opcional;
+- `CandidateService::normalizeDocumentNumber()` permanece como autoridad de normalización del documento del candidato.
 
-## R1-T4 — estado exacto
+## R1-T4 — login HTTP/UI unificado
 
-Objetivo:
-- el formulario de login deja de ser email-only;
-- usa un único campo `identifier`;
-- etiqueta visible: `Usuario, correo o cédula`;
-- debe autenticar por email, username o document_number a través del mismo `AuthService`;
-- no crear otro provider/servicio de autenticación.
+**GREEN / cerrado formalmente.**
 
-### RED publicado
+### RED
 
-Commit:
+Commit test-only:
 `dea18bc6fc05f1fa357d502c3d237d6c275a3c6d`
 
-Archivo modificado únicamente para RED:
-`tests/Integration/Auth/AuthRoutesTest.php`
+CI #1026 confirmó RED limpio en PHP 8.3:
+- 638 tests;
+- 7.620 assertions;
+- 1 failure;
+- 1 skipped.
 
-Nuevo test:
-`testLoginUsesUnifiedIdentifierFieldAndAcceptsUsernameOrDocument`
+La única falla observada era exactamente el contrato nuevo de login: la vista todavía mostraba `Correo` y `name="email"`.
 
-Contrato exigido por el RED:
-1. GET `/login` contiene `Usuario, correo o cédula`.
-2. El input se llama `identifier`.
-3. No debe existir `name="email"` en el login público.
-4. POST `/login` con `identifier=staff.user` funciona.
-5. POST `/login` con `identifier=CC123456` funciona.
+### GREEN
 
-### CI actual
+Cambios mínimos:
 
-CI #1026
-Run: `38845625067`
-SHA exacto: `dea18bc6fc05f1fa357d502c3d237d6c275a3c6d`
+1. `resources/views/login.php`
+   - label: `Usuario, correo o cédula`;
+   - input `type="text"`;
+   - `name="identifier"`;
+   - `autocomplete="username"`;
+   - se elimina el input público email-only.
 
-Último estado observado al crear el checkpoint:
-- `queued`
-- todavía NO se ha confirmado el RED real
+2. `app/Auth/routes.php`
+   - `identifier` es la entrada canónica del POST;
+   - se conserva fallback transitorio de compatibilidad a `email` para tests/clientes internos antiguos;
+   - ambos caminos llegan al mismo `AuthService`;
+   - no existe segunda lógica/provider de autenticación.
 
-**No afirmar que R1-T4 está RED confirmado hasta observar el fallo del CI #1026.**
+Commits GREEN:
+- `868c40ba9778fba10fd1a1e50a8ef2cccfecddef`
+- `4b9b9e6b38558d6529ac3d6cad86e5fe5919b0ae`
 
-## Próximo paso exacto al reanudar
+### Gate certificado
 
-1. Consultar CI #1026 / run `38845625067`.
-2. Confirmar que el fallo proviene exclusivamente del nuevo contrato de `identifier`.
-3. Si RED limpio:
-   - cambiar `app/Auth/routes.php` para leer `$form['identifier']`;
-   - cambiar `resources/views/login.php`:
-     - label `Usuario, correo o cédula`;
-     - input text, no type=email;
-     - `name="identifier"`;
-     - `autocomplete="username"`;
-   - actualizar tests existentes que aún postean `email` al endpoint de login para usar `identifier` cuando representen el contrato nuevo.
-4. GREEN focal.
-5. CI completa PHP 8.3 / 8.4 / 8.5.
-6. Solo después cerrar R1-T4.
+CI #1029 / run `38846178789` sobre el SHA funcional exacto:
+`4b9b9e6b38558d6529ac3d6cad86e5fe5919b0ae`
 
-## Auditoría R1 restante ya descubierta
+Resultado:
+- PHP 8.3: SUCCESS — 638 tests / 7.628 assertions / 1 skipped;
+- PHP 8.4: SUCCESS;
+- PHP 8.5: SUCCESS.
 
-Después de T4 aún queda al menos un bloque pequeño antes de cerrar R1:
+Por tanto:
 
-### R1-T5 — alta administrativa + mínimos visuales
+```text
+R1-T4: GREEN
+```
 
-Hallazgos:
-- `resources/views/admin_users.php` aún tiene `minlength="12"`.
-- `resources/views/change_password.php` aún tiene `minlength="12"`.
-- `resources/views/reset_password.php` aún tiene `minlength="12"`.
-- `UserService::create()` todavía crea admin/gestor solo con email; no acepta `username` ni `document_number`.
-- la UI de alta administrativa tampoco expone esos campos.
+## R1-T5 — último bloque funcional de R1
 
-Objetivo posterior:
-- converger todos los `minlength` visuales a 6;
-- permitir username/document_number para admin/gestor sin obligarlos si no se necesitan;
-- preservar email actual;
-- validar colisiones de identificador de forma fail-closed y sin arquitectura paralela.
+**READY / todavía no implementado.**
 
-No implementar T5 antes de cerrar T4.
+La auditoría ya confirmó dos inconsistencias pendientes.
+
+### T5A — política de contraseña en UI
+
+Backend ya usa mínimo 6, pero las vistas conservan reglas antiguas:
+
+- `resources/views/admin_users.php` → `minlength="12"`;
+- `resources/views/change_password.php` → `minlength="12"`;
+- `resources/views/reset_password.php` → `minlength="12"`;
+- `resources/views/install.php` → `minlength="12"` y texto `Usa al menos 12 caracteres.`
+
+Objetivo:
+- converger todas las superficies visuales al mínimo canónico 6;
+- no crear otra política;
+- mantener `PasswordPolicy` como única autoridad de backend.
+
+### T5B — identificadores opcionales de admin/gestor
+
+Estado actual:
+- `UserService::create()` crea admin/gestor solo con email;
+- `listUsers()` no proyecta username/document_number;
+- `/admin/users` no recibe username/document_number;
+- `admin_users.php` no expone esos campos.
+
+Objetivo KISS:
+- email sigue obligatorio y único;
+- username opcional;
+- document_number opcional;
+- normalizar email con lower/trim;
+- document_number con trim + uppercase para coherencia de identidad;
+- username con una regla simple y estable, sin nuevo servicio;
+- impedir colisiones cruzadas entre `email`, `username` y `document_number` para no crear identificadores ambiguos;
+- mantener los índices unique existentes como segunda barrera;
+- no agregar tabla/provider/capa de identidad.
+
+### Tests a reutilizar
+
+No crear arquitectura de tests nueva. Extender:
+- `tests/Integration/Auth/UserServiceTest.php`;
+- `tests/Integration/Auth/AuthRoutesTest.php`;
+- autoridad visual/política existente para detectar mínimos HTML obsoletos.
+
+Metodología:
+
+```text
+RED focal
+→ confirmar RED exacto
+→ minimal GREEN
+→ full CI PHP 8.3/8.4/8.5
+→ cerrar R1
+```
+
+## Después de R1
+
+No saltar directamente a producción.
+
+Siguiente bloque:
+- R2 design foundation usando los mockups aprobados y preservados;
+- R3 landing/carrusel/login público mobile-first;
+- assets coherentes por inmueble;
+- posterior demo completa y nuevo UAT humano;
+- solo después reconstrucción F25 y eventual F26.
+
+## Visual baseline ya aprobado y preservado
+
+La implementación pública debe seguir las referencias canónicas ya guardadas:
+- mobile aprobado;
+- desktop aprobado;
+- responsive conjunto aprobado.
+
+Principios que no deben desviarse:
+- propiedades disponibles son la prioridad visual;
+- una propiedad protagonista con vecinas visibles en carrusel;
+- desktop: foto(s) a la izquierda e información a la derecha;
+- mobile: carrusel protagonista y login fijo debajo;
+- `Propiedades disponibles` + `Ver todas`;
+- sin Google login;
+- sin X para cerrar login;
+- sin hero de marketing;
+- sin bottom-nav pública;
+- sin sección duplicada `Más propiedades`;
+- no vertical-scroll innecesario en la landing objetivo.
 
 ## Guardrails
 
@@ -133,17 +196,16 @@ No implementar T5 antes de cerrar T4.
 - No tocar F26.
 - No desplegar.
 - No mergear sin autorización explícita.
-- No abrir R2/R3 antes de cerrar R1 ordenadamente.
-- No cambiar diseño visual aprobado durante R1 funcional.
+- No abrir R2/R3 antes de cerrar R1.
+- No reinterpretar el mockup aprobado.
 
 ## Punto corto de reanudación
 
 ```text
 BRANCH: impl/r1-r3-post-uat-recovery-20261015
-HEAD PRE-CHECKPOINT: dea18bc6fc05f1fa357d502c3d237d6c275a3c6d
-CI: #1026 / 38845625067
-STATE: R1-T4 RED TEST PUBLISHED, RED NOT YET CONFIRMED
-NEXT: observe CI #1026 only
+FUNCTIONAL_HEAD_CERTIFIED: 4b9b9e6b38558d6529ac3d6cad86e5fe5919b0ae
+CI: #1029 / 38846178789
+CI_RESULT: PHP 8.3 + 8.4 + 8.5 SUCCESS
+R1-T4: CLOSED GREEN
+NEXT: R1-T5 RED — password UI + managed-user identifiers
 ```
-
-**STOP.**
