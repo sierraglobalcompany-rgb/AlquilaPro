@@ -127,6 +127,13 @@ final readonly class MaintenanceService
         return array_map(fn (array $row): array => $this->normalizeRow($row), $statement->fetchAll(PDO::FETCH_ASSOC));
     }
 
+    public function countActionableRequests(): int
+    {
+        return (int) $this->pdo->query(
+            "SELECT COUNT(*) FROM maintenance_requests WHERE status IN ('open', 'in_progress')",
+        )->fetchColumn();
+    }
+
     /** @return list<array{id:int,full_name:string,role:string}> */
     public function listActiveStaff(): array
     {
