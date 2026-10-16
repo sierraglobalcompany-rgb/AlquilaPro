@@ -103,6 +103,7 @@ final class MigrationRunnerTest extends TestCase
                 '020_create_digital_services_memberships.sql',
                 '021_create_lease_termination.sql',
                 '022_create_audit_log.sql',
+                '023_extend_users_login_identifiers.sql',
         ];
         self::assertSame(count($expectedMigrations), $first['applied']);
         self::assertSame($expectedMigrations, $first['migrations']);
