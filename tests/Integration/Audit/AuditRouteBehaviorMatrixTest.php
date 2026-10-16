@@ -100,6 +100,8 @@ final class AuditRouteBehaviorMatrixTest extends TestCase
         };
         $app = $this->ownerApp('app/Contracts/routes.php', [
             'contracts' => $contracts,
+            'candidates' => new class {},
+            'properties' => new class {},
             'leases' => new class {},
             'finance' => new class {},
         ]);
