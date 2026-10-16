@@ -1,163 +1,186 @@
 # AlquilaPro — R1 Auth GREEN — checkpoint canónico
 
 **Fecha:** 2026-10-16  
-**Estado:** R1 funcional GREEN certificado; cierre documental publicado y pendiente de CI del HEAD documental.  
-**Owner UAT pre-F26:** REJECTED  
+**Estado funcional:** GREEN certificado.  
+**Estado de integración:** cierre final en merge gate; no merge sin autorización explícita.  
+**PRE_F26_OWNER_UAT:** REJECTED  
 **F26:** FROZEN  
 **MERGE_AUTHORIZED:** NO  
 **DEPLOYMENT_AUTHORIZED:** NO
 
-## Autoridad actual
+## Autoridad
 
 - Repo: `sierraglobalcompany-rgb/AlquilaPro`
 - Base `main`: `b45f625e68622702335f5e606ae34d7410a2b7e6`
 - Branch: `impl/r1-r3-post-uat-recovery-20261015`
 - PR: `#31` — DRAFT / OPEN / NOT MERGED
-- Functional GREEN HEAD certificado: `25bf8a97002495f3288bf23de02c563d7a1e39c4`
-- CI funcional: #1037 / run `38851445594`
-- Resultado: PHP 8.3 / 8.4 / 8.5 **SUCCESS**
-- PHP 8.3 observado: 642 tests / 7.659 assertions / 1 skipped
+- Product GREEN: `25bf8a97002495f3288bf23de02c563d7a1e39c4`
+- Closure + continuity HEAD certificado antes de esta convergencia final: `5a0a75738456b64e324b0da34bd93a3fd0819b99`
+- CI exacta de ese HEAD: #1039 / run `38852239017` — PHP 8.3 / 8.4 / 8.5 SUCCESS.
+- Este checkpoint reemplaza el checkpoint transitorio de pausa `R1_CLOSURE_PAUSED_CI1038_2026-10-16.md`, que se retira del HEAD en la misma convergencia anti-ruido.
 
-## R1 — cierre por tareas
+> Regla de continuidad: el body de PR #31 es el estado vivo de ejecución porque puede actualizarse sin mover el HEAD ni crear pipelines rituales. Este archivo conserva la evidencia durable de cierre R1.
 
-### R1-T1 — schema de identificadores
+## R1 — contratos cerrados
+
+### R1-T1 — schema
 
 GREEN.
 
-- Migration: `023_extend_users_login_identifiers.sql`
-- Añade únicamente `users.username` y `users.document_number`, ambos nullable + unique.
-- Migraciones 001–022 permanecen inmutables.
-- Schema GREEN de referencia: `c370ffe9f11f194bce84b9b0c47544930d6e25fc`
+- `database/migrations/023_extend_users_login_identifiers.sql`
+- añade solo `users.username` y `users.document_number`;
+- ambos nullable + unique;
+- migraciones 001–022 permanecen inmutables;
+- schema GREEN de referencia: `c370ffe9f11f194bce84b9b0c47544930d6e25fc`;
 - CI #1010 / run `38837618122`: PHP 8.3 / 8.4 / 8.5 SUCCESS.
 
 ### R1-T2 — AuthService unificado
 
 GREEN.
 
-Contrato:
-- email / username / document_number llegan al mismo `AuthService`;
-- una sola consulta de autenticación;
-- `LIMIT 2` y retorno únicamente con una fila => ambigüedad fail-closed;
-- lockout, reset, sesiones y hashing existentes permanecen en el mismo owner.
+- una sola autoridad: `AuthService`;
+- login por email / username / document_number;
+- una consulta de identidad con fail-closed ante ambigüedad;
+- lockout, reset, hashing y sesiones siguen en el stack existente;
+- no existe provider paralelo.
 
-### R1-T3A — PasswordPolicy canónica
+### R1-T3A — PasswordPolicy
 
 GREEN.
 
-- `PasswordPolicy::MIN_LENGTH = 6` es la única autoridad backend.
-- AuthService, UserService e Installer la reutilizan.
-- `admin_users.php`, `change_password.php`, `reset_password.php`, `install.php` convergieron a `minlength="6"`.
-- Test estructural prohíbe reintroducir `minlength="12"` y texto `12 caracteres`.
+- `PasswordPolicy::MIN_LENGTH = 6` es la única autoridad del mínimo;
+- AuthService, UserService e Installer reutilizan esa policy;
+- `admin_users.php`, `change_password.php`, `reset_password.php` e `install.php` convergen a `minlength="6"`;
+- el test estructural impide reintroducir `minlength="12"` / `12 caracteres`.
 
 ### R1-T3B — tenant identity
 
 GREEN.
 
-Referencia certificada previa:
-- SHA `2670a179784c73b07d96de7ad25d5fa26a3128df`
-- CI #1025 / run `38844956914`: PHP 8.3 / 8.4 / 8.5 SUCCESS.
-
-Contrato final:
-- `document_number` del candidato es el identificador tenant;
+- documento del candidato = identificador tenant;
 - contraseña inicial = mismo documento;
 - contraseña persistida hasheada;
 - `must_change_password = 0`;
-- Auth no cambia el casing del documento canónico del candidato; solo `trim`.
+- tenant conserva exactamente el documento canónico del candidato después de `trim`; no se fuerza uppercase.
 
-### R1-T4 — login HTTP/UI unificado
+Referencia previa certificada:
+- SHA `2670a179784c73b07d96de7ad25d5fa26a3128df`;
+- CI #1025 / run `38844956914`: PHP 8.3 / 8.4 / 8.5 SUCCESS.
+
+### R1-T4 — login HTTP/UI
 
 GREEN.
 
-- RED: `dea18bc6fc05f1fa357d502c3d237d6c275a3c6d`
-- GREEN funcional: `4b9b9e6b38558d6529ac3d6cad86e5fe5919b0ae`
-- CI #1029 / run `38846178789`: PHP 8.3 / 8.4 / 8.5 SUCCESS.
-
-Contrato:
-- vista pública usa `name="identifier"`;
+- RED: `dea18bc6fc05f1fa357d502c3d237d6c275a3c6d`;
+- GREEN funcional: `4b9b9e6b38558d6529ac3d6cad86e5fe5919b0ae`;
+- CI #1029 / run `38846178789`: PHP 8.3 / 8.4 / 8.5 SUCCESS;
+- UI pública usa `name="identifier"`;
 - copy actual: `Usuario, correo o cédula`;
-- no existe input email-only en la vista;
-- el mismo AuthService resuelve las tres identidades.
+- mismo AuthService resuelve las tres identidades.
 
-Deuda transitoria acotada:
-- `routes.php` conserva fallback interno `identifier ?? email` para helpers/tests legados;
-- no es una segunda lógica/provider;
-- no hay evidencia de cliente público separado que lo necesite;
-- **gate de eliminación: R3**, junto con el cierre definitivo de la nueva superficie pública de login, para evitar churn aislado de tests antes de esa fase.
+Compatibilidad transitoria controlada:
+- `routes.php` conserva `identifier ?? email` para helpers/tests legados;
+- no es una segunda autoridad;
+- gate de eliminación: **R3**, cuando se reabra la superficie pública de login.
 
-### R1-T5 — managed identities + UI password convergence
+### R1-T5 — managed identities + visual password convergence
 
 RED legítimo:
-- `a0e22c8594e6828cb3b8c02bb6daaa03cba6a33c`
-- `4fe36629540170c0f1702d0ec0237fb3690a749d`
-- `75ee50687573447168ff6bd4000cc7fd88e334cf`
+- `a0e22c8594e6828cb3b8c02bb6daaa03cba6a33c`;
+- `4fe36629540170c0f1702d0ec0237fb3690a749d`;
+- `75ee50687573447168ff6bd4000cc7fd88e334cf`.
 
 GREEN candidato inicial:
-- `032a2058fcd57901062500d015762b637216fb5a`
+- `032a2058fcd57901062500d015762b637216fb5a`.
 
-CI #1035 detectó una regresión real fuera del contrato T5: el normalizador uppercase de documento gestionado fue reutilizado indebidamente para tenant, alterando el documento canónico de LeaseActivation.
+CI #1035 detectó una regresión real: el uppercase del documento gestionado se reutilizó indebidamente para tenant.
 
 Root cause:
-- managed admin/gestor y tenant tienen autoridades de normalización distintas;
-- tenant debe conservar exactamente el documento del candidato.
+- admin/gestor y tenant tienen contratos de normalización diferentes.
 
 Fix mínimo:
-- SHA `25bf8a97002495f3288bf23de02c563d7a1e39c4`
-- solo 2 líneas funcionales en `UserService::createTenantIdentity()`;
-- se restauró `trim` sin uppercase para tenant.
+- `25bf8a97002495f3288bf23de02c563d7a1e39c4`;
+- 2 líneas funcionales en `UserService::createTenantIdentity()`;
+- tenant vuelve a preservar el casing del documento del candidato.
 
-CI #1037 / `38851445594`:
+CI #1037 / run `38851445594`:
 - PHP 8.3 SUCCESS — 642 tests / 7.659 assertions / 1 skipped;
 - PHP 8.4 SUCCESS;
 - PHP 8.5 SUCCESS.
 
 Contrato T5 final:
-- email administrado obligatorio y normalizado lower+trim;
-- username opcional lower+trim;
-- document_number opcional upper+trim;
-- campos opcionales vacíos -> `NULL`;
-- listUsers proyecta username/document;
-- `/admin/users` expone y pasa ambos campos;
-- una sola comprobación cruzada contra email/username/document_number;
-- índices UNIQUE como segunda barrera;
+- email administrado obligatorio: lower + trim;
+- username opcional: lower + trim;
+- document_number opcional: upper + trim;
+- opcionales vacíos -> `NULL`;
+- listUsers proyecta username/document_number;
+- `/admin/users` expone y pasa ambos;
+- una sola comprobación cruzada de colisiones en `UserService`;
+- índices UNIQUE = segunda barrera;
 - no se creó IdentityService, tabla, provider, trigger ni middleware nuevo.
 
-## Auditoría de las tres leyes — 10 pasadas
+## CI de cierre documental
 
-1. **Base/autoridad:** PASS — branch 33 commits ahead / 0 behind del main auditado antes del cierre documental.
-2. **Schema:** PASS — una migración, dos columnas nullable unique, sin editar histórico.
-3. **Auth owner:** PASS — un AuthService y ambigüedad fail-closed.
-4. **Password authority:** PASS — una PasswordPolicy y cuatro vistas convergidas.
-5. **Managed identities:** PASS — un UserService, sin capa paralela.
-6. **Tenant identity:** PASS tras root-cause fix `25bf8a97…`; contrato exacto protegido por LeaseActivationTest.
-7. **Routes/UI:** PASS — identifier canónico; fallback legacy acotado con eliminación fijada en R3.
-8. **Errores/auditoría:** PASS — las líneas `unhandled PDOException`/`/explode` observadas en CI corresponden a tests intencionales de rollback y boundary 500; no se parchean ni silencian.
-9. **Ruido documental:** CONVERGIDO en este cierre — un checkpoint canónico reemplaza checkpoints transitorios de R1; Git conserva historia.
-10. **Gobernanza:** código R1 GREEN; merge/deployment siguen bloqueados por autorización. `main` fue observado sin branch protection/status checks obligatorios; tratar esa configuración como gate de gobernanza separado, no como parche runtime.
+### `f5db488547f479f596ea5f116ef40eebccd2a357`
 
-## Visual baseline y R3
+Convergió:
+- README al roadmap post-UAT R0–R14;
+- AGENTS a un solo orden de autoridad;
+- checkpoint canónico R1;
+- retiro de cinco checkpoints transitorios previos;
+- sin cambios de runtime.
 
-Spec canónica:
+### `5a0a75738456b64e324b0da34bd93a3fd0819b99`
+
+Añadió solo checkpoint de pausa por solicitud del owner.
+
+CI #1039 / run `38852239017` sobre ese HEAD exacto:
+- PHP 8.3 SUCCESS;
+- PHP 8.4 SUCCESS;
+- PHP 8.5 SUCCESS.
+
+Esta convergencia final absorbe ese checkpoint de pausa en el checkpoint canónico y elimina el transitorio del HEAD. Por ello debe existir una última CI exacta de este nuevo HEAD antes del merge gate definitivo; registrar su resultado en PR #31 sin crear otro commit solo para escribir el mismo resultado.
+
+## Auditoría 10 pasadas — tres leyes
+
+1. **Base/drift:** PASS — antes de esta convergencia la rama estaba 35 commits ahead / 0 behind de `main`.
+2. **Schema:** PASS — una migración nueva; histórico intacto.
+3. **Auth owner:** PASS — un AuthService.
+4. **Password authority:** PASS — una PasswordPolicy.
+5. **Managed identities:** PASS — un UserService; sin capa paralela.
+6. **Tenant:** PASS después del root-cause fix; LeaseActivationTest protege documento/password exactos.
+7. **Routes/UI:** PASS — identifier canónico; fallback temporal con gate de eliminación explícito R3.
+8. **Errores/auditoría:** PASS — logs `unhandled PDOException` y `/explode` observados corresponden a tests intencionales de rollback/boundary; no se silencian con parches.
+9. **Anti-ruido documental:** PASS — checkpoints intermedios absorbidos; este archivo es el checkpoint durable R1.
+10. **Gobernanza:** runtime/cierre R1 verde; merge y deployment continúan bloqueados por autorización. `main` fue observado sin branch protection/status checks obligatorios; tratarlo como gate de gobernanza separado, no como cambio runtime.
+
+## Visual baseline / R3 — bloqueo conocido
+
+Spec:
 `docs/design/APPROVED_PUBLIC_UI_BASELINE_2026-10-15.md`
 
-Antes de implementar R3 resolver una contradicción pendiente de autoridad visual:
+Antes de implementar R3 congelar una sola autoridad para:
 - spec textual: login **sin X/cerrar**;
-- mockup mobile aprobado preservado: muestra visualmente una X;
-- copy también debe congelarse entre `Usuario` y `Usuario, correo o cédula`.
+- mockup mobile aprobado: visualmente muestra una X;
+- copy: `Usuario` vs `Usuario, correo o cédula`.
 
-No implementar por interpretación. Resolver y congelar una sola autoridad primero.
+No implementar por interpretación ni parchear CSS después.
 
 ## Roadmap vigente
 
 `R0 -> R1 -> R2 -> R3 -> R4 -> R5 -> R6 -> R7 -> R8 -> R9 -> R10 -> R11 -> R12 -> R13 -> R14`
 
-Estado al crear este checkpoint:
+Estado durable:
 
 ```text
 R0: LOCKED
-R1_FUNCTIONAL: GREEN CERTIFIED @ 25bf8a97002495f3288bf23de02c563d7a1e39c4
-R1_CLOSURE_DOCS: PUBLISHED IN THIS COMMIT; EXACT CI REQUIRED
+R1_PRODUCT: GREEN @ 25bf8a97002495f3288bf23de02c563d7a1e39c4
+R1_PRODUCT_CI: #1037 PASS 8.3/8.4/8.5
+R1_CLOSURE_PARENT: 5a0a75738456b64e324b0da34bd93a3fd0819b99
+R1_CLOSURE_PARENT_CI: #1039 PASS 8.3/8.4/8.5
+R1_FINAL_DOC_CONVERGENCE: THIS COMMIT — EXACT CI REQUIRED BEFORE MERGE
+PR: #31 DRAFT / OPEN / NOT MERGED
 R2: NOT STARTED
-R3: NOT STARTED
 PRE_F26_OWNER_UAT: REJECTED
 F26: FROZEN
 MERGE_AUTHORIZED: NO
@@ -166,9 +189,10 @@ DEPLOYMENT_AUTHORIZED: NO
 
 ## Próxima acción exacta
 
-1. Obtener CI completa PHP 8.3 / 8.4 / 8.5 del HEAD documental que contiene este checkpoint.
-2. Verificar que PR #31 apunta a ese HEAD y no hay drift.
-3. Actualizar título/body de PR para reflejar R1 GREEN / merge gate.
-4. Auditar diff final y estado de main.
-5. **Parar en merge gate**: no mergear sin autorización explícita del owner.
-6. No abrir R2 mientras R1 no quede cerrado conforme al gate de integración vigente.
+1. Obtener CI PHP 8.3 / 8.4 / 8.5 del HEAD exacto de esta convergencia final.
+2. Verificar PR #31 head/base/mergeability y `main` sin drift.
+3. Actualizar únicamente el body de PR #31 con la evidencia final; no crear otro commit ritual.
+4. Auditar diff final KISS / Cero Ruido / Anti-parche.
+5. **PARAR EN MERGE GATE.**
+6. No mergear hasta autorización explícita del owner.
+7. No abrir R2 antes de cerrar la integración R1 conforme al gate vigente.
