@@ -81,7 +81,7 @@ return static function (App $app, array $deps): void {
 
         $attentionSignals = [];
         if (Permissions::allows($user, 'finance.view')) {
-            $pendingPayments = count($finance->listPendingPayments());
+            $pendingPayments = $finance->countPendingPayments();
             if ($pendingPayments > 0) {
                 $attentionSignals[] = [
                     'key' => 'finance',
@@ -93,8 +93,7 @@ return static function (App $app, array $deps): void {
             }
         }
         if (Permissions::allows($user, 'maintenance.view')) {
-            $openMaintenance = count($maintenance->listForStaff('open'))
-                + count($maintenance->listForStaff('in_progress'));
+            $openMaintenance = $maintenance->countActionableRequests();
             if ($openMaintenance > 0) {
                 $attentionSignals[] = [
                     'key' => 'maintenance',

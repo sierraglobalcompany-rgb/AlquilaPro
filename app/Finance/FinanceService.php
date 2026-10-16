@@ -530,6 +530,13 @@ final readonly class FinanceService
         return array_map(fn (array $row): array => $this->paymentProjection($row), $statement->fetchAll(PDO::FETCH_ASSOC));
     }
 
+    public function countPendingPayments(): int
+    {
+        return (int) $this->pdo->query(
+            'SELECT COUNT(*) FROM payments WHERE reconciled_at IS NULL AND rejected_at IS NULL',
+        )->fetchColumn();
+    }
+
     /** @return list<array<string,mixed>> */
     public function listPendingPayments(): array
     {
