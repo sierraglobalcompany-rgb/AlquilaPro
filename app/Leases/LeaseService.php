@@ -65,7 +65,7 @@ final readonly class LeaseService
             }
 
             $candidateStatement = $this->pdo->prepare(
-                'SELECT id, unit_id, full_name, email FROM candidates WHERE id = :id LIMIT 1',
+                'SELECT id, unit_id, full_name, email, document_number FROM candidates WHERE id = :id LIMIT 1',
             );
             $candidateStatement->execute(['id' => (int) $contract['candidate_id']]);
             $candidate = $candidateStatement->fetch(PDO::FETCH_ASSOC);
@@ -76,6 +76,7 @@ final readonly class LeaseService
             $identity = $this->users->createTenantIdentity(
                 (string) $candidate['full_name'],
                 (string) $candidate['email'],
+                (string) $candidate['document_number'],
             );
 
             $activatedAt = gmdate('Y-m-d H:i:s', $now);
