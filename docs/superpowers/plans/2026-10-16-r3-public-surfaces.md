@@ -14,6 +14,7 @@
 
 - Base authority: `main@b0403a5a1e544d95aa02917ef69687c560a94201`.
 - Mobile-first order: `375x812 -> 768x1024 -> 1440x900`.
+- Existing CSS breakpoints remain authoritative: tablet `768px–1199px`; desktop `>=1200px`.
 - Literal identifier copy: `Usuario, correo o cédula`.
 - Landing login is fixed/integrated: no X, no close behavior, no modal and no Google login.
 - `GET /catalog` remains the only complete public inventory list; no second catalog.
@@ -128,6 +129,19 @@ git add tests/Integration/Properties/PropertyServiceTest.php app/Properties/Prop
 git commit -m "feat(r3): expose linked parking count in public inventory"
 ```
 
+- [ ] **Step 6: Open the R3 draft PR as the live continuity surface**
+
+Open a draft PR from `impl/r3-public-surfaces-20261016` to `main`. Record:
+
+- audited base SHA;
+- active R3 HEAD;
+- approved spec + plan SHAs;
+- Task 1 RED cause and GREEN result;
+- `R4: NOT STARTED`;
+- `DEPLOYMENT_AUTHORIZED: NO`.
+
+From this point onward update the PR body after each task. Do not create active-branch checkpoint commits merely to restate task status.
+
 ---
 
 ### Task 2: Landing Inventory + Shared Login RED/GREEN
@@ -172,7 +186,7 @@ vendor/bin/phpunit \
   --testdox
 ```
 
-Expected: landing contract fails causally; unrelated R1 auth behavior stays green.
+Expected: FAIL only on the newly introduced landing/shared-form assertions (including the current standalone submit text `Entrar`); existing R1 auth behavior must otherwise remain green.
 
 - [ ] **Step 4: Pass real inventory/media into landing**
 
@@ -198,7 +212,7 @@ password password input, autocomplete=current-password
 submit = Iniciar sesión
 ```
 
-`login.php` keeps its heading/hint/error and requires the partial. `public_landing.php` sets the landing action from `$basePath . '/login'` and requires the same partial inside the integrated login panel.
+The partial must HTML-escape `$action` and `$csrfToken` exactly as the current standalone form does. `login.php` keeps its heading/hint/error and requires `__DIR__ . '/partials/login_form.php'`. `public_landing.php` sets `$action = $basePath . '/login'` and requires the same partial inside the integrated login panel.
 
 - [ ] **Step 6: Implement landing SSR structure**
 
@@ -215,12 +229,14 @@ vendor/bin/phpunit \
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 8: Commit and update PR state**
 
 ```bash
 git add app/Properties/routes.php resources/views/public_landing.php resources/views/login.php resources/views/partials/login_form.php tests/Integration/Properties/PublicLandingTest.php tests/Integration/Auth/AuthRoutesTest.php
 git commit -m "feat(r3): render public inventory and integrated login"
 ```
+
+Update the draft PR body with Task 2 RED/GREEN evidence and exact HEAD.
 
 ---
 
@@ -245,7 +261,7 @@ Pin:
 - public layout includes exactly existing `assets/app.css` and existing `assets/app.js` with `defer`;
 - `app.js` contains public carousel selectors but still no `import ` and no `fetch(`;
 - no autoplay/timer (`setInterval(` absent);
-- CSS contains namespaced public carousel/property/login selectors, `scroll-snap-type`, mobile default, `@media (min-width: 768px)` and desktop breakpoint already used by project;
+- CSS contains namespaced public carousel/property/login selectors, `scroll-snap-type`, mobile default, tablet `@media (min-width: 768px) and (max-width: 1199px)` and desktop `@media (min-width: 1200px)`;
 - reduced-motion contract remains present;
 - no additional CSS/JS asset file is referenced.
 
@@ -268,17 +284,18 @@ Add one deferred script tag using `$basePath . '/assets/app.js'`; no new file/CD
 For each `[data-public-carousel]`:
 
 - collect track/slides/prev/next/dots;
-- previous/next scroll/focus to bounded neighboring slide;
-- dot click moves to its slide;
-- update active dot from scroll position using native events/APIs;
+- previous/next calculates a bounded target index and calls the target slide's native `scrollIntoView()`/equivalent horizontal scroll;
+- dot click targets its matching slide;
+- one `scroll` listener schedules at most one `requestAnimationFrame`; in that frame choose the slide whose horizontal center is nearest the track viewport center, then synchronize active dot and previous/next disabled state;
+- initialize index/state from the first slide;
 - disable/hide controls when fewer than two slides;
-- no autoplay, fetch, dependency or global state.
+- no autoplay, `setInterval`, fetch, dependency or global application state.
 
 Keep existing private dialog/unit-type code intact.
 
 - [ ] **Step 5: Converge CSS mobile-first**
 
-Use existing tokens. Mobile must show one protagonist with optional neighboring edge; tablet widens; desktop uses horizontal media-left/info-right card with neighboring cards partially visible. Add shared public facts/price/status/login/card primitives once, not per page.
+Use existing tokens. Mobile must show one protagonist with optional neighboring edge; tablet uses the existing `768–1199px` range; desktop uses the existing `>=1200px` breakpoint with a horizontal media-left/info-right card and neighboring cards partially visible. Add shared public facts/price/status/login/card primitives once, not per page.
 
 - [ ] **Step 6: Run GREEN + UI regressions**
 
@@ -293,12 +310,14 @@ vendor/bin/phpunit \
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Commit and update PR state**
 
 ```bash
 git add tests/Unit/UI tests/Integration/UI/ResponsiveMarkupRegressionTest.php resources/views/layouts/public.php assets/app.js assets/app.css
 git commit -m "feat(r3): add native responsive public carousel"
 ```
+
+Update the draft PR body with Task 3 RED/GREEN evidence and exact HEAD.
 
 ---
 
@@ -321,7 +340,7 @@ Keep all existing filter/privacy/422/basePath assertions. Add contract assertion
 
 - [ ] **Step 2: Add detail RED assertions**
 
-Keep escaping/private/HTTPS-video/404/basePath assertions. Add protagonist gallery, thumbnail links/buttons for multiple positions, status/price/facts, linked parking count for apartment, CTA `/apply/{publicKey}`, and return `/catalog`.
+Keep escaping/private/HTTPS-video/404/basePath assertions. Add protagonist gallery, thumbnail navigation for multiple positions, status/price/facts, linked parking count for apartment, CTA `/apply/{publicKey}`, and return `/catalog`.
 
 - [ ] **Step 3: Run RED**
 
@@ -340,7 +359,7 @@ Retain GET filters and source data. Replace generic `.stack/.surface` presentati
 
 - [ ] **Step 5: Converge detail view**
 
-Use supplied `photoPositions`/`videoLinks`, shared media/gallery/facts/status/price primitives and existing `/apply/{publicKey}` flow. Do not add client API, candidate behavior or private fields.
+Use supplied `photoPositions`/`videoLinks`, shared media/gallery/facts/status/price primitives and existing `/apply/{publicKey}` flow. Render the gallery as SSR horizontal `scroll-snap` media with stable photo fragment IDs; thumbnail anchors point to those IDs, so gallery navigation remains usable without JavaScript and no second gallery runtime is introduced. Do not add client API, candidate behavior or private fields.
 
 - [ ] **Step 6: Run GREEN + full public focal matrix**
 
@@ -350,12 +369,14 @@ vendor/bin/phpunit tests/Integration/Properties/PublicLandingTest.php tests/Inte
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Commit and update PR state**
 
 ```bash
 git add tests/Integration/Properties/PublicCatalogListTest.php tests/Integration/Properties/PublicCatalogDetailTest.php resources/views/public_catalog.php resources/views/public_catalog_detail.php assets/app.css
 git commit -m "feat(r3): converge public catalog and detail"
 ```
+
+Update the draft PR body with Task 4 RED/GREEN evidence and exact HEAD.
 
 ---
 
@@ -407,9 +428,9 @@ composer test
 
 Expected: zero failures/errors; only already-documented intentional skips.
 
-- [ ] **Step 4: Open/update draft PR**
+- [ ] **Step 4: Update the draft PR**
 
-Record base SHA, spec/plan commits, every RED/GREEN task commit, test evidence, fallback ruling, KISS/Cero Ruido/Anti-parche budget, `R4: NOT STARTED`, `DEPLOYMENT_AUTHORIZED: NO`.
+Record base SHA, current exact head, spec/plan commits, every RED/GREEN task commit, focal/full test evidence, fallback ruling, KISS/Cero Ruido/Anti-parche budget, `R4: NOT STARTED`, `DEPLOYMENT_AUTHORIZED: NO`.
 
 - [ ] **Step 5: Obtain exact-head CI**
 
@@ -481,13 +502,13 @@ Only then execute merge when owner continuation/approval is present. After merge
 
 ```text
 R3.1 PUBLIC DTO RED/GREEN
-→ checkpoint/live PR state
+→ draft PR/live continuity surface
 R3.2 LANDING + LOGIN RED/GREEN
-→ checkpoint/live PR state
+→ update PR/checkpoint ref as needed
 R3.3 CAROUSEL + RESPONSIVE RED/GREEN
-→ checkpoint/live PR state
+→ update PR/checkpoint ref as needed
 R3.4 CATALOG + DETAIL RED/GREEN
-→ checkpoint/live PR state
+→ update PR/checkpoint ref as needed
 R3.5 FULL REGRESSION + EXACT-HEAD CI
 → R3.6 VISUAL QA + 10-PASS AUDIT
 → MERGE GATE
