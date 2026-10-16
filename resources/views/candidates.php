@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use AlquilaPro\UI\HumanLabels;
+
 $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 ?>
 <section class="surface">
@@ -20,7 +22,7 @@ $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, 
             <article class="user-card">
                 <div class="user-card__head">
                     <strong><?= $escape($candidate['full_name']) ?></strong>
-                    <span class="status-pill"><?= $escape($candidate['status']) ?></span>
+                    <span class="status-pill"><?= $escape(HumanLabels::candidateStatus((string) $candidate['status'])) ?></span>
                 </div>
                 <div><?= $escape(strtoupper((string) $candidate['document_type'])) ?> <?= $escape($candidate['document_number']) ?></div>
                 <div><?= $escape($candidate['property_name'] ?? '') ?> · <?= $escape($candidate['unit_code'] ?? $candidate['unit_id']) ?></div>
