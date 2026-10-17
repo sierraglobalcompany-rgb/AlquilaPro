@@ -80,19 +80,24 @@ final class HumanFirstContractTemplateAuthorRoutesTest extends TestCase
         self::assertStringContainsString('name="variables[0][key]"', $html);
         self::assertStringContainsString('name="variables[0][label]"', $html);
         self::assertStringContainsString('name="variables[0][required]"', $html);
+        self::assertStringContainsString('name="variables[49][key]"', $html);
+        self::assertStringContainsString('Datos manuales del contrato', $html);
+        self::assertStringContainsString('Más variables manuales', $html);
         self::assertStringNotContainsString('name="variables_json"', $html);
         self::assertStringNotContainsString('Variables manuales JSON', $html);
+        self::assertStringNotContainsString('Texto UTF-8 plano con placeholders allowlisted', $html);
+
+        $variables = array_fill(0, 50, ['key' => '', 'label' => '']);
+        $variables[49] = [
+            'key' => 'custom.note',
+            'label' => 'Nota especial',
+            'required' => '1',
+        ];
 
         $version = $this->request($app, 'POST', '/sub/admin/contract-templates/' . $templateId, [
             'action' => 'new_version',
             'body_template' => 'Contrato {{candidate.full_name}} / {{custom.note}}',
-            'variables' => [
-                [
-                    'key' => 'custom.note',
-                    'label' => 'Nota especial',
-                    'required' => '1',
-                ],
-            ],
+            'variables' => $variables,
         ]);
         self::assertSame(303, $version->getStatusCode());
 
