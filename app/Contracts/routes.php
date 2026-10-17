@@ -166,19 +166,17 @@ return static function (App $app, array $deps): void {
         return array_values($result);
     };
 
-    $templateVariables = static function (array $body): array {
+    $templateVariables = static function (array $body) use ($jsonField): array {
         if (!array_key_exists('variables', $body)) {
-            $rawVariables = (string) ($body['variables_json'] ?? '[]');
+            if (array_key_exists('variables_json', $body)
+                && trim((string) $body['variables_json']) === '') {
+                throw new RuntimeException('Las variables manuales no son válidas.');
+            }
             try {
-                $variables = json_decode($rawVariables, true, 64, JSON_THROW_ON_ERROR);
-            } catch (JsonException) {
+                return $jsonField($body, 'variables_json', '[]', true);
+            } catch (RuntimeException) {
                 throw new RuntimeException('Las variables manuales no son válidas.');
             }
-            if (!is_array($variables)) {
-                throw new RuntimeException('Las variables manuales no son válidas.');
-            }
-
-            return $variables;
         }
 
         if (!is_array($body['variables'])) {
