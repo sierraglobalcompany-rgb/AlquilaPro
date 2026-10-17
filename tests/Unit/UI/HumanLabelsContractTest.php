@@ -47,9 +47,11 @@ final class HumanLabelsContractTest extends TestCase
 
     public function testCandidateDetailUsesHumanLabelsWhileKeepingCanonicalTransitionValues(): void
     {
-        $body = $this->renderView('candidate_detail', $this->candidateDetailVariables('new'));
+        $variables = $this->candidateDetailVariables('new');
+        $variables['activeSection'] = 'manage';
+        $body = $this->renderView('candidate_detail', $variables);
 
-        self::assertStringContainsString('<dt>Estado</dt><dd>Nueva</dd>', $body);
+        self::assertStringContainsString('>Nueva</span>', $body);
         self::assertStringContainsString('<option value="incomplete">Incompleta</option>', $body);
         self::assertStringContainsString('<option value="withdrawn">Retirada</option>', $body);
         self::assertStringNotContainsString('<option value="incomplete">incomplete</option>', $body);
@@ -59,6 +61,7 @@ final class HumanLabelsContractTest extends TestCase
     public function testScreeningUsesHumanLabelsWhileKeepingCanonicalTransitionValues(): void
     {
         $variables = $this->candidateDetailVariables('pending_screening');
+        $variables['activeSection'] = 'screening';
         $variables['screening'] = [
             'status' => 'in_progress',
             'provider' => 'SURA',
@@ -76,7 +79,7 @@ final class HumanLabelsContractTest extends TestCase
 
         $body = $this->renderView('candidate_detail', $variables);
 
-        self::assertStringContainsString('<dt>Estado</dt><dd>Pendiente de estudio</dd>', $body);
+        self::assertStringContainsString('>Pendiente de estudio</span>', $body);
         self::assertStringContainsString('<option value="in_progress" selected>En estudio</option>', $body);
         self::assertStringContainsString('<option value="approved">Aprobado</option>', $body);
         self::assertStringContainsString('<option value="rejected">Rechazado</option>', $body);
@@ -121,6 +124,12 @@ final class HumanLabelsContractTest extends TestCase
             'screening' => null,
             'contractContext' => null,
             'canManageCandidates' => true,
+            'activeSection' => 'overview',
+            'candidateSections' => [
+                ['key' => 'overview', 'label' => 'Solicitud'],
+                ['key' => 'screening', 'label' => 'Estudio de aseguradora'],
+                ['key' => 'manage', 'label' => 'Administrar'],
+            ],
         ];
     }
 
