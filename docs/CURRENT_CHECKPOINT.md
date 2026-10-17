@@ -77,14 +77,15 @@ No se tocó route, servicio, DB, migration, CSS, JS, SPA, framework ni dependenc
 
 Resultado:
 
-- primera variable visible de forma directa;
-- variables 2–50 disponibles bajo `<details>` SSR nativo;
+- datos manuales ocultos por defecto tras un disclosure Human-First;
+- variable 1 disponible en el primer nivel del disclosure;
+- variables 2–50 disponibles bajo un segundo `<details>` SSR nativo;
 - copy primario Human-First;
 - detalle técnico conservado sólo bajo disclosure;
 - `ContractService::validatedVariables()` continúa como único owner profundo y conserva el límite canónico de 50;
 - compatibilidad histórica `variables_json` permanece sólo como fallback de transporte no visible.
 
-### CI GREEN exact-head
+### CI GREEN de producción
 
 CI #1096 / run `38993819633` sobre `a276c136214ecb816366b29cd41a66cda27f1b01`:
 
@@ -93,6 +94,8 @@ CI #1096 / run `38993819633` sobre `a276c136214ecb816366b29cd41a66cda27f1b01`:
 - PHP 8.5: **SUCCESS**;
 - Composer: **SUCCESS** en las tres matrices;
 - `Run tests`: **SUCCESS** en las tres matrices.
+
+> El HEAD documental posterior debe conservar CI exact-head GREEN antes de merge; verificar GitHub al reanudar.
 
 ### Estado de certificación
 
