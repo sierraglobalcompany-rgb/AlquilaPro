@@ -78,6 +78,10 @@ final class AssetContractTest extends TestCase
     public function testCandidateDetailLongValuesCanWrapOnNarrowScreens(): void
     {
         self::assertMatchesRegularExpression(
+            '/\.candidate-shell__copy\s*\{[^}]*overflow-wrap\s*:\s*anywhere\s*;/s',
+            $this->css,
+        );
+        self::assertMatchesRegularExpression(
             '/dl\s+dd[^\{]*\{[^}]*overflow-wrap\s*:\s*anywhere\s*;/s',
             $this->css,
         );
