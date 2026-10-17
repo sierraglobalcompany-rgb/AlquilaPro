@@ -128,7 +128,7 @@ if ($unitCode !== '') {
     </details>
 
     <?php if ($activeSection === 'overview'): ?>
-        <main class="candidate-section" data-candidate-section-body="overview">
+        <section class="candidate-section" data-candidate-section-body="overview">
             <div class="section-heading candidate-section__heading">
                 <div>
                     <p class="eyebrow">Solicitud</p>
@@ -154,22 +154,6 @@ if ($unitCode !== '') {
                     </div>
                 </section>
 
-                <section class="content-card candidate-card">
-                    <p class="eyebrow">Estado actual</p>
-                    <div class="candidate-state-block">
-                        <span class="status-pill status-pill--active"><?= $escape($statusLabel) ?></span>
-                        <h3><?= $escape($statusLabel) ?></h3>
-                        <p class="muted"><?= $escape($statusDescription) ?></p>
-                    </div>
-                </section>
-
-                <section class="content-card candidate-card">
-                    <p class="eyebrow">Unidad solicitada</p>
-                    <h3><?= $escape($candidate['property_name'] ?? 'Unidad de interés') ?></h3>
-                    <?php if ($unitCode !== ''): ?><p class="candidate-unit-code">Unidad <?= $escape($unitCode) ?></p><?php endif; ?>
-                    <p class="muted">Esta es la unidad asociada actualmente a la solicitud.</p>
-                </section>
-
                 <section class="content-card candidate-card candidate-card--timeline">
                     <p class="eyebrow">Actividad</p>
                     <h3>Fechas relevantes</h3>
@@ -180,10 +164,10 @@ if ($unitCode !== '') {
                     </div>
                 </section>
             </div>
-        </main>
+        </section>
 
     <?php elseif ($activeSection === 'work'): ?>
-        <main class="candidate-section" data-candidate-section-body="work">
+        <section class="candidate-section" data-candidate-section-body="work">
             <section class="content-card">
                 <div class="section-heading"><div><p class="eyebrow">Información laboral</p><h2>Información laboral</h2></div></div>
                 <dl class="account-details">
@@ -194,10 +178,10 @@ if ($unitCode !== '') {
                     <div><dt>Notas</dt><dd><?= $escape($candidate['employment_notes'] ?? '') ?></dd></div>
                 </dl>
             </section>
-        </main>
+        </section>
 
     <?php elseif ($activeSection === 'household'): ?>
-        <main class="candidate-section" data-candidate-section-body="household">
+        <section class="candidate-section" data-candidate-section-body="household">
             <section class="content-card">
                 <div class="section-heading"><div><p class="eyebrow">Hogar</p><h2>Ocupantes y mascotas</h2></div></div>
                 <dl class="account-details">
@@ -207,10 +191,10 @@ if ($unitCode !== '') {
                     <div><dt>Detalle de mascotas</dt><dd><?= $escape($candidate['pets_notes'] ?? '') ?></dd></div>
                 </dl>
             </section>
-        </main>
+        </section>
 
     <?php elseif ($activeSection === 'references'): ?>
-        <main class="candidate-section" data-candidate-section-body="references">
+        <section class="candidate-section" data-candidate-section-body="references">
             <section class="content-card">
                 <div class="section-heading"><div><p class="eyebrow">Referencias</p><h2>Referencias</h2></div></div>
                 <?php if (($candidate['references'] ?? []) === []): ?>
@@ -229,10 +213,10 @@ if ($unitCode !== '') {
                     </div>
                 <?php endif; ?>
             </section>
-        </main>
+        </section>
 
     <?php elseif ($activeSection === 'documents'): ?>
-        <main class="candidate-section" data-candidate-section-body="documents">
+        <section class="candidate-section" data-candidate-section-body="documents">
             <section class="content-card">
                 <div class="section-heading"><div><p class="eyebrow">Documentos</p><h2>Documentos</h2></div></div>
                 <?php if ($documents === []): ?>
@@ -249,10 +233,10 @@ if ($unitCode !== '') {
                     </div>
                 <?php endif; ?>
             </section>
-        </main>
+        </section>
 
     <?php elseif ($activeSection === 'screening'): ?>
-        <main class="candidate-section" data-candidate-section-body="screening">
+        <section class="candidate-section" data-candidate-section-body="screening">
             <section class="content-card">
                 <div class="section-heading"><div><p class="eyebrow">Aseguradora</p><h2>Estudio de aseguradora</h2></div></div>
                 <?php if ($screening === null): ?>
@@ -296,10 +280,10 @@ if ($unitCode !== '') {
                     </dl>
                 <?php endif; ?>
             </section>
-        </main>
+        </section>
 
     <?php elseif ($activeSection === 'contracts' && $contractContext !== null): ?>
-        <main class="candidate-section" data-candidate-section-body="contracts">
+        <section class="candidate-section" data-candidate-section-body="contracts">
             <section class="content-card" data-contract-context>
                 <div class="section-heading"><div><p class="eyebrow">Contratos</p><h2>Contratos</h2></div></div>
                 <?php if ($contractRows === []): ?>
@@ -317,10 +301,10 @@ if ($unitCode !== '') {
                 <?php endif; ?>
                 <?php if ($canCreateContract): ?><a class="button" href="<?= $escape($basePath) ?>/admin/contracts?candidate_id=<?= (int) $candidate['id'] ?>">Crear contrato</a><?php endif; ?>
             </section>
-        </main>
+        </section>
 
     <?php elseif ($activeSection === 'manage' && $canManageCandidates): ?>
-        <main class="candidate-section" data-candidate-section-body="manage">
+        <section class="candidate-section" data-candidate-section-body="manage">
             <section class="content-card">
                 <div class="section-heading"><div><p class="eyebrow">Administración</p><h2>Administrar</h2></div></div>
                 <?php if ($allowedTransitions !== []): ?>
@@ -335,6 +319,6 @@ if ($unitCode !== '') {
                     <button type="submit">Regenerar enlace de continuación</button>
                 </form>
             </section>
-        </main>
+        </section>
     <?php endif; ?>
 </div>
