@@ -1,10 +1,10 @@
 # AlquilaPro — Candidatos Human-First Redesign
 
 **Fecha:** 2026-10-17  
-**Estado:** `DRAFT_FOR_OWNER_REVIEW`  
+**Estado:** `OWNER_APPROVED`  
 **Rama de diseño:** `design/candidates-human-first-baseline-20261017`  
 **Base:** `main@f78d80f991334e2646aba1e6d5f8860b925ad88f`  
-**Implementación:** **NO AUTORIZADA por esta spec**; primero requiere revisión/aprobación del owner y luego plan de implementación.
+**Implementación:** **AUTORIZADA por el owner mediante el plan aprobado y sus gates**; esta spec conserva el contrato funcional/UX y no amplía el scope por sí sola.
 
 ---
 
@@ -836,18 +836,20 @@ Si el producto necesita esas capacidades después, cada una tendrá truth contra
 
 ---
 
-## 23. Decisión pendiente del owner
+## 23. Decisión del owner
 
 Esta spec formaliza la dirección aprobada visualmente y elimina de los mockups todo lo que no está respaldado por el backend actual.
 
-**Gate siguiente:** revisión del owner.
+**Decisión del owner:** `APPROVED` el 2026-10-17.
 
-Si se aprueba esta spec, el siguiente paso es crear un plan de implementación detallado por microbloques. Todavía no se debe escribir código de producto.
+El plan detallado por microbloques fue creado y aprobado posteriormente. La implementación ya inició; el estado operativo vivo se mantiene en `docs/CURRENT_CHECKPOINT.md`, no en esta spec.
 
 ```text
-SPEC_STATUS=DRAFT_FOR_OWNER_REVIEW
+SPEC_STATUS=OWNER_APPROVED
+OWNER_APPROVED_DATE=2026-10-17
+IMPLEMENTATION_STARTED=YES
+IMPLEMENTATION_AUTHORITY=APPROVED_PLAN_PLUS_OWNER_GATES
 PR_43=DRAFT_DO_NOT_MERGE
-IMPLEMENTATION_STARTED=NO
 R3=FROZEN
 R4=NOT_STARTED
 DEPLOYMENT=NOT_AUTHORIZED
