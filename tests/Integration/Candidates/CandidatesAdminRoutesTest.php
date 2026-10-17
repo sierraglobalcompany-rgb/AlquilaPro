@@ -128,6 +128,51 @@ final class CandidatesAdminRoutesTest extends TestCase
         self::assertStringNotContainsString('Candidatos', $restrictedHtml);
     }
 
+    public function testCandidateDetailSectionsAreFailClosedPermissionAwareAndPreserveBasePath(): void
+    {
+        $candidateId = $this->insertCandidate('SECTIONS-1', 'Candidato Secciones');
+
+        $this->insertUser('viewer@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
+        $viewerApp = $this->app('/sub');
+        $this->login($viewerApp, 'viewer@example.com', 'ViewerPassword123', '/sub');
+
+        $overview = (string) $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId)->getBody();
+        self::assertStringContainsString('data-candidate-section-body="overview"', $overview);
+        self::assertSame(1, substr_count($overview, 'data-candidate-section-body='));
+        self::assertStringContainsString('/sub/admin/candidates/' . $candidateId . '?section=work', $overview);
+        self::assertStringNotContainsString('?section=contracts', $overview);
+        self::assertStringNotContainsString('?section=manage', $overview);
+
+        $work = (string) $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=work')->getBody();
+        self::assertStringContainsString('data-candidate-section-body="work"', $work);
+        self::assertSame(1, substr_count($work, 'data-candidate-section-body='));
+
+        $unknown = (string) $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=unknown')->getBody();
+        self::assertStringContainsString('data-candidate-section-body="overview"', $unknown);
+        $arrayQuery = (string) $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId . '?section[]=work')->getBody();
+        self::assertStringContainsString('data-candidate-section-body="overview"', $arrayQuery);
+        $forbiddenContracts = (string) $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=contracts')->getBody();
+        self::assertStringContainsString('data-candidate-section-body="overview"', $forbiddenContracts);
+        $forbiddenManage = (string) $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=manage')->getBody();
+        self::assertStringContainsString('data-candidate-section-body="overview"', $forbiddenManage);
+
+        $_SESSION = [];
+        $this->insertUser('manager@example.com', 'ManagerPassword123', 'admin', ['candidates.view', 'candidates.manage']);
+        $managerApp = $this->app('/sub');
+        $this->login($managerApp, 'manager@example.com', 'ManagerPassword123', '/sub');
+        $manage = (string) $this->request($managerApp, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=manage')->getBody();
+        self::assertStringContainsString('data-candidate-section-body="manage"', $manage);
+        self::assertStringContainsString('?section=manage', $manage);
+
+        $_SESSION = [];
+        $this->insertUser('contracts@example.com', 'ContractsPassword123', 'admin', ['candidates.view', 'contracts.view']);
+        $contractsApp = $this->app('/sub');
+        $this->login($contractsApp, 'contracts@example.com', 'ContractsPassword123', '/sub');
+        $contracts = (string) $this->request($contractsApp, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=contracts')->getBody();
+        self::assertStringContainsString('data-candidate-section-body="contracts"', $contracts);
+        self::assertStringContainsString('?section=contracts', $contracts);
+    }
+
     public function testListAndDetailEscapeCandidateReferenceAndOriginalFilename(): void
     {
         $candidateId = $this->insertCandidate('ESC-1', '<script>alert(1)</script>');
@@ -154,16 +199,20 @@ final class CandidatesAdminRoutesTest extends TestCase
         self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $listHtml);
         self::assertStringNotContainsString('<script>alert(1)</script>', $listHtml);
 
-        $detail = $this->request($app, 'GET', '/admin/candidates/' . $candidateId);
-        self::assertSame(200, $detail->getStatusCode());
-        $html = (string) $detail->getBody();
-        self::assertStringContainsString('&lt;b&gt;Referencia&lt;/b&gt;', $html);
-        self::assertStringContainsString('&lt;img src=x onerror=alert(1)&gt;.pdf', $html);
-        self::assertStringNotContainsString('<b>Referencia</b>', $html);
-        self::assertStringNotContainsString('<img src=x onerror=alert(1)>', $html);
-        self::assertStringContainsString('/admin/candidates/' . $candidateId . '/documents/' . $document['id'], $html);
-        self::assertStringNotContainsString('stored_name', $html);
-        self::assertStringNotContainsString($this->documentDirectory, $html);
+        $references = $this->request($app, 'GET', '/admin/candidates/' . $candidateId . '?section=references');
+        self::assertSame(200, $references->getStatusCode());
+        $referencesHtml = (string) $references->getBody();
+        self::assertStringContainsString('&lt;b&gt;Referencia&lt;/b&gt;', $referencesHtml);
+        self::assertStringNotContainsString('<b>Referencia</b>', $referencesHtml);
+
+        $documents = $this->request($app, 'GET', '/admin/candidates/' . $candidateId . '?section=documents');
+        self::assertSame(200, $documents->getStatusCode());
+        $documentsHtml = (string) $documents->getBody();
+        self::assertStringContainsString('&lt;img src=x onerror=alert(1)&gt;.pdf', $documentsHtml);
+        self::assertStringNotContainsString('<img src=x onerror=alert(1)>', $documentsHtml);
+        self::assertStringContainsString('/admin/candidates/' . $candidateId . '/documents/' . $document['id'], $documentsHtml);
+        self::assertStringNotContainsString('stored_name', $documentsHtml);
+        self::assertStringNotContainsString($this->documentDirectory, $documentsHtml);
     }
 
     public function testStatusMutationRequiresManageAndCannotSimulatePublicSubmit(): void
