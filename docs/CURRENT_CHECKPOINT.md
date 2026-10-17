@@ -201,15 +201,17 @@ Mockups mandan en arte/jerarquía/densidad; backend + permisos mandan en funcion
 
 La spec `docs/superpowers/specs/2026-10-17-candidates-human-first-redesign.md` fue **aprobada por el owner el 2026-10-17** y su plan posterior ya registra esa aprobación.
 
-Existe drift puramente documental en el header/final de la spec, que todavía conserva `DRAFT_FOR_OWNER_REVIEW` / `IMPLEMENTATION_STARTED=NO`. Ese texto es histórico y **no debe derrotar** al plan aprobado, PR #44 merged ni PR #45 activo.
+El drift puramente documental del header/final de la spec fue cerrado por PR #47, sin modificar el contrato técnico/UX.
 
 ```text
 SPEC_EFFECTIVE_STATUS = OWNER_APPROVED
-SPEC_HEADER_DRIFT = OPEN_DOCS_ONLY
+SPEC_HEADER_DRIFT = CLOSED
+SPEC_STATUS_CONVERGENCE_PR = 47_MERGED
+SPEC_STATUS_CI = 1124_GREEN_8_3_8_4_8_5
 TECHNICAL_CONTRACT_CHANGE = NO
 ```
 
-Converger ese header en un cambio docs-only separado o dentro de este gate sin modificar el contrato técnico de la spec.
+No reabrir este drift salvo contradicción nueva y demostrable entre la spec, el plan y la verdad viva.
 
 ## 8. PR #43 — evidencia supersedida
 
@@ -259,7 +261,7 @@ No resumir, truncar ni fragmentar el Master para evadir bloqueos de seguridad.
 
 Orden obligatorio:
 
-1. cerrar convergencia documental docs-only de este checkpoint y del estado formal de la spec;
+1. convergencia documental de checkpoint + estado formal de la spec: **CLOSED**;
 2. ejecutar **Browser QA real CAND-01**;
 3. sólo con Browser GREEN + Human-First CERTIFIED + HEAD exacto + CI requerido + reviews limpios + owner gate: merge PR #45;
 4. verificar `main` post-merge y persistir checkpoint;
@@ -320,5 +322,5 @@ PR_43 = DRAFT_DO_NOT_MERGE_VISUAL_SUPERSEDED
 PR_33_R3 = FROZEN_BROWSER_BLOCKED
 R4 = NOT_STARTED
 DEPLOYMENT = NOT_AUTHORIZED
-NEXT_SAFE_ACTION = FINISH_DOCS_CONVERGENCE_THEN_REAL_BROWSER_QA_CAND01
+NEXT_SAFE_ACTION = REAL_BROWSER_QA_CAND01
 ```
