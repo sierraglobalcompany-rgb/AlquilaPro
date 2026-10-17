@@ -43,6 +43,13 @@ $initials = $initials !== '' ? $initials : 'AP';
 $sectionHref = static fn (string $key): string => $basePath
     . '/admin/candidates/' . rawurlencode((string) $candidate['id'])
     . '?section=' . rawurlencode($key);
+$activeSectionLabel = 'Solicitud';
+foreach ($candidateSections as $section) {
+    if ((string) ($section['key'] ?? '') === $activeSection) {
+        $activeSectionLabel = (string) ($section['label'] ?? 'Solicitud');
+        break;
+    }
+}
 
 $humanDate = static function (mixed $value, bool $withTime = false): ?string {
     if (!is_string($value) || trim($value) === '') {
@@ -104,6 +111,21 @@ if ($unitCode !== '') {
             <?php endforeach; ?>
         </div>
     </nav>
+
+    <details class="content-card candidate-section-menu">
+        <summary>Sección: <?= $escape($activeSectionLabel) ?></summary>
+        <nav class="candidate-section-menu__nav" aria-label="Secciones del candidato en móvil">
+            <?php foreach ($candidateSections as $section): ?>
+                <?php
+                $key = (string) ($section['key'] ?? '');
+                $label = (string) ($section['label'] ?? '');
+                $current = $key === $activeSection;
+                ?>
+                <a class="candidate-section-menu__link"
+                   href="<?= $escape($sectionHref($key)) ?>"<?= $current ? ' aria-current="page"' : '' ?>><?= $escape($label) ?></a>
+            <?php endforeach; ?>
+        </nav>
+    </details>
 
     <?php if ($activeSection === 'overview'): ?>
         <main class="candidate-section" data-candidate-section-body="overview">
