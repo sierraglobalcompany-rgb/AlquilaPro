@@ -32,27 +32,45 @@ $typeLabel = match ((string) $template['document_type']) {
 
         <article class="content-card content-card--stacked">
             <h2>Nueva versión</h2>
-            <p class="muted">Texto UTF-8 plano con placeholders allowlisted. Cada guardado crea una versión nueva.</p>
+            <p class="muted">Escribe el contenido del contrato. Cada guardado crea una versión nueva.</p>
             <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/admin/contract-templates/<?= (int) $template['id'] ?>">
                 <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
                 <input type="hidden" name="action" value="new_version">
-                <label>Cuerpo
+                <label>Contenido del contrato
                     <textarea name="body_template" rows="12" required></textarea>
                 </label>
-                <fieldset>
-                    <legend>Variable manual</legend>
-                    <p class="muted">Úsala sólo si el texto necesita un dato propio, por ejemplo <code>{{custom.note}}</code>.</p>
-                    <label>Clave
-                        <input type="text" name="variables[0][key]" placeholder="custom.note">
-                    </label>
-                    <label>Nombre visible
-                        <input type="text" name="variables[0][label]" placeholder="Nota especial">
-                    </label>
-                    <label>
-                        <input type="checkbox" name="variables[0][required]" value="1">
-                        Obligatoria
-                    </label>
-                </fieldset>
+
+                <details>
+                    <summary>Datos manuales del contrato</summary>
+                    <p class="muted">Agrega sólo los datos que una persona deberá completar al crear el contrato.</p>
+                    <p class="muted">El identificador se usa dentro del texto entre llaves dobles, por ejemplo <code>{{custom.note}}</code>.</p>
+
+                    <?php for ($index = 0; $index < 50; $index++): ?>
+                        <?php if ($index === 1): ?>
+                            <details>
+                                <summary>Más variables manuales</summary>
+                        <?php endif; ?>
+
+                        <fieldset>
+                            <legend>Variable <?= $index + 1 ?></legend>
+                            <label>Identificador
+                                <input type="text" name="variables[<?= $index ?>][key]" placeholder="custom.note">
+                            </label>
+                            <label>Nombre visible
+                                <input type="text" name="variables[<?= $index ?>][label]" placeholder="Nota especial">
+                            </label>
+                            <label>
+                                <input type="checkbox" name="variables[<?= $index ?>][required]" value="1">
+                                Obligatoria
+                            </label>
+                        </fieldset>
+
+                        <?php if ($index === 49): ?>
+                            </details>
+                        <?php endif; ?>
+                    <?php endfor; ?>
+                </details>
+
                 <button class="button" type="submit">Crear versión</button>
             </form>
         </article>
