@@ -59,7 +59,7 @@ $typeLabel = match ((string) $template['document_type']) {
                             <label>Nombre visible
                                 <input type="text" name="variables[<?= $index ?>][label]" placeholder="Nota especial">
                             </label>
-                            <label>
+                            <label class="check-row">
                                 <input type="checkbox" name="variables[<?= $index ?>][required]" value="1">
                                 Obligatoria
                             </label>

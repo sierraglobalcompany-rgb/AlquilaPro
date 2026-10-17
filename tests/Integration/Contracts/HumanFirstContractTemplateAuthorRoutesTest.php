@@ -81,6 +81,7 @@ final class HumanFirstContractTemplateAuthorRoutesTest extends TestCase
         self::assertStringContainsString('name="variables[0][label]"', $html);
         self::assertStringContainsString('name="variables[0][required]"', $html);
         self::assertStringContainsString('name="variables[49][key]"', $html);
+        self::assertSame(50, substr_count($html, 'class="check-row"'));
         self::assertStringContainsString('Datos manuales del contrato', $html);
         self::assertStringContainsString('Más variables manuales', $html);
         self::assertStringNotContainsString('name="variables_json"', $html);
