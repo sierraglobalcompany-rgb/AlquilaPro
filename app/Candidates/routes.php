@@ -307,6 +307,29 @@ return static function (App $app, array $deps): void {
                 'can_create' => $contracts->canCreateDraftForCandidate($candidateId),
             ];
         }
+        $canManageCandidates = Permissions::allows($user, 'candidates.manage');
+
+        $candidateSections = [
+            ['key' => 'overview', 'label' => 'Solicitud'],
+            ['key' => 'work', 'label' => 'Información laboral'],
+            ['key' => 'household', 'label' => 'Ocupantes y mascotas'],
+            ['key' => 'references', 'label' => 'Referencias'],
+            ['key' => 'documents', 'label' => 'Documentos'],
+            ['key' => 'screening', 'label' => 'Estudio de aseguradora'],
+        ];
+        if ($contractContext !== null) {
+            $candidateSections[] = ['key' => 'contracts', 'label' => 'Contratos'];
+        }
+        if ($canManageCandidates) {
+            $candidateSections[] = ['key' => 'manage', 'label' => 'Administrar'];
+        }
+
+        $query = $request->getQueryParams();
+        $requestedSection = $query['section'] ?? null;
+        $availableSectionKeys = array_column($candidateSections, 'key');
+        $activeSection = is_string($requestedSection) && in_array($requestedSection, $availableSectionKeys, true)
+            ? $requestedSection
+            : 'overview';
 
         $response->getBody()->write($view->renderApp('candidate_detail', [
             'pageTitle' => 'Candidato',
@@ -317,7 +340,9 @@ return static function (App $app, array $deps): void {
             'documents' => $candidateDocuments->listDocumentsForCandidate($candidateId),
             'screening' => $screening->findForCandidate($candidateId),
             'contractContext' => $contractContext,
-            'canManageCandidates' => Permissions::allows($user, 'candidates.manage'),
+            'canManageCandidates' => $canManageCandidates,
+            'candidateSections' => $candidateSections,
+            'activeSection' => $activeSection,
         ]));
 
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
