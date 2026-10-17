@@ -261,6 +261,9 @@ return static function (App $app, array $deps): void {
         $query = $request->getQueryParams();
         $candidateId = (int) ($query['candidate_id'] ?? 0);
         $candidateRequested = $candidateId > 0;
+        if ($canManage && $candidateRequested && !Permissions::allows($user, 'candidates.view')) {
+            return $response->withStatus(403);
+        }
         $draftContext = null;
         $availableVersions = [];
         $selectedVersionId = null;
