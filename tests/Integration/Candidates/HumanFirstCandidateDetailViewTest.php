@@ -61,6 +61,8 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         $html = (string) ob_get_clean();
 
         self::assertStringContainsString('aria-label="Secciones del candidato"', $html);
+        self::assertStringContainsString('class="content-card candidate-section-menu"', $html);
+        self::assertStringContainsString('<summary>Sección: Solicitud</summary>', $html);
         self::assertStringContainsString('data-candidate-shell', $html);
         self::assertStringContainsString('data-candidate-section-body="overview"', $html);
         self::assertSame(1, substr_count($html, 'data-candidate-section-body='));
