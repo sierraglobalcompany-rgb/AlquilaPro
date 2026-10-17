@@ -552,6 +552,7 @@ return static function (array $settings): App {
             $contractRoutes($app, $shared + [
                 'contracts' => $contracts,
                 'leases' => $leases,
+                'candidates' => $candidates,
             ]);
 
             $leaseRoutes = require dirname(__DIR__) . '/app/Leases/routes.php';

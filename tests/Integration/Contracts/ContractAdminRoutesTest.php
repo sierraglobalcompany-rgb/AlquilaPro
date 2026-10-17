@@ -238,9 +238,12 @@ final class ContractAdminRoutesTest extends TestCase
         $this->login($app, 'draft-manager@example.com', 'ManagerPassword123', '/sub');
         $index = $this->request($app, 'GET', '/sub/admin/contracts');
         self::assertSame(200, $index->getStatusCode());
-        self::assertStringContainsString('Contratos', (string) $index->getBody());
-        self::assertStringContainsString('name="candidate_id"', (string) $index->getBody());
-        self::assertStringContainsString('name="template_version_id"', (string) $index->getBody());
+        $indexHtml = (string) $index->getBody();
+        self::assertStringContainsString('Contratos', $indexHtml);
+        self::assertStringContainsString('Ir a candidatos', $indexHtml);
+        self::assertStringContainsString('href="/sub/admin/candidates"', $indexHtml);
+        self::assertStringNotContainsString('name="candidate_id"', $indexHtml);
+        self::assertStringNotContainsString('name="template_version_id"', $indexHtml);
 
         $create = $this->request($app, 'POST', '/sub/admin/contracts', [
             'candidate_id' => (string) $fixture['candidate_id'],
