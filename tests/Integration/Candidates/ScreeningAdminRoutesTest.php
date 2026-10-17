@@ -68,7 +68,7 @@ final class ScreeningAdminRoutesTest extends TestCase
         $viewerApp = $this->app('/sub');
         $this->login($viewerApp, 'viewer-screening@example.com', 'ViewerPassword123', '/sub');
 
-        $viewer = $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId);
+        $viewer = $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=screening');
         self::assertSame(200, $viewer->getStatusCode());
         $viewerHtml = (string) $viewer->getBody();
         self::assertStringContainsString('Estudio de aseguradora', $viewerHtml);
@@ -79,7 +79,7 @@ final class ScreeningAdminRoutesTest extends TestCase
         $managerApp = $this->app('/sub');
         $this->login($managerApp, 'manager-screening@example.com', 'ManagerPassword123', '/sub');
 
-        $manager = $this->request($managerApp, 'GET', '/sub/admin/candidates/' . $candidateId);
+        $manager = $this->request($managerApp, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=screening');
         self::assertSame(200, $manager->getStatusCode());
         $managerHtml = (string) $manager->getBody();
         self::assertStringContainsString('action="/sub/admin/candidates/' . $candidateId . '/screening"', $managerHtml);
@@ -214,7 +214,7 @@ final class ScreeningAdminRoutesTest extends TestCase
             'result' => 'Aprobado',
         ]);
         self::assertSame(303, $closed->getStatusCode());
-        $terminalHtml = (string) $this->request($app, 'GET', '/admin/candidates/' . $candidateId)->getBody();
+        $terminalHtml = (string) $this->request($app, 'GET', '/admin/candidates/' . $candidateId . '?section=screening')->getBody();
         self::assertStringContainsString('Aprobado', $terminalHtml);
         self::assertStringNotContainsString('/admin/candidates/' . $candidateId . '/screening', $terminalHtml);
         self::assertSame(422, $this->request($app, 'POST', '/admin/candidates/' . $candidateId . '/screening', [
@@ -227,7 +227,7 @@ final class ScreeningAdminRoutesTest extends TestCase
         $withdrawnId = $this->insertCandidate('ADMIN-5', 'pending_screening');
         $service->createForCandidate($withdrawnId, $managerId, ['provider' => 'SURA'], 1791813601);
         $this->pdo->exec("UPDATE candidates SET status = 'withdrawn' WHERE id = " . $withdrawnId);
-        $withdrawnHtml = (string) $this->request($app, 'GET', '/admin/candidates/' . $withdrawnId)->getBody();
+        $withdrawnHtml = (string) $this->request($app, 'GET', '/admin/candidates/' . $withdrawnId . '?section=screening')->getBody();
         self::assertStringContainsString('Estudio de aseguradora', $withdrawnHtml);
         self::assertStringContainsString('SURA', $withdrawnHtml);
         self::assertStringNotContainsString('/admin/candidates/' . $withdrawnId . '/screening', $withdrawnHtml);
@@ -255,7 +255,7 @@ final class ScreeningAdminRoutesTest extends TestCase
 
         $app = $this->app();
         $this->login($app, 'manager-xss@example.com', 'ManagerPassword123');
-        $html = (string) $this->request($app, 'GET', '/admin/candidates/' . $candidateId)->getBody();
+        $html = (string) $this->request($app, 'GET', '/admin/candidates/' . $candidateId . '?section=screening')->getBody();
 
         self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
         self::assertStringContainsString('&lt;b&gt;Producto&lt;/b&gt;', $html);
