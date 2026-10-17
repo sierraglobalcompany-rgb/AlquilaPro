@@ -84,6 +84,27 @@ final class HumanFirstContractTemplateAuthorRoutesTest extends TestCase
         self::assertSame(50, substr_count($html, 'class="check-row"'));
         self::assertStringContainsString('Datos manuales del contrato', $html);
         self::assertStringContainsString('Más variables manuales', $html);
+        preg_match_all(
+            '/<details>\s*<summary>Variables (\d+) a (\d+)<\/summary>/',
+            $html,
+            $variableGroups,
+            PREG_SET_ORDER,
+        );
+        self::assertSame([
+            ['2', '6'],
+            ['7', '11'],
+            ['12', '16'],
+            ['17', '21'],
+            ['22', '26'],
+            ['27', '31'],
+            ['32', '36'],
+            ['37', '41'],
+            ['42', '46'],
+            ['47', '50'],
+        ], array_map(
+            static fn (array $match): array => [$match[1], $match[2]],
+            $variableGroups,
+        ));
         self::assertStringNotContainsString('name="variables_json"', $html);
         self::assertStringNotContainsString('Variables manuales JSON', $html);
         self::assertStringNotContainsString('Texto UTF-8 plano con placeholders allowlisted', $html);

@@ -51,6 +51,11 @@ $typeLabel = match ((string) $template['document_type']) {
                                 <summary>Más variables manuales</summary>
                         <?php endif; ?>
 
+                        <?php if ($index >= 1 && (($index - 1) % 5 === 0)): ?>
+                            <details>
+                                <summary>Variables <?= $index + 1 ?> a <?= min($index + 5, 50) ?></summary>
+                        <?php endif; ?>
+
                         <fieldset>
                             <legend>Variable <?= $index + 1 ?></legend>
                             <label>Identificador
@@ -64,6 +69,10 @@ $typeLabel = match ((string) $template['document_type']) {
                                 Obligatoria
                             </label>
                         </fieldset>
+
+                        <?php if ($index >= 1 && ((($index - 1) % 5 === 4) || $index === 49)): ?>
+                            </details>
+                        <?php endif; ?>
 
                         <?php if ($index === 49): ?>
                             </details>
