@@ -166,6 +166,52 @@ return static function (App $app, array $deps): void {
         return array_values($result);
     };
 
+    $templateVariables = static function (array $body): array {
+        if (!array_key_exists('variables', $body)) {
+            $rawVariables = (string) ($body['variables_json'] ?? '[]');
+            try {
+                $variables = json_decode($rawVariables, true, 64, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                throw new RuntimeException('Las variables manuales no son válidas.');
+            }
+            if (!is_array($variables)) {
+                throw new RuntimeException('Las variables manuales no son válidas.');
+            }
+
+            return $variables;
+        }
+
+        if (!is_array($body['variables'])) {
+            throw new RuntimeException('Las variables manuales no son válidas.');
+        }
+
+        $result = [];
+        foreach ($body['variables'] as $variable) {
+            if (!is_array($variable)) {
+                $result[] = $variable;
+                continue;
+            }
+
+            $key = trim((string) ($variable['key'] ?? ''));
+            $label = trim((string) ($variable['label'] ?? ''));
+            $requiredPresent = array_key_exists('required', $variable);
+            $unknown = array_diff(array_keys($variable), ['key', 'label', 'required']);
+            if ($key === '' && $label === '' && !$requiredPresent && $unknown === []) {
+                continue;
+            }
+
+            $required = $variable['required'] ?? false;
+            if ($required === '1' || $required === 1 || $required === true || $required === 'on') {
+                $variable['required'] = true;
+            } elseif ($required === '0' || $required === 0 || $required === false || $required === '') {
+                $variable['required'] = false;
+            }
+            $result[] = $variable;
+        }
+
+        return array_values($result);
+    };
+
     $versionDeclarations = static function (int $versionId) use ($contracts): array {
         $version = $contracts->findTemplateVersion($versionId);
         if ($version === null) {
@@ -588,7 +634,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($adminGuard, $contracts, $path): ResponseInterface {
+    ) use ($adminGuard, $contracts, $templateVariables, $path): ResponseInterface {
         $user = $adminGuard($response, 'contracts.manage');
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -606,19 +652,9 @@ return static function (App $app, array $deps): void {
                 }
                 $contracts->setTemplateActive($templateId, $active === '1');
             } elseif ($action === 'new_version') {
-                $rawVariables = (string) ($body['variables_json'] ?? '[]');
-                try {
-                    $variables = json_decode($rawVariables, true, 64, JSON_THROW_ON_ERROR);
-                } catch (JsonException) {
-                    throw new RuntimeException('Las variables manuales no son válidas.');
-                }
-                if (!is_array($variables)) {
-                    throw new RuntimeException('Las variables manuales no son válidas.');
-                }
-
                 $contracts->createTemplateVersion($templateId, (int) $user['id'], [
                     'body_template' => $body['body_template'] ?? '',
-                    'variables' => $variables,
+                    'variables' => $templateVariables($body),
                 ]);
             } else {
                 throw new RuntimeException('La acción contractual no es válida.');

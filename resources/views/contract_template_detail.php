@@ -39,9 +39,20 @@ $typeLabel = match ((string) $template['document_type']) {
                 <label>Cuerpo
                     <textarea name="body_template" rows="12" required></textarea>
                 </label>
-                <label>Variables manuales JSON
-                    <textarea name="variables_json" rows="5">[]</textarea>
-                </label>
+                <fieldset>
+                    <legend>Variable manual</legend>
+                    <p class="muted">Úsala sólo si el texto necesita un dato propio, por ejemplo <code>{{custom.note}}</code>.</p>
+                    <label>Clave
+                        <input type="text" name="variables[0][key]" placeholder="custom.note">
+                    </label>
+                    <label>Nombre visible
+                        <input type="text" name="variables[0][label]" placeholder="Nota especial">
+                    </label>
+                    <label>
+                        <input type="checkbox" name="variables[0][required]" value="1">
+                        Obligatoria
+                    </label>
+                </fieldset>
                 <button class="button" type="submit">Crear versión</button>
             </form>
         </article>
