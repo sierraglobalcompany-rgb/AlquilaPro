@@ -139,6 +139,7 @@ final class CandidatesAdminRoutesTest extends TestCase
         $overview = (string) $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId)->getBody();
         self::assertStringContainsString('data-candidate-section-body="overview"', $overview);
         self::assertSame(1, substr_count($overview, 'data-candidate-section-body='));
+        self::assertSame(1, substr_count($overview, '<main '), 'The app layout owns the only main landmark.');
         self::assertStringContainsString('/sub/admin/candidates/' . $candidateId . '?section=work', $overview);
         self::assertStringNotContainsString('?section=contracts', $overview);
         self::assertStringNotContainsString('?section=manage', $overview);

@@ -53,6 +53,20 @@ final class AssetContractTest extends TestCase
         );
     }
 
+    public function testCandidateNavigationVariantsAreMutuallyExclusiveAtTheShellBreakpoint(): void
+    {
+        self::assertMatchesRegularExpression('/\.candidate-tabs\s*\{[^}]*display:\s*none\s*;/s', $this->css);
+        self::assertMatchesRegularExpression('/\.candidate-section-menu\s*\{[^}]*display:\s*block\s*;/s', $this->css);
+        self::assertMatchesRegularExpression('/@media \(min-width: 1200px\)\s*\{\s*\.candidate-tabs\s*\{[^}]*display:\s*block\s*;\s*\}\s*\.candidate-section-menu\s*\{[^}]*display:\s*none\s*;/s', $this->css);
+    }
+
+    public function testCandidateNavigationPreservesTheExistingTouchTargetMinimum(): void
+    {
+        foreach (['.candidate-tab', '.candidate-section-menu > summary', '.candidate-section-menu__link'] as $selector) {
+            self::assertMatchesRegularExpression('/' . preg_quote($selector, '/') . '\s*\{[^}]*min-height:\s*48px\s*;/s', $this->css);
+        }
+    }
+
     public function testLongPublicLinksCanWrapWithinCards(): void
     {
         self::assertMatchesRegularExpression(

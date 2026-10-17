@@ -10,6 +10,62 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
 {
     public function testOverviewUsesHumanFirstShellAndRendersOnlyTheActiveSection(): void
     {
+        $html = $this->renderOverview();
+
+        self::assertStringContainsString('aria-label="Secciones del candidato"', $html);
+        self::assertStringContainsString('class="content-card candidate-section-menu"', $html);
+        self::assertStringContainsString('<summary>Sección: Solicitud</summary>', $html);
+        self::assertStringContainsString('data-candidate-shell', $html);
+        self::assertStringContainsString('data-candidate-section-body="overview"', $html);
+        self::assertSame(1, substr_count($html, 'data-candidate-section-body='));
+        self::assertMatchesRegularExpression('/href="[^\"]*\?section=overview"[^>]*aria-current="page"/', $html);
+
+        foreach (['Camilo Demo UAT', 'Pendiente de estudio', 'Edificio Demo', '101', '123456789', '3000000000', 'camilo@example.com'] as $fact) {
+            self::assertStringContainsString($fact, $html);
+        }
+
+        foreach (['Información laboral', 'Ocupantes y mascotas', 'Referencias', 'Documentos', 'Estudio de aseguradora', 'Contratos', 'Administrar'] as $section) {
+            self::assertStringNotContainsString('<h2>' . $section . '</h2>', $html);
+        }
+        foreach (['Editar candidato', 'Enviar mensaje', '80%', '82 / 100', 'Perfil laboral sólido'] as $inventedCopy) {
+            self::assertStringNotContainsString($inventedCopy, $html);
+        }
+    }
+
+    public function testOverviewKeepsStatusOnlyInItsGlobalShell(): void
+    {
+        $html = $this->renderOverview();
+
+        self::assertSame(1, substr_count($html, 'Pendiente de estudio'));
+        self::assertSame(1, substr_count($html, 'La solicitud está pendiente del estudio de aseguradora.'));
+    }
+
+    public function testOverviewKeepsUnitContextOnlyInItsGlobalShell(): void
+    {
+        $html = $this->renderOverview();
+
+        self::assertSame(1, substr_count($html, 'Edificio Demo'));
+        self::assertSame(1, substr_count($html, 'CED-101'));
+    }
+
+    public function testOverviewGroupsContactAndDatesWithoutRedundantCards(): void
+    {
+        $html = $this->renderOverview();
+        preg_match_all('/<section class="content-card candidate-card[^\"]*"/', $html, $cards);
+
+        self::assertCount(2, $cards[0]);
+        foreach (['Identidad y contacto', 'Fechas relevantes', '17/10/2026 · 00:00', '17/10/2026 · 00:10', '17/10/2026 · 00:20'] as $fact) {
+            self::assertStringContainsString($fact, $html);
+        }
+    }
+
+    public function testCandidateBodyLeavesTheMainLandmarkToTheAppLayout(): void
+    {
+        self::assertDoesNotMatchRegularExpression('/<main\b/', $this->renderOverview());
+    }
+
+    private function renderOverview(): string
+    {
         $candidate = [
             'id' => 1,
             'full_name' => 'Camilo Demo UAT',
@@ -17,7 +73,7 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
             'document_type' => 'cc',
             'document_number' => '123456789',
             'property_name' => 'Edificio Demo',
-            'unit_code' => '101',
+            'unit_code' => 'CED-101',
             'unit_id' => 1,
             'phone' => '3000000000',
             'email' => 'camilo@example.com',
@@ -58,34 +114,6 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
 
         ob_start();
         require dirname(__DIR__, 3) . '/resources/views/candidate_detail.php';
-        $html = (string) ob_get_clean();
-
-        self::assertStringContainsString('aria-label="Secciones del candidato"', $html);
-        self::assertStringContainsString('class="content-card candidate-section-menu"', $html);
-        self::assertStringContainsString('<summary>Sección: Solicitud</summary>', $html);
-        self::assertStringContainsString('data-candidate-shell', $html);
-        self::assertStringContainsString('data-candidate-section-body="overview"', $html);
-        self::assertSame(1, substr_count($html, 'data-candidate-section-body='));
-        self::assertMatchesRegularExpression('/href="[^\"]*\?section=overview"[^>]*aria-current="page"/', $html);
-
-        self::assertStringContainsString('Camilo Demo UAT', $html);
-        self::assertStringContainsString('Pendiente de estudio', $html);
-        self::assertStringContainsString('Edificio Demo', $html);
-        self::assertStringContainsString('101', $html);
-        self::assertStringContainsString('123456789', $html);
-        self::assertStringContainsString('3000000000', $html);
-        self::assertStringContainsString('camilo@example.com', $html);
-
-        self::assertStringNotContainsString('<h2>Información laboral</h2>', $html);
-        self::assertStringNotContainsString('<h2>Ocupantes y mascotas</h2>', $html);
-        self::assertStringNotContainsString('<h2>Referencias</h2>', $html);
-        self::assertStringNotContainsString('<h2>Documentos</h2>', $html);
-        self::assertStringNotContainsString('<h2>Estudio de aseguradora</h2>', $html);
-        self::assertStringNotContainsString('<h2>Contratos</h2>', $html);
-        self::assertStringNotContainsString('<h2>Administrar</h2>', $html);
-
-        foreach (['Editar candidato', 'Enviar mensaje', '80%', '82 / 100', 'Perfil laboral sólido'] as $inventedCopy) {
-            self::assertStringNotContainsString($inventedCopy, $html);
-        }
+        return (string) ob_get_clean();
     }
 }
