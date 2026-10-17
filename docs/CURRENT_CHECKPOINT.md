@@ -3,61 +3,51 @@
 Fecha: 2026-10-17
 Propósito: **puntero operativo único de continuidad, sin ruido histórico**.
 
-> GitHub + CI son autoridad técnica. Este archivo resume el estado vivo; PRs/commits conservan el detalle forense.
+> GitHub + CI son autoridad técnica. Este archivo resume el estado vivo; PRs/commits y evidencia externa conservan el detalle forense.
 
 ## 1. Leyes y convención operativa
 
 - **KISS**: A → B; simple, eficiente, optimizado y eficaz; sin arquitectura innecesaria.
 - **Cero Ruido**: `ELIMINAR → UNIR/CONVERGER → SIMPLIFICAR → MEJORAR/OPTIMIZAR → AGREGAR`.
 - **Anti-parche**: `REPRODUCE → ROOT CAUSE → OWNER → DUPLICACIÓN → RED → CAUSAL RED → MINIMAL GREEN → RETIRAR SUPERSEDED → REGRESSION`.
-- **Human-First / Diseño**: persona > modelo de datos; lenguaje humano; progressive disclosure; No Infinite Excel; accesibilidad/responsive/browser como gates reales.
+- **Human-First**: persona > modelo de datos; progressive disclosure; No Infinite Excel; accesibilidad/responsive/browser son gates reales.
 - **No claim without evidence**: SHA exacto + CI para GREEN técnico; Browser real para certificación visual.
 - Merge y deployment son gates separados.
 - Deployment: **NOT AUTHORIZED**.
-- Convención del owner: cuando Andrés diga **`continua`**, eso autoriza ejecutar el siguiente gate preparado —incluido merge— siempre que siga GREEN, sin drift y dentro del alcance previamente auditado.
+- Convención del owner: cuando Andrés diga **`continua`**, eso autoriza ejecutar el siguiente gate preparado —incluido merge— siempre que siga GREEN, sin drift y dentro del alcance auditado.
 
 ## 2. `main` integrado
 
 - `main`: `f78d80f991334e2646aba1e6d5f8860b925ad88f`.
 - HF-P1C-B: **MERGED / CLOSED / Browser GREEN / Human-First CERTIFIED**.
 - PR #41 merge: `d0c7687ed9fa62554329215eff5f2324cff5e5d1`.
-- PR #42 checkpoint documental merge: `be3413296f1a8d8a980f07ef89307f8e6a99464b`.
+- PR #42 merge: `be3413296f1a8d8a980f07ef89307f8e6a99464b`.
 - R3: **FROZEN**.
 - R4: **NOT STARTED**.
 - Deployment: **NOT AUTHORIZED**.
 
-## 3. HF-P1D — candidate detail progressive disclosure
+## 3. HF-P1D — FINAL candidato certificado, pendiente de merge
 
-### Estado GitHub
+### GitHub
 
-- PR #43: **OPEN / DRAFT / NOT MERGED / mergeable=true**.
+- PR #43: **OPEN / READY / NOT MERGED / mergeable=true**.
 - Branch: `impl/hf-p1d-candidate-detail-disclosure-20261017`.
-- Base verificada: `f78d80f991334e2646aba1e6d5f8860b925ad88f`.
+- Base: `f78d80f991334e2646aba1e6d5f8860b925ad88f`.
 - HEAD técnico exacto: `e9594ef1e431eff2f3fc3193bb16a4533a1820af`.
 - Changed files: **2**.
-- No abrir HF-P1E mientras HF-P1D no esté certificado/cerrado.
 
-### Root cause / RED
+### RED causal
 
-Problema Human-First: `candidate_detail.php` acumulaba solicitud + empleo + ocupantes + referencias + documentos + aseguradora + contratos + administración en una única columna extensa.
-
-RED causal:
-- commit `23e8af3f144fc3b96e9e3e95b18d19e12b9d6d26`;
-- CI #1105;
-- test Human-First esperaba 7 disclosures secundarios y encontró 0;
-- resultado registrado: **659 tests / 7808 assertions / 1 failure / 1 skipped**.
+- Commit: `23e8af3f144fc3b96e9e3e95b18d19e12b9d6d26`.
+- CI #1105 confirmó el defecto: el test Human-First esperaba 7 disclosures secundarios y encontró 0.
+- Resultado registrado: **659 tests / 7808 assertions / 1 failure / 1 skipped**.
 
 ### Minimal GREEN
 
-Commit exacto:
-`e9594ef1e431eff2f3fc3193bb16a4533a1820af`
-
-Owner permanece en la misma vista SSR:
-`resources/views/candidate_detail.php`.
-
-Tratamiento mínimo:
-- `Solicitud` permanece visible;
-- 7 bloques secundarios pasan a `<details>/<summary>` nativos cerrados por defecto:
+- Commit: `e9594ef1e431eff2f3fc3193bb16a4533a1820af`.
+- Owner: `resources/views/candidate_detail.php`.
+- `Solicitud` permanece visible.
+- 7 bloques secundarios bajo `<details>/<summary>` nativos cerrados por defecto:
   1. Información laboral
   2. Ocupantes y mascotas
   3. Referencias
@@ -65,103 +55,90 @@ Tratamiento mínimo:
   5. Estudio de aseguradora
   6. Contratos
   7. Administrar
-- se preserva `data-contract-context` cuando corresponde;
-- sin JS nuevo;
-- sin CSS nuevo;
-- sin rutas/servicios/tablas/migraciones/dependencias/autoridades nuevas.
-
-Test añadido:
-`tests/Integration/Candidates/HumanFirstCandidateDetailViewTest.php`.
+- `data-contract-context` preservado.
+- Sin JS/CSS/rutas/servicios/tablas/migraciones/dependencias/autoridades nuevas.
+- Test: `tests/Integration/Candidates/HumanFirstCandidateDetailViewTest.php`.
 
 ### CI
 
-CI #1106 / run `39000889738` sobre el HEAD exacto `e9594ef1...`:
+CI #1106 / run `39000889738` sobre `e9594ef1...`:
 - PHP 8.3: **SUCCESS**
 - PHP 8.4: **SUCCESS**
 - PHP 8.5: **SUCCESS**
+
+### Browser QA real — Antigravity / Playwright Chromium
+
+Evidencia ejecutada sobre el mismo SHA `e9594ef1...`, working tree CLEAN, **NO CODE CHANGES REQUIRED**.
+
+Navegador:
+- Playwright Chromium `151.0.7922.34`.
+
+Viewports:
+- 1440×900
+- 768×1024
+- 375×812
+
+Resultado:
+- PASS-01 a PASS-10: **10/10 PASS**.
+- 7 disclosures: open/close PASS.
+- 0 overflow horizontal en los 3 viewports.
+- Tab / Shift+Tab / Enter / Space: PASS.
+- foco visible: PASS.
+- `data-contract-context`: PASS.
+- interacción real: abrió `/admin/contracts/1` y volvió al candidato.
+- consola/red/aplicación: **0 errores relevantes**.
+- 10 screenshots guardados fuera del repo.
+- captura móvil específica demuestra foco visible.
+- página cerrada reduce la carga inicial; No Infinite Excel: PASS.
+
+Evidencia externa entregada al owner en `HF-P1D_BROWSER_QA_2026-10-17.zip`.
+
+### Estado final HF-P1D
 
 `HF_P1D_TECHNICAL_GREEN = YES`
 `HF_P1D_KISS = PASS`
 `HF_P1D_ZERO_NOISE = PASS`
 `HF_P1D_ANTI_PATCH = PASS`
-`HF_P1D_HUMAN_FIRST_AUTOMATED = PASS`
+`HF_P1D_BROWSER_QA = GREEN`
+`HF_P1D_HUMAN_FIRST_FINAL = CERTIFIED`
+`HF_P1D_INTEGRATED_IN_MAIN = NO`
 
-## 4. ENV-001 — entorno local QA
+## 4. ENV-001 — cerrado
 
-El primer intento de Browser QA quedó bloqueado por arranque local: faltaba configuración SMTP de la demo.
+- Causa: contenedor QA omitía configuración SMTP demo requerida.
+- Owner: entorno local, no `candidate_detail.php`.
+- Tratamiento: reutilizar configuración demo existente.
+- `/health`: HTTP 200 / `status=ok`.
+- DB demo: `alquilapro_demo_uat`.
+- Migración pendiente `023_extend_users_login_identifiers.sql` aplicada al entorno demo mediante `MigrationRunner::migrate()`.
+- Datos/usuarios demo completados sólo para QA.
+- Ningún commit de producto por ENV-001.
 
-Causa raíz:
-- contenedor QA con DB de demo;
-- variables `ALQUILAPRO_*` requeridas para notificaciones omitidas;
-- no era defecto demostrado en `candidate_detail.php`.
+## 5. Próximo gate exacto
 
-Tratamiento mínimo:
-- recrear sólo el contenedor QA;
-- reutilizar configuración existente del contenedor web de demo;
-- conservar SHA y montajes de código de sólo lectura.
+Precondiciones de merge #43 ya satisfechas:
+- HEAD exacto sin drift: `e9594ef1...`.
+- CI #1106 GREEN 8.3/8.4/8.5.
+- Browser QA real GREEN.
+- Human-First CERTIFIED.
+- PR #43 READY / mergeable=true.
 
-Verificación posterior:
-- entrypoint `/health`: `status=ok`;
-- `/health` por HTTP: `status=ok`;
-- PDO a DB correcta;
-- DNS de Mailpit correcto;
-- working tree limpio;
-- **NO CODE CHANGES REQUIRED**;
-- ningún commit nuevo por ENV-001.
+Siguiente `continua`:
+1. revalidar inmediatamente PR #43 HEAD, `main` y CI #1106;
+2. fusionar PR #43 con `expected_head_sha=e9594ef1e431eff2f3fc3193bb16a4533a1820af` si sigue sin drift;
+3. verificar merge SHA real y nuevo `main`;
+4. actualizar `docs/CURRENT_CHECKPOINT.md` post-merge en un único paso docs-only;
+5. crear checkpoint durable post-HF-P1D;
+6. **HF-P1E permanece NOT STARTED** hasta quedar HF-P1D integrado y documentado.
 
-## 5. Browser QA — bloqueo actual real
-
-Browser previsto: navegador interno de Codex.
-
-Estado:
-- el navegador rechazó adquirir la pestaña por política URL;
-- la instrucción del navegador prohibió reintentar mediante Playwright u otros mecanismos indirectos;
-- no se hizo bypass;
-- health sólo certifica infraestructura, **no** certifica UI/UX.
-
-Pendiente en 1440×900, 768×1024 y 375×812:
-- identidad/carga visual;
-- consola;
-- jerarquía Human-First;
-- disclosures;
-- teclado/foco;
-- responsive;
-- No Infinite Excel;
-- comprensión humana;
-- interacción real;
-- 5 screenshots fuera del repo.
-
-`HF_P1D_BROWSER_QA = BLOCKED`
-`HF_P1D_HUMAN_FIRST_FINAL = NOT_CERTIFIED`
-
-Por tanto:
-- PR #43 permanece **DRAFT**;
-- **NO MERGE** hasta Browser QA real GREEN;
-- HF-P1E permanece **NOT STARTED**.
-
-## 6. Próximo gate exacto
-
-Cuando exista acceso permitido a Browser:
-
-1. probar exactamente `e9594ef1e431eff2f3fc3193bb16a4533a1820af`;
-2. viewports 1440×900, 768×1024 y 375×812;
-3. comprobar teclado/foco, disclosures, responsive, consola, No Infinite Excel y comprensión humana;
-4. capturar 5 PNG fuera del repo;
-5. si todo pasa, registrar:
-   - `HF_P1D_BROWSER_QA = GREEN`
-   - `HF_P1D_HUMAN_FIRST_FINAL = CERTIFIED`
-6. sólo entonces revalidar drift + CI exacto y fusionar PR #43 bajo la convención `continua` del owner.
-
-Si aparece defecto: `REPRODUCE → ROOT CAUSE → OWNER → RED → CAUSAL RED → MINIMAL GREEN → REGRESSION → BROWSER QA`.
-
-## 7. Ledger
+## 6. Ledger
 
 - Human-First governance SPEC/PLAN/AUDIT: **MERGED / CLOSED**.
 - HF-P1A: **MERGED / CLOSED GREEN**.
 - HF-P1B: **MERGED / CLOSED GREEN**.
 - HF-P1C-A: **MERGED / CLOSED GREEN**.
 - HF-P1C-B: **MERGED / CERTIFIED / CLOSED**.
-- HF-P1D: **TECHNICAL GREEN / BROWSER BLOCKED / NOT CERTIFIED / PR #43 DRAFT**.
+- HF-P1D: **GREEN / BROWSER GREEN / HUMAN-FIRST CERTIFIED / PR #43 READY / NOT MERGED**.
 - HF-P1E: **NOT STARTED**.
 - HF-P1F: **NOT STARTED**.
 - HF-P2A: **NOT STARTED**.
@@ -170,16 +147,13 @@ Si aparece defecto: `REPRODUCE → ROOT CAUSE → OWNER → RED → CAUSAL RED �
 - R4: **NOT STARTED**.
 - Deployment: **NOT AUTHORIZED**.
 
-## 8. Recuperación si el chat termina
+## 7. Recuperación si el chat termina
 
-1. Preferir esta rama durable:
-   `checkpoint/hf-p1d-ci-green-browser-blocked-20261017`.
-2. Separar **checkpoint branch HEAD docs-only** del **SHA técnico certificado por CI**: `e9594ef1e431eff2f3fc3193bb16a4533a1820af`.
-3. Confirmar PR #43 sigue OPEN/DRAFT y su HEAD técnico no cambió.
-4. Confirmar CI #1106 SUCCESS en PHP 8.3/8.4/8.5.
-5. No repetir ENV-001: `/health` ya quedó verificado y el entorno fue reparado sin cambios de código.
-6. No inferir Human-First desde health o CI.
-7. No mergear #43 hasta Browser QA real GREEN.
-8. No abrir HF-P1E mientras HF-P1D permanezca NOT_CERTIFIED.
-9. Mantener R3 FROZEN, R4 NOT STARTED y deployment NOT AUTHORIZED.
-10. `continua` = autorización del owner para ejecutar el siguiente gate preparado cuando sus precondiciones estén satisfechas.
+1. Preferir esta rama durable: `checkpoint/hf-p1d-ci-green-browser-blocked-20261017` (nombre histórico; contenido actual ya certifica Browser GREEN).
+2. SHA técnico que debe mergearse: `e9594ef1e431eff2f3fc3193bb16a4533a1820af`.
+3. Confirmar PR #43 OPEN/READY, HEAD exacto y mergeable=true.
+4. Confirmar CI #1106 SUCCESS.
+5. No repetir Browser QA mientras el HEAD no cambie.
+6. Siguiente `continua` autoriza merge #43 si no hay drift.
+7. No abrir HF-P1E antes del merge + checkpoint post-merge de HF-P1D.
+8. Mantener R3 FROZEN, R4 NOT STARTED y deployment NOT AUTHORIZED.
