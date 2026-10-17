@@ -18,10 +18,11 @@ Propósito: **puntero operativo único para recuperar el proyecto sin arrastrar 
 
 ## 2. Main / último merge funcional
 
-- HF-P1C-B remediation PR #39: **MERGED / CLOSED**.
-- Merge commit: `7f56ad39ad230a460259d115e35cb897d68f5496`.
-- HEAD funcional integrado desde PR #39: `7deb6d8f696a1ed410cc307cdd022996354a6a7b`.
-- Historia preservada: `RED d4d59fef → GREEN a276c136 → docs 7deb6d8f → merge 7f56ad39`.
+- HF-P1C-B checkbox primitive PR #40: **MERGED / CLOSED**.
+- Merge commit: `c15bb3b370970b686210e76c3f72fed5d968dce9`.
+- HEAD funcional probado antes del merge: `670850668fc94f69f36bbbd8b784d1a22edbe524`.
+- Historia preservada: `RED dd83b08a → GREEN 67085066 → merge c15bb3b3`.
+- HF-P1C-B remediation PR #39: **MERGED / CLOSED** en `7f56ad39ad230a460259d115e35cb897d68f5496`.
 - PR #38 HF-P1C-B original: **MERGED / CLOSED** en `c23dd7fc1a1dfd2febfd8285c5e07d1033a6f06f`.
 - PR #37 HF-P1C-A: **MERGED / CLOSED GREEN funcional**.
 - PR #36 HF-P1B: **MERGED / CLOSED GREEN funcional**.
@@ -38,17 +39,30 @@ Propósito: **puntero operativo único para recuperar el proyecto sin arrastrar 
 - Variable 1 disponible en primer nivel del disclosure.
 - Variables 2–50 disponibles bajo segundo `<details>` SSR nativo.
 - Se preservó la capacidad canónica de hasta 50 variables.
+- Los 50 checkboxes `Obligatoria` reutilizan la primitive existente `.check-row`; no se añadió CSS nuevo.
 - `ContractService::validatedVariables()` sigue siendo el único owner profundo de reglas de dominio.
 - `variables_json` permanece únicamente como fallback histórico de transporte no visible.
-- Sin DB, migrations, JS, CSS, SPA, framework, nuevo servicio ni nueva route.
+- Sin DB, migrations, JS, CSS nuevo, SPA, framework, nuevo servicio ni nueva route.
 
-### Evidencia TDD / CI
+### Evidencia TDD / CI principal
 
-- RED causal: `d4d59fefdb6f785cecacc17576181b60faacfadf`.
+- RED causal remediation: `d4d59fefdb6f785cecacc17576181b60faacfadf`.
 - CI RED #1095 / run `38993550706`: fallo causal después de setup y Composer PASS.
-- GREEN producción: `a276c136214ecb816366b29cd41a66cda27f1b01`.
+- GREEN remediation: `a276c136214ecb816366b29cd41a66cda27f1b01`.
 - HEAD final PR #39: `7deb6d8f696a1ed410cc307cdd022996354a6a7b`.
-- CI final exact-head #1098 / run `38994399978`: **SUCCESS** PHP 8.3 / 8.4 / 8.5; Composer y `Run tests` SUCCESS en las tres matrices.
+- CI final #1098 / run `38994399978`: **SUCCESS** PHP 8.3 / 8.4 / 8.5.
+
+### Evidencia TDD / CI microfix checkbox
+
+- Root cause: la vista no reutilizaba `.check-row` y el CSS general de `input` podía estirar el checkbox.
+- RED causal: `dd83b08a4b71ea4f2681079cb2e9838ad7373133`.
+- CI RED #1099 / run `38995420951`: PHP 8.3 terminó con **658 tests / 7793 assertions / 1 failure / 1 skipped**; único fallo `0 !== 50` en `HumanFirstContractTemplateAuthorRoutesTest`.
+- GREEN mínimo: `670850668fc94f69f36bbbd8b784d1a22edbe524`.
+- Cambio de producción: sólo `class="check-row"` en el `<label>` existente; test protege 50 usos.
+- CI GREEN #1100 / run `38995707021`: **SUCCESS** PHP 8.3 / 8.4 / 8.5; Composer y `Run tests` SUCCESS en las tres matrices.
+- PR #40: **MERGED / CLOSED**.
+- Merge: `c15bb3b370970b686210e76c3f72fed5d968dce9`.
+- El merge commit conserva el mismo árbol del GREEN probado (`ac32ae50aed326c863e4a37b6dacad3f39c25d09`).
 
 ### Auditoría
 
@@ -57,10 +71,11 @@ Propósito: **puntero operativo único para recuperar el proyecto sin arrastrar 
 `HF_P1C_B_ZERO_NOISE = PASS`
 `HF_P1C_B_ANTI_PATCH = PASS`
 `HF_P1C_B_REMEDIATION_MERGED = YES`
+`HF_P1C_B_CHECKBOX_MICROFIX_MERGED = YES`
 `HF_P1C_B_BROWSER_QA = BLOCKED / NOT_CERTIFIED`
 `HF_P1C_B_HUMAN_FIRST_FINAL = NOT_CERTIFIED`
 
-La remediación funcional está integrada, pero **HF-P1C-B no se declara Human-First final** hasta Browser QA real.
+HF-P1C-B está funcionalmente integrado y el preflight estático no deja abierto el defecto del checkbox, pero **no se declara Human-First final** hasta Browser QA real.
 
 ## 4. Gate activo — Browser / Human-First final
 
@@ -100,7 +115,7 @@ La remediación funcional está integrada, pero **HF-P1C-B no se declara Human-F
 - `DOC-002` puntero vivo: **CLOSED / ACTUALIZADO**.
 - `UX-001` P1 — códigos/estados/roles técnicos: **PARTIAL CLOSED por HF-P1A**.
 - `UX-002` P1 — dashboard sin cockpit: **CLOSED por HF-P1B**.
-- `UX-003` P1 — operador contractual: **CLOSED funcional por HF-P1C-A**; autor de plantillas: **FUNCTIONAL GREEN MERGED / BROWSER NOT_CERTIFIED**.
+- `UX-003` P1 — operador contractual: **CLOSED funcional por HF-P1C-A**; autor de plantillas: **FUNCTIONAL GREEN MERGED / STATIC PREFLIGHT GREEN / BROWSER NOT_CERTIFIED**.
 - `UX-004` P1 — candidate detail / obligations / tenant detail: **PENDIENTE / NO ABRIR AÚN**.
 - `UX-005` P2 — formatos humanos: **PENDIENTE**.
 - `UX-006` P2 — feedback 422: **PENDIENTE**.
@@ -124,7 +139,7 @@ Conservar PHP SSR + Slim; un `View`; un catálogo `Permissions`; autorización r
 - HF-P1B: **MERGED / CLOSED GREEN funcional**.
 - HF-P1C-A: **MERGED / CLOSED GREEN funcional**.
 - HF-P1C-B original: **MERGED / CLOSED**.
-- HF-P1C-B remediation: **MERGED / GREEN funcional / Browser BLOCKED / FINAL NOT_CERTIFIED**.
+- HF-P1C-B remediation: **MERGED / GREEN funcional / checkbox microfix MERGED / Browser BLOCKED / FINAL NOT_CERTIFIED**.
 - HF-P1D: **NOT STARTED / BLOCKED por Browser/Human-First final**.
 - HF-P1E: **NOT STARTED**.
 - HF-P1F: **NOT STARTED**.
@@ -138,8 +153,8 @@ Conservar PHP SSR + Slim; un `View`; un catálogo `Permissions`; autorización r
 Si el chat termina:
 
 1. leer este archivo;
-2. revalidar `main` y confirmar que incluye merge `7f56ad39ad230a460259d115e35cb897d68f5496`;
-3. no repetir RED/GREEN de HF-P1C-B ni reabrir PR #39;
+2. revalidar `main` y confirmar que incluye merge `c15bb3b370970b686210e76c3f72fed5d968dce9`;
+3. no repetir RED/GREEN de HF-P1C-B, no reabrir PR #39 ni PR #40;
 4. comprobar Browser permission;
 5. si Browser sigue bloqueado, mantener `HF_P1C_B_HUMAN_FIRST_FINAL = NOT_CERTIFIED` y **no abrir HF-P1D**;
 6. no descongelar R3 sin Browser QA real;
