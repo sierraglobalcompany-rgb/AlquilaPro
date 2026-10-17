@@ -124,6 +124,30 @@ final class HumanFirstContractOperatorRoutesTest extends TestCase
         self::assertStringNotContainsString('Anexos JSON', $formHtml);
     }
 
+    public function testCandidateContextRequiresCandidateViewPermission(): void
+    {
+        $managerId = $this->insertUser(
+            'hf-contract-no-candidate-view@example.com',
+            'ManagerPassword123',
+            'admin',
+            ['contracts.view', 'contracts.manage'],
+        );
+        $fixture = $this->eligibleContractFixture($managerId, 'Candidato Restringido');
+        $app = $this->app('/sub');
+        $this->login($app, 'hf-contract-no-candidate-view@example.com', 'ManagerPassword123', '/sub');
+
+        $response = $this->request(
+            $app,
+            'GET',
+            '/sub/admin/contracts?candidate_id=' . $fixture['candidate_id'],
+        );
+
+        self::assertSame(403, $response->getStatusCode());
+        $body = (string) $response->getBody();
+        self::assertStringNotContainsString('Candidato Restringido', $body);
+        self::assertStringNotContainsString($fixture['unit_code'], $body);
+    }
+
     public function testOperatorCreatesDraftFromStructuredContractFields(): void
     {
         $managerId = $this->insertUser(
