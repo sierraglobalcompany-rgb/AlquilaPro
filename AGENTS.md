@@ -145,7 +145,32 @@ La implementación visual pública debe respetar la spec versionada aprobada. No
 ## 12. Delegación a Codex
 
 Si se delega un lote:
-- entregar un solo Markdown autocontenido por lote;
-- incluir scope, leyes, owners, RED/GREEN, prohibiciones, comandos de verificación y criterio de parada;
+- entregar al usuario **un solo archivo `.md` descargable** por batch/task aprobado;
+- **no pegar el prompt completo de Codex en el chat** como salida principal;
+- el Markdown debe ser autocontenido, específico, optimizado, eficiente, sin redundancias y auditable;
+- incluir scope, leyes, owners, base/HEAD, RED/GREEN, prohibiciones, hard stops, checkpoints, anti-loop, comandos de verificación, QA/CI, final report format y criterio de parada;
 - Codex no autoriza merge ni deployment;
-- el reporte de Codex nunca sustituye la auditoría directa de GitHub + CI.
+- Codex no rediseña lo ya aprobado ni crea layers/sistemas paralelos;
+- cuando Codex termine un batch importante, su **informe final también debe entregarse como `.md` descargable** con base, HEAD, commits, changed files, tests, CI, issues, repairs, checkpoint, remaining work y hard stops;
+- ChatGPT/Sol debe auditar ese informe contra GitHub + CI; **NO TRUST-BY-REPORT**;
+- el chat no sustituye el Markdown descargable de Codex por una respuesta gigante.
+
+## 13. Ley práctica de evidencia
+
+`NO CLAIM WITHOUT EVIDENCE`
+
+Antes de afirmar GREEN/PASS/MERGEABLE/DEPLOYED:
+
+`CLAIM -> EXACT SHA -> EXACT TEST/CI/EVIDENCE -> RULING`
+
+- No reutilizar CI de otro SHA.
+- No confundir PR HEAD con synthetic merge SHA.
+- No declarar CI PASS mientras haya jobs queued/in_progress.
+- No aceptar un reporte de agente como sustituto de la evidencia directa.
+
+## 14. Método de interacción con el owner
+
+- Antes de implementar: revisar -> recuperar contexto -> contrastar GitHub -> localizar owner -> buscar duplicación -> planificar -> auditar el plan en diez pasadas -> mejorar/converger -> recién entonces implementar o delegar.
+- `continua` significa ejecutar el siguiente gate inequívocamente preparado; no reiniciar el análisis desde cero.
+- Si el owner pide `crea un checkpoint y para`: crear/verificar checkpoint durable y detenerse, sin seguir implementando.
+- Si el owner pide un archivo: generarlo directamente como archivo descargable.
