@@ -40,7 +40,8 @@ Si se delega a Codex:
 
 - Scope: autor de plantillas contractual sin JSON crudo.
 - Branch: `impl/hf-p1c-b-template-human-form-20261016`.
-- PR #38: OPEN / DRAFT / NOT MERGED; **mergeable=false al cierre** por drift documental de `main`.
+- PR #38: OPEN / DRAFT / NOT MERGED.
+- PR mergeability: **RECHECK_REQUIRED**; durante el cierre GitHub la recalculó `false → true` sin cambiar el HEAD funcional. No congelar este valor; reconsultarlo en merge gate.
 - HEAD/RED: `adf1214627490231d9848ec8b0612c8ac2e8c461`.
 - Checkpoint previo: `checkpoint/hf-p1c-b-red-stop-20261016` → mismo SHA.
 - Branch diff: exactamente 1 test nuevo, 196 líneas, 0 producción.
@@ -67,7 +68,7 @@ Si se delega a Codex:
 
 ### Drift HF-P1C-B
 
-La rama nació en `ce3f98de...`. Main avanzó con dos commits documentales (`a99c3cda...`, `85da0676...`). Al corte: rama ahead 1 / behind 2. PR #38 pasó a `mergeable=false`. No rebasear por estética ni repetir RED; preservar línea TDD y reconciliar en merge gate con evidencia.
+La rama nació en `ce3f98de...`. Main avanzó con dos commits documentales (`a99c3cda...`, `85da0676...`). Al corte: rama ahead 1 / behind 2. `mergeable` se observó false y luego true por recálculo de GitHub; tratarlo como efímero. No rebasear por estética ni repetir RED; preservar línea TDD y reconciliar en merge gate con evidencia.
 
 ## Cerrado recientemente
 
@@ -128,9 +129,9 @@ Archivo generado al cierre del chat:
 
 `ALQUILAPRO_HANDOFF_FORENSE_CHAT_END_HF_P1C_B_RED_2026-10-16.md`
 
-- líneas: 3319
-- bytes: 51,947
-- SHA-256: `690b2447bc8065cb8781041b583f368df18240c7e58a2c91abf28bc6f438384f`
+- líneas: 3325
+- bytes: 52,255
+- SHA-256: `b3abb1a3cbeca034627dd24831e5a1ddc0552783048be2ca05863c2cbd16d4a5`
 
 Ese archivo es el handoff largo para adjuntar al chat nuevo. Este checkpoint GitHub es el puntero durable compacto.
 
