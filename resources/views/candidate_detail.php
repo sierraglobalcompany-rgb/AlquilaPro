@@ -5,6 +5,10 @@ declare(strict_types=1);
 use AlquilaPro\UI\HumanLabels;
 
 $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+$activeSection = is_string($activeSection ?? null) ? $activeSection : 'overview';
+$candidateSections = is_array($candidateSections ?? null) ? array_values($candidateSections) : [
+    ['key' => 'overview', 'label' => 'Solicitud'],
+];
 $allowedTransitions = match ((string) $candidate['status']) {
     'new' => ['incomplete', 'withdrawn'],
     'incomplete' => ['withdrawn'],
@@ -28,209 +32,293 @@ $contractRows = $contractContext === null || !is_array($contractContext['contrac
     ? []
     : $contractContext['contracts'];
 $canCreateContract = $contractContext !== null && (bool) ($contractContext['can_create'] ?? false);
+
+$nameParts = preg_split('/\s+/', trim((string) ($candidate['full_name'] ?? ''))) ?: [];
+$initials = '';
+foreach (array_slice(array_values(array_filter($nameParts, static fn (string $part): bool => $part !== '')), 0, 2) as $part) {
+    $initials .= mb_strtoupper(mb_substr($part, 0, 1));
+}
+$initials = $initials !== '' ? $initials : 'AP';
+
+$sectionHref = static fn (string $key): string => $basePath
+    . '/admin/candidates/' . rawurlencode((string) $candidate['id'])
+    . '?section=' . rawurlencode($key);
+$activeSectionLabel = 'Solicitud';
+foreach ($candidateSections as $section) {
+    if ((string) ($section['key'] ?? '') === $activeSection) {
+        $activeSectionLabel = (string) ($section['label'] ?? 'Solicitud');
+        break;
+    }
+}
+
+$humanDate = static function (mixed $value, bool $withTime = false): ?string {
+    if (!is_string($value) || trim($value) === '') {
+        return null;
+    }
+    try {
+        $date = new DateTimeImmutable($value);
+    } catch (Throwable) {
+        return null;
+    }
+
+    return $date->format($withTime ? 'd/m/Y · H:i' : 'd/m/Y');
+};
+
+$birthDate = $humanDate($candidate['birth_date'] ?? null);
+$createdAt = $humanDate($candidate['created_at'] ?? null, true);
+$submittedAt = $humanDate($candidate['submitted_at'] ?? null, true);
+$updatedAt = $humanDate($candidate['updated_at'] ?? null, true);
+$statusCode = (string) ($candidate['status'] ?? '');
+$statusLabel = HumanLabels::candidateStatus($statusCode);
+$statusDescription = HumanLabels::candidateStatusDescription($statusCode);
+$unitLabel = trim((string) ($candidate['property_name'] ?? ''));
+$unitCode = trim((string) ($candidate['unit_code'] ?? $candidate['unit_id'] ?? ''));
+if ($unitCode !== '') {
+    $unitLabel = trim($unitLabel . ' · ' . $unitCode, " ·\t\n\r\0\x0B");
+}
 ?>
-<section class="surface">
-    <p class="eyebrow"><a href="<?= $escape($basePath) ?>/admin/candidates">Candidatos</a></p>
-    <h1><?= $escape($candidate['full_name']) ?></h1>
-    <p class="hint">Expediente privado de candidatura.</p>
-</section>
 
-<section class="surface">
-    <h2>Solicitud</h2>
-    <dl>
-        <dt>Estado</dt><dd><?= $escape(HumanLabels::candidateStatus((string) $candidate['status'])) ?></dd>
-        <dt>Documento</dt><dd><?= $escape(strtoupper((string) $candidate['document_type'])) ?> <?= $escape($candidate['document_number']) ?></dd>
-        <dt>Unidad</dt><dd><?= $escape($candidate['property_name'] ?? '') ?> · <?= $escape($candidate['unit_code'] ?? $candidate['unit_id']) ?></dd>
-        <dt>Teléfono</dt><dd><?= $escape($candidate['phone']) ?></dd>
-        <dt>Correo</dt><dd><?= $escape($candidate['email']) ?></dd>
-        <dt>Fecha de nacimiento</dt><dd><?= $escape($candidate['birth_date'] ?? '') ?></dd>
-        <dt>Dirección actual</dt><dd><?= $escape($candidate['current_address'] ?? '') ?></dd>
-        <dt>Consentimiento</dt><dd><?= $escape($candidate['consent_at']) ?></dd>
-        <dt>Creado</dt><dd><?= $escape($candidate['created_at']) ?></dd>
-        <dt>Enviado</dt><dd><?= $escape($candidate['submitted_at'] ?? '') ?></dd>
-        <dt>Actualizado</dt><dd><?= $escape($candidate['updated_at'] ?? '') ?></dd>
-    </dl>
-</section>
+<div class="candidate-page">
+    <a class="text-link candidate-back" href="<?= $escape($basePath) ?>/admin/candidates">← Volver a candidatos</a>
 
-<section class="surface">
-    <h2>Información laboral</h2>
-    <dl>
-        <dt>Estado laboral</dt><dd><?= $escape($candidate['employment_status'] ?? '') ?></dd>
-        <dt>Empresa</dt><dd><?= $escape($candidate['employer_name'] ?? '') ?></dd>
-        <dt>Ocupación</dt><dd><?= $escape($candidate['occupation'] ?? '') ?></dd>
-        <dt>Ingreso mensual</dt><dd><?= $escape($candidate['monthly_income'] ?? '') ?></dd>
-        <dt>Notas</dt><dd><?= $escape($candidate['employment_notes'] ?? '') ?></dd>
-    </dl>
-</section>
-
-<section class="surface">
-    <h2>Ocupantes y mascotas</h2>
-    <dl>
-        <dt>Ocupantes</dt><dd><?= $escape($candidate['occupants_count'] ?? '') ?></dd>
-        <dt>Detalle de ocupantes</dt><dd><?= $escape($candidate['occupants_notes'] ?? '') ?></dd>
-        <dt>Mascotas</dt><dd><?= $candidate['pets_declared'] ? 'Sí' : 'No' ?></dd>
-        <dt>Detalle de mascotas</dt><dd><?= $escape($candidate['pets_notes'] ?? '') ?></dd>
-    </dl>
-</section>
-
-<section class="surface">
-    <h2>Referencias</h2>
-    <?php if (($candidate['references'] ?? []) === []): ?>
-        <p class="empty-state">No hay referencias registradas.</p>
-    <?php else: ?>
-        <?php foreach ($candidate['references'] as $reference): ?>
-            <article class="user-card">
-                <strong><?= $escape($reference['name']) ?></strong>
-                <div><?= $escape($reference['reference_type'] ?? '') ?></div>
-                <div><?= $escape($reference['relationship'] ?? '') ?></div>
-                <div><?= $escape($reference['phone']) ?></div>
-                <div><?= $escape($reference['email'] ?? '') ?></div>
-            </article>
-        <?php endforeach; ?>
-    <?php endif; ?>
-</section>
-
-<section class="surface">
-    <h2>Documentos</h2>
-    <?php if ($documents === []): ?>
-        <p class="empty-state">No hay documentos adjuntos.</p>
-    <?php else: ?>
-        <?php foreach ($documents as $document): ?>
-            <article class="user-card">
-                <strong><?= $escape($document['requirement_label']) ?></strong>
-                <div><?= $escape($document['original_name'] ?? 'Documento') ?></div>
-                <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/documents/<?= $escape($document['id']) ?>">Abrir documento</a>
-            </article>
-        <?php endforeach; ?>
-    <?php endif; ?>
-</section>
-
-<section class="surface">
-    <h2>Estudio de aseguradora</h2>
-    <?php if ($screening === null): ?>
-        <?php if ($screeningEditable): ?>
-            <form method="post" action="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/screening">
-                <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
-                <label>Proveedor
-                    <input type="text" name="provider" value="SURA" maxlength="120" required>
-                </label>
-                <label>Producto
-                    <input type="text" name="product" maxlength="190">
-                </label>
-                <label>Correo de contacto
-                    <input type="email" name="contact_email" maxlength="190">
-                </label>
-                <label>URL del estudio
-                    <input type="url" name="portal_url" maxlength="2048">
-                </label>
-                <label>Notas internas
-                    <textarea name="notes"></textarea>
-                </label>
-                <label>Soporte / radicado
-                    <input type="text" name="support_reference" maxlength="255">
-                </label>
-                <button type="submit">Crear estudio</button>
-            </form>
-        <?php else: ?>
-            <p class="empty-state">No hay estudio de aseguradora registrado.</p>
-        <?php endif; ?>
-    <?php elseif ($screeningEditable): ?>
-        <form method="post" action="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/screening">
-            <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
-            <label>Proveedor
-                <input type="text" name="provider" value="<?= $escape($screening['provider']) ?>" maxlength="120" required>
-            </label>
-            <label>Producto
-                <input type="text" name="product" value="<?= $escape($screening['product'] ?? '') ?>" maxlength="190">
-            </label>
-            <label>Estado
-                <select name="status" required>
-                    <?php foreach ($screeningTransitions as $status): ?>
-                        <option value="<?= $escape($status) ?>"<?= $status === $screeningStatus ? ' selected' : '' ?>><?= $escape(HumanLabels::screeningStatus((string) $status)) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-            <label>Correo de contacto
-                <input type="email" name="contact_email" value="<?= $escape($screening['contact_email'] ?? '') ?>" maxlength="190">
-            </label>
-            <label>URL del estudio
-                <input type="url" name="portal_url" value="<?= $escape($screening['portal_url'] ?? '') ?>" maxlength="2048">
-            </label>
-            <label>Resultado
-                <textarea name="result"><?= $escape($screening['result'] ?? '') ?></textarea>
-            </label>
-            <label>Notas internas
-                <textarea name="notes"><?= $escape($screening['notes'] ?? '') ?></textarea>
-            </label>
-            <label>Soporte / radicado
-                <input type="text" name="support_reference" value="<?= $escape($screening['support_reference'] ?? '') ?>" maxlength="255">
-            </label>
-            <button type="submit">Actualizar estudio</button>
-        </form>
-    <?php else: ?>
-        <dl>
-            <dt>Proveedor</dt><dd><?= $escape($screening['provider']) ?></dd>
-            <dt>Producto</dt><dd><?= $escape($screening['product'] ?? '') ?></dd>
-            <dt>Estado</dt><dd><?= $escape(HumanLabels::screeningStatus((string) $screening['status'])) ?></dd>
-            <dt>Correo de contacto</dt><dd><?= $escape($screening['contact_email'] ?? '') ?></dd>
-            <dt>URL</dt><dd><?= $escape($screening['portal_url'] ?? '') ?></dd>
-            <dt>Resultado</dt><dd><?= $escape($screening['result'] ?? '') ?></dd>
-            <dt>Notas</dt><dd><?= $escape($screening['notes'] ?? '') ?></dd>
-            <dt>Soporte / radicado</dt><dd><?= $escape($screening['support_reference'] ?? '') ?></dd>
-            <dt>Inicio</dt><dd><?= $escape($screening['started_at'] ?? '') ?></dd>
-            <dt>Resultado registrado</dt><dd><?= $escape($screening['result_at'] ?? '') ?></dd>
-            <dt>Creado</dt><dd><?= $escape($screening['created_at'] ?? '') ?></dd>
-            <dt>Actualizado</dt><dd><?= $escape($screening['updated_at'] ?? '') ?></dd>
-        </dl>
-    <?php endif; ?>
-</section>
-
-<?php if ($contractContext !== null): ?>
-    <section class="surface" data-contract-context>
-        <h2>Contratos</h2>
-        <?php if ($contractRows === []): ?>
-            <p class="empty-state">No hay contratos registrados para este candidato.</p>
-        <?php else: ?>
-            <div class="users-grid">
-                <?php foreach ($contractRows as $contractRow): ?>
-                    <article class="user-card">
-                        <div class="user-card__head">
-                            <strong>Contrato #<?= $escape($contractRow['id']) ?></strong>
-                            <span class="status-pill"><?= $escape($contractRow['status']) ?></span>
-                        </div>
-                        <div><?= $escape($contractRow['template_name'] ?? '') ?> · <?= $escape($contractRow['unit_code'] ?? '') ?></div>
-                        <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($contractRow['id']) ?>">Abrir contrato</a>
-                    </article>
-                <?php endforeach; ?>
+    <header class="content-card candidate-shell" data-candidate-shell>
+        <div class="candidate-shell__identity">
+            <div class="candidate-avatar" aria-hidden="true"><?= $escape($initials) ?></div>
+            <div class="candidate-shell__copy">
+                <p class="eyebrow">Candidato</p>
+                <h1><?= $escape($candidate['full_name'] ?? '') ?></h1>
+                <?php if ($unitLabel !== ''): ?>
+                    <p class="muted candidate-shell__unit"><?= $escape($unitLabel) ?></p>
+                <?php endif; ?>
             </div>
-        <?php endif; ?>
+        </div>
+        <div class="candidate-shell__status">
+            <span class="status-pill status-pill--active"><?= $escape($statusLabel) ?></span>
+            <p class="muted"><?= $escape($statusDescription) ?></p>
+        </div>
+    </header>
 
-        <?php if ($canCreateContract): ?>
-            <a class="button" href="<?= $escape($basePath) ?>/admin/contracts?candidate_id=<?= (int) $candidate['id'] ?>">Crear contrato</a>
-        <?php endif; ?>
-    </section>
-<?php endif; ?>
+    <nav class="content-card candidate-tabs" aria-label="Secciones del candidato">
+        <div class="button-row candidate-tabs__links">
+            <?php foreach ($candidateSections as $section): ?>
+                <?php
+                $key = (string) ($section['key'] ?? '');
+                $label = (string) ($section['label'] ?? '');
+                $current = $key === $activeSection;
+                ?>
+                <a class="button <?= $current ? 'button--secondary' : 'button--quiet' ?> candidate-tab"
+                   href="<?= $escape($sectionHref($key)) ?>"<?= $current ? ' aria-current="page"' : '' ?>><?= $escape($label) ?></a>
+            <?php endforeach; ?>
+        </div>
+    </nav>
 
-<?php if ($canManageCandidates): ?>
-    <section class="surface">
-        <h2>Administrar</h2>
-        <?php if ($allowedTransitions !== []): ?>
-            <form method="post" action="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/status">
-                <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
-                <label>Nuevo estado
-                    <select name="status" required>
-                        <?php foreach ($allowedTransitions as $status): ?>
-                            <option value="<?= $escape($status) ?>"><?= $escape(HumanLabels::candidateStatus((string) $status)) ?></option>
+    <details class="content-card candidate-section-menu">
+        <summary>Sección: <?= $escape($activeSectionLabel) ?></summary>
+        <nav class="candidate-section-menu__nav" aria-label="Secciones del candidato en móvil">
+            <?php foreach ($candidateSections as $section): ?>
+                <?php
+                $key = (string) ($section['key'] ?? '');
+                $label = (string) ($section['label'] ?? '');
+                $current = $key === $activeSection;
+                ?>
+                <a class="candidate-section-menu__link"
+                   href="<?= $escape($sectionHref($key)) ?>"<?= $current ? ' aria-current="page"' : '' ?>><?= $escape($label) ?></a>
+            <?php endforeach; ?>
+        </nav>
+    </details>
+
+    <?php if ($activeSection === 'overview'): ?>
+        <section class="candidate-section" data-candidate-section-body="overview">
+            <div class="section-heading candidate-section__heading">
+                <div>
+                    <p class="eyebrow">Solicitud</p>
+                    <h2>Resumen de la solicitud</h2>
+                    <p class="muted">La información esencial para identificar a la persona y revisar su solicitud.</p>
+                </div>
+            </div>
+
+            <div class="candidate-overview-grid">
+                <section class="content-card candidate-card candidate-card--primary">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">Datos principales</p>
+                            <h3>Identidad y contacto</h3>
+                        </div>
+                    </div>
+                    <div class="candidate-fact-grid">
+                        <div class="candidate-fact"><span>Documento</span><strong><?= $escape(strtoupper((string) ($candidate['document_type'] ?? ''))) ?> <?= $escape($candidate['document_number'] ?? '') ?></strong></div>
+                        <div class="candidate-fact"><span>Celular o WhatsApp</span><strong><?= $escape($candidate['phone'] ?? '') ?></strong></div>
+                        <div class="candidate-fact"><span>Correo</span><strong><?= $escape($candidate['email'] ?? '') ?></strong></div>
+                        <?php if ($birthDate !== null): ?><div class="candidate-fact"><span>Fecha de nacimiento</span><strong><?= $escape($birthDate) ?></strong></div><?php endif; ?>
+                        <?php if (trim((string) ($candidate['current_address'] ?? '')) !== ''): ?><div class="candidate-fact candidate-fact--wide"><span>Dirección actual</span><strong><?= $escape($candidate['current_address']) ?></strong></div><?php endif; ?>
+                    </div>
+                </section>
+
+                <section class="content-card candidate-card candidate-card--timeline">
+                    <p class="eyebrow">Actividad</p>
+                    <h3>Fechas relevantes</h3>
+                    <div class="candidate-timeline">
+                        <?php if ($createdAt !== null): ?><div><span>Solicitud creada</span><strong><?= $escape($createdAt) ?></strong></div><?php endif; ?>
+                        <?php if ($submittedAt !== null): ?><div><span>Solicitud enviada</span><strong><?= $escape($submittedAt) ?></strong></div><?php endif; ?>
+                        <?php if ($updatedAt !== null): ?><div><span>Última actualización</span><strong><?= $escape($updatedAt) ?></strong></div><?php endif; ?>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+    <?php elseif ($activeSection === 'work'): ?>
+        <section class="candidate-section" data-candidate-section-body="work">
+            <section class="content-card">
+                <div class="section-heading"><div><p class="eyebrow">Información laboral</p><h2>Información laboral</h2></div></div>
+                <dl class="account-details">
+                    <div><dt>Estado laboral</dt><dd><?= $escape($candidate['employment_status'] ?? '') ?></dd></div>
+                    <div><dt>Empresa</dt><dd><?= $escape($candidate['employer_name'] ?? '') ?></dd></div>
+                    <div><dt>Ocupación</dt><dd><?= $escape($candidate['occupation'] ?? '') ?></dd></div>
+                    <div><dt>Ingreso mensual</dt><dd><?= $escape($candidate['monthly_income'] ?? '') ?></dd></div>
+                    <div><dt>Notas</dt><dd><?= $escape($candidate['employment_notes'] ?? '') ?></dd></div>
+                </dl>
+            </section>
+        </section>
+
+    <?php elseif ($activeSection === 'household'): ?>
+        <section class="candidate-section" data-candidate-section-body="household">
+            <section class="content-card">
+                <div class="section-heading"><div><p class="eyebrow">Hogar</p><h2>Ocupantes y mascotas</h2></div></div>
+                <dl class="account-details">
+                    <div><dt>Ocupantes</dt><dd><?= $escape($candidate['occupants_count'] ?? '') ?></dd></div>
+                    <div><dt>Detalle de ocupantes</dt><dd><?= $escape($candidate['occupants_notes'] ?? '') ?></dd></div>
+                    <div><dt>Mascotas</dt><dd><?= !empty($candidate['pets_declared']) ? 'Sí' : 'No' ?></dd></div>
+                    <div><dt>Detalle de mascotas</dt><dd><?= $escape($candidate['pets_notes'] ?? '') ?></dd></div>
+                </dl>
+            </section>
+        </section>
+
+    <?php elseif ($activeSection === 'references'): ?>
+        <section class="candidate-section" data-candidate-section-body="references">
+            <section class="content-card">
+                <div class="section-heading"><div><p class="eyebrow">Referencias</p><h2>Referencias</h2></div></div>
+                <?php if (($candidate['references'] ?? []) === []): ?>
+                    <p class="empty-state">No hay referencias registradas.</p>
+                <?php else: ?>
+                    <div class="users-grid">
+                        <?php foreach ($candidate['references'] as $reference): ?>
+                            <article class="user-card">
+                                <strong><?= $escape($reference['name']) ?></strong>
+                                <div><?= $escape($reference['reference_type'] ?? '') ?></div>
+                                <div><?= $escape($reference['relationship'] ?? '') ?></div>
+                                <div><?= $escape($reference['phone']) ?></div>
+                                <div><?= $escape($reference['email'] ?? '') ?></div>
+                            </article>
                         <?php endforeach; ?>
-                    </select>
-                </label>
-                <button type="submit">Actualizar estado</button>
-            </form>
-        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+            </section>
+        </section>
 
-        <form method="post" action="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/token/regenerate">
-            <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
-            <button type="submit">Regenerar enlace de continuación</button>
-        </form>
-    </section>
-<?php endif; ?>
+    <?php elseif ($activeSection === 'documents'): ?>
+        <section class="candidate-section" data-candidate-section-body="documents">
+            <section class="content-card">
+                <div class="section-heading"><div><p class="eyebrow">Documentos</p><h2>Documentos</h2></div></div>
+                <?php if ($documents === []): ?>
+                    <p class="empty-state">No hay documentos adjuntos.</p>
+                <?php else: ?>
+                    <div class="users-grid">
+                        <?php foreach ($documents as $document): ?>
+                            <article class="user-card">
+                                <strong><?= $escape($document['requirement_label']) ?></strong>
+                                <div><?= $escape($document['original_name'] ?? 'Documento') ?></div>
+                                <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/documents/<?= $escape($document['id']) ?>">Abrir documento</a>
+                            </article>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </section>
+        </section>
+
+    <?php elseif ($activeSection === 'screening'): ?>
+        <section class="candidate-section" data-candidate-section-body="screening">
+            <section class="content-card">
+                <div class="section-heading"><div><p class="eyebrow">Aseguradora</p><h2>Estudio de aseguradora</h2></div></div>
+                <?php if ($screening === null): ?>
+                    <?php if ($screeningEditable): ?>
+                        <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/screening">
+                            <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                            <label>Proveedor<input type="text" name="provider" value="SURA" maxlength="120" required></label>
+                            <label>Producto<input type="text" name="product" maxlength="190"></label>
+                            <label>Correo de contacto<input type="email" name="contact_email" maxlength="190"></label>
+                            <label>URL del estudio<input type="url" name="portal_url" maxlength="2048"></label>
+                            <label>Notas internas<textarea name="notes"></textarea></label>
+                            <label>Soporte / radicado<input type="text" name="support_reference" maxlength="255"></label>
+                            <button type="submit">Crear estudio</button>
+                        </form>
+                    <?php else: ?>
+                        <p class="empty-state">No hay estudio de aseguradora registrado.</p>
+                    <?php endif; ?>
+                <?php elseif ($screeningEditable): ?>
+                    <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/screening">
+                        <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                        <label>Proveedor<input type="text" name="provider" value="<?= $escape($screening['provider']) ?>" maxlength="120" required></label>
+                        <label>Producto<input type="text" name="product" value="<?= $escape($screening['product'] ?? '') ?>" maxlength="190"></label>
+                        <label>Estado<select name="status" required><?php foreach ($screeningTransitions as $status): ?><option value="<?= $escape($status) ?>"<?= $status === $screeningStatus ? ' selected' : '' ?>><?= $escape(HumanLabels::screeningStatus((string) $status)) ?></option><?php endforeach; ?></select></label>
+                        <label>Correo de contacto<input type="email" name="contact_email" value="<?= $escape($screening['contact_email'] ?? '') ?>" maxlength="190"></label>
+                        <label>URL del estudio<input type="url" name="portal_url" value="<?= $escape($screening['portal_url'] ?? '') ?>" maxlength="2048"></label>
+                        <label>Resultado<textarea name="result"><?= $escape($screening['result'] ?? '') ?></textarea></label>
+                        <label>Notas internas<textarea name="notes"><?= $escape($screening['notes'] ?? '') ?></textarea></label>
+                        <label>Soporte / radicado<input type="text" name="support_reference" value="<?= $escape($screening['support_reference'] ?? '') ?>" maxlength="255"></label>
+                        <button type="submit">Actualizar estudio</button>
+                    </form>
+                <?php else: ?>
+                    <dl class="account-details">
+                        <div><dt>Proveedor</dt><dd><?= $escape($screening['provider']) ?></dd></div>
+                        <div><dt>Producto</dt><dd><?= $escape($screening['product'] ?? '') ?></dd></div>
+                        <div><dt>Estado</dt><dd><?= $escape(HumanLabels::screeningStatus((string) $screening['status'])) ?></dd></div>
+                        <div><dt>Correo de contacto</dt><dd><?= $escape($screening['contact_email'] ?? '') ?></dd></div>
+                        <div><dt>URL</dt><dd><?= $escape($screening['portal_url'] ?? '') ?></dd></div>
+                        <div><dt>Resultado</dt><dd><?= $escape($screening['result'] ?? '') ?></dd></div>
+                        <div><dt>Notas</dt><dd><?= $escape($screening['notes'] ?? '') ?></dd></div>
+                        <div><dt>Soporte / radicado</dt><dd><?= $escape($screening['support_reference'] ?? '') ?></dd></div>
+                    </dl>
+                <?php endif; ?>
+            </section>
+        </section>
+
+    <?php elseif ($activeSection === 'contracts' && $contractContext !== null): ?>
+        <section class="candidate-section" data-candidate-section-body="contracts">
+            <section class="content-card" data-contract-context>
+                <div class="section-heading"><div><p class="eyebrow">Contratos</p><h2>Contratos</h2></div></div>
+                <?php if ($contractRows === []): ?>
+                    <p class="empty-state">No hay contratos registrados para este candidato.</p>
+                <?php else: ?>
+                    <div class="users-grid">
+                        <?php foreach ($contractRows as $contractRow): ?>
+                            <article class="user-card">
+                                <div class="user-card__head"><strong>Contrato #<?= $escape($contractRow['id']) ?></strong><span class="status-pill"><?= $escape($contractRow['status']) ?></span></div>
+                                <div><?= $escape($contractRow['template_name'] ?? '') ?> · <?= $escape($contractRow['unit_code'] ?? '') ?></div>
+                                <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($contractRow['id']) ?>">Abrir contrato</a>
+                            </article>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+                <?php if ($canCreateContract): ?><a class="button" href="<?= $escape($basePath) ?>/admin/contracts?candidate_id=<?= (int) $candidate['id'] ?>">Crear contrato</a><?php endif; ?>
+            </section>
+        </section>
+
+    <?php elseif ($activeSection === 'manage' && $canManageCandidates): ?>
+        <section class="candidate-section" data-candidate-section-body="manage">
+            <section class="content-card">
+                <div class="section-heading"><div><p class="eyebrow">Administración</p><h2>Administrar</h2></div></div>
+                <?php if ($allowedTransitions !== []): ?>
+                    <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/status">
+                        <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                        <label>Nuevo estado<select name="status" required><?php foreach ($allowedTransitions as $status): ?><option value="<?= $escape($status) ?>"><?= $escape(HumanLabels::candidateStatus((string) $status)) ?></option><?php endforeach; ?></select></label>
+                        <button type="submit">Actualizar estado</button>
+                    </form>
+                <?php endif; ?>
+                <form method="post" action="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/token/regenerate">
+                    <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                    <button type="submit">Regenerar enlace de continuación</button>
+                </form>
+            </section>
+        </section>
+    <?php endif; ?>
+</div>

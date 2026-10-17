@@ -185,9 +185,10 @@ final class ContractFinalizationRoutesTest extends TestCase
         );
         $candidateOnlyApp = $this->app('/sub');
         $this->login($candidateOnlyApp, 'candidate-only@example.com', 'ViewerPassword123', '/sub');
-        $hidden = $this->request($candidateOnlyApp, 'GET', '/sub/admin/candidates/' . $candidateId);
+        $hidden = $this->request($candidateOnlyApp, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=contracts');
         self::assertSame(200, $hidden->getStatusCode());
         self::assertStringNotContainsString('data-contract-context', (string) $hidden->getBody());
+        self::assertStringContainsString('data-candidate-section-body="overview"', (string) $hidden->getBody());
 
         $_SESSION = [];
         $this->insertUser(
@@ -198,7 +199,7 @@ final class ContractFinalizationRoutesTest extends TestCase
         );
         $viewerApp = $this->app('/sub');
         $this->login($viewerApp, 'candidate-contract-viewer@example.com', 'ViewerPassword123', '/sub');
-        $eligible = $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId);
+        $eligible = $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=contracts');
         $eligibleHtml = (string) $eligible->getBody();
         self::assertStringContainsString('data-contract-context', $eligibleHtml);
         self::assertStringContainsString('/sub/admin/contracts', $eligibleHtml);
@@ -211,20 +212,20 @@ final class ContractFinalizationRoutesTest extends TestCase
             $this->validInput(),
             1791865100,
         );
-        $draftDetail = $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId);
+        $draftDetail = $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=contracts');
         $draftHtml = (string) $draftDetail->getBody();
         self::assertStringContainsString('/sub/admin/contracts/' . (int) $draft['id'], $draftHtml);
         self::assertStringNotContainsString('Crear contrato', $draftHtml);
 
         $service->generate((int) $draft['id'], 1791865110);
-        $generatedDetail = $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId);
+        $generatedDetail = $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=contracts');
         self::assertStringContainsString(
             '/sub/admin/contracts/' . (int) $draft['id'],
             (string) $generatedDetail->getBody(),
         );
 
         $service->finalize((int) $draft['id'], $ownerId, 1791865120);
-        $finalDetail = $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId);
+        $finalDetail = $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=contracts');
         $finalHtml = (string) $finalDetail->getBody();
         self::assertStringContainsString('/sub/admin/contracts/' . (int) $draft['id'], $finalHtml);
         self::assertStringContainsString('finalized', $finalHtml);
