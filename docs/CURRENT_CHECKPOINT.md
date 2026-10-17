@@ -16,127 +16,170 @@ Propósito: **puntero operativo único de continuidad, sin ruido histórico**.
 - Deployment: **NOT AUTHORIZED**.
 - Convención del owner: cuando Andrés diga **`continua`**, eso autoriza ejecutar el siguiente gate preparado —incluido merge— siempre que siga GREEN, sin drift y dentro del alcance previamente auditado.
 
-## 2. Verdad viva de GitHub
+## 2. `main` integrado
 
-- Base funcional integrada post-HF-P1C-B: `d0c7687ed9fa62554329215eff5f2324cff5e5d1`.
-- PR #41 **MERGED / CLOSED** en `d0c7687ed9fa62554329215eff5f2324cff5e5d1`.
-- PR #41 HEAD certificado: `71b582c41d379968929c1703bba49dfb54cfdf90`.
-- CI #1101 / run `38997826887`: **SUCCESS PHP 8.3 / 8.4 / 8.5**.
-- PR #42 checkpoint documental: **MERGED / CLOSED** en `be3413296f1a8d8a980f07ef89307f8e6a99464b`.
-- Cualquier HEAD posterior que sólo cambie este checkpoint es descendiente docs-only y no altera la evidencia técnica anterior.
+- `main`: `f78d80f991334e2646aba1e6d5f8860b925ad88f`.
+- HF-P1C-B: **MERGED / CLOSED / Browser GREEN / Human-First CERTIFIED**.
+- PR #41 merge: `d0c7687ed9fa62554329215eff5f2324cff5e5d1`.
+- PR #42 checkpoint documental merge: `be3413296f1a8d8a980f07ef89307f8e6a99464b`.
+- R3: **FROZEN**.
+- R4: **NOT STARTED**.
+- Deployment: **NOT AUTHORIZED**.
 
-## 3. HF-P1C-B — FINAL integrado y certificado
+## 3. HF-P1D — candidate detail progressive disclosure
 
-### Resultado funcional / diseño
+### Estado GitHub
 
-- Autor de plantillas sin JSON crudo como UI primaria.
-- Copy principal en lenguaje humano.
-- Datos manuales bajo progressive disclosure.
-- Variable 1 en primer nivel.
-- Variables 2–50 preservadas con capacidad canónica de 50.
-- Los 50 checkboxes `Obligatoria` reutilizan `.check-row`.
-- `ContractService::validatedVariables()` sigue siendo owner de dominio.
-- Sin DB/migrations/JS/CSS nuevos, SPA, framework, servicio o route nuevos.
+- PR #43: **OPEN / DRAFT / NOT MERGED / mergeable=true**.
+- Branch: `impl/hf-p1d-candidate-detail-disclosure-20261017`.
+- Base verificada: `f78d80f991334e2646aba1e6d5f8860b925ad88f`.
+- HEAD técnico exacto: `e9594ef1e431eff2f3fc3193bb16a4533a1820af`.
+- Changed files: **2**.
+- No abrir HF-P1E mientras HF-P1D no esté certificado/cerrado.
 
-### No Infinite Excel — PR #41
+### Root cause / RED
 
-Root cause: al abrir `Más variables manuales`, se mostraban juntas 49 variables y la página alcanzaba ~14.001 px a 1440×900.
+Problema Human-First: `candidate_detail.php` acumulaba solicitud + empleo + ocupantes + referencias + documentos + aseguradora + contratos + administración en una única columna extensa.
 
-Minimal GREEN:
-- 10 `<details>` HTML nativos cerrados inicialmente;
-- 9 grupos de 5 variables: 2–6, 7–11, 12–16, 17–21, 22–26, 27–31, 32–36, 37–41, 42–46;
-- último grupo 47–50, 4 variables;
-- sin JS/CSS/servicios/routes/DB/migrations/dependencias nuevas.
+RED causal:
+- commit `23e8af3f144fc3b96e9e3e95b18d19e12b9d6d26`;
+- CI #1105;
+- test Human-First esperaba 7 disclosures secundarios y encontró 0;
+- resultado registrado: **659 tests / 7808 assertions / 1 failure / 1 skipped**.
 
-### Evidencia
+### Minimal GREEN
 
-- RED causal: test focal de grupos — **1 test / 13 assertions / FAIL causal** antes del cambio.
-- GREEN focal en `71b582c41d379968929c1703bba49dfb54cfdf90`: **1 test / 19 assertions / PASS**.
-- CI #1101 / run `38997826887`: **SUCCESS PHP 8.3 / 8.4 / 8.5**, suite completa.
-- Browser QA real: **navegador interno de Codex**.
-- Viewports: 1440×900, 768×1024 y 375×812 — PASS.
-- Sin overflow horizontal/clipping; consola sin errors/warnings relevantes.
-- Teclado: Enter, Tab, Space y foco visible — PASS.
-- Interacción: se guardó versión demo con variable adicional.
-- 5 screenshots capturados como evidencia, no versionados.
-- Suite local temporal: 658 tests / 7.585 assertions / 4 failures / 1 skipped; los 4 fallos fueron ambientales (`host.docker.internal` vs `127.0.0.1` y Composer ausente). La suite oficial completa pasó en CI 8.3/8.4/8.5.
+Commit exacto:
+`e9594ef1e431eff2f3fc3193bb16a4533a1820af`
 
-### Estado
+Owner permanece en la misma vista SSR:
+`resources/views/candidate_detail.php`.
 
-`HF_P1C_B_FUNCTIONAL_GREEN = YES`
-`HF_P1C_B_KISS = PASS`
-`HF_P1C_B_ZERO_NOISE = PASS`
-`HF_P1C_B_ANTI_PATCH = PASS`
-`HF_P1C_B_BROWSER_QA = GREEN`
-`HF_P1C_B_HUMAN_FIRST_FINAL = CERTIFIED`
-`HF_P1C_B_INTEGRATED_IN_MAIN = YES`
+Tratamiento mínimo:
+- `Solicitud` permanece visible;
+- 7 bloques secundarios pasan a `<details>/<summary>` nativos cerrados por defecto:
+  1. Información laboral
+  2. Ocupantes y mascotas
+  3. Referencias
+  4. Documentos
+  5. Estudio de aseguradora
+  6. Contratos
+  7. Administrar
+- se preserva `data-contract-context` cuando corresponde;
+- sin JS nuevo;
+- sin CSS nuevo;
+- sin rutas/servicios/tablas/migraciones/dependencias/autoridades nuevas.
 
-## 4. Cierre documental
+Test añadido:
+`tests/Integration/Candidates/HumanFirstCandidateDetailViewTest.php`.
 
-- PR #42 ya está **MERGED / CLOSED**.
-- `docs/CURRENT_CHECKPOINT.md` es el owner único de continuidad.
-- No reabrir PR #41 ni #42 salvo regresión nueva y demostrable.
-- No repetir Browser QA HF-P1C-B si el código no cambió.
+### CI
 
-## 5. Siguiente bloque preparado
+CI #1106 / run `39000889738` sobre el HEAD exacto `e9594ef1...`:
+- PHP 8.3: **SUCCESS**
+- PHP 8.4: **SUCCESS**
+- PHP 8.5: **SUCCESS**
 
-- `HF-P1D` — candidate detail progressive disclosure: **READY_FOR_OWNER_AUTHORIZATION / NOT STARTED**.
-- `HF-P1E` obligations disclosure: **NOT STARTED**.
-- `HF-P1F` tenant portal IA: **NOT STARTED**.
-- `HF-P2A` candidates pagination/filter: **NOT STARTED**.
-- `HF-P2B` feedback consistency: **NOT STARTED**.
+`HF_P1D_TECHNICAL_GREEN = YES`
+`HF_P1D_KISS = PASS`
+`HF_P1D_ZERO_NOISE = PASS`
+`HF_P1D_ANTI_PATCH = PASS`
+`HF_P1D_HUMAN_FIRST_AUTOMATED = PASS`
 
-El próximo `continua`, si no hay drift, autoriza abrir el gate preparado de **HF-P1D**.
+## 4. ENV-001 — entorno local QA
 
-## 6. R3 / R4 / deployment
+El primer intento de Browser QA quedó bloqueado por arranque local: faltaba configuración SMTP de la demo.
 
-### R3
+Causa raíz:
+- contenedor QA con DB de demo;
+- variables `ALQUILAPRO_*` requeridas para notificaciones omitidas;
+- no era defecto demostrado en `candidate_detail.php`.
 
-- Rama: `impl/r3-public-surfaces-20261016`.
-- HEAD: `845295c777151216655b7a7866bc0dc9d93f3e2e`.
-- PR #33: **OPEN / DRAFT / NOT MERGED**.
-- R3.1–R3.5 funcionalmente implementados/certificados.
-- R3.6 Browser QA: **BLOCKED / NOT_CERTIFIED**.
-- Browser QA de HF-P1C-B NO certifica R3.
-- R3 permanece **FROZEN**.
+Tratamiento mínimo:
+- recrear sólo el contenedor QA;
+- reutilizar configuración existente del contenedor web de demo;
+- conservar SHA y montajes de código de sólo lectura.
 
-`R4 = NOT STARTED`
-`DEPLOYMENT = NOT AUTHORIZED`
+Verificación posterior:
+- entrypoint `/health`: `status=ok`;
+- `/health` por HTTP: `status=ok`;
+- PDO a DB correcta;
+- DNS de Mailpit correcto;
+- working tree limpio;
+- **NO CODE CHANGES REQUIRED**;
+- ningún commit nuevo por ENV-001.
 
-## 7. Gobernanza Human-First pendiente
+## 5. Browser QA — bloqueo actual real
 
-- `GOV-001` Master V2.1 exacto: **BLOCKED_TOOL_SAFETY**.
-- Fuente exacta conocida: 70.982 bytes; SHA-256 `55265c92b7a49a4ac2ac976afb6789074b5f95ff5760f6d08b7b1d0e817f6940`.
-- Prohibido resumir/truncar/fragmentar para bypass.
-- `design-system/alquilapro/MASTER.md`: bloqueado por Master.
-- `.github/pull_request_template.md`: governance gap si sigue ausente.
-- `.github/skills/erp-human-first-ui-ux/SKILL.md`: governance gap si sigue ausente.
+Browser previsto: navegador interno de Codex.
 
-## 8. KEEP — no reescribir
+Estado:
+- el navegador rechazó adquirir la pestaña por política URL;
+- la instrucción del navegador prohibió reintentar mediante Playwright u otros mecanismos indirectos;
+- no se hizo bypass;
+- health sólo certifica infraestructura, **no** certifica UI/UX.
 
-Conservar PHP SSR + Slim; un `View`; un catálogo `Permissions`; autorización revalidada en rutas; un `assets/app.css` y un `assets/app.js`; `ContractService` como autoridad contractual; compatibilidad histórica cuando no contradiga Human-First; sin arquitectura paralela.
+Pendiente en 1440×900, 768×1024 y 375×812:
+- identidad/carga visual;
+- consola;
+- jerarquía Human-First;
+- disclosures;
+- teclado/foco;
+- responsive;
+- No Infinite Excel;
+- comprensión humana;
+- interacción real;
+- 5 screenshots fuera del repo.
 
-## 9. Ledger
+`HF_P1D_BROWSER_QA = BLOCKED`
+`HF_P1D_HUMAN_FIRST_FINAL = NOT_CERTIFIED`
+
+Por tanto:
+- PR #43 permanece **DRAFT**;
+- **NO MERGE** hasta Browser QA real GREEN;
+- HF-P1E permanece **NOT STARTED**.
+
+## 6. Próximo gate exacto
+
+Cuando exista acceso permitido a Browser:
+
+1. probar exactamente `e9594ef1e431eff2f3fc3193bb16a4533a1820af`;
+2. viewports 1440×900, 768×1024 y 375×812;
+3. comprobar teclado/foco, disclosures, responsive, consola, No Infinite Excel y comprensión humana;
+4. capturar 5 PNG fuera del repo;
+5. si todo pasa, registrar:
+   - `HF_P1D_BROWSER_QA = GREEN`
+   - `HF_P1D_HUMAN_FIRST_FINAL = CERTIFIED`
+6. sólo entonces revalidar drift + CI exacto y fusionar PR #43 bajo la convención `continua` del owner.
+
+Si aparece defecto: `REPRODUCE → ROOT CAUSE → OWNER → RED → CAUSAL RED → MINIMAL GREEN → REGRESSION → BROWSER QA`.
+
+## 7. Ledger
 
 - Human-First governance SPEC/PLAN/AUDIT: **MERGED / CLOSED**.
 - HF-P1A: **MERGED / CLOSED GREEN**.
 - HF-P1B: **MERGED / CLOSED GREEN**.
 - HF-P1C-A: **MERGED / CLOSED GREEN**.
-- HF-P1C-B original/remediation/checkbox: **MERGED / CLOSED**.
-- HF-P1C-B No Infinite Excel / Browser fix: **MERGED / CERTIFIED / CLOSED**.
-- PR #42 checkpoint documental: **MERGED / CLOSED**.
-- HF-P1D: **READY_FOR_OWNER_AUTHORIZATION / NOT STARTED**.
+- HF-P1C-B: **MERGED / CERTIFIED / CLOSED**.
+- HF-P1D: **TECHNICAL GREEN / BROWSER BLOCKED / NOT CERTIFIED / PR #43 DRAFT**.
+- HF-P1E: **NOT STARTED**.
+- HF-P1F: **NOT STARTED**.
+- HF-P2A: **NOT STARTED**.
+- HF-P2B: **NOT STARTED**.
 - R3: **FROZEN**.
 - R4: **NOT STARTED**.
 - Deployment: **NOT AUTHORIZED**.
 
-## 10. Recuperación si el chat termina
+## 8. Recuperación si el chat termina
 
-1. Leer `docs/CURRENT_CHECKPOINT.md` desde `main` o el checkpoint durable más reciente.
-2. Confirmar PR #41 MERGED en `d0c7687ed9fa62554329215eff5f2324cff5e5d1` y CI #1101 SUCCESS 8.3/8.4/8.5.
-3. Confirmar PR #42 MERGED en `be3413296f1a8d8a980f07ef89307f8e6a99464b`.
-4. No repetir HF-P1C-B ni reabrir PR #41/#42 sin regresión nueva.
-5. `continua` = autorización del owner para el siguiente gate preparado si sigue GREEN/sin drift.
-6. Próximo gate preparado: HF-P1D.
-7. Mantener R3 FROZEN, R4 NOT STARTED y deployment NOT AUTHORIZED.
-8. No confundir residuos locales ignorados por Codex (`config/database.php`, `storage/app/installed.lock`) con cambios versionados.
+1. Preferir esta rama durable:
+   `checkpoint/hf-p1d-ci-green-browser-blocked-20261017`.
+2. Separar **checkpoint branch HEAD docs-only** del **SHA técnico certificado por CI**: `e9594ef1e431eff2f3fc3193bb16a4533a1820af`.
+3. Confirmar PR #43 sigue OPEN/DRAFT y su HEAD técnico no cambió.
+4. Confirmar CI #1106 SUCCESS en PHP 8.3/8.4/8.5.
+5. No repetir ENV-001: `/health` ya quedó verificado y el entorno fue reparado sin cambios de código.
+6. No inferir Human-First desde health o CI.
+7. No mergear #43 hasta Browser QA real GREEN.
+8. No abrir HF-P1E mientras HF-P1D permanezca NOT_CERTIFIED.
+9. Mantener R3 FROZEN, R4 NOT STARTED y deployment NOT AUTHORIZED.
+10. `continua` = autorización del owner para ejecutar el siguiente gate preparado cuando sus precondiciones estén satisfechas.
