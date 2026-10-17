@@ -31,13 +31,14 @@ Orden operativo:
 Repositorio canónico: `sierraglobalcompany-rgb/AlquilaPro`.
 
 ```text
-MAIN = 7caf82e910edec4153f5cc49dcfb404f8f372b37
-MAIN_SOURCE = merge PR #44
+CAND01_PRODUCT_BASE = 7caf82e910edec4153f5cc49dcfb404f8f372b37
+MAIN_AT_PR45_OPEN = 7caf82e910edec4153f5cc49dcfb404f8f372b37
+MAIN_CURRENT = REVALIDATE_LIVE_BEFORE_ACTION
 PR_44 = MERGED / CLOSED
 DEPLOYMENT = NOT_AUTHORIZED
 ```
 
-PR #44 integró la baseline visual aprobada, la spec y el plan de implementación de Candidatos.
+PR #44 integró la baseline visual aprobada, la spec y el plan de implementación de Candidatos. `main` puede avanzar después por commits/merges exclusivamente documentales sin cambiar la base funcional de CAND-01; por eso este checkpoint **no fija como perpetuo** el HEAD vivo de `main`: debe revalidarse en GitHub antes de actuar.
 
 ## 3. Trabajo activo — CAND-01 / PR #45
 
@@ -295,7 +296,7 @@ Backlog posterior, no absorber ahora:
 Al abrir un chat/sesión nueva:
 
 1. leer este checkpoint;
-2. confirmar `main` en GitHub;
+2. revalidar `main` en GitHub;
 3. confirmar PR #45 + HEAD + CI #1121;
 4. confirmar PR #43 supersedido y PR #33 frozen;
 5. cargar la spec/plan de Candidatos y el Master Human-First exacto;
@@ -307,7 +308,8 @@ Al abrir un chat/sesión nueva:
 
 ```text
 REPO = sierraglobalcompany-rgb/AlquilaPro
-MAIN = 7caf82e910edec4153f5cc49dcfb404f8f372b37
+CAND01_PRODUCT_BASE = 7caf82e910edec4153f5cc49dcfb404f8f372b37
+MAIN_CURRENT = REVALIDATE_LIVE_BEFORE_ACTION
 ACTIVE_WORK = CAND-01
 PR_45_HEAD = 95fcbf472bf3caedbfccc23867585ee0644122f0
 PR_45_CI = 1121_GREEN_8_3_8_4_8_5
