@@ -16,13 +16,14 @@ Propósito: **puntero operativo único de continuidad, sin ruido histórico**.
 - Deployment: **NOT AUTHORIZED**.
 - Convención del owner: cuando Andrés diga **`continua`**, eso autoriza ejecutar el siguiente gate preparado —incluido merge— siempre que siga GREEN, sin drift y dentro del alcance previamente auditado.
 
-## 2. Verdad viva de `main`
+## 2. Verdad viva de GitHub
 
-- `main`: `d0c7687ed9fa62554329215eff5f2324cff5e5d1`.
+- Base funcional integrada post-HF-P1C-B: `d0c7687ed9fa62554329215eff5f2324cff5e5d1`.
 - PR #41 **MERGED / CLOSED** en `d0c7687ed9fa62554329215eff5f2324cff5e5d1`.
-- PR #41 HEAD certificado antes del merge: `71b582c41d379968929c1703bba49dfb54cfdf90`.
-- Merge #41 firmado/verificado por GitHub.
-- PR #40 checkbox primitive: **MERGED / CLOSED** en `c15bb3b370970b686210e76c3f72fed5d968dce9`.
+- PR #41 HEAD certificado: `71b582c41d379968929c1703bba49dfb54cfdf90`.
+- CI #1101 / run `38997826887`: **SUCCESS PHP 8.3 / 8.4 / 8.5**.
+- PR #42 checkpoint documental: **MERGED / CLOSED** en `be3413296f1a8d8a980f07ef89307f8e6a99464b`.
+- Cualquier HEAD posterior que sólo cambie este checkpoint es descendiente docs-only y no altera la evidencia técnica anterior.
 
 ## 3. HF-P1C-B — FINAL integrado y certificado
 
@@ -68,25 +69,24 @@ Minimal GREEN:
 `HF_P1C_B_ANTI_PATCH = PASS`
 `HF_P1C_B_BROWSER_QA = GREEN`
 `HF_P1C_B_HUMAN_FIRST_FINAL = CERTIFIED`
-`HF_P1C_B_INTEGRATED_IN_MAIN = YES @ d0c7687ed9fa62554329215eff5f2324cff5e5d1`
+`HF_P1C_B_INTEGRATED_IN_MAIN = YES`
 
-## 4. PR #42 — checkpoint documental
+## 4. Cierre documental
 
-- Rama: `docs/hf-p1c-b-browser-certification-20261017`.
-- Alcance: **sólo `docs/CURRENT_CHECKPOINT.md`**.
-- Debe converger este estado post-merge de #41 y luego marcarse Ready.
-- No introduce cambio funcional ni altera el árbol técnico certificado de PR #41.
-- Si este archivo se lee desde `main` después de merge #42, GitHub es autoridad para su merge SHA final.
+- PR #42 ya está **MERGED / CLOSED**.
+- `docs/CURRENT_CHECKPOINT.md` es el owner único de continuidad.
+- No reabrir PR #41 ni #42 salvo regresión nueva y demostrable.
+- No repetir Browser QA HF-P1C-B si el código no cambió.
 
-## 5. Siguiente bloque Human-First
+## 5. Siguiente bloque preparado
 
-- `HF-P1D` (candidate detail progressive disclosure): **READY_FOR_OWNER_AUTHORIZATION / NOT STARTED**.
+- `HF-P1D` — candidate detail progressive disclosure: **READY_FOR_OWNER_AUTHORIZATION / NOT STARTED**.
 - `HF-P1E` obligations disclosure: **NOT STARTED**.
 - `HF-P1F` tenant portal IA: **NOT STARTED**.
 - `HF-P2A` candidates pagination/filter: **NOT STARTED**.
 - `HF-P2B` feedback consistency: **NOT STARTED**.
 
-No abrir HF-P1D dentro del cierre documental de HF-P1C-B.
+El próximo `continua`, si no hay drift, autoriza abrir el gate preparado de **HF-P1D**.
 
 ## 6. R3 / R4 / deployment
 
@@ -124,6 +124,7 @@ Conservar PHP SSR + Slim; un `View`; un catálogo `Permissions`; autorización r
 - HF-P1C-A: **MERGED / CLOSED GREEN**.
 - HF-P1C-B original/remediation/checkbox: **MERGED / CLOSED**.
 - HF-P1C-B No Infinite Excel / Browser fix: **MERGED / CERTIFIED / CLOSED**.
+- PR #42 checkpoint documental: **MERGED / CLOSED**.
 - HF-P1D: **READY_FOR_OWNER_AUTHORIZATION / NOT STARTED**.
 - R3: **FROZEN**.
 - R4: **NOT STARTED**.
@@ -131,12 +132,11 @@ Conservar PHP SSR + Slim; un `View`; un catálogo `Permissions`; autorización r
 
 ## 10. Recuperación si el chat termina
 
-1. Leer `docs/CURRENT_CHECKPOINT.md` desde `main` o desde el checkpoint durable más reciente.
-2. Revalidar `main`; base funcional post-#41 esperada: `d0c7687ed9fa62554329215eff5f2324cff5e5d1` o un descendiente docs-only.
-3. Confirmar PR #41 MERGED y CI #1101 SUCCESS 8.3/8.4/8.5.
-4. No repetir Browser QA HF-P1C-B sin cambio de código/regresión.
-5. Revalidar PR #42 y su estado documental; si ya está merged, no reabrirlo.
-6. `continua` = autorización del owner para ejecutar el siguiente gate preparado si sigue GREEN/sin drift.
-7. No abrir HF-P1D fuera de su gate preparado.
-8. Mantener R3 FROZEN, R4 NOT STARTED y deployment NOT AUTHORIZED.
-9. No confundir residuos locales ignorados por Codex (`config/database.php`, `storage/app/installed.lock`) con cambios versionados.
+1. Leer `docs/CURRENT_CHECKPOINT.md` desde `main` o el checkpoint durable más reciente.
+2. Confirmar PR #41 MERGED en `d0c7687ed9fa62554329215eff5f2324cff5e5d1` y CI #1101 SUCCESS 8.3/8.4/8.5.
+3. Confirmar PR #42 MERGED en `be3413296f1a8d8a980f07ef89307f8e6a99464b`.
+4. No repetir HF-P1C-B ni reabrir PR #41/#42 sin regresión nueva.
+5. `continua` = autorización del owner para el siguiente gate preparado si sigue GREEN/sin drift.
+6. Próximo gate preparado: HF-P1D.
+7. Mantener R3 FROZEN, R4 NOT STARTED y deployment NOT AUTHORIZED.
+8. No confundir residuos locales ignorados por Codex (`config/database.php`, `storage/app/installed.lock`) con cambios versionados.
