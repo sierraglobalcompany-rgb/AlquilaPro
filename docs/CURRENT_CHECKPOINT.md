@@ -3,72 +3,111 @@
 Fecha de actualización: 2026-10-16
 Propósito: **puntero operativo único para recuperar el proyecto si se pierde el chat/contexto**.
 
-> Regla: GitHub + CI son autoridad técnica. Este archivo sólo resume el estado vivo. Los checkpoints históricos no sustituyen el estado actual.
+> Regla: GitHub + CI son autoridad técnica. Este archivo resume la verdad operativa viva; los checkpoints históricos no sustituyen el estado actual.
 
 ## 1. Leyes obligatorias
 
 - **KISS**: A → B; simple, eficiente, optimizado y eficaz; no capas/servicios/tablas innecesarios.
 - **Cero Ruido**: `ELIMINAR → UNIR/CONVERGER → SIMPLIFICAR → MEJORAR/OPTIMIZAR → AGREGAR`.
 - **Anti-parche**: `REPRODUCE → ROOT CAUSE → OWNER → DUPLICACIÓN → RED → CAUSAL RED → MINIMAL GREEN → RETIRAR SUPERSEDED → REGRESSION`.
+- **Human-First / Diseño**: persona > modelo de datos; lenguaje humano en primera capa; progressive disclosure; datos técnicos sólo donde sean necesarios; no certificar visual/responsive/accessibility sin Browser QA real.
 - TDD para cambios funcionales; producción sólo después de RED causal.
 - Merge y deployment son gates separados.
 - Deployment: **NO AUTORIZADO**.
 
 ## 2. Main / merges cerrados
 
-- `main@ce3f98deb04263bc668376a3b14031a3888f3413` antes de este commit documental.
+- `main@c23dd7fc1a1dfd2febfd8285c5e07d1033a6f06f`.
 - PR #34 Human-First governance: **MERGED / CLOSED**.
-- PR #35 HF-P1A human labels: **MERGED / CLOSED GREEN**.
-- PR #36 HF-P1B dashboard cockpit: **MERGED / CLOSED GREEN**.
-- PR #37 HF-P1C-A contract operator Human-First: **MERGED / CLOSED GREEN**.
-- HF-P1C-A merge commit: `b978219a6ec8d286164d2d849d68315ced894c66`.
-- HF-P1C-A CI final #1091: **GREEN PHP 8.3 / 8.4 / 8.5**; PHP 8.3 `657 tests / 7782 assertions / 1 skipped / 0 warnings`.
+- PR #35 HF-P1A human labels: **MERGED / CLOSED GREEN funcional**.
+- PR #36 HF-P1B dashboard cockpit: **MERGED / CLOSED GREEN funcional**.
+- PR #37 HF-P1C-A contract operator Human-First: **MERGED / CLOSED GREEN funcional**.
+- PR #38 HF-P1C-B template author form: **MERGED / CLOSED**.
+- HF-P1C-B merge commit: `c23dd7fc1a1dfd2febfd8285c5e07d1033a6f06f`.
+- PR #38 preservó la historia `RED adf12146 → GREEN 87dc551f → cleanup 280a6a2e → merge c23dd7fc`.
 
-## 3. ACTIVE — HF-P1C-B causal RED / STOP antes de GREEN
+## 3. ACTIVE — HF-P1C-B certification remediation
 
-### Estado exacto
+### Motivo
 
-- Microbloque: **HF-P1C-B — autor de plantillas contractual sin JSON crudo**.
-- Rama: `impl/hf-p1c-b-template-human-form-20261016`.
-- HEAD: `adf1214627490231d9848ec8b0612c8ac2e8c461`.
-- PR #38: **OPEN / DRAFT / NOT MERGED / mergeable**.
-- Checkpoint ref: `checkpoint/hf-p1c-b-red-stop-20261016` → `adf1214627490231d9848ec8b0612c8ac2e8c461`.
-- Cambios en rama: **1 archivo de test nuevo, 0 producción**.
-- Test: `tests/Integration/Contracts/HumanFirstContractTemplateAuthorRoutesTest.php`.
+La re-auditoría posterior al merge confirmó:
 
-### RED causal certificado
+- **KISS = PASS**.
+- **Cero Ruido = PASS**.
+- **Anti-parche = PASS**.
+- **Human-First / Diseño = incompleto**, por:
+  1. UI humana limitada a una sola variable pese a que `ContractService` soporta hasta 50;
+  2. copy técnico primario (`Texto UTF-8 plano con placeholders allowlisted`);
+  3. checkpoint canónico desactualizado;
+  4. Browser QA real todavía bloqueado.
 
-CI #1092 / run `38986855330` sobre PR #38:
+### Rama y PR
 
-- PHP 8.3: **FAILURE causal** — `658 tests / 7790 assertions / 1 failure / 1 skipped`.
-- PHP 8.4: **FAILURE causal**.
-- PHP 8.5: **FAILURE causal**.
-- Composer validate strict: PASS.
-- Único fallo verificado en PHP 8.3: `HumanFirstContractTemplateAuthorRoutesTest::testTemplateAuthorUsesStructuredVariableFieldsInsteadOfJson`.
-- Causa exacta: la vista todavía expone `variables_json` y aún no renderiza `variables[0][key]`, `variables[0][label]`, `variables[0][required]`.
-- No hay fallo de setup, DB, Composer ni regresión ajena.
+- Rama: `impl/hf-p1c-b-human-first-certification-20261016`.
+- Base exacta: `main@c23dd7fc1a1dfd2febfd8285c5e07d1033a6f06f`.
+- PR #39: **OPEN / DRAFT / NOT MERGED**.
+- RED HEAD: `d4d59fefdb6f785cecacc17576181b60faacfadf`.
+- GREEN de producción verificado: `a276c136214ecb816366b29cd41a66cda27f1b01`.
+- Checkpoint intermedio: `checkpoint/hf-p1c-b-certification-green-ci-in-progress-20261016` → `a276c136214ecb816366b29cd41a66cda27f1b01`.
 
-### Contrato GREEN ya diseñado, NO escrito
+### RED causal
 
-Al reanudar:
+CI #1095 / run `38993550706` sobre `d4d59fefdb6f785cecacc17576181b60faacfadf`:
 
-1. revalidar `main`, rama, PR #38 y checkpoint;
-2. **no repetir RED**;
-3. implementar GREEN mínimo sólo en:
-   - `resources/views/contract_template_detail.php`;
-   - `app/Contracts/routes.php`;
-4. la vista debe sustituir el textarea humano `variables_json` por campos SSR `variables[n][key|label|required]`;
-5. la route debe aceptar `variables[...]` como transporte HTML y normalizar `required` a booleano;
-6. conservar `variables_json` únicamente como fallback histórico de compatibilidad;
-7. `ContractService::createTemplateVersion()` permanece como único validador/truth owner profundo;
-8. no duplicar reglas de dominio en route;
-9. no DB, no migration, no JS, no CSS, no SPA/framework, no segundo servicio;
-10. correr full CI PHP 8.3/8.4/8.5; sólo después auditar/checkpoint/merge.
+- setup: PASS;
+- Composer: PASS;
+- PHP 8.3: `Run tests = FAILURE` causal;
+- fallo introducido deliberadamente por el test Human-First que exige:
+  - mantener JSON crudo fuera de la UI primaria;
+  - ofrecer transporte estructurado para múltiples variables;
+  - lenguaje humano primero;
+  - progressive disclosure SSR nativo.
 
-`HF_P1C_B_RED_CAUSAL = YES`
-`HF_P1C_B_GREEN = NOT_WRITTEN`
-`HF_P1C_B_MERGED = NO`
-`RESUME_EXACTLY_FROM = HF-P1C-B minimal GREEN after causal RED adf12146`
+### GREEN mínimo
+
+Sólo se modificó producción en:
+
+- `resources/views/contract_template_detail.php`.
+
+El test causal está en:
+
+- `tests/Integration/Contracts/HumanFirstContractTemplateAuthorRoutesTest.php`.
+
+No se tocó route, servicio, DB, migration, CSS, JS, SPA, framework ni dependencias.
+
+Resultado:
+
+- datos manuales ocultos por defecto tras un disclosure Human-First;
+- variable 1 disponible en el primer nivel del disclosure;
+- variables 2–50 disponibles bajo un segundo `<details>` SSR nativo;
+- copy primario Human-First;
+- detalle técnico conservado sólo bajo disclosure;
+- `ContractService::validatedVariables()` continúa como único owner profundo y conserva el límite canónico de 50;
+- compatibilidad histórica `variables_json` permanece sólo como fallback de transporte no visible.
+
+### CI GREEN de producción
+
+CI #1096 / run `38993819633` sobre `a276c136214ecb816366b29cd41a66cda27f1b01`:
+
+- PHP 8.3: **SUCCESS**;
+- PHP 8.4: **SUCCESS**;
+- PHP 8.5: **SUCCESS**;
+- Composer: **SUCCESS** en las tres matrices;
+- `Run tests`: **SUCCESS** en las tres matrices.
+
+> El HEAD documental posterior debe conservar CI exact-head GREEN antes de merge; verificar GitHub al reanudar.
+
+### Estado de certificación
+
+`HF_P1C_B_FUNCTIONAL_GREEN = YES`
+`HF_P1C_B_KISS = PASS`
+`HF_P1C_B_ZERO_NOISE = PASS`
+`HF_P1C_B_ANTI_PATCH = PASS`
+`HF_P1C_B_BROWSER_QA = BLOCKED / NOT_CERTIFIED`
+`HF_P1C_B_HUMAN_FIRST_FINAL = NOT_CERTIFIED`
+`HF_P1C_B_REMEDIATION_MERGED = NO`
+
+No abrir HF-P1D mientras el gate Browser/Human-First siga sin certificar.
 
 ## 4. R3 — congelado
 
@@ -86,17 +125,19 @@ Al reanudar:
 
 `HUMAN_FIRST_TASK1 = BLOCKED_TOOL_SAFETY`
 
-- Fuente exacta: `70,982 bytes`.
+- Fuente exacta conocida: `70,982 bytes`.
 - SHA-256: `55265c92b7a49a4ac2ac976afb6789074b5f95ff5760f6d08b7b1d0e817f6940`.
-- El conector GitHub bloqueó persistir el payload exacto.
+- El payload exacto sigue sin persistirse en GitHub.
 - Prohibido resumir/truncar/fragmentar para bypass.
 - Adapter huérfano: **NO CREADO**.
+- Design Master: **bloqueado por Master**.
 
 ### Browser
 
 `PASS_10_BROWSER = BLOCKED / NOT_CERTIFIED`
 
-No certificar visual/responsive/accessibility actual por inferencia.
+- La conexión Browser requiere permiso del usuario.
+- No certificar visual, responsive ni accessibility por inferencia.
 
 ## 6. Auditoría Human-First
 
@@ -105,18 +146,18 @@ No certificar visual/responsive/accessibility actual por inferencia.
 
 - `GOV-001` P0 — Master exacto no persistido: **BLOCKED_TOOL_SAFETY**.
 - `DOC-001` README drift: **CLOSED**.
-- `DOC-002` puntero vivo: **CLOSED**.
+- `DOC-002` puntero vivo: **ACTUALIZADO por PR #39**.
 - `UX-001` P1 — códigos/estados/roles técnicos: **PARTIAL CLOSED por HF-P1A**.
 - `UX-002` P1 — dashboard sin cockpit: **CLOSED por HF-P1B**.
-- `UX-003` P1 — operador contractual: **CLOSED por HF-P1C-A**; autor de plantillas: **ACTIVE RED HF-P1C-B**.
-- `UX-004` P1 — candidate detail / obligations / tenant detail: **PENDIENTE**.
+- `UX-003` P1 — operador contractual: **CLOSED funcional por HF-P1C-A**; autor de plantillas: **FUNCTIONAL GREEN / BROWSER NOT_CERTIFIED**.
+- `UX-004` P1 — candidate detail / obligations / tenant detail: **PENDIENTE / NO ABRIR AÚN**.
 - `UX-005` P2 — formatos humanos: **PENDIENTE**.
 - `UX-006` P2 — feedback 422: **PENDIENTE**.
 - `PERF-001` P2 — candidatos paginación/filtros: **PENDIENTE**.
 - `A11Y-001`, `RESP-001`, `BROWSER-001`: **BLOCKED / PENDIENTE**.
 - `DS-001` P3 — Design Master: **bloqueado por Master**.
 
-Informe: `docs/audits/2026-10-16-human-first-repository-audit.md`.
+Informe base: `docs/audits/2026-10-16-human-first-repository-audit.md`.
 
 ## 7. KEEP — no reescribir
 
@@ -125,15 +166,16 @@ Conservar PHP SSR + Slim; un `View`; un catálogo `Permissions`; autorización r
 ## 8. Ledger
 
 - Human-First governance SPEC/PLAN/AUDIT: **MERGED / CLOSED**.
-- HF-G0 README + checkpoint: **MERGED / CLOSED GREEN**.
+- HF-G0 README + checkpoint: **MERGED / CLOSED GREEN funcional**.
 - HF-G0 Master exacto: **BLOCKED_TOOL_SAFETY**.
 - HF-G0 adapters + Design Master: **BLOCKED por Master**.
 - HF-G1 R3 Browser QA: **BLOCKED por Browser permission**.
-- HF-P1A human labels: **MERGED / CLOSED GREEN**.
-- HF-P1B dashboard cockpit: **MERGED / CLOSED GREEN**.
-- HF-P1C-A contract operator: **MERGED / CLOSED GREEN**.
-- HF-P1C-B template author: **ACTIVE / CAUSAL RED / GREEN NOT WRITTEN / STOP**.
-- HF-P1D candidate detail disclosure: **NOT STARTED**.
+- HF-P1A human labels: **MERGED / CLOSED GREEN funcional**.
+- HF-P1B dashboard cockpit: **MERGED / CLOSED GREEN funcional**.
+- HF-P1C-A contract operator: **MERGED / CLOSED GREEN funcional**.
+- HF-P1C-B template author original: **MERGED / CLOSED por PR #38**.
+- HF-P1C-B certification remediation: **GREEN funcional / PR #39 OPEN / BROWSER BLOCKED / FINAL NOT_CERTIFIED**.
+- HF-P1D candidate detail disclosure: **NOT STARTED / BLOCKED por cierre Human-First de P1C-B**.
 - HF-P1E obligations disclosure: **NOT STARTED**.
 - HF-P1F tenant portal IA: **NOT STARTED**.
 - HF-P2A candidates pagination/filter: **NOT STARTED**.
@@ -146,9 +188,9 @@ Conservar PHP SSR + Slim; un `View`; un catálogo `Permissions`; autorización r
 Si el chat termina:
 
 1. leer este archivo;
-2. revalidar `main`, rama `impl/hf-p1c-b-template-human-form-20261016`, PR #38 y CI #1092;
-3. confirmar checkpoint `checkpoint/hf-p1c-b-red-stop-20261016@adf1214627490231d9848ec8b0612c8ac2e8c461`;
-4. no repetir HF-P1A/P1B/P1C-A ni el RED de P1C-B;
-5. reanudar exactamente en el GREEN mínimo de HF-P1C-B;
-6. no R3 visual GREEN sin Browser real;
+2. revalidar `main@c23dd7fc1a1dfd2febfd8285c5e07d1033a6f06f`, rama `impl/hf-p1c-b-human-first-certification-20261016` y PR #39;
+3. confirmar el HEAD vivo de PR #39 y su CI exact-head;
+4. no repetir el RED #1095 ni el GREEN funcional ya demostrado;
+5. verificar Browser permission; si sigue bloqueado, mantener `NOT_CERTIFIED` y no abrir HF-P1D;
+6. no descongelar R3 sin Browser QA real;
 7. no R4 y no deployment.
