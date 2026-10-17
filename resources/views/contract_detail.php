@@ -6,6 +6,17 @@ $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, 
 $manualJson = $contract['manual_variables_json'] ?? '{}';
 $tasksJson = $contract['tasks_json'] ?? '[]';
 $annexesJson = $contract['annexes_json'] ?? '[]';
+$manualValues = json_decode((string) $manualJson, true, 64, JSON_THROW_ON_ERROR);
+$tasks = json_decode((string) $tasksJson, true, 64, JSON_THROW_ON_ERROR);
+$annexes = json_decode((string) $annexesJson, true, 64, JSON_THROW_ON_ERROR);
+if (!is_array($manualValues) || !is_array($tasks) || !array_is_list($tasks) || !is_array($annexes) || !array_is_list($annexes)) {
+    throw new RuntimeException('Los datos contractuales almacenados no son válidos.');
+}
+$manualVariableDeclarations = is_array($manualVariableDeclarations ?? null) ? $manualVariableDeclarations : [];
+$taskRows = $tasks;
+$taskRows[] = ['label' => '', 'done' => false];
+$annexRows = $annexes;
+$annexRows[] = ['title' => '', 'note' => null];
 $status = (string) $contract['status'];
 $isDraft = $status === 'draft';
 $isGenerated = $status === 'generated';
@@ -232,18 +243,54 @@ $currentPeriodMonth = (string) ($currentPeriodMonth ?? '');
                 <span>Duración acordada</span>
                 <input type="text" maxlength="120" name="duration_text" value="<?= $escape($contract['duration_text']) ?>" required>
             </label>
-            <label class="field">
-                <span>Variables manuales JSON</span>
-                <textarea name="manual_variables_json" rows="4"><?= $escape($manualJson) ?></textarea>
-            </label>
-            <label class="field">
-                <span>Tareas JSON</span>
-                <textarea name="tasks_json" rows="4"><?= $escape($tasksJson) ?></textarea>
-            </label>
-            <label class="field">
-                <span>Anexos JSON</span>
-                <textarea name="annexes_json" rows="4"><?= $escape($annexesJson) ?></textarea>
-            </label>
+
+            <?php if ($manualVariableDeclarations !== []): ?>
+                <fieldset class="settings-form">
+                    <legend>Datos adicionales del contrato</legend>
+                    <?php foreach ($manualVariableDeclarations as $declaration): ?>
+                        <?php
+                        $key = (string) ($declaration['key'] ?? '');
+                        $label = (string) ($declaration['label'] ?? $key);
+                        $required = (bool) ($declaration['required'] ?? false);
+                        ?>
+                        <label class="field">
+                            <span><?= $escape($label) ?><?= $required ? ' *' : '' ?></span>
+                            <input type="text" name="manual_variables[<?= $escape($key) ?>]" maxlength="4000" value="<?= $escape($manualValues[$key] ?? '') ?>"<?= $required ? ' required' : '' ?>>
+                        </label>
+                    <?php endforeach; ?>
+                </fieldset>
+            <?php endif; ?>
+
+            <fieldset class="settings-form">
+                <legend>Tareas</legend>
+                <?php foreach ($taskRows as $index => $task): ?>
+                    <div class="user-card">
+                        <label class="field">
+                            <span>Tarea<?= $index === count($taskRows) - 1 ? ' nueva (opcional)' : '' ?></span>
+                            <input type="text" name="tasks[<?= (int) $index ?>][label]" maxlength="190" value="<?= $escape($task['label'] ?? '') ?>">
+                        </label>
+                        <input type="hidden" name="tasks[<?= (int) $index ?>][done]" value="0">
+                        <label><input type="checkbox" name="tasks[<?= (int) $index ?>][done]" value="1"<?= !empty($task['done']) ? ' checked' : '' ?>> Completada</label>
+                    </div>
+                <?php endforeach; ?>
+            </fieldset>
+
+            <fieldset class="settings-form">
+                <legend>Anexos</legend>
+                <?php foreach ($annexRows as $index => $annex): ?>
+                    <div class="user-card">
+                        <label class="field">
+                            <span>Título<?= $index === count($annexRows) - 1 ? ' nuevo (opcional)' : '' ?></span>
+                            <input type="text" name="annexes[<?= (int) $index ?>][title]" maxlength="190" value="<?= $escape($annex['title'] ?? '') ?>">
+                        </label>
+                        <label class="field">
+                            <span>Nota</span>
+                            <textarea name="annexes[<?= (int) $index ?>][note]" rows="3"><?= $escape($annex['note'] ?? '') ?></textarea>
+                        </label>
+                    </div>
+                <?php endforeach; ?>
+            </fieldset>
+
             <button class="button" type="submit">Guardar borrador</button>
         </form>
     </section>
@@ -265,10 +312,16 @@ $currentPeriodMonth = (string) ($currentPeriodMonth ?? '');
         <form method="post" action="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($contract['id']) ?>" class="settings-form">
             <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
             <input type="hidden" name="action" value="update_tasks">
-            <label class="field">
-                <span>Tareas JSON</span>
-                <textarea name="tasks_json" rows="4"><?= $escape($tasksJson) ?></textarea>
-            </label>
+            <?php foreach ($taskRows as $index => $task): ?>
+                <div class="user-card">
+                    <label class="field">
+                        <span>Tarea<?= $index === count($taskRows) - 1 ? ' nueva (opcional)' : '' ?></span>
+                        <input type="text" name="tasks[<?= (int) $index ?>][label]" maxlength="190" value="<?= $escape($task['label'] ?? '') ?>">
+                    </label>
+                    <input type="hidden" name="tasks[<?= (int) $index ?>][done]" value="0">
+                    <label><input type="checkbox" name="tasks[<?= (int) $index ?>][done]" value="1"<?= !empty($task['done']) ? ' checked' : '' ?>> Completada</label>
+                </div>
+            <?php endforeach; ?>
             <button class="button" type="submit">Actualizar tareas</button>
         </form>
     </section>

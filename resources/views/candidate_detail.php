@@ -206,7 +206,7 @@ $canCreateContract = $contractContext !== null && (bool) ($contractContext['can_
         <?php endif; ?>
 
         <?php if ($canCreateContract): ?>
-            <a class="button" href="<?= $escape($basePath) ?>/admin/contracts">Crear contrato</a>
+            <a class="button" href="<?= $escape($basePath) ?>/admin/contracts?candidate_id=<?= (int) $candidate['id'] ?>">Crear contrato</a>
         <?php endif; ?>
     </section>
 <?php endif; ?>
