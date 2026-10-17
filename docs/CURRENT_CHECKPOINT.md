@@ -22,6 +22,7 @@ Propósito: **puntero operativo único para recuperar el proyecto sin arrastrar 
 - Merge commit: `c15bb3b370970b686210e76c3f72fed5d968dce9`.
 - HEAD funcional probado antes del merge: `670850668fc94f69f36bbbd8b784d1a22edbe524`.
 - Historia preservada: `RED dd83b08a → GREEN 67085066 → merge c15bb3b3`.
+- HF-P1C-B Browser QA fix PR #41: **OPEN / READY FOR REVIEW / NOT MERGED**; candidato certificado `71b582c41d379968929c1703bba49dfb54cfdf90`.
 - HF-P1C-B remediation PR #39: **MERGED / CLOSED** en `7f56ad39ad230a460259d115e35cb897d68f5496`.
 - PR #38 HF-P1C-B original: **MERGED / CLOSED** en `c23dd7fc1a1dfd2febfd8285c5e07d1033a6f06f`.
 - PR #37 HF-P1C-A: **MERGED / CLOSED GREEN funcional**.
@@ -64,6 +65,18 @@ Propósito: **puntero operativo único para recuperar el proyecto sin arrastrar 
 - Merge: `c15bb3b370970b686210e76c3f72fed5d968dce9`.
 - El merge commit conserva el mismo árbol del GREEN probado (`ac32ae50aed326c863e4a37b6dacad3f39c25d09`).
 
+### Browser QA — candidato PR #41
+
+- Root cause reproducida: al abrir «Más variables manuales» se renderizaban juntas las variables 2–50; a 1440×900 la página alcanzó 14.001 px.
+- Minimal GREEN: diez `<details>` nativos cerrados por defecto, cinco variables por grupo; capacidad 50 y primitive `.check-row` preservadas.
+- RED causal: test focal esperaba los rangos 2–6, 7–11, …, 47–50; falló antes del cambio (1 test / 13 assertions).
+- GREEN focal en `71b582c41d379968929c1703bba49dfb54cfdf90`: **1 test / 19 assertions**.
+- CI #1101 / run `38997826887`: **SUCCESS**, suite completa y PHP 8.3 / 8.4 / 8.5.
+- Navegador: ChatGPT in-app browser, `http://127.0.0.1:8180/admin/contract-templates/1`; 1440×900, 768×1024 y 375×812. Sin overflow horizontal, clipping ni errores/advertencias de consola. TAB sigue textarea → disclosure → campos → checkbox → disclosures → acción primaria; summary funciona con Enter y checkbox con Space/foco visible. Se guardó una versión demo con variable adicional.
+- Capturas reales desktop (primera capa cerrada, primer disclosure y grupos), tablet y móvil capturadas en la evidencia de esta tarea; no versionadas.
+- Suite local del contenedor temporal: 658 tests / 7.585 assertions / 4 failures / 1 skipped. Los cuatro fallos fueron de configuración de ese contenedor: `InstallerTest` recibió `host.docker.internal` en lugar de `127.0.0.1`; tres pruebas `ServerReadyBuilder` no encontraron `composer`. La suite de CI pasó en las tres matrices.
+- PR #41 está abierto y no fusionado. No afirmar que el candidato ya está integrado en `main`.
+
 ### Auditoría
 
 `HF_P1C_B_FUNCTIONAL_GREEN = YES`
@@ -72,18 +85,18 @@ Propósito: **puntero operativo único para recuperar el proyecto sin arrastrar 
 `HF_P1C_B_ANTI_PATCH = PASS`
 `HF_P1C_B_REMEDIATION_MERGED = YES`
 `HF_P1C_B_CHECKBOX_MICROFIX_MERGED = YES`
-`HF_P1C_B_BROWSER_QA = BLOCKED / NOT_CERTIFIED`
-`HF_P1C_B_HUMAN_FIRST_FINAL = NOT_CERTIFIED`
+`HF_P1C_B_BROWSER_QA = GREEN @ 71b582c41d379968929c1703bba49dfb54cfdf90`
+`HF_P1C_B_HUMAN_FIRST_FINAL = CERTIFIED @ PR #41 HEAD; merge awaits owner authorization`
 
-HF-P1C-B está funcionalmente integrado y el preflight estático no deja abierto el defecto del checkbox, pero **no se declara Human-First final** hasta Browser QA real.
+`main` conserva el último merge `c15bb3b3`; la certificación aplica al candidato PR #41 y no implica integración.
 
 ## 4. Gate activo — Browser / Human-First final
 
-`PASS_10_BROWSER = BLOCKED / NOT_CERTIFIED`
+`PASS_10_BROWSER = GREEN @ PR #41 HEAD 71b582c41d379968929c1703bba49dfb54cfdf90`
 
-- Browser control sigue requiriendo permiso del usuario.
-- No certificar visual, responsive ni accessibility por inferencia.
-- **HF-P1D NO se abre mientras este gate siga bloqueado**, según el plan vigente.
+- Browser interno real completado: identidad, render, consola, interacción, teclado, foco, Human-First y No Infinite Excel PASS.
+- Viewports verificados: desktop 1440×900, tablet 768×1024 y móvil 375×812; evidencia capturada y no versionada.
+- HF-P1D: **READY_FOR_OWNER_AUTHORIZATION / NOT STARTED**; esta tarea no lo implementa.
 
 ## 5. R3 — congelado
 
@@ -115,7 +128,7 @@ HF-P1C-B está funcionalmente integrado y el preflight estático no deja abierto
 - `DOC-002` puntero vivo: **CLOSED / ACTUALIZADO**.
 - `UX-001` P1 — códigos/estados/roles técnicos: **PARTIAL CLOSED por HF-P1A**.
 - `UX-002` P1 — dashboard sin cockpit: **CLOSED por HF-P1B**.
-- `UX-003` P1 — operador contractual: **CLOSED funcional por HF-P1C-A**; autor de plantillas: **FUNCTIONAL GREEN MERGED / STATIC PREFLIGHT GREEN / BROWSER NOT_CERTIFIED**.
+- `UX-003` P1 — operador contractual: **CLOSED funcional por HF-P1C-A**; autor de plantillas: **BROWSER/HUMAN-FIRST CERTIFIED en candidato PR #41; merge pendiente**.
 - `UX-004` P1 — candidate detail / obligations / tenant detail: **PENDIENTE / NO ABRIR AÚN**.
 - `UX-005` P2 — formatos humanos: **PENDIENTE**.
 - `UX-006` P2 — feedback 422: **PENDIENTE**.
@@ -139,8 +152,8 @@ Conservar PHP SSR + Slim; un `View`; un catálogo `Permissions`; autorización r
 - HF-P1B: **MERGED / CLOSED GREEN funcional**.
 - HF-P1C-A: **MERGED / CLOSED GREEN funcional**.
 - HF-P1C-B original: **MERGED / CLOSED**.
-- HF-P1C-B remediation: **MERGED / GREEN funcional / checkbox microfix MERGED / Browser BLOCKED / FINAL NOT_CERTIFIED**.
-- HF-P1D: **NOT STARTED / BLOCKED por Browser/Human-First final**.
+- HF-P1C-B remediation: **MERGED / GREEN funcional / checkbox microfix MERGED / Browser + Human-First CERTIFIED en PR #41 HEAD `71b582c`; merge pendiente**.
+- HF-P1D: **READY_FOR_OWNER_AUTHORIZATION / NOT STARTED**.
 - HF-P1E: **NOT STARTED**.
 - HF-P1F: **NOT STARTED**.
 - HF-P2A: **NOT STARTED**.
@@ -152,10 +165,8 @@ Conservar PHP SSR + Slim; un `View`; un catálogo `Permissions`; autorización r
 
 Si el chat termina:
 
-1. leer este archivo;
-2. revalidar `main` y confirmar que incluye merge `c15bb3b370970b686210e76c3f72fed5d968dce9`;
-3. no repetir RED/GREEN de HF-P1C-B, no reabrir PR #39 ni PR #40;
-4. comprobar Browser permission;
-5. si Browser sigue bloqueado, mantener `HF_P1C_B_HUMAN_FIRST_FINAL = NOT_CERTIFIED` y **no abrir HF-P1D**;
-6. no descongelar R3 sin Browser QA real;
-7. no R4 y no deployment.
+1. leer este archivo y revalidar `main` (último SHA auditado: `3648ca8962980ed3a529d77bffacafc87a250b16`);
+2. revisar PR #41 y su SHA `71b582c41d379968929c1703bba49dfb54cfdf90`; no fusionar sin autorización explícita del owner;
+3. no repetir RED/GREEN de PR #39/#40 ni Browser QA sin cambio de código o regresión;
+4. HF-P1D permanece preparado, pero **NOT STARTED** hasta autorización del owner;
+5. mantener R3 **FROZEN**, R4 **NOT STARTED** y deployment **NOT AUTHORIZED**.
