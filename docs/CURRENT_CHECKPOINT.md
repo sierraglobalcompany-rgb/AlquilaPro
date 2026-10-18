@@ -14,6 +14,7 @@ Propósito: **puntero operativo único de continuidad, sin ruido histórico**.
 - **No claim without evidence**: SHA exacto + CI para GREEN técnico; Browser real para certificación visual.
 - Merge y deployment son gates separados.
 - Deployment: **NOT AUTHORIZED**.
+- **Hostinger sólo al final:** no preparar ni publicar previews, hPanel, DNS, bases o despliegues durante desarrollo. Instalar únicamente el sistema completo tras QA integral + UAT y autorización final separada del owner.
 - Convención del owner: `continua` autoriza ejecutar el siguiente gate inequívocamente preparado —incluido merge— sólo si sigue GREEN, sin drift y dentro del alcance ya auditado.
 - `checkpoint y para` = persistir/verificar checkpoint y detenerse.
 
@@ -131,6 +132,8 @@ CAND_02 = NOT_STARTED
 ```
 
 **Un test verde o contratos CSS no certifican UX.** No mergear PR #45 sin Browser QA real de CAND-01.
+
+Intentos documentados (2026-10-17): Codex/Antigravity y Work no consiguieron una instancia autorizada y observable; **cero capturas reales de producto**. El paquete SERVER_READY de PR #45 se construyó y auditó localmente, pero no hubo rehearsal, preview ni publicación. Los preflights de Hostinger quedan **SUSPENDIDOS por decisión del owner**, no son el siguiente gate. No repetir la misma ruta bloqueada ni sustituir Browser QA por inferencias estáticas.
 
 ## 5. Browser QA pendiente — CAND-01
 
@@ -262,7 +265,7 @@ No resumir, truncar ni fragmentar el Master para evadir bloqueos de seguridad.
 Orden obligatorio:
 
 1. convergencia documental de checkpoint + estado formal de la spec: **CLOSED**;
-2. ejecutar **Browser QA real CAND-01**;
+2. ejecutar **Browser QA real CAND-01 en entorno de desarrollo autorizado**, sin usar Hostinger; obtener capturas auténticas, navegación, permisos, consola, foco y tres viewports. Si el navegador sigue denegado, permanecer BLOCKED y documentar el bloqueo;
 3. sólo con Browser GREEN + Human-First CERTIFIED + HEAD exacto + CI requerido + reviews limpios + owner gate: merge PR #45;
 4. verificar `main` post-merge y persistir checkpoint;
 5. abrir CAND-02.
@@ -304,7 +307,7 @@ Al abrir un chat/sesión nueva:
 5. cargar la spec/plan de Candidatos y el Master Human-First exacto;
 6. aplicar KISS + Cero Ruido + Anti-parche + Human-First;
 7. no mergear PR #45 mientras Browser QA siga bloqueado;
-8. deployment sigue **NOT AUTHORIZED**.
+8. deployment sigue **NOT AUTHORIZED**; **Hostinger es la última fase**, tras completar producto, QA integral y UAT aprobado por el owner.
 
 ## 13. Estado resumido
 
@@ -322,5 +325,7 @@ PR_43 = DRAFT_DO_NOT_MERGE_VISUAL_SUPERSEDED
 PR_33_R3 = FROZEN_BROWSER_BLOCKED
 R4 = NOT_STARTED
 DEPLOYMENT = NOT_AUTHORIZED
-NEXT_SAFE_ACTION = REAL_BROWSER_QA_CAND01
+HOSTINGER_PHASE = FINAL_ONLY_AFTER_COMPLETE_SYSTEM_AND_OWNER_UAT
+REMOTE_QA_PREVIEW = SUSPENDED_BY_OWNER
+NEXT_SAFE_ACTION = REAL_BROWSER_QA_CAND01_LOCAL_AUTHORIZED
 ```
