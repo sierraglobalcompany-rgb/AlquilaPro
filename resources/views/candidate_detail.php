@@ -86,16 +86,18 @@ if ($unitCode !== '') {
             <div class="candidate-avatar" aria-hidden="true"><?= $escape($initials) ?></div>
             <div class="candidate-shell__copy">
                 <p class="eyebrow">Candidato</p>
-                <h1><?= $escape($candidate['full_name'] ?? '') ?></h1>
+                <div class="candidate-shell__title">
+                    <h1><?= $escape($candidate['full_name'] ?? '') ?></h1>
+                    <span class="status-pill"><?= $escape($statusLabel) ?></span>
+                </div>
                 <?php if ($unitLabel !== ''): ?>
                     <p class="muted candidate-shell__unit"><?= $escape($unitLabel) ?></p>
                 <?php endif; ?>
             </div>
         </div>
-        <div class="candidate-shell__status">
-            <span class="status-pill status-pill--active"><?= $escape($statusLabel) ?></span>
-            <p class="muted"><?= $escape($statusDescription) ?></p>
-        </div>
+        <?php if ($activeSection !== 'overview'): ?>
+            <div class="candidate-shell__status"><p class="muted"><?= $escape($statusDescription) ?></p></div>
+        <?php endif; ?>
     </header>
 
     <nav class="content-card candidate-tabs" aria-label="Secciones del candidato">
@@ -129,39 +131,39 @@ if ($unitCode !== '') {
 
     <?php if ($activeSection === 'overview'): ?>
         <section class="candidate-section" data-candidate-section-body="overview">
-            <div class="section-heading candidate-section__heading">
-                <div>
-                    <p class="eyebrow">Solicitud</p>
-                    <h2>Resumen de la solicitud</h2>
-                    <p class="muted">La información esencial para identificar a la persona y revisar su solicitud.</p>
-                </div>
-            </div>
-
             <div class="candidate-overview-grid">
-                <section class="content-card candidate-card candidate-card--primary">
-                    <div class="section-heading">
-                        <div>
-                            <p class="eyebrow">Datos principales</p>
-                            <h3>Identidad y contacto</h3>
-                        </div>
+                <section class="content-card candidate-card candidate-card--primary" aria-labelledby="candidate-summary-title">
+                    <div class="candidate-summary-heading">
+                        <p class="eyebrow">Solicitud</p>
+                        <h2 id="candidate-summary-title">Resumen de la solicitud</h2>
+                        <p class="muted">Identidad y contacto</p>
                     </div>
-                    <div class="candidate-fact-grid">
-                        <div class="candidate-fact"><span>Documento</span><strong><?= $escape(strtoupper((string) ($candidate['document_type'] ?? ''))) ?> <?= $escape($candidate['document_number'] ?? '') ?></strong></div>
-                        <div class="candidate-fact"><span>Celular o WhatsApp</span><strong><?= $escape($candidate['phone'] ?? '') ?></strong></div>
-                        <div class="candidate-fact"><span>Correo</span><strong><?= $escape($candidate['email'] ?? '') ?></strong></div>
-                        <?php if ($birthDate !== null): ?><div class="candidate-fact"><span>Fecha de nacimiento</span><strong><?= $escape($birthDate) ?></strong></div><?php endif; ?>
-                        <?php if (trim((string) ($candidate['current_address'] ?? '')) !== ''): ?><div class="candidate-fact candidate-fact--wide"><span>Dirección actual</span><strong><?= $escape($candidate['current_address']) ?></strong></div><?php endif; ?>
+                    <div class="candidate-summary-layout">
+                        <div class="candidate-fact-grid">
+                            <dl class="candidate-fact"><dt>Documento</dt><dd><?= trim((string) ($candidate['document_number'] ?? '')) !== '' ? $escape(strtoupper((string) ($candidate['document_type'] ?? '')) . ' ' . $candidate['document_number']) : 'Sin documento registrado' ?></dd></dl>
+                            <dl class="candidate-fact"><dt>Celular o WhatsApp</dt><dd><?= trim((string) ($candidate['phone'] ?? '')) !== '' ? $escape($candidate['phone']) : 'Sin teléfono registrado' ?></dd></dl>
+                            <dl class="candidate-fact"><dt>Correo</dt><dd><?= trim((string) ($candidate['email'] ?? '')) !== '' ? $escape($candidate['email']) : 'Sin correo registrado' ?></dd></dl>
+                            <?php if ($birthDate !== null): ?><dl class="candidate-fact"><dt>Fecha de nacimiento</dt><dd><?= $escape($birthDate) ?></dd></dl><?php endif; ?>
+                            <?php if (trim((string) ($candidate['current_address'] ?? '')) !== ''): ?><dl class="candidate-fact candidate-fact--wide"><dt>Dirección actual</dt><dd><?= $escape($candidate['current_address']) ?></dd></dl><?php endif; ?>
+                        </div>
+                        <aside class="candidate-state" aria-labelledby="candidate-state-title">
+                            <h3 id="candidate-state-title">Estado actual</h3>
+                            <p><?= $escape($statusDescription) ?></p>
+                        </aside>
                     </div>
                 </section>
 
-                <section class="content-card candidate-card candidate-card--timeline">
-                    <p class="eyebrow">Actividad</p>
-                    <h3>Fechas relevantes</h3>
-                    <div class="candidate-timeline">
-                        <?php if ($createdAt !== null): ?><div><span>Solicitud creada</span><strong><?= $escape($createdAt) ?></strong></div><?php endif; ?>
-                        <?php if ($submittedAt !== null): ?><div><span>Solicitud enviada</span><strong><?= $escape($submittedAt) ?></strong></div><?php endif; ?>
-                        <?php if ($updatedAt !== null): ?><div><span>Última actualización</span><strong><?= $escape($updatedAt) ?></strong></div><?php endif; ?>
-                    </div>
+                <section class="content-card candidate-card candidate-card--timeline" aria-labelledby="candidate-dates-title">
+                    <h3 id="candidate-dates-title">Fechas relevantes</h3>
+                    <?php if ($createdAt === null && $submittedAt === null && $updatedAt === null): ?>
+                        <p class="empty-state">No hay fechas registradas para esta solicitud.</p>
+                    <?php else: ?>
+                        <div class="candidate-timeline">
+                            <?php foreach (['created_at' => ['Solicitud creada', $createdAt], 'submitted_at' => ['Solicitud enviada', $submittedAt], 'updated_at' => ['Última actualización', $updatedAt]] as $dateKey => [$dateLabel, $dateText]): ?>
+                                <?php if ($dateText !== null): ?><dl><dt><?= $escape($dateLabel) ?></dt><dd><time datetime="<?= $escape($candidate[$dateKey]) ?>"><?= $escape($dateText) ?></time></dd></dl><?php endif; ?>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
                 </section>
             </div>
         </section>
