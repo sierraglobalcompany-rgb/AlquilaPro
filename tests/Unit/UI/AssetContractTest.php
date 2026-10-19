@@ -67,6 +67,15 @@ final class AssetContractTest extends TestCase
         }
     }
 
+    public function testCandidateMenuFocusReservesSpaceForFixedMobileNavigation(): void
+    {
+        self::assertMatchesRegularExpression(
+            '/\.candidate-section-menu__link\s*\{[^}]*scroll-margin-block:\s*100px\s*;/s',
+            $this->css,
+            'Native keyboard focus must scroll candidate links clear of the fixed mobile bars.',
+        );
+    }
+
     public function testLongPublicLinksCanWrapWithinCards(): void
     {
         self::assertMatchesRegularExpression(
