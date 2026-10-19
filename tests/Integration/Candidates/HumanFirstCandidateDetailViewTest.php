@@ -64,7 +64,43 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertDoesNotMatchRegularExpression('/<main\b/', $this->renderOverview());
     }
 
-    private function renderOverview(): string
+    public function testOverviewHasOneNamedSummaryWithContactAndContextualState(): void
+    {
+        $dom = new \DOMDocument();
+        @$dom->loadHTML('<?xml encoding="UTF-8">' . $this->renderOverview());
+        $xpath = new \DOMXPath($dom);
+        $summary = '//section[@aria-labelledby="candidate-summary-title"]';
+        self::assertSame(1, $xpath->query($summary)->length, 'The summary must be a single named semantic surface.');
+        self::assertSame('Resumen de la solicitud', $xpath->evaluate('string(' . $summary . '//h2)'));
+        self::assertSame(1, $xpath->query($summary . '//dl[dt="Correo"]/dd[contains(., "camilo@example.com")]')->length);
+        self::assertSame(1, $xpath->query($summary . '//aside[@aria-labelledby="candidate-state-title"]')->length);
+        self::assertStringContainsString('La solicitud está pendiente del estudio de aseguradora.', $xpath->evaluate('string(' . $summary . '//aside)'));
+        self::assertSame(0, $xpath->query('//header[@data-candidate-shell]//p[contains(., "La solicitud está pendiente")]')->length);
+    }
+
+    public function testOverviewDatesAreSemanticAndMissingFactsAreExplicit(): void
+    {
+        $html = $this->renderOverview();
+        self::assertStringContainsString('<time datetime="2026-10-17 00:10:00">17/10/2026 · 00:10</time>', $html);
+        $empty = $this->renderOverview(['phone' => null, 'email' => '', 'document_number' => null, 'created_at' => null, 'submitted_at' => null, 'updated_at' => null]);
+        self::assertStringContainsString('Sin teléfono registrado', $empty);
+        self::assertStringContainsString('Sin correo registrado', $empty);
+        self::assertStringContainsString('Sin documento registrado', $empty);
+        self::assertStringContainsString('No hay fechas registradas para esta solicitud.', $empty);
+        self::assertStringNotContainsString('<time', $empty);
+    }
+
+    public function testOverviewEscapesLongFactsAndPreservesSubdirectoryLinks(): void
+    {
+        $name = '<script>alert("demo")</script>' . str_repeat('Nombre largo ', 12);
+        $html = $this->renderOverview(['full_name' => $name, 'email' => 'correo+largo@example.invalid'], '/sub');
+        self::assertStringNotContainsString('<script>', $html);
+        self::assertStringContainsString('&lt;script&gt;', $html);
+        self::assertStringContainsString('/sub/admin/candidates/1?section=overview', $html);
+        self::assertStringContainsString('/sub/admin/candidates"', $html);
+    }
+
+    private function renderOverview(array $overrides = [], string $basePath = ''): string
     {
         $candidate = [
             'id' => 1,
@@ -94,12 +130,12 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
             'pets_notes' => '',
             'references' => [],
         ];
+        $candidate = array_replace($candidate, $overrides);
         $documents = [];
         $screening = null;
         $contractContext = ['contracts' => [], 'can_create' => false];
         $canManageCandidates = true;
         $csrfToken = 'csrf-demo';
-        $basePath = '';
         $activeSection = 'overview';
         $candidateSections = [
             ['key' => 'overview', 'label' => 'Solicitud'],
