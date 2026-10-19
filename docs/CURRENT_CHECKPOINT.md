@@ -133,9 +133,13 @@ CAND_02 = NOT_STARTED
 
 **Un test verde o contratos CSS no certifican UX.** No mergear PR #45 sin Browser QA real de CAND-01.
 
+**Auditoría visual V2 — 2026-10-18/19 (evidencia nueva):** el paquete externo `AlquilaPro-Auditoria-Completa-2026-10-18.zip` contiene **889 PNG** (352 escritorio 1440×900 y 537 móvil emulado 390×844), con integridad de archivos/hashes verificada. Hay capturas de Candidatos y otras áreas, pero **no certificación integral**, ni prueba independiente de que el SHA servido fuese el PR45; faltan 375×812 y 768×1024, permisos/teclado/foco/acciones y aceptación visual final. Se confirmó **divergencia de composición en CAND-01/overview** contra el mockup `01_SOLICITUD.png`; otras siete secciones son microbloques CAND02–08 todavía planificados, no regresiones imputables a CAND-01. La portada pública también difiere del baseline, pero R3/PR33 continúa FROZEN. Los análisis externos `ALQUILAPRO_AUDITORIA_FORENSE_V2_2026-10-19.md`, `ALQUILAPRO_PLAN_MAESTRO_V2_DETALLADO_2026-10-19.md` y la matriz CSV documentan el detalle; **no** sustituir la spec aprobada ni integrar sus ejemplos sin verdad del backend.
+
 Intentos documentados (2026-10-17): Codex/Antigravity y Work no consiguieron una instancia autorizada y observable; **cero capturas reales de producto**. El paquete SERVER_READY de PR #45 se construyó y auditó localmente, pero no hubo rehearsal, preview ni publicación. Los preflights de Hostinger quedan **SUSPENDIDOS por decisión del owner**, no son el siguiente gate. No repetir la misma ruta bloqueada ni sustituir Browser QA por inferencias estáticas.
 
 ## 5. Browser QA pendiente — CAND-01
+
+**Siguiente trabajo de producto (tras convergencia documental): `CAND01-VIS-REPAIR` dentro de PR #45**: reproducir diferencia contra el mockup 01 con captura real, escribir RED focal causal, reorganizar únicamente overview + CSS en owners existentes, retirar estilos/markup supersedidos, pasar regresión y CI nuevo del SHA modificado, y capturar 375×812 / 390×844 / 768×1024 / 1440×900 con SHA servido comprobado. No abrir CAND02 ni deshacer el freeze R3. No confundir las 889 capturas actuales con el Browser QA GREEN de la versión reparada.
 
 Viewports obligatorios:
 
@@ -265,7 +269,7 @@ No resumir, truncar ni fragmentar el Master para evadir bloqueos de seguridad.
 Orden obligatorio:
 
 1. convergencia documental de checkpoint + estado formal de la spec: **CLOSED**;
-2. ejecutar **Browser QA real CAND-01 en entorno de desarrollo autorizado**, sin usar Hostinger; obtener capturas auténticas, navegación, permisos, consola, foco y tres viewports. Si el navegador sigue denegado, permanecer BLOCKED y documentar el bloqueo;
+2. **CAND01-VIS-REPAIR**: reparar sólo la divergencia demostrada de overview en el PR #45 mediante RED causal y GREEN mínimo; luego **Browser QA real** de la versión reparada, local autorizado y sin Hostinger; aportar SHA servido, capturas, navegación, permisos, consola, foco y viewports 375/390/768/1440. Si no hay acceso o evidencia, permanecer BLOCKED;
 3. sólo con Browser GREEN + Human-First CERTIFIED + HEAD exacto + CI requerido + reviews limpios + owner gate: merge PR #45;
 4. verificar `main` post-merge y persistir checkpoint;
 5. abrir CAND-02.
@@ -306,7 +310,7 @@ Al abrir un chat/sesión nueva:
 4. confirmar PR #43 supersedido y PR #33 frozen;
 5. cargar la spec/plan de Candidatos y el Master Human-First exacto;
 6. aplicar KISS + Cero Ruido + Anti-parche + Human-First;
-7. no mergear PR #45 mientras Browser QA siga bloqueado;
+7. no mergear PR #45 mientras Browser QA y Human-First sigan sin certificar; las 889 capturas son evidencia de diagnóstico, no aceptación de la versión reparada;
 8. deployment sigue **NOT AUTHORIZED**; **Hostinger es la última fase**, tras completar producto, QA integral y UAT aprobado por el owner.
 
 ## 13. Estado resumido
@@ -327,5 +331,9 @@ R4 = NOT_STARTED
 DEPLOYMENT = NOT_AUTHORIZED
 HOSTINGER_PHASE = FINAL_ONLY_AFTER_COMPLETE_SYSTEM_AND_OWNER_UAT
 REMOTE_QA_PREVIEW = SUSPENDED_BY_OWNER
-NEXT_SAFE_ACTION = REAL_BROWSER_QA_CAND01_LOCAL_AUTHORIZED
+VISUAL_AUDIT_V2 = 889_PNG_INTEGRITY_VERIFIED_MISMATCH_CONFIRMED
+SERVED_SHA = NOT_INDEPENDENTLY_VERIFIED
+VISUAL_QA_VIEWPORT_GAPS = 375x812_768x1024
+CAND01_VISUAL_GATE = REPAIR_REQUIRED_NOT_CERTIFIED
+NEXT_SAFE_ACTION = CAND01_VIS_REPAIR_RED_FIRST_PR45
 ```
