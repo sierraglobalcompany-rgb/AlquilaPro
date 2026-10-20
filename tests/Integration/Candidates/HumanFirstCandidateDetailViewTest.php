@@ -150,6 +150,21 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertSame('no', $notSubmitted->evaluate('string(//li[strong="Solicitud"]/@data-milestone-completed)'));
     }
 
+    public function testNextStepExplanationBelongsToTheSameAccessibleLink(): void
+    {
+        $dom = new \DOMDocument();
+        @$dom->loadHTML('<?xml encoding="UTF-8">' . $this->renderOverview());
+        $xpath = new \DOMXPath($dom);
+        $links = $xpath->query('//section[@aria-labelledby="candidate-next-title"]//ol/li//a');
+
+        self::assertCount(3, $links);
+        foreach ($links as $link) {
+            self::assertSame(1, $xpath->query('./strong', $link)->length);
+            self::assertSame(1, $xpath->query('./span', $link)->length, 'The explanation must share the real link target instead of sitting outside its touch area.');
+            self::assertStringContainsString('?section=', $link->getAttribute('href'));
+        }
+    }
+
     public function testStructuralCardsRemainPresentWhenOptionalFactsAreAbsent(): void
     {
         $html = $this->renderOverview([

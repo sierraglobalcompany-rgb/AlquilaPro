@@ -96,12 +96,14 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                     <h1><?= $escape($candidate['full_name'] ?? '') ?></h1>
                     <span class="status-pill"><?= $escape($statusLabel) ?></span>
                 </div>
-                <?php if ($unitLabel !== ''): ?>
-                    <p class="muted candidate-shell__unit"><?= $candidateIcon('building') ?><?= $escape($unitLabel) ?></p>
-                <?php endif; ?>
-                <?php if ($propertyLocation !== ''): ?>
-                    <p class="muted candidate-shell__property-address"><?= $candidateIcon('map-pin') ?><?= $escape($propertyLocation) ?></p>
-                <?php endif; ?>
+                <div class="candidate-shell__location">
+                    <?php if ($unitLabel !== ''): ?>
+                        <p class="muted candidate-shell__unit"><?= $candidateIcon('building') ?><?= $escape($unitLabel) ?></p>
+                    <?php endif; ?>
+                    <?php if ($propertyLocation !== ''): ?>
+                        <p class="muted candidate-shell__property-address"><?= $candidateIcon('map-pin') ?><?= $escape($propertyLocation) ?></p>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
         <?php if ($activeSection !== 'overview'): ?>
@@ -216,7 +218,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                             <?php foreach ($reviewSections as $index => $section): ?>
                                 <li>
                                     <span class="candidate-next-number" aria-hidden="true"><?= $index + 1 ?></span>
-                                    <div><a href="<?= $escape($sectionHref($section['key'])) ?>"><?= $escape($section['title']) ?></a><p><?= $escape($section['detail']) ?></p></div>
+                                    <a href="<?= $escape($sectionHref($section['key'])) ?>"><strong><?= $escape($section['title']) ?></strong><span><?= $escape($section['detail']) ?></span></a>
                                 </li>
                             <?php endforeach; ?>
                         </ol>
