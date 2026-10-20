@@ -11,6 +11,7 @@ Propósito: **puntero operativo único de continuidad, sin ruido histórico**.
 - **Cero Ruido**: `ELIMINAR → UNIR/CONVERGER → SIMPLIFICAR → MEJORAR/OPTIMIZAR → AGREGAR`.
 - **Anti-parche**: `REPRODUCE → ROOT CAUSE → OWNER → DUPLICACIÓN → RED → CAUSAL RED → MINIMAL GREEN → RETIRAR SUPERSEDED → REGRESSION`.
 - **Human-First / Diseño**: persona > modelo de datos; lenguaje humano; jerarquía clara; No Infinite Excel; accesibilidad, responsive y Browser QA real como gates.
+- **Contrato visual aprobado (decisión explícita del owner 2026-10-19)**: el mockup `01_SOLICITUD.png` se **implementa**, no se usa como inspiración. No sustituir estética, composición, iconografía, jerarquía o densidad aprobadas por una versión "más simple". Sólo se omiten o adaptan **datos/acciones inexistentes**, justificando la excepción específica y conservando el resto del diseño.
 - **No claim without evidence**: SHA exacto + CI para GREEN técnico; Browser real para certificación visual.
 - Merge y deployment son gates separados.
 - Deployment: **NOT AUTHORIZED**.
@@ -48,9 +49,9 @@ ACTIVE_BLOCK = CAND-01
 PR_45 = OPEN / DRAFT / NOT_MERGED
 PR_45_BRANCH = impl/cand-01-shell-overview-20261017
 PR_45_BASE = 7caf82e910edec4153f5cc49dcfb404f8f372b37
-PR_45_HEAD = 95fcbf472bf3caedbfccc23867585ee0644122f0
+PR_45_HEAD = a186b0ab765a9547def7501905486f18159c6982
 PR_45_CHANGED_FILES = 11
-PR_45_COMMITS = 15
+PR_45_COMMITS = 19
 ```
 
 Alcance implementado:
@@ -125,21 +126,21 @@ Estado del gate:
 
 ```text
 CAND_01_AUTOMATED_QA = GREEN
-CAND_01_BROWSER_QA = BLOCKED
+CAND_01_BROWSER_QA = G1_GREEN_G2_PENDING
 CAND_01_HUMAN_FIRST_FINAL = NOT_CERTIFIED
 PR_45_MERGE = NO
 CAND_02 = NOT_STARTED
 ```
 
-**Un test verde o contratos CSS no certifican UX.** No mergear PR #45 sin Browser QA real de CAND-01.
+**Un test verde o contratos CSS no certifican UX.** No mergear PR #45 sin Browser QA real de la **versión G2** y aprobación visual explícita del owner. G1 pasó QA técnico pero **fue rechazado visualmente** por su falta de fidelidad al mockup.
 
 **Auditoría visual V2 — 2026-10-18/19 (evidencia nueva):** el paquete externo `AlquilaPro-Auditoria-Completa-2026-10-18.zip` contiene **889 PNG** (352 escritorio 1440×900 y 537 móvil emulado 390×844), con integridad de archivos/hashes verificada. Hay capturas de Candidatos y otras áreas, pero **no certificación integral**, ni prueba independiente de que el SHA servido fuese el PR45; faltan 375×812 y 768×1024, permisos/teclado/foco/acciones y aceptación visual final. Se confirmó **divergencia de composición en CAND-01/overview** contra el mockup `01_SOLICITUD.png`; otras siete secciones son microbloques CAND02–08 todavía planificados, no regresiones imputables a CAND-01. La portada pública también difiere del baseline, pero R3/PR33 continúa FROZEN. Los análisis externos `ALQUILAPRO_AUDITORIA_FORENSE_V2_2026-10-19.md`, `ALQUILAPRO_PLAN_MAESTRO_V2_DETALLADO_2026-10-19.md` y la matriz CSV documentan el detalle; **no** sustituir la spec aprobada ni integrar sus ejemplos sin verdad del backend.
 
 Intentos documentados (2026-10-17): Codex/Antigravity y Work no consiguieron una instancia autorizada y observable; **cero capturas reales de producto**. El paquete SERVER_READY de PR #45 se construyó y auditó localmente, pero no hubo rehearsal, preview ni publicación. Los preflights de Hostinger quedan **SUSPENDIDOS por decisión del owner**, no son el siguiente gate. No repetir la misma ruta bloqueada ni sustituir Browser QA por inferencias estáticas.
 
-## 5. Browser QA pendiente — CAND-01
+## 5. Fidelidad al mockup y Browser QA pendiente — CAND-01
 
-**Siguiente trabajo de producto (tras convergencia documental): `CAND01-VIS-REPAIR` dentro de PR #45**: reproducir diferencia contra el mockup 01 con captura real, escribir RED focal causal, reorganizar únicamente overview + CSS en owners existentes, retirar estilos/markup supersedidos, pasar regresión y CI nuevo del SHA modificado, y capturar 375×812 / 390×844 / 768×1024 / 1440×900 con SHA servido comprobado. No abrir CAND02 ni deshacer el freeze R3. No confundir las 889 capturas actuales con el Browser QA GREEN de la versión reparada.
+**G1 técnico cerrado / visual REJECTED por el owner (2026-10-19):** `PR45@a186b0ab765a9547def7501905486f18159c6982`, CI manual #1131 run `39204913575` SUCCESS en PHP 8.3/8.4/8.5; 670 tests, 7893 assertions, 0 failures, 1 skipped; 31 capturas reales del HEAD G1 y 2 capturas de baseline recreada; evidencia de SHA servido en ZIP. G1 resolvió fallos estructurales y foco móvil, pero **no reprodujo sidebar/topbar/hero/tabs/panel verde/card-grid/densidad del mockup aprobado**. `OWNER_VISUAL_APPROVAL=REJECTED_G1`, `HUMAN_FIRST_FINAL=NOT_CERTIFIED`; no merge. G2 es la corrección obligatoria de fidelidad: `ALQUILAPRO_CODEX_LUNA_G2_FIDELIDAD_MOCKUP_OBLIGATORIA_2026-10-19.md` (prompt externo), acompañado de `01_SOLICITUD.png` exacto. RED causal → GREEN con owners existentes → CI exact HEAD 8.3/8.4/8.5 → Browser QA de G2 a 375/390/768/1440 → comparación completa → **owner review**. Preservar 7 secciones legacy hasta CAND02–08, PR43 supersedido, R3 congelado y Hostinger al final.
 
 Viewports obligatorios:
 
@@ -269,7 +270,7 @@ No resumir, truncar ni fragmentar el Master para evadir bloqueos de seguridad.
 Orden obligatorio:
 
 1. convergencia documental de checkpoint + estado formal de la spec: **CLOSED**;
-2. **CAND01-VIS-REPAIR**: reparar sólo la divergencia demostrada de overview en el PR #45 mediante RED causal y GREEN mínimo; luego **Browser QA real** de la versión reparada, local autorizado y sin Hostinger; aportar SHA servido, capturas, navegación, permisos, consola, foco y viewports 375/390/768/1440. Si no hay acceso o evidencia, permanecer BLOCKED;
+2. **G2 FIDELIDAD MOCKUP APROBADO**: ejecutar reparación visual de CAND01 Solicitud en PR #45 contra `01_SOLICITUD.png` mediante RED causal, GREEN mínimo y, si es necesario, ajuste del layout compartido con regresión transversal. No inventar botones/funciones; la estética del shell existente no justifica diferencias visuales. Repetir CI del HEAD G2 y Browser QA real 375/390/768/1440, SHA servido, accesibilidad/roles/capturas. Presentar al owner para aprobación visual explícita;
 3. sólo con Browser GREEN + Human-First CERTIFIED + HEAD exacto + CI requerido + reviews limpios + owner gate: merge PR #45;
 4. verificar `main` post-merge y persistir checkpoint;
 5. abrir CAND-02.
@@ -310,7 +311,7 @@ Al abrir un chat/sesión nueva:
 4. confirmar PR #43 supersedido y PR #33 frozen;
 5. cargar la spec/plan de Candidatos y el Master Human-First exacto;
 6. aplicar KISS + Cero Ruido + Anti-parche + Human-First;
-7. no mergear PR #45 mientras Browser QA y Human-First sigan sin certificar; las 889 capturas son evidencia de diagnóstico, no aceptación de la versión reparada;
+7. no mergear PR #45 mientras falten Browser QA de G2 y aprobación Human-First explícita del owner; el Browser QA técnico G1 fue GREEN pero el diseño G1 fue rechazado;
 8. deployment sigue **NOT AUTHORIZED**; **Hostinger es la última fase**, tras completar producto, QA integral y UAT aprobado por el owner.
 
 ## 13. Estado resumido
@@ -320,10 +321,10 @@ REPO = sierraglobalcompany-rgb/AlquilaPro
 CAND01_PRODUCT_BASE = 7caf82e910edec4153f5cc49dcfb404f8f372b37
 MAIN_CURRENT = REVALIDATE_LIVE_BEFORE_ACTION
 ACTIVE_WORK = CAND-01
-PR_45_HEAD = 95fcbf472bf3caedbfccc23867585ee0644122f0
-PR_45_CI = 1121_GREEN_8_3_8_4_8_5
+PR_45_HEAD = a186b0ab765a9547def7501905486f18159c6982
+PR_45_CI = 1131_GREEN_8_3_8_4_8_5_G1
 CAND_01_AUTOMATED_QA = GREEN
-CAND_01_BROWSER_QA = BLOCKED
+CAND_01_BROWSER_QA = G1_GREEN_G2_PENDING
 CAND_01_HUMAN_FIRST_FINAL = NOT_CERTIFIED
 PR_43 = DRAFT_DO_NOT_MERGE_VISUAL_SUPERSEDED
 PR_33_R3 = FROZEN_BROWSER_BLOCKED
@@ -332,8 +333,12 @@ DEPLOYMENT = NOT_AUTHORIZED
 HOSTINGER_PHASE = FINAL_ONLY_AFTER_COMPLETE_SYSTEM_AND_OWNER_UAT
 REMOTE_QA_PREVIEW = SUSPENDED_BY_OWNER
 VISUAL_AUDIT_V2 = 889_PNG_INTEGRITY_VERIFIED_MISMATCH_CONFIRMED
-SERVED_SHA = NOT_INDEPENDENTLY_VERIFIED
-VISUAL_QA_VIEWPORT_GAPS = 375x812_768x1024
-CAND01_VISUAL_GATE = REPAIR_REQUIRED_NOT_CERTIFIED
-NEXT_SAFE_ACTION = CAND01_VIS_REPAIR_RED_FIRST_PR45
+G1_SERVED_SHA = EVIDENCE_REPORTED_VERIFIED_BY_CODEX
+G2_SERVED_SHA = MUST_VERIFY_FRESH
+G1_VIEWPORTS = 375x812_390x844_768x1024_1440x900
+G2_VIEWPORTS = RECHECK_REQUIRED_AFTER_CHANGES
+G1_VISUAL_GATE = REJECTED_BY_OWNER_MOCKUP_FIDELITY
+G2_TARGET = IMPLEMENT_01_SOLICITUD_APPROVED_MOCKUP_WITH_REAL_BACKEND
+CAND01_VISUAL_GATE = RED_G2_REQUIRED_OWNER_APPROVAL
+NEXT_SAFE_ACTION = G2_FIDELITY_IMPLEMENTATION_RED_FIRST_PR45
 ```
