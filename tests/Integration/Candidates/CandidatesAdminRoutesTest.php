@@ -63,6 +63,9 @@ final class CandidatesAdminRoutesTest extends TestCase
             @unlink($file);
         }
         @rmdir($this->documentDirectory);
+        foreach (glob($this->directory . '/unit-media/*') ?: [] as $file) {
+            @unlink($file);
+        }
         @unlink($this->lockPath);
         @unlink($this->lockPath . '.tmp');
         @rmdir($this->directory . '/branding');
@@ -181,6 +184,20 @@ final class CandidatesAdminRoutesTest extends TestCase
         $update = $this->pdo->prepare('UPDATE units SET monthly_price = :price, area_m2 = :area, bedrooms = :bedrooms WHERE id = :id');
         $update->execute(['price' => '2500000', 'area' => '85', 'bedrooms' => 3, 'id' => $unitId]);
 
+        $photoDir = $this->directory . '/unit-media';
+        mkdir($photoDir, 0700, true);
+        $filename = 'photo-' . bin2hex(random_bytes(16)) . '.png';
+        file_put_contents(
+            $photoDir . '/' . $filename,
+            base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0ZkAAAAASUVORK5CYII=', true),
+        );
+        $photoStatement = $this->pdo->prepare(
+            "INSERT INTO unit_media (unit_id, type, stored_name, mime_type, external_url, sort_order, is_cover) "
+            . "VALUES (:unit_id, 'photo', :stored_name, 'image/png', NULL, 1, 1)",
+        );
+        $photoStatement->execute(['unit_id' => $unitId, 'stored_name' => $filename]);
+        $photoId = (int) $this->pdo->lastInsertId();
+
         $this->insertUser('g3-viewer@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
         $viewer = $this->app('/sub');
         $this->login($viewer, 'g3-viewer@example.com', 'ViewerPassword123', '/sub');
@@ -192,6 +209,7 @@ final class CandidatesAdminRoutesTest extends TestCase
         self::assertStringNotContainsString('Calle 1', $viewerHtml);
         self::assertStringNotContainsString('2.500.000', $viewerHtml);
         self::assertStringNotContainsString('/admin/units/' . $unitId . '/media/', $viewerHtml);
+        self::assertSame(403, $this->request($viewer, 'GET', '/sub/admin/units/' . $unitId . '/media/' . $photoId)->getStatusCode());
 
         $_SESSION = [];
         $this->insertUser('g3-property@example.com', 'PropertyPassword123', 'admin', ['candidates.view', 'properties.view']);
@@ -203,8 +221,8 @@ final class CandidatesAdminRoutesTest extends TestCase
         self::assertStringContainsString('Dirección del inmueble', $propertyHtml);
         self::assertStringContainsString('Calle 1', $propertyHtml);
         self::assertStringContainsString('2.500.000', $propertyHtml);
-        self::assertStringContainsString('Sin foto registrada', $propertyHtml);
-        self::assertStringNotContainsString('/admin/units/' . $unitId . '/media/', $propertyHtml);
+        self::assertStringContainsString('/sub/admin/units/' . $unitId . '/media/' . $photoId, $propertyHtml);
+        self::assertSame(200, $this->request($allowed, 'GET', '/sub/admin/units/' . $unitId . '/media/' . $photoId)->getStatusCode());
     }
 
     public function testListAndDetailEscapeCandidateReferenceAndOriginalFilename(): void
