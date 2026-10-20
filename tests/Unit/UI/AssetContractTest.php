@@ -67,12 +67,12 @@ final class AssetContractTest extends TestCase
         }
     }
 
-    public function testCandidateMenuFocusReservesSpaceForFixedMobileNavigation(): void
+    public function testEveryFocusedControlReservesSpaceForFixedNavigation(): void
     {
         self::assertMatchesRegularExpression(
-            '/\.candidate-section-menu__link\s*\{[^}]*scroll-margin-block:\s*100px\s*;/s',
+            '/:focus-visible\s*\{[^}]*scroll-margin-block:\s*100px\s*;/s',
             $this->css,
-            'Native keyboard focus must scroll candidate links clear of the fixed mobile bars.',
+            'Native keyboard focus must scroll every control clear of the fixed bars, not just candidate menu links.',
         );
     }
 

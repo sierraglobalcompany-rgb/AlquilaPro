@@ -151,7 +151,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
             ['label' => 'Información laboral', 'verified' => trim((string) ($candidate['employment_status'] ?? '')) !== '', 'completed' => false, 'detail' => null, 'raw_date' => null],
             ['label' => 'Referencias', 'verified' => count($candidate['references'] ?? []) > 0, 'completed' => false, 'detail' => null, 'raw_date' => null],
             ['label' => 'Estudio de aseguradora', 'verified' => $screening !== null, 'completed' => false, 'detail' => null, 'raw_date' => null],
-            ['label' => 'Contrato', 'verified' => count($contractRows) > 0, 'completed' => false, 'detail' => null, 'raw_date' => null],
+            ['label' => 'Contrato', 'verified' => $contractContext === null ? null : count($contractRows) > 0, 'completed' => false, 'detail' => null, 'raw_date' => null],
         ];
         $reviewSections = [
             ['key' => 'work', 'title' => 'Información laboral', 'detail' => 'Consultar la información declarada'],
@@ -197,10 +197,10 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                         <p class="muted candidate-progress-subtitle">Fechas relevantes y otros hitos registrados</p>
                         <ol class="candidate-progress-list" aria-label="Hitos con registro verificable">
                             <?php foreach ($milestones as $milestone): ?>
-                                <li class="<?= $milestone['completed'] ? 'candidate-milestone--completed' : ($milestone['verified'] ? 'candidate-milestone--recorded' : 'candidate-milestone--unrecorded') ?>" data-milestone-recorded="<?= $milestone['verified'] ? 'yes' : 'no' ?>" data-milestone-completed="<?= $milestone['completed'] ? 'yes' : 'no' ?>">
+                                <li class="<?= $milestone['completed'] ? 'candidate-milestone--completed' : ($milestone['verified'] === null ? 'candidate-milestone--unavailable' : ($milestone['verified'] ? 'candidate-milestone--recorded' : 'candidate-milestone--unrecorded')) ?>" data-milestone-recorded="<?= $milestone['verified'] === null ? 'unknown' : ($milestone['verified'] ? 'yes' : 'no') ?>" data-milestone-completed="<?= $milestone['completed'] ? 'yes' : 'no' ?>">
                                     <span class="candidate-milestone-marker" aria-hidden="true"><?= $milestone['completed'] ? '✓' : ($milestone['verified'] ? '•' : '·') ?></span>
                                     <strong><?= $escape($milestone['label']) ?></strong>
-                                    <span><?= $milestone['completed'] ? 'Completada' : ($milestone['verified'] ? 'Con registro' : 'Sin registro') ?></span>
+                                    <span><?= $milestone['completed'] ? 'Completada' : ($milestone['verified'] === null ? 'Sin acceso' : ($milestone['verified'] ? 'Con registro' : 'Sin registro')) ?></span>
                                     <?php if ($milestone['detail'] !== null): ?>
                                         <time datetime="<?= $escape($milestone['raw_date']) ?>"><?= $escape($milestone['detail']) ?></time>
                                     <?php endif; ?>

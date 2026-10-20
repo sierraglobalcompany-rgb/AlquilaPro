@@ -49,6 +49,7 @@ $isCandidateSurface = !$isTenant && in_array($view ?? '', ['candidate_detail', '
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title><?= $escape($pageTitle !== '' ? $pageTitle . ' · ' . $branding['app_name'] : $branding['app_name']) ?></title>
+    <link rel="icon" type="image/svg+xml" href="<?= $escape($basePath) ?>/assets/favicon.svg">
     <link rel="stylesheet" href="<?= $escape($basePath) ?>/assets/app.css">
 </head>
 <body class="app-page<?= $isCandidateSurface ? ' candidate-surface' : '' ?>" style="--brand-primary: <?= $escape($branding['primary_color']) ?>;">

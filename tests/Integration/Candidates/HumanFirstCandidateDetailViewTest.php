@@ -150,6 +150,19 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertSame('no', $notSubmitted->evaluate('string(//li[strong="Solicitud"]/@data-milestone-completed)'));
     }
 
+    public function testContractWithoutPermissionIsUnknownRatherThanAnAbsentRecord(): void
+    {
+        $dom = new \DOMDocument();
+        @$dom->loadHTML('<?xml encoding="UTF-8">' . $this->renderOverview([], '', null));
+        $xpath = new \DOMXPath($dom);
+        $contract = '//li[strong="Contrato"]';
+
+        self::assertSame('unknown', $xpath->evaluate('string(' . $contract . '/@data-milestone-recorded)'));
+        self::assertSame('no', $xpath->evaluate('string(' . $contract . '/@data-milestone-completed)'));
+        self::assertStringContainsString('Sin acceso', $xpath->evaluate('string(' . $contract . ')'));
+        self::assertStringNotContainsString('Sin registro', $xpath->evaluate('string(' . $contract . ')'));
+    }
+
     public function testNextStepExplanationBelongsToTheSameAccessibleLink(): void
     {
         $dom = new \DOMDocument();
@@ -241,7 +254,7 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertStringContainsString('/sub/admin/candidates"', $html);
     }
 
-    private function renderOverview(array $overrides = [], string $basePath = ''): string
+    private function renderOverview(array $overrides = [], string $basePath = '', ?array $contracts = ['contracts' => [], 'can_create' => false]): string
     {
         $candidate = [
             'id' => 1,
@@ -274,7 +287,7 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         $candidate = array_replace($candidate, $overrides);
         $documents = [];
         $screening = null;
-        $contractContext = ['contracts' => [], 'can_create' => false];
+        $contractContext = $contracts;
         $canManageCandidates = true;
         $csrfToken = 'csrf-demo';
         $activeSection = 'overview';
