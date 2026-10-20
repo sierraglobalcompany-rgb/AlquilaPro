@@ -79,6 +79,10 @@ $unitCode = trim((string) ($candidate['unit_code'] ?? $candidate['unit_id'] ?? '
 if ($unitCode !== '') {
     $unitLabel = trim($unitLabel . ' · ' . $unitCode, " ·\t\n\r\0\x0B");
 }
+$propertyDetails = is_array($propertyDetails ?? null) ? $propertyDetails : null;
+$propertyStreet = $propertyDetails !== null ? trim((string) ($propertyDetails['address'] ?? '')) : '';
+$propertyCity = $propertyDetails !== null ? trim((string) ($propertyDetails['city'] ?? '')) : '';
+$propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCity !== '' ? ', ' . $propertyCity : '');
 ?>
 
 <div class="candidate-page">
@@ -94,6 +98,9 @@ if ($unitCode !== '') {
                 </div>
                 <?php if ($unitLabel !== ''): ?>
                     <p class="muted candidate-shell__unit"><?= $candidateIcon('building') ?><?= $escape($unitLabel) ?></p>
+                <?php endif; ?>
+                <?php if ($propertyLocation !== ''): ?>
+                    <p class="muted candidate-shell__property-address"><?= $candidateIcon('map-pin') ?><?= $escape($propertyLocation) ?></p>
                 <?php endif; ?>
             </div>
         </div>
@@ -133,7 +140,6 @@ if ($unitCode !== '') {
 
     <?php if ($activeSection === 'overview'): ?>
         <?php
-        $propertyDetails = is_array($propertyDetails ?? null) ? $propertyDetails : null;
         $coverPhotoId = is_int($coverPhotoId ?? null) && $coverPhotoId > 0 ? $coverPhotoId : null;
         $humanMoney = static function (mixed $amount): ?string {
             return is_numeric($amount) ? '$ ' . number_format((float) $amount, 0, ',', '.') . ' COP' : null;
@@ -165,8 +171,11 @@ if ($unitCode !== '') {
                                     <div class="candidate-fact"><?= $candidateIcon('account') ?><dl><dt>Nombre completo</dt><dd><?= $escape($candidate['full_name'] ?? '') ?></dd></dl></div>
                                     <div class="candidate-fact"><?= $candidateIcon('building') ?><dl><dt>Inmueble</dt><dd><?= $escape($unitLabel !== '' ? $unitLabel : 'Sin unidad registrada') ?></dd></dl></div>
                                     <div class="candidate-fact"><?= $candidateIcon('phone') ?><dl><dt>Celular o WhatsApp</dt><dd><?= trim((string) ($candidate['phone'] ?? '')) !== '' ? $escape($candidate['phone']) : 'Sin teléfono registrado' ?></dd></dl></div>
+                                    <?php if ($propertyLocation !== ''): ?>
+                                        <div class="candidate-fact candidate-fact--property-address"><?= $candidateIcon('map-pin') ?><dl><dt>Dirección del inmueble</dt><dd><?= $escape($propertyLocation) ?></dd></dl></div>
+                                    <?php endif; ?>
+                                    <div class="candidate-fact"><?= $candidateIcon('mail') ?><dl><dt>Correo</dt><dd><?= trim((string) ($candidate['email'] ?? '')) !== '' ? $escape($candidate['email']) : 'Sin correo registrado' ?></dd></dl></div>
                                     <div class="candidate-fact"><?= $candidateIcon('calendar') ?><dl><dt>Fecha de solicitud</dt><dd><?= $submittedAt !== null ? $escape($submittedAt) : 'Sin envío registrado' ?></dd></dl></div>
-                                    <div class="candidate-fact candidate-fact--wide"><?= $candidateIcon('mail') ?><dl><dt>Correo</dt><dd><?= trim((string) ($candidate['email'] ?? '')) !== '' ? $escape($candidate['email']) : 'Sin correo registrado' ?></dd></dl></div>
                                 </div>
                             </div>
                             <aside class="candidate-state" aria-labelledby="candidate-state-title">
