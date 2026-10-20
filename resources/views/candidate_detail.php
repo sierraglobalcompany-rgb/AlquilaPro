@@ -145,11 +145,11 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
             return is_numeric($amount) ? '$ ' . number_format((float) $amount, 0, ',', '.') . ' COP' : null;
         };
         $milestones = [
-            ['label' => 'Solicitud', 'verified' => $createdAt !== null, 'detail' => $createdAt],
-            ['label' => 'Envío', 'verified' => $submittedAt !== null, 'detail' => $submittedAt],
-            ['label' => 'Referencias', 'verified' => count($candidate['references'] ?? []) > 0, 'detail' => null],
-            ['label' => 'Estudio', 'verified' => $screening !== null, 'detail' => null],
-            ['label' => 'Contrato', 'verified' => count($contractRows) > 0, 'detail' => null],
+            ['label' => 'Solicitud', 'verified' => $createdAt !== null, 'detail' => $createdAt, 'raw_date' => $candidate['created_at'] ?? null],
+            ['label' => 'Información laboral', 'verified' => trim((string) ($candidate['employment_status'] ?? '')) !== '', 'detail' => null, 'raw_date' => null],
+            ['label' => 'Referencias', 'verified' => count($candidate['references'] ?? []) > 0, 'detail' => null, 'raw_date' => null],
+            ['label' => 'Estudio de aseguradora', 'verified' => $screening !== null, 'detail' => null, 'raw_date' => null],
+            ['label' => 'Contrato', 'verified' => count($contractRows) > 0, 'detail' => null, 'raw_date' => null],
         ];
         $reviewSections = [
             ['key' => 'work', 'title' => 'Información laboral', 'detail' => 'Consultar la información declarada'],
@@ -175,7 +175,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                                         <div class="candidate-fact candidate-fact--property-address"><?= $candidateIcon('map-pin') ?><dl><dt>Dirección del inmueble</dt><dd><?= $escape($propertyLocation) ?></dd></dl></div>
                                     <?php endif; ?>
                                     <div class="candidate-fact"><?= $candidateIcon('mail') ?><dl><dt>Correo</dt><dd><?= trim((string) ($candidate['email'] ?? '')) !== '' ? $escape($candidate['email']) : 'Sin correo registrado' ?></dd></dl></div>
-                                    <div class="candidate-fact"><?= $candidateIcon('calendar') ?><dl><dt>Fecha de solicitud</dt><dd><?= $submittedAt !== null ? $escape($submittedAt) : 'Sin envío registrado' ?></dd></dl></div>
+                                    <div class="candidate-fact"><?= $candidateIcon('calendar') ?><dl><dt>Fecha de solicitud</dt><dd><?php if ($submittedAt !== null): ?><time datetime="<?= $escape($candidate['submitted_at']) ?>"><?= $escape($submittedAt) ?></time><?php else: ?>Sin envío registrado<?php endif; ?></dd></dl></div>
                                 </div>
                             </div>
                             <aside class="candidate-state" aria-labelledby="candidate-state-title">
@@ -200,7 +200,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                                     <strong><?= $escape($milestone['label']) ?></strong>
                                     <span><?= $milestone['verified'] ? 'Con registro' : 'Sin registro' ?></span>
                                     <?php if ($milestone['detail'] !== null): ?>
-                                        <time datetime="<?= $escape($milestone['label'] === 'Solicitud' ? $candidate['created_at'] : $candidate['submitted_at']) ?>"><?= $escape($milestone['detail']) ?></time>
+                                        <time datetime="<?= $escape($milestone['raw_date']) ?>"><?= $escape($milestone['detail']) ?></time>
                                     <?php endif; ?>
                                 </li>
                             <?php endforeach; ?>
