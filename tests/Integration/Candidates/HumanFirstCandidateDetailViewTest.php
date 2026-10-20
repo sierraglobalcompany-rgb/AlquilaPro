@@ -80,6 +80,43 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertStringNotContainsString('82 / 100', $html);
     }
 
+    public function testApprovedProgressMilestonesReflectRealEmploymentDataAndNeverInventContractVisibility(): void
+    {
+        $xpath = static function (string $html): \DOMXPath {
+            $dom = new \DOMDocument();
+            @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+            return new \DOMXPath($dom);
+        };
+
+        $overview = $xpath($this->renderOverview());
+        $labels = [];
+        foreach ($overview->query('//ol[contains(@class,"candidate-progress-list")]/li/strong') as $heading) {
+            $labels[] = trim($heading->textContent);
+        }
+        self::assertSame(
+            ['Solicitud', 'Información laboral', 'Referencias', 'Estudio de aseguradora', 'Contrato'],
+            $labels,
+            'The five approved visual stages must retain their business meaning.',
+        );
+        self::assertSame(
+            'yes',
+            $overview->evaluate('string(//li[strong="Información laboral"]/@data-milestone-recorded)'),
+            'A declared employment status has a factual record, even without completion claims.',
+        );
+
+        $missingWork = $xpath($this->renderOverview(['employment_status' => null]));
+        self::assertSame(
+            'no',
+            $missingWork->evaluate('string(//li[strong="Información laboral"]/@data-milestone-recorded)'),
+            'A submission date must not falsely certify work information.',
+        );
+        self::assertSame(
+            '2026-10-17 00:00:00',
+            $overview->evaluate('string(//li[strong="Solicitud"]//time/@datetime)'),
+            'Progress dates must use the correct factual source, never a label-dependent guess.',
+        );
+    }
+
     public function testStructuralCardsRemainPresentWhenOptionalFactsAreAbsent(): void
     {
         $html = $this->renderOverview([
