@@ -14,7 +14,7 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
 
         self::assertStringContainsString('aria-label="Secciones del candidato"', $html);
         self::assertStringContainsString('class="content-card candidate-section-menu"', $html);
-        self::assertStringContainsString('<summary>SecciÃ³n: Solicitud</summary>', $html);
+        self::assertStringContainsString('<summary>Sección: Solicitud</summary>', $html);
         self::assertStringContainsString('data-candidate-shell', $html);
         self::assertStringContainsString('data-candidate-section-body="overview"', $html);
         self::assertSame(1, substr_count($html, 'data-candidate-section-body='));
@@ -24,10 +24,10 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
             self::assertStringContainsString($fact, $html);
         }
 
-        foreach (['InformaciÃ³n laboral', 'Ocupantes y mascotas', 'Referencias', 'Documentos', 'Estudio de aseguradora', 'Contratos', 'Administrar'] as $section) {
+        foreach (['Información laboral', 'Ocupantes y mascotas', 'Referencias', 'Documentos', 'Estudio de aseguradora', 'Contratos', 'Administrar'] as $section) {
             self::assertStringNotContainsString('<h2>' . $section . '</h2>', $html);
         }
-        foreach (['Editar candidato', 'Enviar mensaje', '80%', '82 / 100', 'Perfil laboral sÃ³lido'] as $inventedCopy) {
+        foreach (['Editar candidato', 'Enviar mensaje', '80%', '82 / 100', 'Perfil laboral sólido'] as $inventedCopy) {
             self::assertStringNotContainsString($inventedCopy, $html);
         }
     }
@@ -37,7 +37,7 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         $html = $this->renderOverview();
 
         self::assertSame(2, substr_count($html, 'Pendiente de estudio'));
-        self::assertSame(1, substr_count($html, 'La solicitud estÃ¡ pendiente del estudio de aseguradora.'));
+        self::assertSame(1, substr_count($html, 'La solicitud está pendiente del estudio de aseguradora.'));
     }
 
     public function testOverviewKeepsUnitContextOnlyInItsGlobalShell(): void
@@ -54,7 +54,7 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         preg_match_all('/<section class="content-card candidate-card[^\"]*"/', $html, $cards);
 
         self::assertCount(6, $cards[0]);
-        foreach (['Información principal de la postulación', 'Fechas relevantes', '17/10/2026 Â· 00:00', '17/10/2026 Â· 00:10', '17/10/2026 Â· 00:20'] as $fact) {
+        foreach (['Información principal de la postulación', 'Fechas relevantes', '17/10/2026 · 00:00', '17/10/2026 · 00:10', '17/10/2026 · 00:20'] as $fact) {
             self::assertStringContainsString($fact, $html);
         }
     }
@@ -108,16 +108,16 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertSame('Resumen de la solicitud', $xpath->evaluate('string(' . $summary . '//h2)'));
         self::assertSame(1, $xpath->query($summary . '//dl[dt="Correo"]/dd[contains(., "camilo@example.com")]')->length);
         self::assertSame(1, $xpath->query($summary . '//aside[@aria-labelledby="candidate-state-title"]')->length);
-        self::assertStringContainsString('La solicitud estÃ¡ pendiente del estudio de aseguradora.', $xpath->evaluate('string(' . $summary . '//aside)'));
-        self::assertSame(0, $xpath->query('//header[@data-candidate-shell]//p[contains(., "La solicitud estÃ¡ pendiente")]')->length);
+        self::assertStringContainsString('La solicitud está pendiente del estudio de aseguradora.', $xpath->evaluate('string(' . $summary . '//aside)'));
+        self::assertSame(0, $xpath->query('//header[@data-candidate-shell]//p[contains(., "La solicitud está pendiente")]')->length);
     }
 
     public function testOverviewDatesAreSemanticAndMissingFactsAreExplicit(): void
     {
         $html = $this->renderOverview();
-        self::assertStringContainsString('<time datetime="2026-10-17 00:10:00">17/10/2026 Â· 00:10</time>', $html);
+        self::assertStringContainsString('<time datetime="2026-10-17 00:10:00">17/10/2026 · 00:10</time>', $html);
         $empty = $this->renderOverview(['phone' => null, 'email' => '', 'document_number' => null, 'created_at' => null, 'submitted_at' => null, 'updated_at' => null]);
-        self::assertStringContainsString('Sin telÃ©fono registrado', $empty);
+        self::assertStringContainsString('Sin teléfono registrado', $empty);
         self::assertStringContainsString('Sin correo registrado', $empty);
         self::assertStringContainsString('Sin documento registrado', $empty);
         self::assertStringContainsString('No hay fechas registradas para esta solicitud.', $empty);
@@ -170,7 +170,7 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
             'phone' => '3000000000',
             'email' => 'camilo@example.com',
             'birth_date' => '1990-01-01',
-            'current_address' => 'DirecciÃ³n demo',
+            'current_address' => 'Dirección demo',
             'consent_at' => '2026-10-17 00:00:00',
             'created_at' => '2026-10-17 00:00:00',
             'submitted_at' => '2026-10-17 00:10:00',
@@ -195,7 +195,7 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         $activeSection = 'overview';
         $candidateSections = [
             ['key' => 'overview', 'label' => 'Solicitud'],
-            ['key' => 'work', 'label' => 'InformaciÃ³n laboral'],
+            ['key' => 'work', 'label' => 'Información laboral'],
             ['key' => 'household', 'label' => 'Ocupantes y mascotas'],
             ['key' => 'references', 'label' => 'Referencias'],
             ['key' => 'documents', 'label' => 'Documentos'],
