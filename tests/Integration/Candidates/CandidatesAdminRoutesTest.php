@@ -220,6 +220,8 @@ final class CandidatesAdminRoutesTest extends TestCase
         $propertyHtml = (string) $full->getBody();
         self::assertStringContainsString('Dirección del inmueble', $propertyHtml);
         self::assertStringContainsString('Calle 1', $propertyHtml);
+        self::assertMatchesRegularExpression('/<p class="muted candidate-shell__property-address">[^<]*<svg[^>]*>.*?Calle 1, Medellín<\/p>/s', $propertyHtml);
+        self::assertMatchesRegularExpression('/<div class="candidate-fact candidate-fact--property-address">.*?Calle 1, Medellín<\/dd><\/dl><\/div>/s', $propertyHtml);
         self::assertStringContainsString('2.500.000', $propertyHtml);
         self::assertStringContainsString('/sub/admin/units/' . $unitId . '/media/' . $photoId, $propertyHtml);
         self::assertSame(200, $this->request($allowed, 'GET', '/sub/admin/units/' . $unitId . '/media/' . $photoId)->getStatusCode());
