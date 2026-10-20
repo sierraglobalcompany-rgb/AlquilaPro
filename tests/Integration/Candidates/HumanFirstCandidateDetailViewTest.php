@@ -32,11 +32,11 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         }
     }
 
-    public function testOverviewKeepsStatusOnlyInItsGlobalShell(): void
+    public function testOverviewContextualPanelRepeatsOnlyTheStatusLabelRequiredByG2(): void
     {
         $html = $this->renderOverview();
 
-        self::assertSame(1, substr_count($html, 'Pendiente de estudio'));
+        self::assertSame(2, substr_count($html, 'Pendiente de estudio'));
         self::assertSame(1, substr_count($html, 'La solicitud está pendiente del estudio de aseguradora.'));
     }
 
@@ -53,7 +53,7 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         $html = $this->renderOverview();
         preg_match_all('/<section class="content-card candidate-card[^\"]*"/', $html, $cards);
 
-        self::assertCount(2, $cards[0]);
+        self::assertCount(3, $cards[0]);
         foreach (['Identidad y contacto', 'Fechas relevantes', '17/10/2026 · 00:00', '17/10/2026 · 00:10', '17/10/2026 · 00:20'] as $fact) {
             self::assertStringContainsString($fact, $html);
         }
@@ -88,6 +88,20 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertStringContainsString('Sin documento registrado', $empty);
         self::assertStringContainsString('No hay fechas registradas para esta solicitud.', $empty);
         self::assertStringNotContainsString('<time', $empty);
+    }
+
+    public function testApprovedCompositionHasTonalStateIconsAndFactualSecondaryModules(): void
+    {
+        $dom = new \DOMDocument();
+        @$dom->loadHTML('<?xml encoding="UTF-8">' . $this->renderOverview());
+        $xpath = new \DOMXPath($dom);
+        self::assertSame(1, $xpath->query('//aside[@aria-labelledby="candidate-state-title"]//div[contains(@class,"candidate-state-panel")]/h4[text()="Pendiente de estudio"]')->length);
+        self::assertSame(1, $xpath->query('//section[@aria-labelledby="candidate-summary-title"]//h2/*[local-name()="svg" and @aria-hidden="true"]')->length);
+        self::assertSame(16, $xpath->query('//a[contains(@href,"?section=")]/*[local-name()="svg" and @aria-hidden="true"]')->length);
+        self::assertSame(1, $xpath->query('//section[@aria-labelledby="candidate-personal-title"]//dt[text()="Fecha de nacimiento"]')->length);
+        self::assertSame(1, $xpath->query('//section[@aria-labelledby="candidate-dates-title"]//time[@datetime="2026-10-17 00:00:00"]')->length);
+        self::assertSame(1, substr_count($dom->textContent, '3000000000'));
+        self::assertSame(1, substr_count($dom->textContent, 'camilo@example.com'));
     }
 
     public function testOverviewEscapesLongFactsAndPreservesSubdirectoryLinks(): void
