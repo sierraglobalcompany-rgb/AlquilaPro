@@ -174,6 +174,39 @@ final class CandidatesAdminRoutesTest extends TestCase
         self::assertStringContainsString('?section=contracts', $contracts);
     }
 
+    public function testCandidateOverviewKeepsPrivatePropertyFactsBehindIndependentPropertyPermission(): void
+    {
+        $candidateId = $this->insertCandidate('PROPERTY-PRIVATE-G3', 'Persona Demo G3');
+        $unitId = $this->candidateUnitId($candidateId);
+        $update = $this->pdo->prepare('UPDATE units SET monthly_price = :price, area_m2 = :area, bedrooms = :bedrooms WHERE id = :id');
+        $update->execute(['price' => '2500000', 'area' => '85', 'bedrooms' => 3, 'id' => $unitId]);
+
+        $this->insertUser('g3-viewer@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
+        $viewer = $this->app('/sub');
+        $this->login($viewer, 'g3-viewer@example.com', 'ViewerPassword123', '/sub');
+        $restricted = $this->request($viewer, 'GET', '/sub/admin/candidates/' . $candidateId);
+        self::assertSame(200, $restricted->getStatusCode());
+        $viewerHtml = (string) $restricted->getBody();
+        self::assertStringContainsString('data-candidate-row="details"', $viewerHtml);
+        self::assertStringContainsString('Detalles limitados por permisos', $viewerHtml);
+        self::assertStringNotContainsString('Calle 1', $viewerHtml);
+        self::assertStringNotContainsString('2.500.000', $viewerHtml);
+        self::assertStringNotContainsString('/admin/units/' . $unitId . '/media/', $viewerHtml);
+
+        $_SESSION = [];
+        $this->insertUser('g3-property@example.com', 'PropertyPassword123', 'admin', ['candidates.view', 'properties.view']);
+        $allowed = $this->app('/sub');
+        $this->login($allowed, 'g3-property@example.com', 'PropertyPassword123', '/sub');
+        $full = $this->request($allowed, 'GET', '/sub/admin/candidates/' . $candidateId);
+        self::assertSame(200, $full->getStatusCode());
+        $propertyHtml = (string) $full->getBody();
+        self::assertStringContainsString('Dirección del inmueble', $propertyHtml);
+        self::assertStringContainsString('Calle 1', $propertyHtml);
+        self::assertStringContainsString('2.500.000', $propertyHtml);
+        self::assertStringContainsString('Sin foto registrada', $propertyHtml);
+        self::assertStringNotContainsString('/admin/units/' . $unitId . '/media/', $propertyHtml);
+    }
+
     public function testListAndDetailEscapeCandidateReferenceAndOriginalFilename(): void
     {
         $candidateId = $this->insertCandidate('ESC-1', '<script>alert(1)</script>');
