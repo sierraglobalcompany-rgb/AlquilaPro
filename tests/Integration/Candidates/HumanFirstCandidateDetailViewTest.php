@@ -118,6 +118,38 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         );
     }
 
+    public function testRecordedMilestonesNeverLookLikeCompletedSteps(): void
+    {
+        $asXpath = static function (string $html): \DOMXPath {
+            $dom = new \DOMDocument();
+            @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+            return new \DOMXPath($dom);
+        };
+        $xpath = $asXpath($this->renderOverview());
+        self::assertSame(
+            'yes',
+            $xpath->evaluate('string(//li[strong="Solicitud"]/@data-milestone-completed)'),
+            'Submitted request may show a completed request stage.',
+        );
+        self::assertSame(
+            1,
+            $xpath->query('//li[@data-milestone-completed="yes"]//span[contains(@class,"candidate-milestone-marker")][contains(.,"✓")]')->length,
+        );
+        foreach (['Información laboral', 'Referencias', 'Estudio de aseguradora', 'Contrato'] as $stage) {
+            self::assertSame(
+                'no',
+                $xpath->evaluate('string(//li[strong="' . $stage . '"]/@data-milestone-completed)'),
+                $stage . ' cannot be marked completed based on record presence.',
+            );
+        }
+        self::assertSame(
+            0,
+            $xpath->query('//li[@data-milestone-completed="no"]//span[contains(@class,"candidate-milestone-marker")][contains(.,"✓")]')->length,
+        );
+        $notSubmitted = $asXpath($this->renderOverview(['submitted_at' => null]));
+        self::assertSame('no', $notSubmitted->evaluate('string(//li[strong="Solicitud"]/@data-milestone-completed)'));
+    }
+
     public function testStructuralCardsRemainPresentWhenOptionalFactsAreAbsent(): void
     {
         $html = $this->renderOverview([
