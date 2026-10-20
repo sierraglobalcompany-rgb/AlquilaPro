@@ -1,5 +1,23 @@
 # AlquilaPro — CURRENT CHECKPOINT
 
+## Fase activa: CAND01 / G2 — 2026-10-19
+
+- Base G1 rechazada por owner: `a186b0ab765a9547def7501905486f18159c6982`.
+- Branch: `impl/cand-01-shell-overview-20261017`; PR #45 OPEN/DRAFT.
+- Implementación G2: `975a54fe0ce4c0c210a6f0c32d11249a91c8de9d`; corrección factual: `1459ef2`.
+- HEAD de certificación: commit que contiene esta actualización; consultar GitHub/CI por SHA completo. Ningún CI de SHA anterior lo certifica.
+- RED composición: `f864c06`, 3 fallos causales; GREEN vista inicial 9/60. RED revisión: `df6b55f` (el mensaje dice fix, pero sólo agregó el test RED); GREEN posterior 10/62 en `1459ef2`.
+- Owners: candidate_detail.php, app.css, layout existente y parcial único SVG. Siete cuerpos de secciones y dominio intactos.
+- G1 CI run39204913575 pertenece sólo a G1. G2 run39367261913 pertenece a975a54f; supersedido por corrección posterior.
+- Suite completa/CI del HEAD final: PENDING al crear este checkpoint; resultados exactos se entregarán en informe externo y PR45. No claim PASS hasta observarlos.
+- G2_OWNER_VISUAL_APPROVAL=PENDING; HUMAN_FIRST_FINAL=NOT_CERTIFIED.
+- PR45_MERGE=NO; deployment NOT AUTHORIZED; HOSTINGER=NOT_TOUCHED; CAND02=NOT_STARTED.
+- Evidencia local: `C:/Users/felip/Pictures/ALQUILAPRO_G2_FIDELIDAD_2026-10-19`.
+- Siguiente acción: certificar HEAD exacto con focal/full/CI8.3–8.5, regenerar capturas y entregar comparación al owner. Sólo su aceptación visual permite avanzar al gate correspondiente.
+
+## Registro histórico previo (no representa la fase activa)
+
+
 Fecha: 2026-10-17
 Propósito: **puntero operativo único de continuidad, sin ruido histórico**.
 
@@ -14,7 +32,7 @@ Propósito: **puntero operativo único de continuidad, sin ruido histórico**.
 - **No claim without evidence**: SHA exacto + CI para GREEN técnico; Browser real para certificación visual.
 - Merge y deployment son gates separados.
 - Deployment: **NOT AUTHORIZED**.
-- Convención del owner: cuando Andrés diga **`continua`**, eso autoriza ejecutar el siguiente gate preparado —incluido merge— siempre que siga GREEN, sin drift y dentro del alcance previamente auditado.
+- Convención vigente: `continua` ejecuta el siguiente gate inequívoco; no autoriza merge de PR45, prohibido explícitamente por G2.
 
 ## 2. Verdad viva de GitHub
 
