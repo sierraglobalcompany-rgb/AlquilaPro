@@ -183,6 +183,7 @@ if ($unitCode !== '') {
                 <div class="candidate-secondary-grid" data-candidate-row="process">
                     <section class="content-card candidate-card candidate-card--progress" aria-labelledby="candidate-dates-title">
                         <h3 id="candidate-dates-title"><?= $candidateIcon('history') ?>Progreso de la solicitud</h3>
+                        <p class="muted candidate-progress-subtitle">Fechas relevantes y otros hitos registrados</p>
                         <ol class="candidate-progress-list" aria-label="Hitos con registro verificable">
                             <?php foreach ($milestones as $milestone): ?>
                                 <li class="<?= $milestone['verified'] ? 'candidate-milestone--recorded' : 'candidate-milestone--unrecorded' ?>" data-milestone-recorded="<?= $milestone['verified'] ? 'yes' : 'no' ?>">
@@ -198,6 +199,7 @@ if ($unitCode !== '') {
                         <?php if ($createdAt === null && $submittedAt === null && $updatedAt === null): ?>
                             <p class="muted">No hay fechas registradas para esta solicitud.</p>
                         <?php endif; ?>
+                        <?php if ($updatedAt !== null): ?><p class="candidate-progress-last-update">Última actualización: <time datetime="<?= $escape($candidate['updated_at']) ?>"><?= $escape($updatedAt) ?></time></p><?php endif; ?>
                         <p class="candidate-progress-disclaimer">Los indicadores señalan registros existentes; no representan aprobación ni porcentaje de avance.</p>
                     </section>
                     <section class="content-card candidate-card candidate-card--next" aria-labelledby="candidate-next-title">
