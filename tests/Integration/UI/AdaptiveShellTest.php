@@ -35,8 +35,11 @@ final class AdaptiveShellTest extends TestCase
         $layout = $this->file('resources/views/layouts/app.php');
 
         self::assertStringContainsString('aria-current="page"', $layout);
-        self::assertStringContainsString('<svg', $layout);
-        self::assertStringContainsString('aria-hidden="true"', $layout);
+        self::assertStringContainsString("require __DIR__ . '/../partials/icons.php'", $layout);
+        $icons = $this->file('resources/views/partials/icons.php');
+        self::assertStringContainsString('<svg', $icons);
+        self::assertStringContainsString('aria-hidden="true"', $icons);
+        self::assertStringContainsString('focusable="false"', $icons);
         self::assertStringContainsString('aria-label="Abrir aplicaciones"', $layout);
         self::assertStringNotContainsString('https://fonts.googleapis.com', $layout);
         self::assertStringNotContainsString('https://fonts.gstatic.com', $layout);

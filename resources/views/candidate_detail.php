@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use AlquilaPro\UI\HumanLabels;
 
+$candidateIcon = require __DIR__ . '/partials/icons.php';
+$candidateSectionIcons = ['overview' => 'file-signature', 'work' => 'briefcase', 'household' => 'users', 'references' => 'account', 'documents' => 'files', 'screening' => 'shield', 'contracts' => 'file-signature', 'manage' => 'settings'];
+
 $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 $activeSection = is_string($activeSection ?? null) ? $activeSection : 'overview';
 $candidateSections = is_array($candidateSections ?? null) ? array_values($candidateSections) : [
@@ -85,13 +88,12 @@ if ($unitCode !== '') {
         <div class="candidate-shell__identity">
             <div class="candidate-avatar" aria-hidden="true"><?= $escape($initials) ?></div>
             <div class="candidate-shell__copy">
-                <p class="eyebrow">Candidato</p>
                 <div class="candidate-shell__title">
                     <h1><?= $escape($candidate['full_name'] ?? '') ?></h1>
                     <span class="status-pill"><?= $escape($statusLabel) ?></span>
                 </div>
                 <?php if ($unitLabel !== ''): ?>
-                    <p class="muted candidate-shell__unit"><?= $escape($unitLabel) ?></p>
+                    <p class="muted candidate-shell__unit"><?= $candidateIcon('building') ?><?= $escape($unitLabel) ?></p>
                 <?php endif; ?>
             </div>
         </div>
@@ -109,7 +111,7 @@ if ($unitCode !== '') {
                 $current = $key === $activeSection;
                 ?>
                 <a class="button <?= $current ? 'button--secondary' : 'button--quiet' ?> candidate-tab"
-                   href="<?= $escape($sectionHref($key)) ?>"<?= $current ? ' aria-current="page"' : '' ?>><?= $escape($label) ?></a>
+                   href="<?= $escape($sectionHref($key)) ?>"<?= $current ? ' aria-current="page"' : '' ?>><?= $candidateIcon($candidateSectionIcons[$key] ?? 'files') ?><span><?= $escape($label) ?></span></a>
             <?php endforeach; ?>
         </div>
     </nav>
@@ -124,7 +126,7 @@ if ($unitCode !== '') {
                 $current = $key === $activeSection;
                 ?>
                 <a class="candidate-section-menu__link"
-                   href="<?= $escape($sectionHref($key)) ?>"<?= $current ? ' aria-current="page"' : '' ?>><?= $escape($label) ?></a>
+                   href="<?= $escape($sectionHref($key)) ?>"<?= $current ? ' aria-current="page"' : '' ?>><?= $candidateIcon($candidateSectionIcons[$key] ?? 'files') ?><span><?= $escape($label) ?></span></a>
             <?php endforeach; ?>
         </nav>
     </details>
@@ -133,38 +135,46 @@ if ($unitCode !== '') {
         <section class="candidate-section" data-candidate-section-body="overview">
             <div class="candidate-overview-grid">
                 <section class="content-card candidate-card candidate-card--primary" aria-labelledby="candidate-summary-title">
-                    <div class="candidate-summary-heading">
-                        <p class="eyebrow">Solicitud</p>
-                        <h2 id="candidate-summary-title">Resumen de la solicitud</h2>
-                        <p class="muted">Identidad y contacto</p>
-                    </div>
                     <div class="candidate-summary-layout">
-                        <div class="candidate-fact-grid">
-                            <dl class="candidate-fact"><dt>Documento</dt><dd><?= trim((string) ($candidate['document_number'] ?? '')) !== '' ? $escape(strtoupper((string) ($candidate['document_type'] ?? '')) . ' ' . $candidate['document_number']) : 'Sin documento registrado' ?></dd></dl>
-                            <dl class="candidate-fact"><dt>Celular o WhatsApp</dt><dd><?= trim((string) ($candidate['phone'] ?? '')) !== '' ? $escape($candidate['phone']) : 'Sin teléfono registrado' ?></dd></dl>
-                            <dl class="candidate-fact"><dt>Correo</dt><dd><?= trim((string) ($candidate['email'] ?? '')) !== '' ? $escape($candidate['email']) : 'Sin correo registrado' ?></dd></dl>
-                            <?php if ($birthDate !== null): ?><dl class="candidate-fact"><dt>Fecha de nacimiento</dt><dd><?= $escape($birthDate) ?></dd></dl><?php endif; ?>
-                            <?php if (trim((string) ($candidate['current_address'] ?? '')) !== ''): ?><dl class="candidate-fact candidate-fact--wide"><dt>Dirección actual</dt><dd><?= $escape($candidate['current_address']) ?></dd></dl><?php endif; ?>
+                        <div class="candidate-summary-contact">
+                            <div class="candidate-summary-heading">
+                                <h2 id="candidate-summary-title"><?= $candidateIcon('file-signature') ?>Resumen de la solicitud</h2>
+                                <p class="muted">Identidad y contacto de la postulación</p>
+                            </div>
+                            <div class="candidate-fact-grid">
+                                <div class="candidate-fact"><?= $candidateIcon('id-card') ?><dl><dt>Documento</dt><dd><?= trim((string) ($candidate['document_number'] ?? '')) !== '' ? $escape(strtoupper((string) ($candidate['document_type'] ?? '')) . ' ' . $candidate['document_number']) : 'Sin documento registrado' ?></dd></dl></div>
+                                <div class="candidate-fact"><?= $candidateIcon('phone') ?><dl><dt>Celular o WhatsApp</dt><dd><?= trim((string) ($candidate['phone'] ?? '')) !== '' ? $escape($candidate['phone']) : 'Sin teléfono registrado' ?></dd></dl></div>
+                                <div class="candidate-fact candidate-fact--wide"><?= $candidateIcon('mail') ?><dl><dt>Correo</dt><dd><?= trim((string) ($candidate['email'] ?? '')) !== '' ? $escape($candidate['email']) : 'Sin correo registrado' ?></dd></dl></div>
+                            </div>
                         </div>
                         <aside class="candidate-state" aria-labelledby="candidate-state-title">
                             <h3 id="candidate-state-title">Estado actual</h3>
-                            <p><?= $escape($statusDescription) ?></p>
+                            <div class="candidate-state-panel"><h4><?= $escape($statusLabel) ?></h4><p><?= $escape($statusDescription) ?></p></div>
                         </aside>
                     </div>
                 </section>
-
-                <section class="content-card candidate-card candidate-card--timeline" aria-labelledby="candidate-dates-title">
-                    <h3 id="candidate-dates-title">Fechas relevantes</h3>
-                    <?php if ($createdAt === null && $submittedAt === null && $updatedAt === null): ?>
-                        <p class="empty-state">No hay fechas registradas para esta solicitud.</p>
-                    <?php else: ?>
-                        <div class="candidate-timeline">
-                            <?php foreach (['created_at' => ['Solicitud creada', $createdAt], 'submitted_at' => ['Solicitud enviada', $submittedAt], 'updated_at' => ['Última actualización', $updatedAt]] as $dateKey => [$dateLabel, $dateText]): ?>
-                                <?php if ($dateText !== null): ?><dl><dt><?= $escape($dateLabel) ?></dt><dd><time datetime="<?= $escape($candidate[$dateKey]) ?>"><?= $escape($dateText) ?></time></dd></dl><?php endif; ?>
-                            <?php endforeach; ?>
+                <div class="candidate-secondary-grid">
+                    <section class="content-card candidate-card candidate-card--timeline" aria-labelledby="candidate-dates-title">
+                        <h3 id="candidate-dates-title"><?= $candidateIcon('history') ?>Fechas relevantes</h3>
+                        <?php if ($createdAt === null && $submittedAt === null && $updatedAt === null): ?>
+                            <p class="empty-state">No hay fechas registradas para esta solicitud.</p>
+                        <?php else: ?>
+                            <ol class="candidate-timeline">
+                                <?php foreach (['created_at' => ['Solicitud creada', $createdAt], 'submitted_at' => ['Solicitud enviada', $submittedAt], 'updated_at' => ['Última actualización', $updatedAt]] as $dateKey => [$dateLabel, $dateText]): ?>
+                                    <?php if ($dateText !== null): ?><li><span><?= $escape($dateLabel) ?></span><time datetime="<?= $escape($candidate[$dateKey]) ?>"><?= $escape($dateText) ?></time></li><?php endif; ?>
+                                <?php endforeach; ?>
+                            </ol>
+                        <?php endif; ?>
+                    </section>
+                    <section class="content-card candidate-card candidate-card--personal" aria-labelledby="candidate-personal-title">
+                        <h3 id="candidate-personal-title"><?= $candidateIcon('account') ?>Información del candidato</h3>
+                        <div class="candidate-personal-facts">
+                            <?php if ($birthDate !== null): ?><div class="candidate-fact"><?= $candidateIcon('calendar') ?><dl><dt>Fecha de nacimiento</dt><dd><?= $escape($birthDate) ?></dd></dl></div><?php endif; ?>
+                            <?php if (trim((string) ($candidate['current_address'] ?? '')) !== ''): ?><div class="candidate-fact"><?= $candidateIcon('map-pin') ?><dl><dt>Dirección actual</dt><dd><?= $escape($candidate['current_address']) ?></dd></dl></div><?php endif; ?>
+                            <?php if ($birthDate === null && trim((string) ($candidate['current_address'] ?? '')) === ''): ?><p class="empty-state">No se registró fecha de nacimiento ni dirección actual.</p><?php endif; ?>
                         </div>
-                    <?php endif; ?>
-                </section>
+                    </section>
+                </div>
             </div>
         </section>
 
