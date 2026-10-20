@@ -132,49 +132,137 @@ if ($unitCode !== '') {
     </details>
 
     <?php if ($activeSection === 'overview'): ?>
+        <?php
+        $propertyDetails = is_array($propertyDetails ?? null) ? $propertyDetails : null;
+        $coverPhotoId = is_int($coverPhotoId ?? null) && $coverPhotoId > 0 ? $coverPhotoId : null;
+        $humanMoney = static function (mixed $amount): ?string {
+            return is_numeric($amount) ? '$ ' . number_format((float) $amount, 0, ',', '.') . ' COP' : null;
+        };
+        $milestones = [
+            ['label' => 'Solicitud', 'verified' => $createdAt !== null, 'detail' => $createdAt],
+            ['label' => 'Envío', 'verified' => $submittedAt !== null, 'detail' => $submittedAt],
+            ['label' => 'Referencias', 'verified' => count($candidate['references'] ?? []) > 0, 'detail' => null],
+            ['label' => 'Estudio', 'verified' => $screening !== null, 'detail' => null],
+            ['label' => 'Contrato', 'verified' => count($contractRows) > 0, 'detail' => null],
+        ];
+        $reviewSections = [
+            ['key' => 'work', 'title' => 'Información laboral', 'detail' => 'Consultar la información declarada'],
+            ['key' => 'references', 'title' => 'Referencias', 'detail' => 'Consultar referencias registradas'],
+            ['key' => 'screening', 'title' => 'Estudio de aseguradora', 'detail' => 'Consultar el estado del estudio'],
+        ];
+        ?>
         <section class="candidate-section" data-candidate-section-body="overview">
             <div class="candidate-overview-grid">
-                <section class="content-card candidate-card candidate-card--primary" aria-labelledby="candidate-summary-title">
-                    <div class="candidate-summary-layout">
-                        <div class="candidate-summary-contact">
-                            <div class="candidate-summary-heading">
-                                <h2 id="candidate-summary-title"><?= $candidateIcon('file-signature') ?>Resumen de la solicitud</h2>
-                                <p class="muted">Identidad y contacto de la postulación</p>
+                <div data-candidate-row="summary">
+                    <section class="content-card candidate-card candidate-card--primary" aria-labelledby="candidate-summary-title">
+                        <div class="candidate-summary-layout">
+                            <div class="candidate-summary-contact">
+                                <div class="candidate-summary-heading">
+                                    <h2 id="candidate-summary-title"><?= $candidateIcon('file-signature') ?>Resumen de la solicitud</h2>
+                                    <p class="muted">Información principal de la postulación</p>
+                                </div>
+                                <div class="candidate-fact-grid">
+                                    <div class="candidate-fact"><?= $candidateIcon('account') ?><dl><dt>Nombre completo</dt><dd><?= $escape($candidate['full_name'] ?? '') ?></dd></dl></div>
+                                    <div class="candidate-fact"><?= $candidateIcon('building') ?><dl><dt>Inmueble</dt><dd><?= $escape($unitLabel !== '' ? $unitLabel : 'Sin unidad registrada') ?></dd></dl></div>
+                                    <div class="candidate-fact"><?= $candidateIcon('phone') ?><dl><dt>Celular o WhatsApp</dt><dd><?= trim((string) ($candidate['phone'] ?? '')) !== '' ? $escape($candidate['phone']) : 'Sin teléfono registrado' ?></dd></dl></div>
+                                    <div class="candidate-fact"><?= $candidateIcon('calendar') ?><dl><dt>Fecha de solicitud</dt><dd><?= $submittedAt !== null ? $escape($submittedAt) : 'Sin envío registrado' ?></dd></dl></div>
+                                    <div class="candidate-fact candidate-fact--wide"><?= $candidateIcon('mail') ?><dl><dt>Correo</dt><dd><?= trim((string) ($candidate['email'] ?? '')) !== '' ? $escape($candidate['email']) : 'Sin correo registrado' ?></dd></dl></div>
+                                </div>
                             </div>
-                            <div class="candidate-fact-grid">
-                                <div class="candidate-fact"><?= $candidateIcon('id-card') ?><dl><dt>Documento</dt><dd><?= trim((string) ($candidate['document_number'] ?? '')) !== '' ? $escape(strtoupper((string) ($candidate['document_type'] ?? '')) . ' ' . $candidate['document_number']) : 'Sin documento registrado' ?></dd></dl></div>
-                                <div class="candidate-fact"><?= $candidateIcon('phone') ?><dl><dt>Celular o WhatsApp</dt><dd><?= trim((string) ($candidate['phone'] ?? '')) !== '' ? $escape($candidate['phone']) : 'Sin teléfono registrado' ?></dd></dl></div>
-                                <div class="candidate-fact candidate-fact--wide"><?= $candidateIcon('mail') ?><dl><dt>Correo</dt><dd><?= trim((string) ($candidate['email'] ?? '')) !== '' ? $escape($candidate['email']) : 'Sin correo registrado' ?></dd></dl></div>
-                            </div>
+                            <aside class="candidate-state" aria-labelledby="candidate-state-title">
+                                <h3 id="candidate-state-title">Estado actual</h3>
+                                <div class="candidate-state-panel">
+                                    <h4><?= $escape($statusLabel) ?></h4>
+                                    <p><?= $escape($statusDescription) ?></p>
+                                </div>
+                            </aside>
                         </div>
-                        <aside class="candidate-state" aria-labelledby="candidate-state-title">
-                            <h3 id="candidate-state-title">Estado actual</h3>
-                            <div class="candidate-state-panel"><h4><?= $escape($statusLabel) ?></h4><p><?= $escape($statusDescription) ?></p></div>
-                        </aside>
-                    </div>
-                </section>
-                <div class="candidate-secondary-grid">
-                    <section class="content-card candidate-card candidate-card--timeline" aria-labelledby="candidate-dates-title">
-                        <h3 id="candidate-dates-title"><?= $candidateIcon('history') ?>Fechas relevantes</h3>
+                    </section>
+                </div>
+
+                <div class="candidate-secondary-grid" data-candidate-row="process">
+                    <section class="content-card candidate-card candidate-card--progress" aria-labelledby="candidate-dates-title">
+                        <h3 id="candidate-dates-title"><?= $candidateIcon('history') ?>Progreso de la solicitud</h3>
+                        <ol class="candidate-progress-list" aria-label="Hitos con registro verificable">
+                            <?php foreach ($milestones as $milestone): ?>
+                                <li class="<?= $milestone['verified'] ? 'candidate-milestone--recorded' : 'candidate-milestone--unrecorded' ?>" data-milestone-recorded="<?= $milestone['verified'] ? 'yes' : 'no' ?>">
+                                    <span class="candidate-milestone-marker" aria-hidden="true"><?= $milestone['verified'] ? '✓' : '·' ?></span>
+                                    <strong><?= $escape($milestone['label']) ?></strong>
+                                    <span><?= $milestone['verified'] ? 'Con registro' : 'Sin registro' ?></span>
+                                    <?php if ($milestone['detail'] !== null): ?>
+                                        <time datetime="<?= $escape($milestone['label'] === 'Solicitud' ? $candidate['created_at'] : $candidate['submitted_at']) ?>"><?= $escape($milestone['detail']) ?></time>
+                                    <?php endif; ?>
+                                </li>
+                            <?php endforeach; ?>
+                        </ol>
                         <?php if ($createdAt === null && $submittedAt === null && $updatedAt === null): ?>
-                            <p class="empty-state">No hay fechas registradas para esta solicitud.</p>
-                        <?php else: ?>
-                            <ol class="candidate-timeline">
-                                <?php foreach (['created_at' => ['Solicitud creada', $createdAt], 'submitted_at' => ['Solicitud enviada', $submittedAt], 'updated_at' => ['Última actualización', $updatedAt]] as $dateKey => [$dateLabel, $dateText]): ?>
-                                    <?php if ($dateText !== null): ?><li><span><?= $escape($dateLabel) ?></span><time datetime="<?= $escape($candidate[$dateKey]) ?>"><?= $escape($dateText) ?></time></li><?php endif; ?>
-                                <?php endforeach; ?>
-                            </ol>
+                            <p class="muted">No hay fechas registradas para esta solicitud.</p>
+                        <?php endif; ?>
+                        <p class="candidate-progress-disclaimer">Los indicadores señalan registros existentes; no representan aprobación ni porcentaje de avance.</p>
+                    </section>
+                    <section class="content-card candidate-card candidate-card--next" aria-labelledby="candidate-next-title">
+                        <h3 id="candidate-next-title"><?= $candidateIcon('history') ?>Apartados para revisar</h3>
+                        <ol class="candidate-next-list">
+                            <?php foreach ($reviewSections as $index => $section): ?>
+                                <li>
+                                    <span class="candidate-next-number" aria-hidden="true"><?= $index + 1 ?></span>
+                                    <div><a href="<?= $escape($sectionHref($section['key'])) ?>"><?= $escape($section['title']) ?></a><p><?= $escape($section['detail']) ?></p></div>
+                                </li>
+                            <?php endforeach; ?>
+                        </ol>
+                    </section>
+                </div>
+
+                <div class="candidate-detail-grid" data-candidate-row="details">
+                    <section class="content-card candidate-card candidate-card--personal" aria-labelledby="candidate-personal-title">
+                        <h3 id="candidate-personal-title"><?= $candidateIcon('account') ?>Detalles del candidato</h3>
+                        <dl class="candidate-detail-facts">
+                            <div><dt>Documento</dt><dd><?= trim((string) ($candidate['document_number'] ?? '')) !== '' ? $escape(strtoupper((string) ($candidate['document_type'] ?? '')) . ' ' . $candidate['document_number']) : 'Sin documento registrado' ?></dd></div>
+                            <?php if ($birthDate !== null): ?><div><dt>Fecha de nacimiento</dt><dd><?= $escape($birthDate) ?></dd></div><?php endif; ?>
+                        </dl>
+                        <?php if ($birthDate === null && trim((string) ($candidate['current_address'] ?? '')) === ''): ?>
+                            <p class="muted">Sin datos personales adicionales.</p>
                         <?php endif; ?>
                     </section>
-                    <?php if ($birthDate !== null || trim((string) ($candidate['current_address'] ?? '')) !== ''): ?>
-                    <section class="content-card candidate-card candidate-card--personal" aria-labelledby="candidate-personal-title">
-                        <h3 id="candidate-personal-title"><?= $candidateIcon('account') ?>Información del candidato</h3>
-                        <div class="candidate-personal-facts">
-                            <?php if ($birthDate !== null): ?><div class="candidate-fact"><?= $candidateIcon('calendar') ?><dl><dt>Fecha de nacimiento</dt><dd><?= $escape($birthDate) ?></dd></dl></div><?php endif; ?>
-                            <?php if (trim((string) ($candidate['current_address'] ?? '')) !== ''): ?><div class="candidate-fact"><?= $candidateIcon('map-pin') ?><dl><dt>Dirección actual</dt><dd><?= $escape($candidate['current_address']) ?></dd></dl></div><?php endif; ?>
-                        </div>
+
+                    <section class="content-card candidate-card candidate-card--contact" aria-labelledby="candidate-contact-title">
+                        <h3 id="candidate-contact-title"><?= $candidateIcon('phone') ?>Información de contacto</h3>
+                        <dl class="candidate-detail-facts">
+                            <div><dt>Teléfono principal</dt><dd><?= trim((string) ($candidate['phone'] ?? '')) !== '' ? $escape($candidate['phone']) : 'Sin teléfono registrado' ?></dd></div>
+                            <div><dt>Correo electrónico</dt><dd><?= trim((string) ($candidate['email'] ?? '')) !== '' ? $escape($candidate['email']) : 'Sin correo registrado' ?></dd></div>
+                            <?php if (trim((string) ($candidate['current_address'] ?? '')) !== ''): ?>
+                                <div><dt>Dirección actual del candidato</dt><dd><?= $escape($candidate['current_address']) ?></dd></div>
+                            <?php endif; ?>
+                        </dl>
                     </section>
-                    <?php endif; ?>
+
+                    <section class="content-card candidate-card candidate-card--property" aria-labelledby="candidate-property-title">
+                        <h3 id="candidate-property-title"><?= $candidateIcon('building') ?>Información del inmueble</h3>
+                        <?php if ($propertyDetails === null): ?>
+                            <p class="candidate-property-name"><?= $escape($unitLabel !== '' ? $unitLabel : 'Unidad no disponible') ?></p>
+                            <p class="muted">Detalles limitados por permisos.</p>
+                        <?php else: ?>
+                            <div class="candidate-property-main">
+                                <?php if ($coverPhotoId !== null): ?>
+                                    <img class="candidate-property-photo" src="<?= $escape($basePath) ?>/admin/units/<?= (int) $propertyDetails['unit_id'] ?>/media/<?= $coverPhotoId ?>" alt="Foto registrada de la unidad">
+                                <?php else: ?>
+                                    <div class="candidate-property-placeholder"><?= $candidateIcon('building') ?><small>Sin foto registrada</small></div>
+                                <?php endif; ?>
+                                <div>
+                                    <p class="candidate-property-name"><?= $escape($unitLabel !== '' ? $unitLabel : $propertyDetails['unit_code']) ?></p>
+                                    <dl class="candidate-detail-facts">
+                                        <?php if (trim((string) ($propertyDetails['address'] ?? '')) !== ''): ?><div><dt>Dirección del inmueble</dt><dd><?= $escape($propertyDetails['address']) ?><?= trim((string) ($propertyDetails['city'] ?? '')) !== '' ? ', ' . $escape($propertyDetails['city']) : '' ?></dd></div><?php endif; ?>
+                                        <div><dt>Tipo</dt><dd><?= ($propertyDetails['type'] ?? '') === 'apartment' ? 'Apartamento' : 'Parqueadero' ?></dd></div>
+                                        <?php if ($humanMoney($propertyDetails['monthly_price']) !== null): ?><div><dt>Canon mensual</dt><dd><?= $escape($humanMoney($propertyDetails['monthly_price'])) ?></dd></div><?php endif; ?>
+                                        <?php if ($humanMoney($propertyDetails['administration_fee']) !== null): ?><div><dt>Administración</dt><dd><?= $escape($humanMoney($propertyDetails['administration_fee'])) ?></dd></div><?php endif; ?>
+                                        <?php if (is_numeric($propertyDetails['area_m2'])): ?><div><dt>Área</dt><dd><?= $escape($propertyDetails['area_m2']) ?> m²</dd></div><?php endif; ?>
+                                        <?php if ($propertyDetails['bedrooms'] !== null): ?><div><dt>Habitaciones</dt><dd><?= (int) $propertyDetails['bedrooms'] ?></dd></div><?php endif; ?>
+                                        <?php if ($propertyDetails['bathrooms'] !== null): ?><div><dt>Baños</dt><dd><?= $escape($propertyDetails['bathrooms']) ?></dd></div><?php endif; ?>
+                                    </dl>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                    </section>
                 </div>
             </div>
         </section>
