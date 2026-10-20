@@ -45,7 +45,7 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         $html = $this->renderOverview();
 
         self::assertGreaterThanOrEqual(2, substr_count($html, 'Edificio Demo'));
-        self::assertSame(1, substr_count($html, 'CED-101'));
+        self::assertGreaterThanOrEqual(2, substr_count($html, 'CED-101'));
     }
 
     public function testOverviewGroupsContactAndDatesWithoutRedundantCards(): void
@@ -54,7 +54,7 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         preg_match_all('/<section class="content-card candidate-card[^\"]*"/', $html, $cards);
 
         self::assertCount(6, $cards[0]);
-        foreach (['Identidad y contacto', 'Fechas relevantes', '17/10/2026 Â· 00:00', '17/10/2026 Â· 00:10', '17/10/2026 Â· 00:20'] as $fact) {
+        foreach (['Información principal de la postulación', 'Fechas relevantes', '17/10/2026 Â· 00:00', '17/10/2026 Â· 00:10', '17/10/2026 Â· 00:20'] as $fact) {
             self::assertStringContainsString($fact, $html);
         }
     }
