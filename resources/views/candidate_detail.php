@@ -212,7 +212,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                         <p class="candidate-progress-disclaimer">Los indicadores señalan registros existentes; no representan aprobación ni porcentaje de avance.</p>
                     </section>
                     <section class="content-card candidate-card candidate-card--next" aria-labelledby="candidate-next-title">
-                        <h3 id="candidate-next-title"><?= $candidateIcon('history') ?>Apartados para revisar</h3>
+                        <h3 id="candidate-next-title"><?= $candidateIcon('history') ?>Próximos pasos</h3>
                         <ol class="candidate-next-list">
                             <?php foreach ($reviewSections as $index => $section): ?>
                                 <li>
