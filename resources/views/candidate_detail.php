@@ -166,14 +166,15 @@ if ($unitCode !== '') {
                             </ol>
                         <?php endif; ?>
                     </section>
+                    <?php if ($birthDate !== null || trim((string) ($candidate['current_address'] ?? '')) !== ''): ?>
                     <section class="content-card candidate-card candidate-card--personal" aria-labelledby="candidate-personal-title">
                         <h3 id="candidate-personal-title"><?= $candidateIcon('account') ?>Información del candidato</h3>
                         <div class="candidate-personal-facts">
                             <?php if ($birthDate !== null): ?><div class="candidate-fact"><?= $candidateIcon('calendar') ?><dl><dt>Fecha de nacimiento</dt><dd><?= $escape($birthDate) ?></dd></dl></div><?php endif; ?>
                             <?php if (trim((string) ($candidate['current_address'] ?? '')) !== ''): ?><div class="candidate-fact"><?= $candidateIcon('map-pin') ?><dl><dt>Dirección actual</dt><dd><?= $escape($candidate['current_address']) ?></dd></dl></div><?php endif; ?>
-                            <?php if ($birthDate === null && trim((string) ($candidate['current_address'] ?? '')) === ''): ?><p class="empty-state">No se registró fecha de nacimiento ni dirección actual.</p><?php endif; ?>
                         </div>
                     </section>
+                    <?php endif; ?>
                 </div>
             </div>
         </section>
