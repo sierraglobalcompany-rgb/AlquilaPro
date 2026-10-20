@@ -145,11 +145,11 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
             return is_numeric($amount) ? '$ ' . number_format((float) $amount, 0, ',', '.') . ' COP' : null;
         };
         $milestones = [
-            ['label' => 'Solicitud', 'verified' => $createdAt !== null, 'detail' => $createdAt, 'raw_date' => $candidate['created_at'] ?? null],
-            ['label' => 'Información laboral', 'verified' => trim((string) ($candidate['employment_status'] ?? '')) !== '', 'detail' => null, 'raw_date' => null],
-            ['label' => 'Referencias', 'verified' => count($candidate['references'] ?? []) > 0, 'detail' => null, 'raw_date' => null],
-            ['label' => 'Estudio de aseguradora', 'verified' => $screening !== null, 'detail' => null, 'raw_date' => null],
-            ['label' => 'Contrato', 'verified' => count($contractRows) > 0, 'detail' => null, 'raw_date' => null],
+            ['label' => 'Solicitud', 'verified' => $createdAt !== null, 'completed' => $submittedAt !== null, 'detail' => $createdAt, 'raw_date' => $candidate['created_at'] ?? null],
+            ['label' => 'Información laboral', 'verified' => trim((string) ($candidate['employment_status'] ?? '')) !== '', 'completed' => false, 'detail' => null, 'raw_date' => null],
+            ['label' => 'Referencias', 'verified' => count($candidate['references'] ?? []) > 0, 'completed' => false, 'detail' => null, 'raw_date' => null],
+            ['label' => 'Estudio de aseguradora', 'verified' => $screening !== null, 'completed' => false, 'detail' => null, 'raw_date' => null],
+            ['label' => 'Contrato', 'verified' => count($contractRows) > 0, 'completed' => false, 'detail' => null, 'raw_date' => null],
         ];
         $reviewSections = [
             ['key' => 'work', 'title' => 'Información laboral', 'detail' => 'Consultar la información declarada'],
@@ -195,10 +195,10 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                         <p class="muted candidate-progress-subtitle">Fechas relevantes y otros hitos registrados</p>
                         <ol class="candidate-progress-list" aria-label="Hitos con registro verificable">
                             <?php foreach ($milestones as $milestone): ?>
-                                <li class="<?= $milestone['verified'] ? 'candidate-milestone--recorded' : 'candidate-milestone--unrecorded' ?>" data-milestone-recorded="<?= $milestone['verified'] ? 'yes' : 'no' ?>">
-                                    <span class="candidate-milestone-marker" aria-hidden="true"><?= $milestone['verified'] ? '✓' : '·' ?></span>
+                                <li class="<?= $milestone['completed'] ? 'candidate-milestone--completed' : ($milestone['verified'] ? 'candidate-milestone--recorded' : 'candidate-milestone--unrecorded') ?>" data-milestone-recorded="<?= $milestone['verified'] ? 'yes' : 'no' ?>" data-milestone-completed="<?= $milestone['completed'] ? 'yes' : 'no' ?>">
+                                    <span class="candidate-milestone-marker" aria-hidden="true"><?= $milestone['completed'] ? '✓' : ($milestone['verified'] ? '•' : '·') ?></span>
                                     <strong><?= $escape($milestone['label']) ?></strong>
-                                    <span><?= $milestone['verified'] ? 'Con registro' : 'Sin registro' ?></span>
+                                    <span><?= $milestone['completed'] ? 'Completada' : ($milestone['verified'] ? 'Con registro' : 'Sin registro') ?></span>
                                     <?php if ($milestone['detail'] !== null): ?>
                                         <time datetime="<?= $escape($milestone['raw_date']) ?>"><?= $escape($milestone['detail']) ?></time>
                                     <?php endif; ?>
@@ -208,8 +208,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                         <?php if ($createdAt === null && $submittedAt === null && $updatedAt === null): ?>
                             <p class="muted">No hay fechas registradas para esta solicitud.</p>
                         <?php endif; ?>
-                        <?php if ($updatedAt !== null): ?><p class="candidate-progress-last-update">Última actualización: <time datetime="<?= $escape($candidate['updated_at']) ?>"><?= $escape($updatedAt) ?></time></p><?php endif; ?>
-                        <p class="candidate-progress-disclaimer">Los indicadores señalan registros existentes; no representan aprobación ni porcentaje de avance.</p>
+                        <p class="candidate-progress-footer"><?php if ($updatedAt !== null): ?>Última actualización: <time datetime="<?= $escape($candidate['updated_at']) ?>"><?= $escape($updatedAt) ?></time> · <?php endif; ?>Los registros no implican aprobación ni porcentaje de avance.</p>
                     </section>
                     <section class="content-card candidate-card candidate-card--next" aria-labelledby="candidate-next-title">
                         <h3 id="candidate-next-title"><?= $candidateIcon('history') ?>Próximos pasos</h3>

@@ -81,7 +81,7 @@ final class AssetContractTest extends TestCase
         // Guard the previously measured sources of 234px of extra document height.
         // This does NOT certify the rendered mockup: Browser QA at 1448x1086 is mandatory.
         self::assertMatchesRegularExpression('/\.candidate-page\s*\{[^}]*gap:\s*14px;/s', $this->css);
-        self::assertMatchesRegularExpression('/\.candidate-back\s*\{[^}]*min-height:\s*32px;/s', $this->css);
+        self::assertMatchesRegularExpression('/\.candidate-back\s*\{[^}]*min-height:\s*44px;/s', $this->css);
         self::assertMatchesRegularExpression('/\.candidate-card\s*\{[^}]*padding:\s*18px;/s', $this->css);
         self::assertMatchesRegularExpression('/\.candidate-fact-grid\s*\{[^}]*gap:\s*14px 24px;[^}]*margin-top:\s*16px;/s', $this->css);
         self::assertMatchesRegularExpression('/\.candidate-card--progress\s*\{[^}]*gap:\s*9px;/s', $this->css);
