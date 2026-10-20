@@ -104,6 +104,13 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertSame(1, substr_count($dom->textContent, 'camilo@example.com'));
     }
 
+    public function testOptionalPersonalCardRequiresAtLeastOneFact(): void
+    {
+        $empty = $this->renderOverview(['birth_date' => null, 'current_address' => '']);
+        self::assertStringNotContainsString('aria-labelledby="candidate-personal-title"', $empty);
+        self::assertStringContainsString('aria-labelledby="candidate-personal-title"', $this->renderOverview(['birth_date' => null, 'current_address' => 'Dirección ficticia']));
+    }
+
     public function testOverviewEscapesLongFactsAndPreservesSubdirectoryLinks(): void
     {
         $name = '<script>alert("demo")</script>' . str_repeat('Nombre largo ', 12);
