@@ -1,24 +1,6 @@
 # AlquilaPro — CURRENT CHECKPOINT
 
-## Fase activa: CAND01 / G2 — 2026-10-19
-
-- Base G1 rechazada por owner: `a186b0ab765a9547def7501905486f18159c6982`.
-- Branch: `impl/cand-01-shell-overview-20261017`; PR #45 OPEN/DRAFT.
-- Implementación G2: `975a54fe0ce4c0c210a6f0c32d11249a91c8de9d`; corrección factual: `1459ef2`.
-- HEAD de certificación: commit que contiene esta actualización; consultar GitHub/CI por SHA completo. Ningún CI de SHA anterior lo certifica.
-- RED composición: `f864c06`, 3 fallos causales; GREEN vista inicial 9/60. RED revisión: `df6b55f` (el mensaje dice fix, pero sólo agregó el test RED); GREEN posterior 10/62 en `1459ef2`.
-- Owners: candidate_detail.php, app.css, layout existente y parcial único SVG. Siete cuerpos de secciones y dominio intactos.
-- G1 CI run39204913575 pertenece sólo a G1. G2 run39367261913 pertenece a975a54f; supersedido por corrección posterior.
-- Suite completa/CI del HEAD final: PENDING al crear este checkpoint; resultados exactos se entregarán en informe externo y PR45. No claim PASS hasta observarlos.
-- G2_OWNER_VISUAL_APPROVAL=PENDING; HUMAN_FIRST_FINAL=NOT_CERTIFIED.
-- PR45_MERGE=NO; deployment NOT AUTHORIZED; HOSTINGER=NOT_TOUCHED; CAND02=NOT_STARTED.
-- Evidencia local: `C:/Users/felip/Pictures/ALQUILAPRO_G2_FIDELIDAD_2026-10-19`.
-- Siguiente acción: certificar HEAD exacto con focal/full/CI8.3–8.5, regenerar capturas y entregar comparación al owner. Sólo su aceptación visual permite avanzar al gate correspondiente.
-
-## Registro histórico previo (no representa la fase activa)
-
-
-Fecha: 2026-10-17
+Actualizado: 2026-10-20  
 Propósito: **puntero operativo único de continuidad, sin ruido histórico**.
 
 > GitHub + CI son autoridad técnica. Este archivo resume el estado vivo; PRs/commits conservan el detalle forense.
@@ -28,133 +10,218 @@ Propósito: **puntero operativo único de continuidad, sin ruido histórico**.
 - **KISS**: A → B; simple, eficiente, optimizado y eficaz; sin arquitectura innecesaria.
 - **Cero Ruido**: `ELIMINAR → UNIR/CONVERGER → SIMPLIFICAR → MEJORAR/OPTIMIZAR → AGREGAR`.
 - **Anti-parche**: `REPRODUCE → ROOT CAUSE → OWNER → DUPLICACIÓN → RED → CAUSAL RED → MINIMAL GREEN → RETIRAR SUPERSEDED → REGRESSION`.
-- **Human-First / Diseño**: persona > modelo de datos; lenguaje humano; progressive disclosure; No Infinite Excel; accesibilidad/responsive/browser como gates reales.
+- **Human-First / Diseño**: persona > modelo de datos; lenguaje humano; jerarquía clara; No Infinite Excel; accesibilidad, responsive y Browser QA real como gates.
+- **Contrato visual aprobado (decisión explícita del owner 2026-10-19)**: el mockup `01_SOLICITUD.png` se **implementa**, no se usa como inspiración. No sustituir estética, composición, iconografía, jerarquía o densidad aprobadas por una versión "más simple". Sólo se omiten o adaptan **datos/acciones inexistentes**, justificando la excepción específica y conservando el resto del diseño.
 - **No claim without evidence**: SHA exacto + CI para GREEN técnico; Browser real para certificación visual.
 - Merge y deployment son gates separados.
 - Deployment: **NOT AUTHORIZED**.
-- Convención vigente: `continua` ejecuta el siguiente gate inequívoco; no autoriza merge de PR45, prohibido explícitamente por G2.
+- **Hostinger sólo al final:** no preparar ni publicar previews, hPanel, DNS, bases o despliegues durante desarrollo. Instalar únicamente el sistema completo tras QA integral + UAT y autorización final separada del owner.
+- Convención del owner: `continua` autoriza ejecutar el siguiente gate inequívocamente preparado —incluido merge— sólo si sigue GREEN, sin drift y dentro del alcance ya auditado.
+- `checkpoint y para` = persistir/verificar checkpoint y detenerse.
 
-## 2. Verdad viva de GitHub
+## 2. Autoridad viva y base integrada
 
-- Base funcional integrada post-HF-P1C-B: `d0c7687ed9fa62554329215eff5f2324cff5e5d1`.
-- PR #41 **MERGED / CLOSED** en `d0c7687ed9fa62554329215eff5f2324cff5e5d1`.
-- PR #41 HEAD certificado: `71b582c41d379968929c1703bba49dfb54cfdf90`.
-- CI #1101 / run `38997826887`: **SUCCESS PHP 8.3 / 8.4 / 8.5**.
-- PR #42 checkpoint documental: **MERGED / CLOSED** en `be3413296f1a8d8a980f07ef89307f8e6a99464b`.
-- Cualquier HEAD posterior que sólo cambie este checkpoint es descendiente docs-only y no altera la evidencia técnica anterior.
+Orden operativo:
 
-## 3. HF-P1C-B — FINAL integrado y certificado
+1. GitHub del repositorio canónico.
+2. CI del SHA exacto.
+3. este checkpoint.
+4. SPEC / PLAN aprobado aplicable.
+5. `AGENTS.md` + README.
+6. handoffs/chats sólo como recuperación.
 
-### Resultado funcional / diseño
+Repositorio canónico: `sierraglobalcompany-rgb/AlquilaPro`.
 
-- Autor de plantillas sin JSON crudo como UI primaria.
-- Copy principal en lenguaje humano.
-- Datos manuales bajo progressive disclosure.
-- Variable 1 en primer nivel.
-- Variables 2–50 preservadas con capacidad canónica de 50.
-- Los 50 checkboxes `Obligatoria` reutilizan `.check-row`.
-- `ContractService::validatedVariables()` sigue siendo owner de dominio.
-- Sin DB/migrations/JS/CSS nuevos, SPA, framework, servicio o route nuevos.
+```text
+CAND01_PRODUCT_BASE = 7caf82e910edec4153f5cc49dcfb404f8f372b37
+MAIN_AT_PR45_OPEN = 7caf82e910edec4153f5cc49dcfb404f8f372b37
+MAIN_CURRENT = REVALIDATE_LIVE_BEFORE_ACTION
+PR_44 = MERGED / CLOSED
+DEPLOYMENT = NOT_AUTHORIZED
+```
 
-### No Infinite Excel — PR #41
+PR #44 integró la baseline visual aprobada, la spec y el plan de implementación de Candidatos. `main` puede avanzar después por commits/merges exclusivamente documentales sin cambiar la base funcional de CAND-01; por eso este checkpoint **no fija como perpetuo** el HEAD vivo de `main`: debe revalidarse en GitHub antes de actuar.
 
-Root cause: al abrir `Más variables manuales`, se mostraban juntas 49 variables y la página alcanzaba ~14.001 px a 1440×900.
+## 3. Trabajo activo — CAND-01 / PR #45
 
-Minimal GREEN:
-- 10 `<details>` HTML nativos cerrados inicialmente;
-- 9 grupos de 5 variables: 2–6, 7–11, 12–16, 17–21, 22–26, 27–31, 32–36, 37–41, 42–46;
-- último grupo 47–50, 4 variables;
-- sin JS/CSS/servicios/routes/DB/migrations/dependencias nuevas.
+```text
+ACTIVE_BLOCK = CAND-01 / G2
+PR_45 = OPEN / DRAFT / NOT_MERGED
+PR_45_BRANCH = impl/cand-01-shell-overview-20261017
+PR_45_G2_LAST_VERIFIED_HEAD = ce3e536ee2c3d2a6432a2c65aac71076612ab7c9
+PR_45_HEAD_AFTER_RECONCILIATION = REVALIDATE_LIVE
+PR_45_MERGE = NO
+CAND02 = NOT_STARTED
+```
 
-### Evidencia
+G2 implementó la composición visual aprobada de `01_SOLICITUD.png`: sidebar y topbar, hero, pestañas, panel contextual verde e identidad/fechas factuales. `View`, `candidate_detail.php`, `resources/views/layouts/app.php`, un parcial SVG y `assets/app.css` siguen siendo owners existentes. Una sola sección SSR activa por `?section=`; sin SPA, servicios, nuevas rutas, JS, dependencias ni migraciones. Los siete cuerpos restantes no fueron rediseñados: CAND-02 a CAND-08 siguen pendientes.
 
-- RED causal: test focal de grupos — **1 test / 13 assertions / FAIL causal** antes del cambio.
-- GREEN focal en `71b582c41d379968929c1703bba49dfb54cfdf90`: **1 test / 19 assertions / PASS**.
-- CI #1101 / run `38997826887`: **SUCCESS PHP 8.3 / 8.4 / 8.5**, suite completa.
-- Browser QA real: **navegador interno de Codex**.
-- Viewports: 1440×900, 768×1024 y 375×812 — PASS.
-- Sin overflow horizontal/clipping; consola sin errors/warnings relevantes.
-- Teclado: Enter, Tab, Space y foco visible — PASS.
-- Interacción: se guardó versión demo con variable adicional.
-- 5 screenshots capturados como evidencia, no versionados.
-- Suite local temporal: 658 tests / 7.585 assertions / 4 failures / 1 skipped; los 4 fallos fueron ambientales (`host.docker.internal` vs `127.0.0.1` y Composer ausente). La suite oficial completa pasó en CI 8.3/8.4/8.5.
+**El merge de mantenimiento de rama sólo resuelve la divergencia documental**: conservar blobs G2 de código y pruebas, documentos aprobados de `main` y este checkpoint convergido. Los SHA de pruebas anteriores certifican G2 antes de integrar `main`, no automáticamente el nuevo merge HEAD.
 
-### Estado
+## 4. Evidencia exacta de CAND-01 G2
 
-`HF_P1C_B_FUNCTIONAL_GREEN = YES`
-`HF_P1C_B_KISS = PASS`
-`HF_P1C_B_ZERO_NOISE = PASS`
-`HF_P1C_B_ANTI_PATCH = PASS`
-`HF_P1C_B_BROWSER_QA = GREEN`
-`HF_P1C_B_HUMAN_FIRST_FINAL = CERTIFIED`
-`HF_P1C_B_INTEGRATED_IN_MAIN = YES`
+- G1 rechazado visualmente por el owner: `a186b0ab765a9547def7501905486f18159c6982`, pese a GREEN técnico (CI #1131).
+- G2 TDD: RED composición `f864c06` (9 tests/3 fallos causales), GREEN `975a54f`. Segundo RED de ausencia factual `df6b55f`, GREEN `1459ef2`.
+- G2 HEAD certificado antes de la conciliación: `ce3e536ee2c3d2a6432a2c65aac71076612ab7c9`.
+- Full local G2 PHP 8.5: **672 tests, 7908 assertions, 0 failures, 0 errors, 1 skipped**. CI #1135, run `39367525206`: **SUCCESS PHP 8.3/8.4/8.5 para el HEAD exacto G2**.
+- Browser QA local real: SHA servido comprobado por Codex, 375×812, 390×844, 768×1024, 1440×900; accesibilidad de teclado/foco, navegación, permisos, fallback, consola, red y sin overflow en pruebas observadas. Paquete G2: 50 PNG totales (mockup, antes y después, regresiones), no 50 capturas nuevas finales distintas.
+- Inspección visual independiente del asistente: **favorable / PASS de fidelidad por regiones**. `OWNER_VISUAL_APPROVAL=PENDING`; no es aprobación del propietario ni certificación Human-First final. Native zoom 200%, dispositivos físicos y WCAG integral no certificados.
+- Las 889 capturas anteriores corresponden al diagnóstico transversal del ERP, no a la certificación final de G2. Referencia externa: `ALQUILAPRO_G2_FIDELIDAD_2026-10-19.zip`, `ALQUILAPRO_G2_FINAL_REPORT_2026-10-19.md`.
+- Merge doc-only PR #51 se integró en main `243dea9c821645dd554cc5fdd66cb6c9a0d4f2ce` después de CI #1132 GREEN.
 
-## 4. Cierre documental
+## 5. Gate visual, integración y decisión del owner
 
-- PR #42 ya está **MERGED / CLOSED**.
-- `docs/CURRENT_CHECKPOINT.md` es el owner único de continuidad.
-- No reabrir PR #41 ni #42 salvo regresión nueva y demostrable.
-- No repetir Browser QA HF-P1C-B si el código no cambió.
+**Regla absoluta:** mockup aprobado = contrato visual vinculante. Su composición, densidad, jerarquía, colores e iconografía se implementan. Sólo datos/acciones inexistentes pueden omitirse y cada diferencia requiere justificación específica. G1 fue rechazado por no cumplirla; G2 es favorable en inspección independiente, pero **espera la decisión visual explícita del owner**.
 
-## 5. Siguiente bloque preparado
+```text
+G2_TECHNICAL_QA_PRE_MERGE = GREEN_AT_ce3e536ee2c3
+G2_BROWSER_QA_PRE_MERGE = GREEN_CODEX_WITH_LOCAL_EVIDENCE
+G2_ASSISTANT_VISUAL_REVIEW = FAVORABLE
+OWNER_VISUAL_APPROVAL = PENDING
+HUMAN_FIRST_FINAL = NOT_CERTIFIED
+PR45_MERGE = NO
+DEPLOYMENT = NOT_AUTHORIZED
+```
 
-- `HF-P1D` — candidate detail progressive disclosure: **READY_FOR_OWNER_AUTHORIZATION / NOT STARTED**.
-- `HF-P1E` obligations disclosure: **NOT STARTED**.
-- `HF-P1F` tenant portal IA: **NOT STARTED**.
-- `HF-P2A` candidates pagination/filter: **NOT STARTED**.
-- `HF-P2B` feedback consistency: **NOT STARTED**.
+La conciliación de GitHub debe mantener estas evidencias y ejecutar CI **nuevo** sobre el nuevo HEAD antes de cualquier gate de merge. Una mera resolución de conflictos no constituye aceptación del diseño. La revisión del propietario sigue pendiente; no pasar a CAND-02 sin cerrar el gate CAND-01.
 
-El próximo `continua`, si no hay drift, autoriza abrir el gate preparado de **HF-P1D**.
+## 6. Diseño aprobado de Candidatos
 
-## 6. R3 / R4 / deployment
+Arquitectura:
 
-### R3
+```text
+GET /admin/candidates/{id}?section=<key>
+```
 
-- Rama: `impl/r3-public-surfaces-20261016`.
-- HEAD: `845295c777151216655b7a7866bc0dc9d93f3e2e`.
-- PR #33: **OPEN / DRAFT / NOT MERGED**.
-- R3.1–R3.5 funcionalmente implementados/certificados.
-- R3.6 Browser QA: **BLOCKED / NOT_CERTIFIED**.
-- Browser QA de HF-P1C-B NO certifica R3.
-- R3 permanece **FROZEN**.
+Keys:
 
-`R4 = NOT STARTED`
-`DEPLOYMENT = NOT AUTHORIZED`
+```text
+overview
+work
+household
+references
+documents
+screening
+contracts
+manage
+```
 
-## 7. Gobernanza Human-First pendiente
+Regla de no redundancia:
 
-- `GOV-001` Master V2.1 exacto: **BLOCKED_TOOL_SAFETY**.
-- Fuente exacta conocida: 70.982 bytes; SHA-256 `55265c92b7a49a4ac2ac976afb6789074b5f95ff5760f6d08b7b1d0e817f6940`.
-- Prohibido resumir/truncar/fragmentar para bypass.
-- `design-system/alquilapro/MASTER.md`: bloqueado por Master.
-- `.github/pull_request_template.md`: governance gap si sigue ausente.
-- `.github/skills/erp-human-first-ui-ux/SKILL.md`: governance gap si sigue ausente.
+```text
+Nombre + estado + unidad -> shell
+Identidad/contacto       -> Solicitud
+Trabajo                  -> Información laboral
+Hogar/mascotas           -> Ocupantes y mascotas
+Referencias              -> Referencias
+Archivos                 -> Documentos
+Aseguradora              -> Estudio de aseguradora
+Contratos                -> Contratos
+Acciones sensibles       -> Administrar
+```
 
-## 8. KEEP — no reescribir
+Mockups mandan en arte/jerarquía/densidad; backend + permisos mandan en funciones. No inventar scores, ratings, mensajería, firmas, historial, pre-aprobación, datos estructurados de ocupantes/mascotas ni acciones inexistentes.
 
-Conservar PHP SSR + Slim; un `View`; un catálogo `Permissions`; autorización revalidada en rutas; un `assets/app.css` y un `assets/app.js`; `ContractService` como autoridad contractual; compatibilidad histórica cuando no contradiga Human-First; sin arquitectura paralela.
+## 7. Spec / plan — estado documental
 
-## 9. Ledger
+La spec `docs/superpowers/specs/2026-10-17-candidates-human-first-redesign.md` fue **aprobada por el owner el 2026-10-17** y su plan posterior ya registra esa aprobación.
 
-- Human-First governance SPEC/PLAN/AUDIT: **MERGED / CLOSED**.
-- HF-P1A: **MERGED / CLOSED GREEN**.
-- HF-P1B: **MERGED / CLOSED GREEN**.
-- HF-P1C-A: **MERGED / CLOSED GREEN**.
-- HF-P1C-B original/remediation/checkbox: **MERGED / CLOSED**.
-- HF-P1C-B No Infinite Excel / Browser fix: **MERGED / CERTIFIED / CLOSED**.
-- PR #42 checkpoint documental: **MERGED / CLOSED**.
-- HF-P1D: **READY_FOR_OWNER_AUTHORIZATION / NOT STARTED**.
-- R3: **FROZEN**.
-- R4: **NOT STARTED**.
-- Deployment: **NOT AUTHORIZED**.
+El drift puramente documental del header/final de la spec fue cerrado por PR #47, sin modificar el contrato técnico/UX.
 
-## 10. Recuperación si el chat termina
+```text
+SPEC_EFFECTIVE_STATUS = OWNER_APPROVED
+SPEC_HEADER_DRIFT = CLOSED
+SPEC_STATUS_CONVERGENCE_PR = 47_MERGED
+SPEC_STATUS_CI = 1124_GREEN_8_3_8_4_8_5
+TECHNICAL_CONTRACT_CHANGE = NO
+```
 
-1. Leer `docs/CURRENT_CHECKPOINT.md` desde `main` o el checkpoint durable más reciente.
-2. Confirmar PR #41 MERGED en `d0c7687ed9fa62554329215eff5f2324cff5e5d1` y CI #1101 SUCCESS 8.3/8.4/8.5.
-3. Confirmar PR #42 MERGED en `be3413296f1a8d8a980f07ef89307f8e6a99464b`.
-4. No repetir HF-P1C-B ni reabrir PR #41/#42 sin regresión nueva.
-5. `continua` = autorización del owner para el siguiente gate preparado si sigue GREEN/sin drift.
-6. Próximo gate preparado: HF-P1D.
-7. Mantener R3 FROZEN, R4 NOT STARTED y deployment NOT AUTHORIZED.
-8. No confundir residuos locales ignorados por Codex (`config/database.php`, `storage/app/installed.lock`) con cambios versionados.
+No reabrir este drift salvo contradicción nueva y demostrable entre la spec, el plan y la verdad viva.
+
+## 8. PR #43 — evidencia supersedida
+
+```text
+PR_43 = OPEN / DRAFT / DO_NOT_MERGE
+PR_43_HEAD = e9594ef1e431eff2f3fc3193bb16a4533a1820af
+HF_P1D_TECHNICAL_GREEN = YES
+HF_P1D_PRODUCT_DESIGN_APPROVAL = REJECTED_FOR_DETAILS_STACK
+```
+
+Preservar su evidencia técnica/Browser histórica. **No reutilizar la solución de siete `<details>` como dirección visual.** Lección: colapsar un Excel no lo vuelve Human-First.
+
+## 9. R3 / PR #33
+
+```text
+PR_33 = OPEN / DRAFT / FROZEN / NOT_MERGED
+PR_33_HEAD = 845295c777151216655b7a7866bc0dc9d93f3e2e
+R3_FUNCTIONAL = GREEN_HISTORICAL
+R3_BROWSER_QA = BLOCKED / NOT_CERTIFIED
+R4 = NOT_STARTED
+```
+
+No usar Browser QA de otra fase para certificar R3. No descongelar R3 por inferencia.
+
+## 10. Gobernanza pendiente
+
+Gaps conocidos en `main`:
+
+```text
+docs/ERP_HUMAN_FIRST_UI_UX_MASTER_SKILL.md
+design-system/alquilapro/MASTER.md
+.github/pull_request_template.md
+.github/skills/erp-human-first-ui-ux/SKILL.md
+```
+
+Master Human-First V2.1 exacto respaldado externamente:
+
+```text
+SHA256 = 55265c92b7a49a4ac2ac976afb6789074b5f95ff5760f6d08b7b1d0e817f6940
+```
+
+No resumir, truncar ni fragmentar el Master para evadir bloqueos de seguridad.
+
+`main` fue observado sin branch protection/required checks activos; no afirmar lo contrario sin nueva evidencia.
+
+## 11. Próximos gates exactos
+
+1. Integrar únicamente la convergencia documental del PR #51: **CLOSED (merge `243dea9c`)**.
+2. Conciliar PR #45 con main mediante merge de dos padres, sin cambiar los 14 blobs funcionales de G2; resolver checkpoint contra `main` y verificar alcance/diff + HEAD.
+3. Ejecutar CI PHP 8.3/8.4/8.5 **sobre el HEAD post-conciliación**. Ante fallos, reproducir causa raíz, RED causal, GREEN mínimo y nuevo CI; verificar si un cambio funcional invalida capturas y repetirlas cuando aplique.
+4. Obtener aceptación visual explícita del propietario para G2. Informe del asistente favorable **no reemplaza** su gate. Si rechaza una región, corregir sólo esa región y repetir sus pruebas/evidencias.
+5. Sólo con HEAD exacto GREEN, reviews limpios, Browser QA aplicable y `HUMAN_FIRST_FINAL=CERTIFIED_BY_OWNER`: evaluar merger de PR #45. No merge anticipado.
+6. Verificar main post-merge; checkpoint; recién entonces CAND-02.
+
+Microbloques siguientes: CAND-02 trabajo; CAND-03 hogar/mascotas; CAND-04 referencias; CAND-05 documentos; CAND-06 aseguradora; CAND-07 contratos; CAND-08 administrar; CAND-09 lista. Cada uno: `TRUTH → UX CONTRACT → RED → GREEN → REGRESSION → CI → BROWSER QA → OWNER GATE → MERGE`. R3/PR #33 FROZEN, PR #43 SUPERSEDED; Hostinger **sólo al final de todo el proyecto**.
+
+## 12. Recuperación rápida
+
+1. Revalidar `main` y PR #45 vivo en GitHub (después de este merge de reconciliación el HEAD será nuevo).
+2. Leer este único checkpoint, la spec y baseline aprobados; los handoffs son referencia, no reemplazan la autoridad.
+3. Comprobar G2 `ce3e536ee2c3d2a6432a2c65aac71076612ab7c9`, CI #1135 y nuevas ejecuciones del merge HEAD; no reutilizar CI de otro SHA como pase.
+4. Leer el dictamen visual G2 y el paquete de 50 PNG; owner acceptance sigue pendiente hasta que el propietario la emita.
+5. Cuatro leyes: KISS, eliminar ruido, no parches, fidelidad a mockup aprobado.
+6. PR #45 Draft/no merge, CAND-02 no iniciado, R3 congelado, Hostinger sólo final.
+
+## 13. Estado resumido
+
+```text
+REPO = sierraglobalcompany-rgb/AlquilaPro
+MAIN_CURRENT = REVALIDATE_LIVE
+ACTIVE_WORK = CAND-01_G2
+PR_45_LAST_CERTIFIED_G2_HEAD = ce3e536ee2c3d2a6432a2c65aac71076612ab7c9
+PR_45_NEW_MERGE_HEAD = REVALIDATE_LIVE
+G2_CI_EXACT_SHA = 1135_GREEN_PHP_8_3_8_4_8_5
+G2_LOCAL_FULL = 672_TESTS_7908_ASSERTIONS_1_SKIP
+POST_RECONCILIATION_CI = REQUIRED_ON_NEW_SHA
+G2_BROWSER_QA = GREEN_PRE_RECONCILIATION
+G2_VISUAL_ASSISTANT = FAVORABLE
+G2_OWNER_VISUAL_APPROVAL = PENDING
+HUMAN_FIRST_FINAL = NOT_CERTIFIED
+PR45 = OPEN_DRAFT_NO_MERGE
+CAND02 = NOT_STARTED
+PR43 = SUPERSEDED_DRAFT
+PR33_R3 = FROZEN
+DEPLOYMENT = NOT_AUTHORIZED
+HOSTINGER = FINAL_ONLY_AFTER_SYSTEM_QA_AND_OWNER_UAT
+NEXT_SAFE_ACTION = CI_NEW_HEAD_THEN_OWNER_VISUAL_GATE
+```
