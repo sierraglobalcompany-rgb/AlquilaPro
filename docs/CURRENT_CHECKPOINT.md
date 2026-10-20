@@ -45,6 +45,16 @@ PR #44 integró la baseline visual aprobada, la spec y el plan de implementació
 
 ## 3. Trabajo activo — CAND-01 / PR #45
 
+**G3 IMPLEMENTADO — QA TÉCNICO GREEN, QA VISUAL PENDIENTE (2026-10-20).**
+
+- HEAD de código G3 exacto: `cbe3b27ae0b7a7bffc24aed88c8b69c1d7d9bb06`.
+- CI #1147, run `39381365745`: **SUCCESS PHP 8.3, 8.4 y 8.5**, cada matriz 675 tests, 7941 assertions, 0 failures/errors, 1 skipped (preexistente).
+- RED previo #1138, commit `7afe0409`: 10 fallos / 1 omitida con layout 1+2 antes del cambio. GREEN rediseñó overview como fila A (1), fila B (2), fila C (3) sin inventar funcionalidad.
+- Ruta existente carga datos verdaderos desde `PropertyService`; `UnitMediaService` sólo con `properties.view` y ruta privada con 403/200 verificados en suite; reparada su inyección faltante en `bootstrap/app.php`.
+- Code delta: exactamente seis archivos (`app/Candidates/routes.php`, `bootstrap/app.php`, `resources/views/candidate_detail.php`, `assets/app.css`, dos tests). Sin nuevos endpoints, tablas, framework, JS, servicios paralelos ni dependencia.
+- `G3_SERVED_SHA=NOT_VERIFIED`; `G3_REAL_BROWSER_SCREENSHOTS=0`; `G3_VISUAL_FIDELITY=RED_UNTIL_INDEPENDENT_REVIEW`. Faltan capturas auténticas 1448×1086, 1440×900 full-page, 768×1024, 390×844 y 375×812, y matriz adversarial de 17 regiones contra PNG exacto. `OWNER_APPROVAL=NOT_REQUESTED_WHILE_RED`.
+- El compromiso documental de este texto generará nuevo HEAD; CI #1147 certifica el código anterior, **no** convierte automáticamente el nuevo SHA en GREEN.
+
 ```text
 ACTIVE_BLOCK = CAND-01 / G2
 PR_45 = OPEN / DRAFT / NOT_MERGED
@@ -71,6 +81,8 @@ G2 implementó la composición visual aprobada de `01_SOLICITUD.png`: sidebar y 
 - Merge doc-only PR #51 se integró en main `243dea9c821645dd554cc5fdd66cb6c9a0d4f2ce` después de CI #1132 GREEN.
 
 ## 5. Gate visual y decisión obligatoria
+
+**Situación G3:** La implementación estructural 1+2+3 pasó las pruebas técnicas (CI #1147) pero **no ha sido observada en navegador**. Se conserva como `VISUAL_RED/NOT_VERIFIED` por Ley 5; no aceptar ni fusionar. Las limitaciones reales (búsqueda global, campana, acciones de editar/mensaje/evaluar) son `GAP_FUNCIONAL`, no PASS visual automático. El auditor debe refutar posibles coincidencias del nuevo render y documentar cada una de las 17 regiones sin reutilizar el antiguo ledger G2.
 
 **Ley 5 activa.** Mockup aprobado = composición, jerarquía, densidad, iconografía y layout vinculantes. Omisiones funcionales individuales sólo están justificadas por ausencia real de backend, pero una fila/carta estructural desaparecida deja RED. **El dictamen anterior favorable está RETRACTADO**. El propietario NO tiene que reaprobar el mockup ni descubrir nuestras fallas: se corrigen antes de solicitar aceptación final.
 
@@ -188,44 +200,45 @@ No resumir, truncar ni fragmentar el Master para evadir bloqueos de seguridad.
 
 ## 11. Próximos gates exactos
 
-1. Conciliación G2/main: **CLOSED**. Merge de dos padres mantuvo 14 blobs de código/pruebas G2. CI #1136 GREEN (PHP 8.3/8.4/8.5) sobre SHA reconciliado.
-2. **Ley 5, auditoría adversarial**: actualizar ledger de 17 regiones con estados válidos, evidencia real y veto para ausencias estructurales; el viejo `MATCH` no demuestra cumplimiento.
-3. Root cause y contrato de verdad: inventariar datos reales de CandidateService/rutas/spec. Resolver geometría/densidad/cards con datos existentes sin duplicar; cada bloque que requiera capacidad inexistente queda `GAP_FUNCIONAL`, y su ausencia visual esencial sigue RED hasta definir solución auténtica/autorizada.
-4. Reproducir RED visual; GREEN mínimo en owners SSR/CSS existentes, retirar superseded, focal + full suite + CI nuevo 8.3/8.4/8.5.
-5. Tomar capturas frescas SHA servido 375/390/768/1440 y compararlas con PNG original; auditor independiente debe buscar discrepancias y documentarlas. Repetir regresión transversal si toca layout.
-6. Sólo cuando no existan RED estructurales, presentar G2 corregido al propietario para aceptación final **una sola vez**, después de hacer nuestra auditoría. PR45 permanece Draft y NO MERGE hasta ese gate; entonces verificar main post-merge y abrir CAND02.
+1. Código G3 implementado en PR #45, RED #1138 y CI #1147 GREEN sobre `cbe3b27ae0b7a7bffc24aed88c8b69c1d7d9bb06`. Persistir y verificar este checkpoint en HEAD posterior.
+2. **Browser QA REAL de G3**: checkout limpio en máquina autorizada, verificar SHA realmente servido, demo aislada; capturas del viewport completo y full-page a 1448×1086 / 1440×900 / 768×1024 / 390×844 / 375×812, consola/red y flujos funcionales.
+3. **Auditoría adversarial Ley 5**: comparar PNG `01_SOLICITUD.png` con screenshots G3, 17 regiones, geometría, densidad, jerarquía, filas 1+2+3, privacidad viewer/admin, estado, foco/teclado, no fake CTAs; `RED_ESENCIAL` / `GAP_FUNCIONAL` estructural veta PASS aunque CI GREEN.
+4. Si hay RED: reproducir, causa raíz, RED→GREEN mínimo, regresión, CI y capturas nuevas. **No más informes favorables sin evidencia visual original**.
+5. Sólo con visual completo PASS, CI HEAD exacto, revisión independiente limpia y aceptación explícita owner: considerar Ready/merge PR45. Después main/CI/checkpoint y CAND02.
 
-Microbloques siguientes: CAND02 trabajo; CAND03 hogar; CAND04 referencias; CAND05 documentos; CAND06 aseguradora; CAND07 contratos; CAND08 administrar; CAND09 lista. R3 y PR33 congelados, PR43 supersedido y Hostinger **únicamente al final**.
+R3/PR33 FROZEN, PR43 SUPERSEDED, Hostinger reservado para fin del ERP y UAT integral.
 
 ## 12. Recuperación rápida
 
-1. Revalidar main y PR45 HEAD; este checkpoint es owner único.
-2. Cinco leyes: KISS, Cero Ruido, Antiparches, Human-First y **Ley 5 Fidelidad Visual Verificable / Cero Autoaprobación**.
-3. Ver `ALQUILAPRO_LEY_5_FIDELIDAD_VISUAL_VERIFICABLE_Y_REAUDITORIA_G2_2026-10-20.md` y matriz de 17 regiones; comparar PNG exacto, no aceptar el viejo ledger MATCH.
-4. G2 CI técnico GREEN, pero visual RED: el anterior dictamen favorable está **retirado**; no pedir aceptación al owner mientras falten filas/estructura del mockup.
-5. PR45 Draft/no merge, CAND02 no iniciado, R3 congelado, Hostinger sólo final.
+1. Revalidar `main` y HEAD de PR #45 (tras el commit documental el HEAD difiere del commit de código G3).
+2. Cinco leyes: KISS, cero ruido, antiparches, Human-First y Ley 5 de fidelidad verificable.
+3. RED #1138 / GREEN #1147 de G3; código `cbe3b27ae0b7a7bffc24aed88c8b69c1d7d9bb06` sin screenshot G3 real todavía. No confundir CI técnico con fidelidad.
+4. Leer el mockup original `01_SOLICITUD.png`, 17 regiones y `ALQUILAPRO_G3_CODEX_LUNA_LEY5_REPARACION_ESTRUCTURAL_2026-10-20.md` como contrato de Browser QA.
+5. PR45 Draft/NO MERGE, CAND02 no iniciado, R3 congelado, Hostinger sólo final.
 
 ## 13. Estado resumido
 
 ```text
 REPO = sierraglobalcompany-rgb/AlquilaPro
 MAIN_CURRENT = REVALIDATE_LIVE
-ACTIVE_WORK = CAND01_G2_VISUAL_REPAIR_REQUIRED
-PR45_RECONCILED_HEAD = 265532abdf41196e9aab81f6e743b857f490c087
-PR45_NEXT_DOC_HEAD = REVALIDATE_LIVE
-CI_PRE_DOC_HEAD = 1136_GREEN_PHP_8_3_8_4_8_5
-CI_DOC_SHA = REQUIRED
-G2_TECHNICAL = GREEN
-G2_VISUAL = RED_STRUCTURAL_FIDELITY
-ASSISTANT_PREVIOUS_VISUAL_PASS = RETRACTED_FALSE_POSITIVE
-G2_OWNER_VISUAL_APPROVAL = NOT_REQUESTED_WHILE_RED
+ACTIVE_WORK = CAND01_G3_VISUAL_QA_PENDING
+G3_CODE_HEAD = cbe3b27ae0b7a7bffc24aed88c8b69c1d7d9bb06
+PR45_NEW_DOC_HEAD = REVALIDATE_LIVE
+G3_TECHNICAL = GREEN_CI1147_PHP_8_3_8_4_8_5
+G3_TESTS = 675_TESTS_7941_ASSERTIONS_1_SKIP
+G3_VISUAL_STRUCTURE_IMPLEMENTED = 1_PLUS_2_PLUS_3_IN_SSR
+G3_SERVED_SHA = NOT_VERIFIED
+G3_BROWSER_SCREENSHOTS = 0
+G3_VISUAL_FIDELITY = RED_NOT_VERIFIED
+G3_INDEPENDENT_REVIEW = PENDING
+OWNER_VISUAL_APPROVAL = NOT_REQUESTED_WHILE_RED
 HUMAN_FIRST_FINAL = NOT_CERTIFIED
-LAW_5 = ACTIVE_VISUAL_FIDELITY_AND_INDEPENDENT_REVIEW
+LAW_5 = ACTIVE
 PR45 = OPEN_DRAFT_NO_MERGE
 CAND02 = NOT_STARTED
 PR43 = SUPERSEDED
 PR33_R3 = FROZEN
 DEPLOYMENT = NOT_AUTHORIZED
 HOSTINGER = FINAL_ONLY_AFTER_SYSTEM_QA_AND_OWNER_UAT
-NEXT_SAFE_ACTION = G2_VISUAL_STRUCTURAL_REPAIR_RED_FIRST
+NEXT_SAFE_ACTION = VERIFY_NEW_SHA_CI_THEN_G3_REAL_BROWSER_ADVERSARIAL_AUDIT
 ```
