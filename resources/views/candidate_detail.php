@@ -213,7 +213,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                         <p class="candidate-progress-footer"><?php if ($updatedAt !== null): ?>Última actualización: <time datetime="<?= $escape($candidate['updated_at']) ?>"><?= $escape($updatedAt) ?></time> · <?php endif; ?>Los registros no implican aprobación ni porcentaje de avance.</p>
                     </section>
                     <section class="content-card candidate-card candidate-card--next" aria-labelledby="candidate-next-title">
-                        <h3 id="candidate-next-title"><?= $candidateIcon('history') ?>Próximos pasos</h3>
+                        <h3 id="candidate-next-title"><?= $candidateIcon('history') ?>Secciones para consultar</h3>
                         <ol class="candidate-next-list">
                             <?php foreach ($reviewSections as $index => $section): ?>
                                 <li>

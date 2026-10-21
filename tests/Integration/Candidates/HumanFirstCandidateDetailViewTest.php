@@ -73,10 +73,11 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertSame(2, $xpath->query('//div[@data-candidate-row="process"]//section[contains(@class, "candidate-card")]')->length);
         self::assertSame(3, $xpath->query('//div[@data-candidate-row="details"]//section[contains(@class, "candidate-card")]')->length);
 
-        foreach (['Progreso de la solicitud', 'Próximos pasos', 'Detalles del candidato', 'Información de contacto', 'Información del inmueble'] as $title) {
+        foreach (['Progreso de la solicitud', 'Secciones para consultar', 'Detalles del candidato', 'Información de contacto', 'Información del inmueble'] as $title) {
             self::assertStringContainsString($title, $html);
         }
-        self::assertSame(3, $xpath->query('//section[@aria-labelledby="candidate-next-title"]//ol/li//a')->length, 'Steps must link to real application sections only.');
+        self::assertSame(3, $xpath->query('//section[@aria-labelledby="candidate-next-title"]//ol/li//a')->length, 'Consultation links must point to real application sections only.');
+        self::assertStringNotContainsString('Próximos pasos', $html, 'Consultation links must not claim to be an automatic next-step workflow.');
         self::assertStringNotContainsString('80%', $html);
         self::assertStringNotContainsString('82 / 100', $html);
     }
