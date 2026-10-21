@@ -52,8 +52,8 @@ $canCreateContract = $contractContext !== null && (bool) ($contractContext['can_
     </dl>
 </section>
 
-<section class="surface">
-    <h2>Información laboral</h2>
+<details class="surface" data-candidate-section>
+    <summary>Información laboral</summary>
     <dl>
         <dt>Estado laboral</dt><dd><?= $escape($candidate['employment_status'] ?? '') ?></dd>
         <dt>Empresa</dt><dd><?= $escape($candidate['employer_name'] ?? '') ?></dd>
@@ -61,20 +61,20 @@ $canCreateContract = $contractContext !== null && (bool) ($contractContext['can_
         <dt>Ingreso mensual</dt><dd><?= $escape($candidate['monthly_income'] ?? '') ?></dd>
         <dt>Notas</dt><dd><?= $escape($candidate['employment_notes'] ?? '') ?></dd>
     </dl>
-</section>
+</details>
 
-<section class="surface">
-    <h2>Ocupantes y mascotas</h2>
+<details class="surface" data-candidate-section>
+    <summary>Ocupantes y mascotas</summary>
     <dl>
         <dt>Ocupantes</dt><dd><?= $escape($candidate['occupants_count'] ?? '') ?></dd>
         <dt>Detalle de ocupantes</dt><dd><?= $escape($candidate['occupants_notes'] ?? '') ?></dd>
         <dt>Mascotas</dt><dd><?= $candidate['pets_declared'] ? 'Sí' : 'No' ?></dd>
         <dt>Detalle de mascotas</dt><dd><?= $escape($candidate['pets_notes'] ?? '') ?></dd>
     </dl>
-</section>
+</details>
 
-<section class="surface">
-    <h2>Referencias</h2>
+<details class="surface" data-candidate-section>
+    <summary>Referencias</summary>
     <?php if (($candidate['references'] ?? []) === []): ?>
         <p class="empty-state">No hay referencias registradas.</p>
     <?php else: ?>
@@ -88,10 +88,10 @@ $canCreateContract = $contractContext !== null && (bool) ($contractContext['can_
             </article>
         <?php endforeach; ?>
     <?php endif; ?>
-</section>
+</details>
 
-<section class="surface">
-    <h2>Documentos</h2>
+<details class="surface" data-candidate-section>
+    <summary>Documentos</summary>
     <?php if ($documents === []): ?>
         <p class="empty-state">No hay documentos adjuntos.</p>
     <?php else: ?>
@@ -103,10 +103,10 @@ $canCreateContract = $contractContext !== null && (bool) ($contractContext['can_
             </article>
         <?php endforeach; ?>
     <?php endif; ?>
-</section>
+</details>
 
-<section class="surface">
-    <h2>Estudio de aseguradora</h2>
+<details class="surface" data-candidate-section>
+    <summary>Estudio de aseguradora</summary>
     <?php if ($screening === null): ?>
         <?php if ($screeningEditable): ?>
             <form method="post" action="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/screening">
@@ -183,37 +183,39 @@ $canCreateContract = $contractContext !== null && (bool) ($contractContext['can_
             <dt>Actualizado</dt><dd><?= $escape($screening['updated_at'] ?? '') ?></dd>
         </dl>
     <?php endif; ?>
-</section>
+</details>
 
 <?php if ($contractContext !== null): ?>
-    <section class="surface" data-contract-context>
-        <h2>Contratos</h2>
-        <?php if ($contractRows === []): ?>
-            <p class="empty-state">No hay contratos registrados para este candidato.</p>
-        <?php else: ?>
-            <div class="users-grid">
-                <?php foreach ($contractRows as $contractRow): ?>
-                    <article class="user-card">
-                        <div class="user-card__head">
-                            <strong>Contrato #<?= $escape($contractRow['id']) ?></strong>
-                            <span class="status-pill"><?= $escape($contractRow['status']) ?></span>
-                        </div>
-                        <div><?= $escape($contractRow['template_name'] ?? '') ?> · <?= $escape($contractRow['unit_code'] ?? '') ?></div>
-                        <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($contractRow['id']) ?>">Abrir contrato</a>
-                    </article>
-                <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
+    <details class="surface" data-candidate-section>
+        <summary>Contratos</summary>
+        <div data-contract-context>
+            <?php if ($contractRows === []): ?>
+                <p class="empty-state">No hay contratos registrados para este candidato.</p>
+            <?php else: ?>
+                <div class="users-grid">
+                    <?php foreach ($contractRows as $contractRow): ?>
+                        <article class="user-card">
+                            <div class="user-card__head">
+                                <strong>Contrato #<?= $escape($contractRow['id']) ?></strong>
+                                <span class="status-pill"><?= $escape($contractRow['status']) ?></span>
+                            </div>
+                            <div><?= $escape($contractRow['template_name'] ?? '') ?> · <?= $escape($contractRow['unit_code'] ?? '') ?></div>
+                            <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($contractRow['id']) ?>">Abrir contrato</a>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
 
-        <?php if ($canCreateContract): ?>
-            <a class="button" href="<?= $escape($basePath) ?>/admin/contracts?candidate_id=<?= (int) $candidate['id'] ?>">Crear contrato</a>
-        <?php endif; ?>
-    </section>
+            <?php if ($canCreateContract): ?>
+                <a class="button" href="<?= $escape($basePath) ?>/admin/contracts?candidate_id=<?= (int) $candidate['id'] ?>">Crear contrato</a>
+            <?php endif; ?>
+        </div>
+    </details>
 <?php endif; ?>
 
 <?php if ($canManageCandidates): ?>
-    <section class="surface">
-        <h2>Administrar</h2>
+    <details class="surface" data-candidate-section>
+        <summary>Administrar</summary>
         <?php if ($allowedTransitions !== []): ?>
             <form method="post" action="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/status">
                 <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
@@ -232,5 +234,5 @@ $canCreateContract = $contractContext !== null && (bool) ($contractContext['can_
             <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
             <button type="submit">Regenerar enlace de continuación</button>
         </form>
-    </section>
+    </details>
 <?php endif; ?>
