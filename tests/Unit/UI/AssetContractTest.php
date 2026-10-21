@@ -38,6 +38,17 @@ final class AssetContractTest extends TestCase
         self::assertStringContainsString('@media (prefers-reduced-motion: reduce)', $this->css);
     }
 
+    public function testBottomNavUsesOpaqueSurfaceBackground(): void
+    {
+        self::assertMatchesRegularExpression('/\.bottom-nav\s*\{([^}]*)\}/s', $this->css, 'The shared bottom navigation must have an explicit background owner.');
+        preg_match('/\.bottom-nav\s*\{([^}]*)\}/s', $this->css, $matches);
+        self::assertArrayHasKey(1, $matches);
+        self::assertMatchesRegularExpression('/background\s*:\s*var\(--color-surface\)\s*;/i', $matches[1]);
+        preg_match('/background\s*:\s*([^;]+)\s*;/i', $matches[1], $background);
+        self::assertArrayHasKey(1, $background);
+        self::assertStringNotContainsString('transparent', strtolower($background[1]));
+    }
+
     public function testCssDefinesVisibleFocusAndMinimumTouchTarget(): void
     {
         self::assertStringContainsString(':focus-visible', $this->css);

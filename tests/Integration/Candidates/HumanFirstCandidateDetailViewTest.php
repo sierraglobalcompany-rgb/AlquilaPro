@@ -76,7 +76,32 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         foreach (['Progreso de la solicitud', 'Secciones para consultar', 'Detalles del candidato', 'Información de contacto', 'Información del inmueble'] as $title) {
             self::assertStringContainsString($title, $html);
         }
-        self::assertSame(3, $xpath->query('//section[@aria-labelledby="candidate-next-title"]//ol/li//a')->length, 'Consultation links must point to real application sections only.');
+        $consultationList = '//section[@aria-labelledby="candidate-next-title"]//ul[contains(concat(" ", normalize-space(@class), " "), " candidate-next-list ")]';
+        self::assertSame(1, $xpath->query($consultationList)->length, 'Consultation links must use a non-sequential list.');
+        self::assertSame(0, $xpath->query('//section[@aria-labelledby="candidate-next-title"]//ol[contains(concat(" ", normalize-space(@class), " "), " candidate-next-list ")]')->length);
+        self::assertSame(3, $xpath->query($consultationList . '/li')->length);
+        $consultationLinks = $xpath->query($consultationList . '/li/a');
+        self::assertSame(3, $consultationLinks->length, 'Consultation links must point to real application sections only.');
+        $markers = $xpath->query($consultationList . '/li/span[contains(concat(" ", normalize-space(@class), " "), " candidate-next-marker ")]');
+        self::assertSame(3, $markers->length);
+        foreach ($markers as $marker) {
+            self::assertSame('true', $marker->getAttribute('aria-hidden'));
+            self::assertSame(1, $xpath->query('./svg', $marker)->length);
+            self::assertSame('', trim($marker->textContent), 'Consultation markers must not imply sequential tasks.');
+        }
+        $expectedConsultations = [
+            ['work', 'Información laboral', 'Consultar la información declarada'],
+            ['references', 'Referencias', 'Consultar referencias registradas'],
+            ['screening', 'Estudio de aseguradora', 'Consultar el estado del estudio'],
+        ];
+        foreach ($expectedConsultations as $index => [$section, $title, $description]) {
+            $link = $consultationLinks->item($index);
+            self::assertInstanceOf(\DOMElement::class, $link);
+            parse_str((string) parse_url($link->getAttribute('href'), PHP_URL_QUERY), $query);
+            self::assertSame($section, $query['section'] ?? null);
+            self::assertSame($title, trim($xpath->evaluate('string(./strong)', $link)));
+            self::assertSame($description, trim($xpath->evaluate('string(./span)', $link)));
+        }
         self::assertStringNotContainsString('Próximos pasos', $html, 'Consultation links must not claim to be an automatic next-step workflow.');
         self::assertStringNotContainsString('80%', $html);
         self::assertStringNotContainsString('82 / 100', $html);
@@ -169,7 +194,7 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         $dom = new \DOMDocument();
         @$dom->loadHTML('<?xml encoding="UTF-8">' . $this->renderOverview());
         $xpath = new \DOMXPath($dom);
-        $links = $xpath->query('//section[@aria-labelledby="candidate-next-title"]//ol/li//a');
+        $links = $xpath->query('//section[@aria-labelledby="candidate-next-title"]//ul/li//a');
 
         self::assertCount(3, $links);
         foreach ($links as $link) {

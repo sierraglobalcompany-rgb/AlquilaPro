@@ -10,16 +10,16 @@
 | Rama activa | `impl/cand-01-shell-overview-20261017` |
 | PR | [#45](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/45), OPEN / DRAFT / NOT_MERGED |
 | `main` observado | `243dea9c821645dd554cc5fdd66cb6c9a0d4f2ce`; volver a comprobar antes de escribir |
-| Último HEAD de producto ya verificado | `fbf2bf48aa18fb988c3c9ff96a003e7d80528a56` |
-| CI de ese HEAD de producto | [#1159](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39536302708): SUCCESS PHP 8.3/8.4/8.5, 680 tests por runtime, 1 skipped, 0 failures |
-| Aserciones CI #1159 | PHP 8.3 = 7.979; 8.4 = 7.980; 8.5 = 7.980 |
+| Último HEAD de producto acreditado (base del microbloque) | `c501f589c2133d8723615e6d671f31b96130a38b` |
+| CI exacto de la base | [#1160](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39538013276): SUCCESS PHP 8.3/8.4/8.5; no atribuirlo al código local aún no publicado |
 | Fase | CAND-01 / G3 — Solicitud, seis tarjetas en tres filas |
-| Browser QA exacto HEAD `fbf2bf48` | **PENDIENTE**; no atribuir a este HEAD capturas anteriores |
+| Browser QA de `c501f589` | 14 PNG auténticos en cinco viewports; geometría 1+2+3 y seguridad verificadas; fidelidad global **RED_ESENCIAL** |
+| Microbloque local | Lista de consulta semántica y nav opaca implementadas; XPath alineado; dos clases focales locales GREEN; nuevo SHA/CI/Browser QA pendientes |
 | Fidelidad visual de CAND-01 | **RED_ESENCIAL / no certificada** |
 | Owner UAT / merge / despliegue | NO autorizado |
 | Otros frentes | CAND-02 NOT_STARTED; R3/PR #33 FROZEN; PR #43 SUPERSEDED, DRAFT |
 
-**Importante:** este checkpoint es un cambio documental posterior al HEAD de producto `fbf2bf48`. Su commit genera un HEAD nuevo. La CI #1159 sólo acredita el commit previo: verificar CI del nuevo HEAD antes de cualquier afirmación de GREEN exacto. La evidencia visual de `17e7bce` NO certifica los cambios posteriores.
+**Importante:** CI #1160 y el Browser QA de 14 capturas acreditan exclusivamente la base `c501f589`. No certifican el microbloque local ni ningún SHA futuro. Verificar CI y Browser QA del HEAD nuevo antes de afirmar un resultado técnico para ese código.
 
 **Orden de autoridad:** GitHub (HEAD real) → CI del SHA exacto → este checkpoint → SPEC/PLAN aprobados → AGENTS/README → handoffs y chats. Si hay contradicción, conciliar; nunca inventar un PASS.
 
@@ -48,7 +48,9 @@
 - **Paquete G3 anterior:** HEAD `17e7bce398f38f670914e237fa26415582722679`, [CI #1158](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39506039397) SUCCESS PHP 8.3/8.4/8.5, 680 tests cada uno, 1 skipped. Browser anterior con 65 capturas actuales (58 hashes únicos), referencia, históricos y comparativas; auditoría independiente de 17 regiones y comentario [Ley 5 en PR](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/45#issuecomment-6304009090). Los ZIP originales y matriz se conservan en Library `/AlquilaPro/`.
 - **Hecho del paquete anterior:** geometría 1+2+3 y seis tarjetas PASS en 1448×1086; diferencias visuales esenciales en topbar/hero, proporciones/íconos/tipo y densidad de tarjetas. Sin autorización para inventar botones o datos; visual global RED. No convertir 65 capturas en certificación del nuevo SHA.
 - **Cambio directo nuevo:** commit [`fbf2bf48`](https://github.com/sierraglobalcompany-rgb/AlquilaPro/commit/fbf2bf48aa18fb988c3c9ff96a003e7d80528a56). Sólo tres archivos existentes: vista reemplaza `Próximos pasos` por `Secciones para consultar` (enlaces reales, no workflow); CSS `.candidate-card` radio 12px y titulares 700; test de semántica actualizado. CI #1159 GREEN; no nueva captura del commit.
-- **No demostrado todavía:** la geometría posterior al nuevo peso tipográfico y radios, paridad visual definitiva, auditoría accesibilidad integral o dispositivos físicos. No marcar visual GREEN.
+- **QA del HEAD base `c501f589`:** `CAND01_G3_C501_QA_20261021.zip` (SHA-256 `64c229f7bb919c4e9b58d8973ffcb5a7280d7140df54aa6416e12c9c80352369`), 14 PNG auténticos y cinco viewports; geometría 1+2+3 y controles de seguridad verificados. La auditoría visual independiente conserva `VISUAL_FIDELITY=RED_ESENCIAL`; la evidencia no certifica el microbloque local.
+- **Microbloque local pendiente de publicar:** lista `ul` con SVG no secuenciales y fondo opaco `.bottom-nav`; clases de integración y assets GREEN localmente. El SHA nuevo aún no existe; CI exacto y Browser QA del nuevo HEAD están pendientes.
+- **No demostrado todavía:** fidelidad visual global, auditoría de accesibilidad integral o comportamiento en dispositivos físicos. No marcar visual GREEN.
 
 ## 5. Bloqueos y decisiones pendientes
 
@@ -59,25 +61,21 @@
 | P1 | Móvil/tableta: barra inferior fija cruza texto en scroll | La captura anterior demuestra intersección temporal, pero el texto es recuperable al final. Medir top/middle/bottom y foco antes de cambiar CSS global |
 | P1 | CSS de foco global `:focus-visible{scroll-margin-block:100px}` | Smoke de Propiedades, Contratos, login, catálogo, candidatos y diálogo Apps; no duplicar CSS sin reproducir defecto |
 | P1 | Repetición teléfono/correo en resumen y tarjeta contacto | Revisar con SPEC y utilidad contextual; evitar borrar campos o degradar seis tarjetas por una abstracción |
-| P1 | PR #45 tiene descripción histórica anclada a `815bf352` | Actualizar descripción sin reescribir historial ni afirmar GREEN visual |
 | P2 | UI UX Pro Max no está versionada en el árbol GitHub comprobado | Sólo registrar versión/commit si se comprueba su uso; no instalar a ciegas |
 
 ## 6. NEXT exacto y gates
 
-1. **Verificar HEAD real y CI posterior a este commit documental**. Mantener PR #45 Draft. Una CI del HEAD exacto es obligatoria.
-2. **Browser QA real del HEAD ya estabilizado**, con fixture demo seguro y comprobación de ruta/servidor/SHA/CSS servido, foto privada según permiso y estados. Recuperar las capturas antiguas de Library sólo como baseline histórica.
-3. Auditoría adversarial visual **17 regiones** frente al mockup correcto; no declarar PASS sin evidencia en las cinco resoluciones; distinguir `PASS_GEOMETRIA`, `PASS_FUNCIONAL` y `PASS_VISUAL`.
-4. Si persisten diferencias reales: microbloque mínimo en owners existentes, test RED causal, GREEN mínimo, suite focal/full, CI triple, nuevas capturas y regresión transversal. No añadir implementaciones cosméticas sin contrato.
-5. Sólo si cero RED esencial, owner acepta explícitamente y CI exacto pasa: evaluar merge de PR #45; CAND-02 sólo después. **Hostinger/producción final-only** después del QA/UAT integral y autorización independiente.
+1. `NEXT=EXACT_SHA_CI_THEN_BROWSER_QA_THEN_INDEPENDENT_VISUAL_REVIEW`: verificar el nuevo SHA publicado y CI exacto PHP 8.3/8.4/8.5.
+2. Con CI GREEN, ejecutar Browser QA real del SHA servido con fixture sintético, cinco viewports, comprobación de SHA/CSS, seguridad, responsive y regresión transversal; registrar 17 regiones sin dictamen estético automático.
+3. ChatGPT/owner dictamina fidelidad visual contra la referencia. Mantener PR #45 Draft mientras exista RED esencial; sin merge ni despliegue.
 
 ## 7. Semáforo de recuperación
 
 ```text
-TECHNICAL_PRE_DOC_UPDATE = GREEN_CI_1159@fbf2bf48aa18fb988c3c9ff96a003e7d80528a56
-HEAD_AFTER_DOC_UPDATE = REVALIDATE_GITHUB_AND_CI
-G3_VISUAL_EVIDENCE_HISTORIC = 17e7bce398f38f670914e237fa26415582722679
-G3_VISUAL_NEW_HEAD = NO_NEW_BROWSER_CAPTURE
-GEOMETRY_PREVIOUS_HEAD = PASS_1_PLUS_2_PLUS_3
+BASELINE_HEAD = c501f589c2133d8723615e6d671f31b96130a38b
+BASELINE_CI = CI_1160_GREEN@c501f589c2133d8723615e6d671f31b96130a38b
+G3_VISUAL_BASELINE_C501 = 14_REAL_SCREENSHOTS; FIVE_VIEWPORTS; GEOMETRY_AND_SECURITY_VERIFIED
+G3_VISUAL_CURRENT_CODE = VERIFY_PR45_HEAD_AND_LATEST_QA_EVIDENCE
 VISUAL_FIDELITY = RED_ESENCIAL_NOT_CERTIFIED
 PR45 = OPEN_DRAFT_NOT_MERGED
 OWNER_APPROVAL = NOT_REQUESTED_WHILE_RED
@@ -86,5 +84,5 @@ R3_PR33 = FROZEN
 PR43 = SUPERSEDED
 MAIN = DO_NOT_MODIFY
 HOSTINGER = FINAL_ONLY_NO_DEPLOY
-NEXT = CI_DOC_HEAD_THEN_EXACT_SHA_REAL_BROWSER_VISUAL_GATE
+NEXT = EXACT_SHA_CI_THEN_BROWSER_QA_THEN_INDEPENDENT_VISUAL_REVIEW
 ```

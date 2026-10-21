@@ -369,7 +369,7 @@ ul { padding-left: 22px; }
     margin: 0 auto;
     padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--color-border);
-    background: color-mix(in srgb, var(--color-surface) 96%, transparent);
+    background: var(--color-surface);
     box-shadow: 0 -8px 30px rgba(23, 33, 31, .08);
 }
 .bottom-nav__item,
@@ -680,7 +680,8 @@ ul { padding-left: 22px; }
 .candidate-progress-footer time { font-variant-numeric: tabular-nums; }
 .candidate-next-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .candidate-next-list li { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: start; gap: 14px; }
-.candidate-next-number { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--color-background); color: var(--color-text); font-size: 13px; font-weight: 650; }
+.candidate-next-marker { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--color-background); color: var(--color-text); font-size: 13px; font-weight: 650; }
+.candidate-next-marker .nav-icon { width: 18px; height: 18px; }
 .candidate-next-list a { display: grid; align-content: center; gap: 3px; min-height: 44px; font-size: 13px; font-weight: 650; color: var(--color-text); text-decoration: none; }
 .candidate-next-list a:hover { color: var(--brand-primary); text-decoration: underline; }
 .candidate-next-list a span { font-size: 12px; font-weight: 400; line-height: 1.5; color: var(--color-muted); }

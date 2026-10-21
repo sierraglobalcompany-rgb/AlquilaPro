@@ -213,15 +213,15 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                         <p class="candidate-progress-footer"><?php if ($updatedAt !== null): ?>Última actualización: <time datetime="<?= $escape($candidate['updated_at']) ?>"><?= $escape($updatedAt) ?></time> · <?php endif; ?>Los registros no implican aprobación ni porcentaje de avance.</p>
                     </section>
                     <section class="content-card candidate-card candidate-card--next" aria-labelledby="candidate-next-title">
-                        <h3 id="candidate-next-title"><?= $candidateIcon('history') ?>Secciones para consultar</h3>
-                        <ol class="candidate-next-list">
-                            <?php foreach ($reviewSections as $index => $section): ?>
+                        <h3 id="candidate-next-title"><?= $candidateIcon('files') ?>Secciones para consultar</h3>
+                        <ul class="candidate-next-list">
+                            <?php foreach ($reviewSections as $section): ?>
                                 <li>
-                                    <span class="candidate-next-number" aria-hidden="true"><?= $index + 1 ?></span>
+                                    <span class="candidate-next-marker" aria-hidden="true"><?= $candidateIcon($candidateSectionIcons[$section['key']] ?? 'files') ?></span>
                                     <a href="<?= $escape($sectionHref($section['key'])) ?>"><strong><?= $escape($section['title']) ?></strong><span><?= $escape($section['detail']) ?></span></a>
                                 </li>
                             <?php endforeach; ?>
-                        </ol>
+                        </ul>
                     </section>
                 </div>
 
