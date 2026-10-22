@@ -100,6 +100,21 @@ final class AssetContractTest extends TestCase
         self::assertStringNotContainsString('zoom:', $this->css);
     }
 
+    public function testCandidateSurfaceInheritsCanonicalSystemFont(): void
+    {
+        self::assertMatchesRegularExpression(
+            '/:root\s*\{[^}]*font-family:\s*system-ui,/',
+            $this->css,
+            'La tipografia base del ERP debe ser la autoridad.',
+        );
+        self::assertSame(1, preg_match('/\.candidate-surface\s*\{([^}]*)\}/s', $this->css, $matches));
+        self::assertDoesNotMatchRegularExpression(
+            '/\bfont-family\s*:/i',
+            $matches[1],
+            'Candidatos no debe forzar una segunda tipografia.',
+        );
+    }
+
     public function testLongPublicLinksCanWrapWithinCards(): void
     {
         self::assertMatchesRegularExpression(

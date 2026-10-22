@@ -10,16 +10,18 @@
 | Rama activa | `impl/cand-01-shell-overview-20261017` |
 | PR | [#45](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/45), OPEN / DRAFT / NOT_MERGED |
 | `main` observado | `243dea9c821645dd554cc5fdd66cb6c9a0d4f2ce`; volver a comprobar antes de escribir |
-| Último HEAD de producto acreditado (base del microbloque) | `c501f589c2133d8723615e6d671f31b96130a38b` |
-| CI exacto de la base | [#1160](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39538013276): SUCCESS PHP 8.3/8.4/8.5; no atribuirlo al código local aún no publicado |
+| Último HEAD de producto acreditado / base del microbloque tipográfico | `710b96710ee1d8839d462dd01d3de81806378891` |
+| CI exacto de la base | [#1161 / run 39623120946](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39623120946): SUCCESS PHP 8.3/8.4/8.5; no atribuirlo al commit local futuro |
 | Fase | CAND-01 / G3 — Solicitud, seis tarjetas en tres filas |
-| Browser QA de `c501f589` | 14 PNG auténticos en cinco viewports; geometría 1+2+3 y seguridad verificadas; fidelidad global **RED_ESENCIAL** |
-| Microbloque local | Lista de consulta semántica y nav opaca implementadas; XPath alineado; dos clases focales locales GREEN; nuevo SHA/CI/Browser QA pendientes |
-| Fidelidad visual de CAND-01 | **RED_ESENCIAL / no certificada** |
+| Browser QA de `710b9671` | 13 PNG y matriz de 17 regiones en cinco viewports; permisos complementados por V6; fidelidad global **RED_ESENCIAL_NOT_CERTIFIED** |
+| Microbloque tipográfico local | V7/V9 quita solo el override Arial de `.candidate-surface`; GREEN causal observado; commit local preparado, CI remoto nuevo pendiente |
+| Suite V9 | PHP 8.5.8: 682 tests, 8.017 aserciones, 0 fallos, 0 errores, 266 warnings, 2 skipped |
+| Focales V11 | PHP 8.5.8: 33/33 tests, 225 aserciones; lint y `composer validate --strict` válidos |
+| Fidelidad visual de CAND-01 | **RED_ESENCIAL_NOT_CERTIFIED** |
 | Owner UAT / merge / despliegue | NO autorizado |
 | Otros frentes | CAND-02 NOT_STARTED; R3/PR #33 FROZEN; PR #43 SUPERSEDED, DRAFT |
 
-**Importante:** CI #1160 y el Browser QA de 14 capturas acreditan exclusivamente la base `c501f589`. No certifican el microbloque local ni ningún SHA futuro. Verificar CI y Browser QA del HEAD nuevo antes de afirmar un resultado técnico para ese código.
+**Importante:** CI #1161/run 39623120946 acredita exclusivamente la base remota `710b9671`. V9 acredita la regresión tipográfica causal local, no paridad visual global. El nuevo commit local requiere CI propio tras la publicación propietaria; no reabrir ni repetir el Browser QA V9.
 
 **Orden de autoridad:** GitHub (HEAD real) → CI del SHA exacto → este checkpoint → SPEC/PLAN aprobados → AGENTS/README → handoffs y chats. Si hay contradicción, conciliar; nunca inventar un PASS.
 
@@ -49,40 +51,48 @@
 - **Hecho del paquete anterior:** geometría 1+2+3 y seis tarjetas PASS en 1448×1086; diferencias visuales esenciales en topbar/hero, proporciones/íconos/tipo y densidad de tarjetas. Sin autorización para inventar botones o datos; visual global RED. No convertir 65 capturas en certificación del nuevo SHA.
 - **Cambio directo nuevo:** commit [`fbf2bf48`](https://github.com/sierraglobalcompany-rgb/AlquilaPro/commit/fbf2bf48aa18fb988c3c9ff96a003e7d80528a56). Sólo tres archivos existentes: vista reemplaza `Próximos pasos` por `Secciones para consultar` (enlaces reales, no workflow); CSS `.candidate-card` radio 12px y titulares 700; test de semántica actualizado. CI #1159 GREEN; no nueva captura del commit.
 - **QA del HEAD base `c501f589`:** `CAND01_G3_C501_QA_20261021.zip` (SHA-256 `64c229f7bb919c4e9b58d8973ffcb5a7280d7140df54aa6416e12c9c80352369`), 14 PNG auténticos y cinco viewports; geometría 1+2+3 y controles de seguridad verificados. La auditoría visual independiente conserva `VISUAL_FIDELITY=RED_ESENCIAL`; la evidencia no certifica el microbloque local.
-- **Microbloque local pendiente de publicar:** lista `ul` con SVG no secuenciales y fondo opaco `.bottom-nav`; clases de integración y assets GREEN localmente. El SHA nuevo aún no existe; CI exacto y Browser QA del nuevo HEAD están pendientes.
+- **Microbloque de navegación ya publicado en 710b9671:** lista semántica no secuencial, enlaces reales y `.bottom-nav` opaca. No afirmar que siga pendiente.
+- **V6 — permisos:** `candidates.view` permite candidato HTTP 200, oculta datos privados y niega imagen privada con 403; control `candidates.view + properties.view` permite la misma imagen con 200. ZIP `CAND01_G3_710B9671_ROLE_QA_V6_DELTA.zip`, SHA-256 `0131d7c8ac73d6ad9f19d3561eed34907a24f5398dc2d93e07d4a83308fb234e`; no repetir aquí.
+- **V9 — fuente y QA causal:** elimina solo `font-family: Arial, Helvetica, sans-serif;` de `.candidate-surface` y hereda `system-ui` de `:root`; conserva `testCandidateSurfaceInheritsCanonicalSystemFont()`. ZIP `ALQUILAPRO-CAND01-G3-V9_FONT_QA_DELTA.zip`, SHA-256 `4a0f2039c6fc13018ed91909aa204b9d0b6a9f6abb915cb931e3ef36afc050a2`; manifiesto 24 payloads verificados y CRC PASS. Incluye 10 capturas reales BEFORE/AFTER en cinco viewports: 1448×1086, 1440×900, 768×1024, 390×844 y 375×812. Mismo rol/fixture y CSS servido; H1 −3 px de ancho, misma altura, 0 overflow horizontal, composición 1+2+3 intacta. Esto demuestra ausencia de regresión tipográfica relevante, no `PASS_VISUAL`.
+- **V11 focales:** 33/33 tests, 225 aserciones con aislamiento PHPUnit dirigido al puerto local 1 sin servicio; sin acceso a bases V6/V9. `php -l` y `composer validate --strict` válidos.
+- **Suite V9:** 682 tests, 8.017 aserciones, 0 fallos, 0 errores, 266 warnings, 2 skipped; no ocultar warnings.
 - **No demostrado todavía:** fidelidad visual global, auditoría de accesibilidad integral o comportamiento en dispositivos físicos. No marcar visual GREEN.
 
 ## 5. Bloqueos y decisiones pendientes
 
 | Prioridad | Asunto | Acción correcta |
-| --- | --- |
-| P0 | Verificar geometría y fidelidad visual del HEAD actual | Capturar SHA servido real a 1448×1086, 1440×900, 768×1024, 390×844 y 375×812; comparar 17 regiones y registrar RED concretos |
-| P0 | Diferencias de topbar/hero/panel estado | Resolver equivalencia estética sin acciones ficticias; no crear búsqueda, campana, mensajería ni botones mudos |
-| P1 | Móvil/tableta: barra inferior fija cruza texto en scroll | La captura anterior demuestra intersección temporal, pero el texto es recuperable al final. Medir top/middle/bottom y foco antes de cambiar CSS global |
+| --- | --- | --- |
+| P0 | Publicar el commit local tipográfico y obtener CI del nuevo SHA | ChatGPT verifica los tres blobs y publica por fast-forward con la conexión GitHub propietaria; esperar CI PHP 8.3/8.4/8.5 |
+| P0 | Diferencias visuales esenciales frente al mockup | Mantener `RED_ESENCIAL_NOT_CERTIFIED`; decisión independiente del owner antes de cualquier remediación |
+| P1 | Móvil/tableta: barra inferior fija cruza texto en scroll | V9 midió solapamiento transitorio de 72 px en 375×812, recuperable al final; no aplicar parche global sin causa/RED nuevo |
 | P1 | CSS de foco global `:focus-visible{scroll-margin-block:100px}` | Smoke de Propiedades, Contratos, login, catálogo, candidatos y diálogo Apps; no duplicar CSS sin reproducir defecto |
 | P1 | Repetición teléfono/correo en resumen y tarjeta contacto | Revisar con SPEC y utilidad contextual; evitar borrar campos o degradar seis tarjetas por una abstracción |
 | P2 | UI UX Pro Max no está versionada en el árbol GitHub comprobado | Sólo registrar versión/commit si se comprueba su uso; no instalar a ciegas |
 
 ## 6. NEXT exacto y gates
 
-1. `NEXT=EXACT_SHA_CI_THEN_BROWSER_QA_THEN_INDEPENDENT_VISUAL_REVIEW`: verificar el nuevo SHA publicado y CI exacto PHP 8.3/8.4/8.5.
-2. Con CI GREEN, ejecutar Browser QA real del SHA servido con fixture sintético, cinco viewports, comprobación de SHA/CSS, seguridad, responsive y regresión transversal; registrar 17 regiones sin dictamen estético automático.
-3. ChatGPT/owner dictamina fidelidad visual contra la referencia. Mantener PR #45 Draft mientras exista RED esencial; sin merge ni despliegue.
+`NEXT=OWNER_GITHUB_PUBLISH_EXACT_3_FILE_COMMIT -> CI_NEW_SHA_8.3_8.4_8.5 -> INDEPENDENT_DESIGN_DECISION`
+
+ChatGPT revalida HEAD remoto y base, publica por fast-forward los tres blobs preparados, verifica el SHA y espera el CI exacto. Mantener PR #45 Draft; no hacer merge, deploy ni iniciar CAND-02.
 
 ## 7. Semáforo de recuperación
 
 ```text
-BASELINE_HEAD = c501f589c2133d8723615e6d671f31b96130a38b
-BASELINE_CI = CI_1160_GREEN@c501f589c2133d8723615e6d671f31b96130a38b
-G3_VISUAL_BASELINE_C501 = 14_REAL_SCREENSHOTS; FIVE_VIEWPORTS; GEOMETRY_AND_SECURITY_VERIFIED
-G3_VISUAL_CURRENT_CODE = VERIFY_PR45_HEAD_AND_LATEST_QA_EVIDENCE
-VISUAL_FIDELITY = RED_ESENCIAL_NOT_CERTIFIED
 PR45 = OPEN_DRAFT_NOT_MERGED
-OWNER_APPROVAL = NOT_REQUESTED_WHILE_RED
+PR45_BRANCH = impl/cand-01-shell-overview-20261017
+REMOTE_BASE_HEAD = 710b96710ee1d8839d462dd01d3de81806378891
+BASE_CI = CI_1161_GREEN_PHP_8.3_8.4_8.5
+FONT_LOCAL_CHANGE = GREEN_CAUSAL_V7_V9
+V11_CHANGES = ONLY_CSS_MINUS_1_TEST_PLUS_15_CANONICAL_CHECKPOINT
+V11_LOCAL_COMMIT = PREPARED_FOR_OWNER_GITHUB_PUBLICATION
+V11_REMOTE_PUBLISH = NOT_ATTEMPTED_BY_CODEX
+V11_CI = PENDING_OWNER_REMOTE_PUBLICATION
+BROWSER_QA_V9 = 10_SCREENSHOTS_REUSABLE_FOR_CAUSAL_ONLY
+PERMISSIONS_V6 = PASS_NOT_RERUN
+VISUAL_GLOBAL = RED_ESENCIAL_NOT_CERTIFIED
+STAGING_V6_V9 = RETAINED_POLICY_RESTRICTION
 CAND02 = NOT_STARTED
-R3_PR33 = FROZEN
-PR43 = SUPERSEDED
-MAIN = DO_NOT_MODIFY
-HOSTINGER = FINAL_ONLY_NO_DEPLOY
-NEXT = EXACT_SHA_CI_THEN_BROWSER_QA_THEN_INDEPENDENT_VISUAL_REVIEW
+MAIN = DO_NOT_TOUCH
+HOSTINGER = DO_NOT_DEPLOY
+NEXT = CHATGPT_RECHECK_REMOTE_HEAD_PUBLISH_IDENTICAL_3_BLOBS_CI_8.3_8.4_8.5
 ```
