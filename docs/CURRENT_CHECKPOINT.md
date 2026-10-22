@@ -1,31 +1,21 @@
 # AlquilaPro — CURRENT CHECKPOINT
 
-**Fecha de corte:** 2026-10-21 (actualización G3 posterior a V12 y MEDIA-PROBE-01). **Rol:** única referencia operativa del estado actual. El historial completo de G1/G2/G3 queda en Git y evidencias del PR; no interpretar commits históricos como HEAD.
+**Corte:** 2026-10-22, después de CAND01-QA-CIERRE-02. **Rol:** checkpoint operativo canónico, no historial de cada commit. Orden de autoridad: HEAD GitHub → CI de SHA exacto → este checkpoint → SPEC/AGENTS → evidencias; confirmar HEAD antes de actuar.
 
 ## 1. Estado comprobado y autoridad
 
-| Campo | Estado |
+| Campo | Estado verificado (antes de este commit de documentación) |
 | --- | --- |
-| Repositorio | `sierraglobalcompany-rgb/AlquilaPro` |
-| Rama activa | `impl/cand-01-shell-overview-20261017` |
-| PR | [#45](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/45), OPEN / DRAFT / NOT_MERGED |
-| `main` observado | `243dea9c821645dd554cc5fdd66cb6c9a0d4f2ce`; volver a comprobar antes de escribir |
-| Último HEAD remoto acreditado (base del ajuste de columnas) | `d825248f03c788b0bd92a0c433bc510f59b87c43` |
-| CI exacto de la base | [#1163 / run 39715171344](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39715171344): SUCCESS PHP 8.3/8.4/8.5; el próximo cambio de columnas requiere CI propio |
-| Fase | CAND-01 / G3 — Solicitud, seis tarjetas en tres filas |
-| Browser QA | V9 cinco viewports tipografía; V12 escritorio/móvil ocho secciones y matriz 17, con foto ausente (HTTP 404 en staging). Fidelidad **RED_ESENCIAL_NOT_CERTIFIED** |
-| Tipografía V11 | Publicada en `24a6918e`; CI #1162 GREEN; no repetir V9. |
-| Hitos (G3-PROGRESS-D1-02) | PUBLICADO, CI #1163 GREEN y Browser QA focal PASS; `completed` verde, otros cuatro hitos grises. |
-| Microbloque de diseño actual | En escritorio, tercera tarjeta del inmueble proporcionalmente mayor (`1fr 1fr 1.1fr`), sin modificar tablet/móvil; nuevo SHA/CI y comparación focal pendientes. |
-| Suite V9 | PHP 8.5.8: 682 tests, 8.017 aserciones, 0 fallos, 0 errores, 266 warnings, 2 skipped |
-| Focales V11 | PHP 8.5.8: 33/33 tests, 225 aserciones; lint y `composer validate --strict` válidos |
-| Fidelidad visual de CAND-01 | **RED_ESENCIAL_NOT_CERTIFIED** |
-| Owner UAT / merge / despliegue | NO autorizado |
-| Otros frentes | CAND-02 NOT_STARTED; R3/PR #33 FROZEN; PR #43 SUPERSEDED, DRAFT |
+| Repositorio / rama | `sierraglobalcompany-rgb/AlquilaPro` · `impl/cand-01-shell-overview-20261017` |
+| PR #45 | [OPEN / DRAFT / NOT MERGED](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/45); GitHub informa mergeable/clean, **no es aprobación para fusionar** |
+| Código exacto auditado | `aa9b2619d34451d406f05a019842da81f458d7a1` |
+| `main` observado | `243dea9c821645dd554cc5fdd66cb6c9a0d4f2ce`; NO modificar |
+| CI del código auditado | [#1164 / run 39723814465](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39723814465) SUCCESS PHP 8.3 / 8.4 / 8.5 |
+| CAND-01 Solicitud | Dirección visual **APROBADA por el owner**, QA focal y residual **PASS**, fidelidad global **NO certificada** |
+| Merge / Hostinger | NO autorizados / NO desplegado |
+| Próximas fases | CAND-02 NOT_STARTED; R3/PR #33 FROZEN; PR #43 SUPERSEDED |
 
-**Importante:** CI #1163/run 39715171344 acredita exclusivamente `d825248f` (hitos ya corregidos). El ajuste de columnas desktop no está acreditado por esa CI. Evidencias G3-PROGRESS-D1-02 certifican solo progreso, no diseño global.
-
-**Orden de autoridad:** GitHub (HEAD real) → CI del SHA exacto → este checkpoint → SPEC/PLAN aprobados → AGENTS/README → handoffs y chats. Si hay contradicción, conciliar; nunca inventar un PASS.
+**Nota de temporalidad:** este documento se publica mediante un **nuevo commit exclusivamente documental**. Su nuevo SHA tendrá CI propio; las capturas y hashes evidencian el **código de producto sin cambios** de `aa9b2619d34451d406f05a019842da81f458d7a1`, no se deben atribuir falsamente a capturas de otro SHA.
 
 ## 2. Leyes y forma de trabajo
 
@@ -49,54 +39,60 @@
 
 ## 4. Evidencia G3 heredada y cambios nuevos
 
-- **Paquete G3 anterior:** HEAD `17e7bce398f38f670914e237fa26415582722679`, [CI #1158](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39506039397) SUCCESS PHP 8.3/8.4/8.5, 680 tests cada uno, 1 skipped. Browser anterior con 65 capturas actuales (58 hashes únicos), referencia, históricos y comparativas; auditoría independiente de 17 regiones y comentario [Ley 5 en PR](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/45#issuecomment-6304009090). Los ZIP originales y matriz se conservan en Library `/AlquilaPro/`.
-- **Hecho del paquete anterior:** geometría 1+2+3 y seis tarjetas PASS en 1448×1086; diferencias visuales esenciales en topbar/hero, proporciones/íconos/tipo y densidad de tarjetas. Sin autorización para inventar botones o datos; visual global RED. No convertir 65 capturas en certificación del nuevo SHA.
-- **Cambio directo nuevo:** commit [`fbf2bf48`](https://github.com/sierraglobalcompany-rgb/AlquilaPro/commit/fbf2bf48aa18fb988c3c9ff96a003e7d80528a56). Sólo tres archivos existentes: vista reemplaza `Próximos pasos` por `Secciones para consultar` (enlaces reales, no workflow); CSS `.candidate-card` radio 12px y titulares 700; test de semántica actualizado. CI #1159 GREEN; no nueva captura del commit.
-- **QA del HEAD base `c501f589`:** `CAND01_G3_C501_QA_20261021.zip` (SHA-256 `64c229f7bb919c4e9b58d8973ffcb5a7280d7140df54aa6416e12c9c80352369`), 14 PNG auténticos y cinco viewports; geometría 1+2+3 y controles de seguridad verificados. La auditoría visual independiente conserva `VISUAL_FIDELITY=RED_ESENCIAL`; la evidencia no certifica el microbloque local.
-- **Microbloque de navegación ya publicado en 710b9671:** lista semántica no secuencial, enlaces reales y `.bottom-nav` opaca. No afirmar que siga pendiente.
-- **V6 — permisos:** `candidates.view` permite candidato HTTP 200, oculta datos privados y niega imagen privada con 403; control `candidates.view + properties.view` permite la misma imagen con 200. ZIP `CAND01_G3_710B9671_ROLE_QA_V6_DELTA.zip`, SHA-256 `0131d7c8ac73d6ad9f19d3561eed34907a24f5398dc2d93e07d4a83308fb234e`; no repetir aquí.
-- **V9 — fuente y QA causal:** elimina solo `font-family: Arial, Helvetica, sans-serif;` de `.candidate-surface` y hereda `system-ui` de `:root`; conserva `testCandidateSurfaceInheritsCanonicalSystemFont()`. ZIP `ALQUILAPRO-CAND01-G3-V9_FONT_QA_DELTA.zip`, SHA-256 `4a0f2039c6fc13018ed91909aa204b9d0b6a9f6abb915cb931e3ef36afc050a2`; manifiesto 24 payloads verificados y CRC PASS. Incluye 10 capturas reales BEFORE/AFTER en cinco viewports: 1448×1086, 1440×900, 768×1024, 390×844 y 375×812. Mismo rol/fixture y CSS servido; H1 −3 px de ancho, misma altura, 0 overflow horizontal, composición 1+2+3 intacta. Esto demuestra ausencia de regresión tipográfica relevante, no `PASS_VISUAL`.
-- **V11 publicado:** HEAD `24a6918e61d69b1cf8e53156abcb30acf833c27`, CI #1162 SUCCESS PHP 8.3/8.4/8.5; retira override Arial, mantiene test causal y hereda fuente ERP.
-- **V12 ocho secciones:** ZIP SHA `f6e9d090bee5b7938866e56f7eb1d5e978ea81b810cdae82541ef480adf2b89b`; D1 1448×1086 y M2 375×812; 8 secciones HTTP 200, geometría 1+2+3 dentro del viewport desktop; 404 solo de foto privada no restaurada en staging. Foto sintética original de V6 localizada en MEDIA-PROBE-01, SHA-256 `5e804b0dfcebbc26fdbbf612ba86d8bbf4633533909916b5c43a25ecfbbde74d` (182879 bytes); no fue copiada ni recapturada. Evitar más ciclos solo por esa foto.
-- **Hitos del progreso:** el backend distingue `recorded` vs `completed` (`data-milestone-*` y texto). El aro verde en un hito solamente registrado transmite aprobación falsa; se retira el owner CSS redundante y el estado neutral recupera el estilo base. Solo `completed` continúa verde; se conserva el texto explícito. Comparativa visual del nuevo SHA pendiente.
-- **Suite V9:** 682 tests, 8.017 aserciones, 0 fallos, 0 errores, 266 warnings, 2 skipped; no ocultar warnings.
-- **No demostrado todavía:** fidelidad visual global, auditoría de accesibilidad integral o comportamiento en dispositivos físicos. No marcar visual GREEN.
+Los paquetes históricos se conservan en Git/Library y la descripción del PR, no se duplican aquí. **Gates cerrados y evidencia única**:
+
+| Gate | Prueba | Veredicto acotado |
+| --- | --- | --- |
+| Autenticación/permisos V6 | `candidates.view` candidato 200, medio privado 403; `+properties.view` medio 200; ZIP SHA-256 `0131d7c8ac73d6ad9f19d3561eed34907a24f5398dc2d93e07d4a83308fb234e` | PASS |
+| Tipografía V9/V11 | Antes/después 5 viewports; fuente `system-ui` heredada del ERP; V9 ZIP SHA-256 `4a0f2039c6fc13018ed91909aa204b9d0b6a9f6abb915cb931e3ef36afc050a2` | PASS causal |
+| Ocho secciones / responsive V12 | 8 rutas GET 200, desktop 1448×1086 y móvil 375×812; ZIP SHA-256 `f6e9d090bee5b7938866e56f7eb1d5e978ea81b810cdae82541ef480adf2b89b` | PASS funcional/estructural, no 17/17 visual |
+| Hitos de progreso D1 | PNG SHA-256 `ad22f76c9cfde260d1cbccc726226df786528fe97565d7af92c00278bf0e6eb9`; sólo `completed` verde; CI #1163 | PASS focal |
+| Fila C desktop | PNG SHA-256 `3a53702e043967008db88b3304688d209e0c23d586b9ba8d47eaace74facf916`; anchos 362.837/362.837/399.125 px, gaps 16/16 px, termina en y=1072.35; CI #1164 | PASS focal |
+| QA residual final A/B/C | ZIP `CAND01_QA_RESIDUAL_20261022.zip` SHA-256 `ea135eac4b574055565e32f2764cf9c59ddee05a44ca89b730a21e8760220c8a`; CRC PASS; JSON y dos PNG íntegros | PASS A/B/C |
+| CI producto actual | #1164 exacto para `aa9b2619d34451d406f05a019842da81f458d7a1`, tres versiones PHP SUCCESS | GREEN |
+
+**QA residual A/B/C detallado:** A: menú `768×1024` abierto con 8 enlaces y estado activo correcto, sin overflow; B: en `375×812`, contenido final y=715.85 antes de barra y=740, botón Administrar alcanzable con 7 Tabs y foco visible, sin POST; C: foto sintética privada GET autenticado `200 image/jpeg`, 182879 bytes, SHA-256 `5e804b0dfcebbc26fdbbf612ba86d8bbf4633533909916b5c43a25ecfbbde74d`, naturalWidth 1280. La foto se restauró **únicamente en staging QA**, sin cambiar producto ni datos de negocio.
+
+**La Dirección visual de Solicitud está aprobada por el owner.** Eso no aprueba las siete pantallas secundarias ni certifica todas las 17 regiones.
 
 ## 5. Bloqueos y decisiones pendientes
 
-| Prioridad | Asunto | Acción correcta |
-| --- | --- | --- |
-| P0 | Proporciones de fila C del mockup (≈374/367/406 px vs actual 380/380/380) | En desktop ampliar la tercera columna con `1fr 1fr 1.1fr`; test en owner CSS, CI triple y una medición focal sin repetir 17 regiones. |
-| P0 | Diferencias visuales esenciales frente al mockup | Mantener `RED_ESENCIAL_NOT_CERTIFIED`; decisión independiente del owner antes de cualquier remediación |
-| P1 | Móvil/tableta: barra inferior fija cruza texto en scroll | V9 midió solapamiento transitorio de 72 px en 375×812, recuperable al final; no aplicar parche global sin causa/RED nuevo |
-| P1 | CSS de foco global `:focus-visible{scroll-margin-block:100px}` | Smoke de Propiedades, Contratos, login, catálogo, candidatos y diálogo Apps; no duplicar CSS sin reproducir defecto |
-| P1 | Repetición teléfono/correo en resumen y tarjeta contacto | Revisar con SPEC y utilidad contextual; evitar borrar campos o degradar seis tarjetas por una abstracción |
-| P2 | UI UX Pro Max no está versionada en el árbol GitHub comprobado | Sólo registrar versión/commit si se comprueba su uso; no instalar a ciegas |
+| Tema | Dictamen y siguiente acción |
+| --- | --- |
+| Producto, permisos, CI, ocho rutas y QA focal/residual | **GREEN dentro del alcance medido**; no repetir sin causa nueva |
+| `VISUAL_GLOBAL` | **RED_ESENCIAL_NOT_CERTIFIED**; no declarar 17/17 PASS. El owner aprobó dirección de Solicitud, no certificación de fidelidad completa |
+| Accesibilidad integral | Foco y semántica básica PASS en recorridos observados; **WCAG integral/lector de pantalla NO certificados**. La Definition of Done del **módulo Candidatos entero** (§21 SPEC) excede CAND-01 Solicitud |
+| Barra fija móvil | Solapamiento temporal de contenido durante desplazamiento, sin último elemento o foco permanentemente cubiertos en gate B; registrar reserva, **sin parche CSS automático** |
+| Foto QA histórica 404 | Falta de bytes en staging V12, corregida al reponer JPEG sintético aislado y obtener 200; no defecto demostrado del producto |
+| CAND-02..CAND-08 | Mockups originales disponibles y backend existente; trabajo visual posterior, NO iniciado ni autorizado para este PR |
+
+**Sin otros P0 de código demostrados.** No sumar capas, servicios, rutas, estilos ni tests por rutina.
 
 ## 6. NEXT exacto y gates
 
-`NEXT=CI_NEW_SHA_THEN_TARGETED_DESKTOP_DETAIL_GRID_MEASUREMENT_THEN_INDEPENDENT_VISUAL_REVIEW`
+`NEXT=OWNER_FINAL_CAND01_ACCEPTANCE_DECISION`
 
-El único cambio de producto de este microbloque es ajustar las proporciones desktop de las tres tarjetas inferiores para dar más espacio a información del inmueble. No se alteran las reglas tablet/móvil, permisos, estados ni estructura 1+2+3. Verificar CI exacto y comparar anchos/heights de la fila C en un solo viewport desktop cuando corresponda. Mantener PR #45 Draft; no merge/deploy/CAND-02.
+1. Presentar al owner en un dictamen único: **QA residual PASS**, **dirección visual de Solicitud aprobada**, y **fidelidad/accessibilidad completas sin certificar**. La aceptación de CAND-01 con reservas debe ser **explícita**.
+2. Si el owner exige `VISUAL_GLOBAL=PASS`, identificar únicamente las regiones de imagen que aún carecen de equivalencia o justificación; autorizar QA causal y acotado. No repetir V6/V9/V12/fila C/progreso/A-B-C.
+3. Cualquier merge del PR #45 requiere autorización explícita y CI del nuevo HEAD documental exacto. Hostinger queda bloqueado y CAND-02 no empieza por inferencia.
+
+**Leyes:** KISS (simple y eficaz), cero ruido (eliminar/unir/simplificar con evidencia), antiparches (RED→causa→GREEN + regresiones), Human-First/UX/UI Pro (sin capacidades falsas), fidelidad visual verificable (no autodeclarar PASS).
 
 ## 7. Semáforo de recuperación
 
 ```text
 PR45 = OPEN_DRAFT_NOT_MERGED
 PR45_BRANCH = impl/cand-01-shell-overview-20261017
-REMOTE_BASE_HEAD = d825248f03c788b0bd92a0c433bc510f59b87c43
-BASE_CI = CI_1163_GREEN_PHP_8.3_8.4_8.5
-V11_TYPOGRAPHY = PUBLISHED_VERIFIED
-G3_VISUAL_PROGRESS_FIX = REMOVE_RECORDED_GREEN_ONLY_KEEP_COMPLETED_GREEN
-G3_PROGRESS_NEW_CI = CI_1163_GREEN_D1_VISUAL_PASS
-G3_DETAIL_GRID_NEW_CI = PENDING_NEW_SHA
-BROWSER_QA_V9 = 10_SCREENSHOTS_REUSABLE_FOR_TYPOGRAPHY_ONLY
-BROWSER_QA_V12 = 2_REAL_SCREENSHOTS_8_TABS_MISSING_MEDIA_404
-PERMISSIONS_V6 = PASS_NOT_RERUN
+AUDITED_PRODUCT_HEAD = aa9b2619d34451d406f05a019842da81f458d7a1
+PRODUCT_CI = 1164_SUCCESS_PHP_8.3_8.4_8.5
+CAND01_DIRECTION_VISUAL = OWNER_APPROVED
+CAND01_QA_RESIDUAL = PASS
+CAND01_TECHNICAL_GATES = PASS_WITH_SCOPE
 VISUAL_GLOBAL = RED_ESENCIAL_NOT_CERTIFIED
-STAGING_V6_V9 = RETAINED_POLICY_RESTRICTION
+ACCESSIBILITY_FULL = NOT_CERTIFIED
+PR45_MERGE_AUTHORIZATION = NO
+HOSTINGER_DEPLOY = NO
 CAND02 = NOT_STARTED
-MAIN = DO_NOT_TOUCH
-HOSTINGER = DO_NOT_DEPLOY
-NEXT = CI_NEW_SHA_THEN_TARGETED_DESKTOP_DETAIL_GRID_MEASUREMENT_THEN_INDEPENDENT_VISUAL_REVIEW
+NEXT = OWNER_FINAL_CAND01_ACCEPTANCE_DECISION
 ```
+
