@@ -672,7 +672,6 @@ ul { padding-left: 22px; }
 .candidate-progress-list li strong { font-size: 12px; line-height: 1.35; color: var(--color-text); }
 .candidate-progress-list time { font-size: 11px; overflow-wrap: anywhere; }
 .candidate-milestone-marker { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #e3e7e5; color: var(--color-muted); font-size: 14px; font-weight: 700; }
-.candidate-milestone--recorded .candidate-milestone-marker { background: color-mix(in srgb, var(--brand-primary) 9%, var(--color-surface)); border: 2px solid var(--brand-primary); color: var(--brand-primary); }
 .candidate-milestone--completed .candidate-milestone-marker { background: var(--brand-primary); border: 2px solid var(--brand-primary); color: white; }
 .candidate-card--progress { gap: 9px; }
 .candidate-progress-footer { margin: 0; font-size: 11px; color: var(--color-muted); line-height: 1.5; }

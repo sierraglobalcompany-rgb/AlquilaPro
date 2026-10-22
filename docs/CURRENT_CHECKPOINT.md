@@ -1,6 +1,6 @@
 # AlquilaPro — CURRENT CHECKPOINT
 
-**Fecha de corte:** 2026-10-21. **Rol:** única referencia operativa del estado actual. El historial completo de G1/G2/G3 queda en Git y evidencias del PR; no interpretar commits históricos como HEAD.
+**Fecha de corte:** 2026-10-21 (actualización G3 posterior a V12 y MEDIA-PROBE-01). **Rol:** única referencia operativa del estado actual. El historial completo de G1/G2/G3 queda en Git y evidencias del PR; no interpretar commits históricos como HEAD.
 
 ## 1. Estado comprobado y autoridad
 
@@ -10,18 +10,19 @@
 | Rama activa | `impl/cand-01-shell-overview-20261017` |
 | PR | [#45](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/45), OPEN / DRAFT / NOT_MERGED |
 | `main` observado | `243dea9c821645dd554cc5fdd66cb6c9a0d4f2ce`; volver a comprobar antes de escribir |
-| Último HEAD de producto acreditado / base del microbloque tipográfico | `710b96710ee1d8839d462dd01d3de81806378891` |
-| CI exacto de la base | [#1161 / run 39623120946](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39623120946): SUCCESS PHP 8.3/8.4/8.5; no atribuirlo al commit local futuro |
+| Último HEAD remoto acreditado (base de este microbloque) | `24a6918ee61d69b1cf8e53156abcb30acf833c27` |
+| CI exacto de la base | [#1162 / run 39703346438](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39703346438): SUCCESS PHP 8.3/8.4/8.5; no atribuirlo al nuevo cambio de hitos |
 | Fase | CAND-01 / G3 — Solicitud, seis tarjetas en tres filas |
-| Browser QA de `710b9671` | 13 PNG y matriz de 17 regiones en cinco viewports; permisos complementados por V6; fidelidad global **RED_ESENCIAL_NOT_CERTIFIED** |
-| Microbloque tipográfico local | V7/V9 quita solo el override Arial de `.candidate-surface`; GREEN causal observado; commit local preparado, CI remoto nuevo pendiente |
+| Browser QA | V9 cinco viewports tipografía; V12 escritorio/móvil ocho secciones y matriz 17, con foto ausente (HTTP 404 en staging). Fidelidad **RED_ESENCIAL_NOT_CERTIFIED** |
+| Tipografía V11 | Publicada en `24a6918e`; CI #1162 GREEN; no repetir V9. |
+| Microbloque visual actual | Eliminar estilo verde redundante de hitos `recorded` no completados; preservar marcador verde solo `completed` y leyenda de registro. Nuevo SHA/CI pendiente. |
 | Suite V9 | PHP 8.5.8: 682 tests, 8.017 aserciones, 0 fallos, 0 errores, 266 warnings, 2 skipped |
 | Focales V11 | PHP 8.5.8: 33/33 tests, 225 aserciones; lint y `composer validate --strict` válidos |
 | Fidelidad visual de CAND-01 | **RED_ESENCIAL_NOT_CERTIFIED** |
 | Owner UAT / merge / despliegue | NO autorizado |
 | Otros frentes | CAND-02 NOT_STARTED; R3/PR #33 FROZEN; PR #43 SUPERSEDED, DRAFT |
 
-**Importante:** CI #1161/run 39623120946 acredita exclusivamente la base remota `710b9671`. V9 acredita la regresión tipográfica causal local, no paridad visual global. El nuevo commit local requiere CI propio tras la publicación propietaria; no reabrir ni repetir el Browser QA V9.
+**Importante:** CI #1162/run 39703346438 acredita exclusivamente `24a6918e` (fuente `system-ui`). La mejora visual de hitos de esta revisión requiere CI exacto del nuevo SHA; la evidencia V12 no acredita ese cambio futuro ni certifica paridad visual.
 
 **Orden de autoridad:** GitHub (HEAD real) → CI del SHA exacto → este checkpoint → SPEC/PLAN aprobados → AGENTS/README → handoffs y chats. Si hay contradicción, conciliar; nunca inventar un PASS.
 
@@ -54,7 +55,9 @@
 - **Microbloque de navegación ya publicado en 710b9671:** lista semántica no secuencial, enlaces reales y `.bottom-nav` opaca. No afirmar que siga pendiente.
 - **V6 — permisos:** `candidates.view` permite candidato HTTP 200, oculta datos privados y niega imagen privada con 403; control `candidates.view + properties.view` permite la misma imagen con 200. ZIP `CAND01_G3_710B9671_ROLE_QA_V6_DELTA.zip`, SHA-256 `0131d7c8ac73d6ad9f19d3561eed34907a24f5398dc2d93e07d4a83308fb234e`; no repetir aquí.
 - **V9 — fuente y QA causal:** elimina solo `font-family: Arial, Helvetica, sans-serif;` de `.candidate-surface` y hereda `system-ui` de `:root`; conserva `testCandidateSurfaceInheritsCanonicalSystemFont()`. ZIP `ALQUILAPRO-CAND01-G3-V9_FONT_QA_DELTA.zip`, SHA-256 `4a0f2039c6fc13018ed91909aa204b9d0b6a9f6abb915cb931e3ef36afc050a2`; manifiesto 24 payloads verificados y CRC PASS. Incluye 10 capturas reales BEFORE/AFTER en cinco viewports: 1448×1086, 1440×900, 768×1024, 390×844 y 375×812. Mismo rol/fixture y CSS servido; H1 −3 px de ancho, misma altura, 0 overflow horizontal, composición 1+2+3 intacta. Esto demuestra ausencia de regresión tipográfica relevante, no `PASS_VISUAL`.
-- **V11 focales:** 33/33 tests, 225 aserciones con aislamiento PHPUnit dirigido al puerto local 1 sin servicio; sin acceso a bases V6/V9. `php -l` y `composer validate --strict` válidos.
+- **V11 publicado:** HEAD `24a6918e61d69b1cf8e53156abcb30acf833c27`, CI #1162 SUCCESS PHP 8.3/8.4/8.5; retira override Arial, mantiene test causal y hereda fuente ERP.
+- **V12 ocho secciones:** ZIP SHA `f6e9d090bee5b7938866e56f7eb1d5e978ea81b810cdae82541ef480adf2b89b`; D1 1448×1086 y M2 375×812; 8 secciones HTTP 200, geometría 1+2+3 dentro del viewport desktop; 404 solo de foto privada no restaurada en staging. Foto sintética original de V6 localizada en MEDIA-PROBE-01, SHA-256 `5e804b0dfcebbc26fdbbf612ba86d8bbf4633533909916b5c43a25ecfbbde74d` (182879 bytes); no fue copiada ni recapturada. Evitar más ciclos solo por esa foto.
+- **Hitos del progreso:** el backend distingue `recorded` vs `completed` (`data-milestone-*` y texto). El aro verde en un hito solamente registrado transmite aprobación falsa; se retira el owner CSS redundante y el estado neutral recupera el estilo base. Solo `completed` continúa verde; se conserva el texto explícito. Comparativa visual del nuevo SHA pendiente.
 - **Suite V9:** 682 tests, 8.017 aserciones, 0 fallos, 0 errores, 266 warnings, 2 skipped; no ocultar warnings.
 - **No demostrado todavía:** fidelidad visual global, auditoría de accesibilidad integral o comportamiento en dispositivos físicos. No marcar visual GREEN.
 
@@ -62,7 +65,7 @@
 
 | Prioridad | Asunto | Acción correcta |
 | --- | --- | --- |
-| P0 | Publicar el commit local tipográfico y obtener CI del nuevo SHA | ChatGPT verifica los tres blobs y publica por fast-forward con la conexión GitHub propietaria; esperar CI PHP 8.3/8.4/8.5 |
+| P0 | Microcorrección de semántica visual de hitos (`recorded` ≠ `completed`) | Quitar regla CSS redundante y añadir prueba causal al owner existente. CI triple y una comparación de progreso real en siguiente QA justificado, sin reabrir permisos/8 secciones. |
 | P0 | Diferencias visuales esenciales frente al mockup | Mantener `RED_ESENCIAL_NOT_CERTIFIED`; decisión independiente del owner antes de cualquier remediación |
 | P1 | Móvil/tableta: barra inferior fija cruza texto en scroll | V9 midió solapamiento transitorio de 72 px en 375×812, recuperable al final; no aplicar parche global sin causa/RED nuevo |
 | P1 | CSS de foco global `:focus-visible{scroll-margin-block:100px}` | Smoke de Propiedades, Contratos, login, catálogo, candidatos y diálogo Apps; no duplicar CSS sin reproducir defecto |
@@ -71,28 +74,27 @@
 
 ## 6. NEXT exacto y gates
 
-`NEXT=OWNER_GITHUB_PUBLISH_EXACT_3_FILE_COMMIT -> CI_NEW_SHA_8.3_8.4_8.5 -> INDEPENDENT_DESIGN_DECISION`
+`NEXT=CI_NEW_SHA_THEN_TARGETED_PROGRESS_BROWSER_EVIDENCE_THEN_INDEPENDENT_VISUAL_REVIEW`
 
-ChatGPT revalida HEAD remoto y base, publica por fast-forward los tres blobs preparados, verifica el SHA y espera el CI exacto. Mantener PR #45 Draft; no hacer merge, deploy ni iniciar CAND-02.
+El único cambio de producto de este microbloque es neutralizar el marcador de hitos registrados pero NO completados; conservar seis tarjetas, responsive, permisos y hitos verdaderamente completados. Esperar CI exacto y pedir Browser QA focal únicamente si es imprescindible para certificar estética. Mantener PR #45 Draft; no merge/deploy/CAND-02.
 
 ## 7. Semáforo de recuperación
 
 ```text
 PR45 = OPEN_DRAFT_NOT_MERGED
 PR45_BRANCH = impl/cand-01-shell-overview-20261017
-REMOTE_BASE_HEAD = 710b96710ee1d8839d462dd01d3de81806378891
-BASE_CI = CI_1161_GREEN_PHP_8.3_8.4_8.5
-FONT_LOCAL_CHANGE = GREEN_CAUSAL_V7_V9
-V11_CHANGES = ONLY_CSS_MINUS_1_TEST_PLUS_15_CANONICAL_CHECKPOINT
-V11_LOCAL_COMMIT = PREPARED_FOR_OWNER_GITHUB_PUBLICATION
-V11_REMOTE_PUBLISH = NOT_ATTEMPTED_BY_CODEX
-V11_CI = PENDING_OWNER_REMOTE_PUBLICATION
-BROWSER_QA_V9 = 10_SCREENSHOTS_REUSABLE_FOR_CAUSAL_ONLY
+REMOTE_BASE_HEAD = 24a6918ee61d69b1cf8e53156abcb30acf833c27
+BASE_CI = CI_1162_GREEN_PHP_8.3_8.4_8.5
+V11_TYPOGRAPHY = PUBLISHED_VERIFIED
+G3_VISUAL_PROGRESS_FIX = REMOVE_RECORDED_GREEN_ONLY_KEEP_COMPLETED_GREEN
+G3_PROGRESS_NEW_CI = PENDING_NEW_SHA
+BROWSER_QA_V9 = 10_SCREENSHOTS_REUSABLE_FOR_TYPOGRAPHY_ONLY
+BROWSER_QA_V12 = 2_REAL_SCREENSHOTS_8_TABS_MISSING_MEDIA_404
 PERMISSIONS_V6 = PASS_NOT_RERUN
 VISUAL_GLOBAL = RED_ESENCIAL_NOT_CERTIFIED
 STAGING_V6_V9 = RETAINED_POLICY_RESTRICTION
 CAND02 = NOT_STARTED
 MAIN = DO_NOT_TOUCH
 HOSTINGER = DO_NOT_DEPLOY
-NEXT = CHATGPT_RECHECK_REMOTE_HEAD_PUBLISH_IDENTICAL_3_BLOBS_CI_8.3_8.4_8.5
+NEXT = CI_NEW_SHA_THEN_TARGETED_PROGRESS_BROWSER_EVIDENCE_THEN_INDEPENDENT_VISUAL_REVIEW
 ```

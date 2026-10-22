@@ -100,6 +100,25 @@ final class AssetContractTest extends TestCase
         self::assertStringNotContainsString('zoom:', $this->css);
     }
 
+    public function testUnfinishedCandidateMilestonesStayNeutral(): void
+    {
+        self::assertMatchesRegularExpression(
+            '/\.candidate-milestone-marker\s*\{[^}]*background:\s*#e3e7e5\s*;/s',
+            $this->css,
+            'Los hitos sin completar deben conservar una superficie neutra.',
+        );
+        self::assertStringNotContainsString(
+            '.candidate-milestone--recorded .candidate-milestone-marker',
+            $this->css,
+            'Tener un registro no debe simular una etapa completada.',
+        );
+        self::assertMatchesRegularExpression(
+            '/\.candidate-milestone--completed \.candidate-milestone-marker\s*\{[^}]*background:\s*var\(--brand-primary\)\s*;/s',
+            $this->css,
+            'Solo el estado realmente completado usa el marcador verde.',
+        );
+    }
+
     public function testCandidateSurfaceInheritsCanonicalSystemFont(): void
     {
         self::assertMatchesRegularExpression(
