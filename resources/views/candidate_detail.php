@@ -67,6 +67,10 @@ $humanDate = static function (mixed $value, bool $withTime = false): ?string {
     return $date->format($withTime ? 'd/m/Y · H:i' : 'd/m/Y');
 };
 
+$humanMoney = static function (mixed $amount): ?string {
+    return is_numeric($amount) ? '$ ' . number_format((float) $amount, 0, ',', '.') . ' COP' : null;
+};
+
 $birthDate = $humanDate($candidate['birth_date'] ?? null);
 $createdAt = $humanDate($candidate['created_at'] ?? null, true);
 $submittedAt = $humanDate($candidate['submitted_at'] ?? null, true);
@@ -143,9 +147,6 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
     <?php if ($activeSection === 'overview'): ?>
         <?php
         $coverPhotoId = is_int($coverPhotoId ?? null) && $coverPhotoId > 0 ? $coverPhotoId : null;
-        $humanMoney = static function (mixed $amount): ?string {
-            return is_numeric($amount) ? '$ ' . number_format((float) $amount, 0, ',', '.') . ' COP' : null;
-        };
         $milestones = [
             ['label' => 'Solicitud', 'verified' => $createdAt !== null, 'completed' => $submittedAt !== null, 'detail' => $createdAt, 'raw_date' => $candidate['created_at'] ?? null],
             ['label' => 'Información laboral', 'verified' => trim((string) ($candidate['employment_status'] ?? '')) !== '', 'completed' => false, 'detail' => null, 'raw_date' => null],
@@ -280,17 +281,53 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
         </section>
 
     <?php elseif ($activeSection === 'work'): ?>
+        <?php
+        $workStatus = trim((string) ($candidate['employment_status'] ?? ''));
+        $workEmployer = trim((string) ($candidate['employer_name'] ?? ''));
+        $workOccupation = trim((string) ($candidate['occupation'] ?? ''));
+        $workNotes = trim((string) ($candidate['employment_notes'] ?? ''));
+        $workIncome = $humanMoney($candidate['monthly_income'] ?? null);
+        $workHasFacts = $workStatus !== '' || $workEmployer !== '' || $workOccupation !== '';
+        ?>
         <section class="candidate-section" data-candidate-section-body="work">
-            <section class="content-card">
-                <div class="section-heading"><div><p class="eyebrow">Información laboral</p><h2>Información laboral</h2></div></div>
-                <dl class="account-details">
-                    <div><dt>Estado laboral</dt><dd><?= $escape($candidate['employment_status'] ?? '') ?></dd></div>
-                    <div><dt>Empresa</dt><dd><?= $escape($candidate['employer_name'] ?? '') ?></dd></div>
-                    <div><dt>Ocupación</dt><dd><?= $escape($candidate['occupation'] ?? '') ?></dd></div>
-                    <div><dt>Ingreso mensual</dt><dd><?= $escape($candidate['monthly_income'] ?? '') ?></dd></div>
-                    <div><dt>Notas</dt><dd><?= $escape($candidate['employment_notes'] ?? '') ?></dd></div>
-                </dl>
-            </section>
+            <div class="candidate-work-layout<?= $workIncome !== null ? ' candidate-work-layout--with-income' : '' ?>">
+                <section class="content-card candidate-card candidate-work-summary" aria-labelledby="candidate-work-title">
+                    <div class="candidate-summary-heading">
+                        <h2 id="candidate-work-title"><?= $candidateIcon('briefcase') ?>Resumen laboral</h2>
+                        <p class="muted">Información laboral declarada por el candidato</p>
+                    </div>
+                    <?php if (!$workHasFacts && $workIncome === null && $workNotes === ''): ?>
+                        <p class="empty-state">No se registró información laboral.</p>
+                    <?php elseif ($workHasFacts): ?>
+                        <div class="candidate-fact-grid candidate-work-facts">
+                            <?php if ($workStatus !== ''): ?>
+                                <div class="candidate-fact"><?= $candidateIcon('briefcase') ?><dl><dt>Estado laboral</dt><dd><?= $escape($workStatus) ?></dd></dl></div>
+                            <?php endif; ?>
+                            <?php if ($workEmployer !== ''): ?>
+                                <div class="candidate-fact"><?= $candidateIcon('building') ?><dl><dt>Empresa</dt><dd><?= $escape($workEmployer) ?></dd></dl></div>
+                            <?php endif; ?>
+                            <?php if ($workOccupation !== ''): ?>
+                                <div class="candidate-fact"><?= $candidateIcon('account') ?><dl><dt>Ocupación</dt><dd><?= $escape($workOccupation) ?></dd></dl></div>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+                </section>
+                <?php if ($workIncome !== null): ?>
+                    <section class="content-card candidate-card candidate-work-income" aria-labelledby="candidate-work-income-title">
+                        <h2 id="candidate-work-income-title"><?= $candidateIcon('wallet') ?>Ingresos declarados</h2>
+                        <dl class="candidate-work-money">
+                            <div><dt>Ingreso mensual</dt><dd><?= $escape($workIncome) ?></dd></div>
+                        </dl>
+                        <p class="candidate-work-income-context">Monto informado por el candidato. No constituye aprobación ni verificación de solvencia.</p>
+                    </section>
+                <?php endif; ?>
+            </div>
+            <?php if ($workNotes !== ''): ?>
+                <section class="content-card candidate-card candidate-work-notes" aria-labelledby="candidate-work-notes-title">
+                    <h2 id="candidate-work-notes-title">Observaciones laborales</h2>
+                    <p><?= nl2br($escape($workNotes)) ?></p>
+                </section>
+            <?php endif; ?>
         </section>
 
     <?php elseif ($activeSection === 'household'): ?>
