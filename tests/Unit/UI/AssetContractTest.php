@@ -97,6 +97,7 @@ final class AssetContractTest extends TestCase
         self::assertMatchesRegularExpression('/\.candidate-fact-grid\s*\{[^}]*gap:\s*14px 24px;[^}]*margin-top:\s*16px;/s', $this->css);
         self::assertMatchesRegularExpression('/\.candidate-card--progress\s*\{[^}]*gap:\s*9px;/s', $this->css);
         self::assertStringContainsString('.candidate-progress-footer', $this->css);
+        self::assertStringContainsString('.candidate-detail-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr); }', $this->css, 'Desktop property facts need the wider approved third column.');
         self::assertStringNotContainsString('zoom:', $this->css);
     }
 

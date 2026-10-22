@@ -726,7 +726,7 @@ ul { padding-left: 22px; }
     .candidate-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (min-width: 1024px) {
-    .candidate-detail-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .candidate-detail-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr); }
     .candidate-surface .app-shell { grid-template-columns: 212px minmax(0, 1fr); padding-bottom: 0; }
     .candidate-surface .desktop-sidebar { width: 212px; padding: 14px 12px; gap: 14px; }
     .candidate-surface .desktop-sidebar__brand { min-height: 42px; padding: 0 8px; }

@@ -10,19 +10,20 @@
 | Rama activa | `impl/cand-01-shell-overview-20261017` |
 | PR | [#45](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/45), OPEN / DRAFT / NOT_MERGED |
 | `main` observado | `243dea9c821645dd554cc5fdd66cb6c9a0d4f2ce`; volver a comprobar antes de escribir |
-| Último HEAD remoto acreditado (base de este microbloque) | `24a6918ee61d69b1cf8e53156abcb30acf833c27` |
-| CI exacto de la base | [#1162 / run 39703346438](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39703346438): SUCCESS PHP 8.3/8.4/8.5; no atribuirlo al nuevo cambio de hitos |
+| Último HEAD remoto acreditado (base del ajuste de columnas) | `d825248f03c788b0bd92a0c433bc510f59b87c43` |
+| CI exacto de la base | [#1163 / run 39715171344](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39715171344): SUCCESS PHP 8.3/8.4/8.5; el próximo cambio de columnas requiere CI propio |
 | Fase | CAND-01 / G3 — Solicitud, seis tarjetas en tres filas |
 | Browser QA | V9 cinco viewports tipografía; V12 escritorio/móvil ocho secciones y matriz 17, con foto ausente (HTTP 404 en staging). Fidelidad **RED_ESENCIAL_NOT_CERTIFIED** |
 | Tipografía V11 | Publicada en `24a6918e`; CI #1162 GREEN; no repetir V9. |
-| Microbloque visual actual | Eliminar estilo verde redundante de hitos `recorded` no completados; preservar marcador verde solo `completed` y leyenda de registro. Nuevo SHA/CI pendiente. |
+| Hitos (G3-PROGRESS-D1-02) | PUBLICADO, CI #1163 GREEN y Browser QA focal PASS; `completed` verde, otros cuatro hitos grises. |
+| Microbloque de diseño actual | En escritorio, tercera tarjeta del inmueble proporcionalmente mayor (`1fr 1fr 1.1fr`), sin modificar tablet/móvil; nuevo SHA/CI y comparación focal pendientes. |
 | Suite V9 | PHP 8.5.8: 682 tests, 8.017 aserciones, 0 fallos, 0 errores, 266 warnings, 2 skipped |
 | Focales V11 | PHP 8.5.8: 33/33 tests, 225 aserciones; lint y `composer validate --strict` válidos |
 | Fidelidad visual de CAND-01 | **RED_ESENCIAL_NOT_CERTIFIED** |
 | Owner UAT / merge / despliegue | NO autorizado |
 | Otros frentes | CAND-02 NOT_STARTED; R3/PR #33 FROZEN; PR #43 SUPERSEDED, DRAFT |
 
-**Importante:** CI #1162/run 39703346438 acredita exclusivamente `24a6918e` (fuente `system-ui`). La mejora visual de hitos de esta revisión requiere CI exacto del nuevo SHA; la evidencia V12 no acredita ese cambio futuro ni certifica paridad visual.
+**Importante:** CI #1163/run 39715171344 acredita exclusivamente `d825248f` (hitos ya corregidos). El ajuste de columnas desktop no está acreditado por esa CI. Evidencias G3-PROGRESS-D1-02 certifican solo progreso, no diseño global.
 
 **Orden de autoridad:** GitHub (HEAD real) → CI del SHA exacto → este checkpoint → SPEC/PLAN aprobados → AGENTS/README → handoffs y chats. Si hay contradicción, conciliar; nunca inventar un PASS.
 
@@ -65,7 +66,7 @@
 
 | Prioridad | Asunto | Acción correcta |
 | --- | --- | --- |
-| P0 | Microcorrección de semántica visual de hitos (`recorded` ≠ `completed`) | Quitar regla CSS redundante y añadir prueba causal al owner existente. CI triple y una comparación de progreso real en siguiente QA justificado, sin reabrir permisos/8 secciones. |
+| P0 | Proporciones de fila C del mockup (≈374/367/406 px vs actual 380/380/380) | En desktop ampliar la tercera columna con `1fr 1fr 1.1fr`; test en owner CSS, CI triple y una medición focal sin repetir 17 regiones. |
 | P0 | Diferencias visuales esenciales frente al mockup | Mantener `RED_ESENCIAL_NOT_CERTIFIED`; decisión independiente del owner antes de cualquier remediación |
 | P1 | Móvil/tableta: barra inferior fija cruza texto en scroll | V9 midió solapamiento transitorio de 72 px en 375×812, recuperable al final; no aplicar parche global sin causa/RED nuevo |
 | P1 | CSS de foco global `:focus-visible{scroll-margin-block:100px}` | Smoke de Propiedades, Contratos, login, catálogo, candidatos y diálogo Apps; no duplicar CSS sin reproducir defecto |
@@ -74,20 +75,21 @@
 
 ## 6. NEXT exacto y gates
 
-`NEXT=CI_NEW_SHA_THEN_TARGETED_PROGRESS_BROWSER_EVIDENCE_THEN_INDEPENDENT_VISUAL_REVIEW`
+`NEXT=CI_NEW_SHA_THEN_TARGETED_DESKTOP_DETAIL_GRID_MEASUREMENT_THEN_INDEPENDENT_VISUAL_REVIEW`
 
-El único cambio de producto de este microbloque es neutralizar el marcador de hitos registrados pero NO completados; conservar seis tarjetas, responsive, permisos y hitos verdaderamente completados. Esperar CI exacto y pedir Browser QA focal únicamente si es imprescindible para certificar estética. Mantener PR #45 Draft; no merge/deploy/CAND-02.
+El único cambio de producto de este microbloque es ajustar las proporciones desktop de las tres tarjetas inferiores para dar más espacio a información del inmueble. No se alteran las reglas tablet/móvil, permisos, estados ni estructura 1+2+3. Verificar CI exacto y comparar anchos/heights de la fila C en un solo viewport desktop cuando corresponda. Mantener PR #45 Draft; no merge/deploy/CAND-02.
 
 ## 7. Semáforo de recuperación
 
 ```text
 PR45 = OPEN_DRAFT_NOT_MERGED
 PR45_BRANCH = impl/cand-01-shell-overview-20261017
-REMOTE_BASE_HEAD = 24a6918ee61d69b1cf8e53156abcb30acf833c27
-BASE_CI = CI_1162_GREEN_PHP_8.3_8.4_8.5
+REMOTE_BASE_HEAD = d825248f03c788b0bd92a0c433bc510f59b87c43
+BASE_CI = CI_1163_GREEN_PHP_8.3_8.4_8.5
 V11_TYPOGRAPHY = PUBLISHED_VERIFIED
 G3_VISUAL_PROGRESS_FIX = REMOVE_RECORDED_GREEN_ONLY_KEEP_COMPLETED_GREEN
-G3_PROGRESS_NEW_CI = PENDING_NEW_SHA
+G3_PROGRESS_NEW_CI = CI_1163_GREEN_D1_VISUAL_PASS
+G3_DETAIL_GRID_NEW_CI = PENDING_NEW_SHA
 BROWSER_QA_V9 = 10_SCREENSHOTS_REUSABLE_FOR_TYPOGRAPHY_ONLY
 BROWSER_QA_V12 = 2_REAL_SCREENSHOTS_8_TABS_MISSING_MEDIA_404
 PERMISSIONS_V6 = PASS_NOT_RERUN
@@ -96,5 +98,5 @@ STAGING_V6_V9 = RETAINED_POLICY_RESTRICTION
 CAND02 = NOT_STARTED
 MAIN = DO_NOT_TOUCH
 HOSTINGER = DO_NOT_DEPLOY
-NEXT = CI_NEW_SHA_THEN_TARGETED_PROGRESS_BROWSER_EVIDENCE_THEN_INDEPENDENT_VISUAL_REVIEW
+NEXT = CI_NEW_SHA_THEN_TARGETED_DESKTOP_DETAIL_GRID_MEASUREMENT_THEN_INDEPENDENT_VISUAL_REVIEW
 ```
