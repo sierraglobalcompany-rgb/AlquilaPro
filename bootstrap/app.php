@@ -544,6 +544,7 @@ return static function (array $settings): App {
                 'candidates' => $candidates,
                 'candidate_documents' => $candidateDocuments,
                 'properties' => $properties,
+                'unit_media' => $unitMedia,
                 'screening' => $screening,
                 'contracts' => $contracts,
             ]);

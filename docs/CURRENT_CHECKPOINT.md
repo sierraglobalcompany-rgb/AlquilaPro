@@ -1,344 +1,98 @@
 # AlquilaPro — CURRENT CHECKPOINT
 
-Fecha: 2026-10-17  
-Propósito: **puntero operativo único de continuidad, sin ruido histórico**.
+**Corte:** 2026-10-22, después de CAND01-QA-CIERRE-02. **Rol:** checkpoint operativo canónico, no historial de cada commit. Orden de autoridad: HEAD GitHub → CI de SHA exacto → este checkpoint → SPEC/AGENTS → evidencias; confirmar HEAD antes de actuar.
 
-> GitHub + CI son autoridad técnica. Este archivo resume el estado vivo; PRs/commits conservan el detalle forense.
+## 1. Estado comprobado y autoridad
 
-## 1. Leyes y convención operativa
+| Campo | Estado verificado (antes de este commit de documentación) |
+| --- | --- |
+| Repositorio / rama | `sierraglobalcompany-rgb/AlquilaPro` · `impl/cand-01-shell-overview-20261017` |
+| PR #45 | [OPEN / DRAFT / NOT MERGED](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/45); GitHub informa mergeable/clean, **no es aprobación para fusionar** |
+| Código exacto auditado | `aa9b2619d34451d406f05a019842da81f458d7a1` |
+| `main` observado | `243dea9c821645dd554cc5fdd66cb6c9a0d4f2ce`; NO modificar |
+| CI del código auditado | [#1164 / run 39723814465](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39723814465) SUCCESS PHP 8.3 / 8.4 / 8.5 |
+| CAND-01 Solicitud | Dirección visual **APROBADA por el owner**, QA focal y residual **PASS**, fidelidad global **NO certificada** |
+| Merge / Hostinger | NO autorizados / NO desplegado |
+| Próximas fases | CAND-02 NOT_STARTED; R3/PR #33 FROZEN; PR #43 SUPERSEDED |
 
-- **KISS**: A → B; simple, eficiente, optimizado y eficaz; sin arquitectura innecesaria.
-- **Cero Ruido**: `ELIMINAR → UNIR/CONVERGER → SIMPLIFICAR → MEJORAR/OPTIMIZAR → AGREGAR`.
-- **Anti-parche**: `REPRODUCE → ROOT CAUSE → OWNER → DUPLICACIÓN → RED → CAUSAL RED → MINIMAL GREEN → RETIRAR SUPERSEDED → REGRESSION`.
-- **Human-First / Diseño**: persona > modelo de datos; lenguaje humano; jerarquía clara; No Infinite Excel; accesibilidad, responsive y Browser QA real como gates.
-- **Contrato visual aprobado (decisión explícita del owner 2026-10-19)**: el mockup `01_SOLICITUD.png` se **implementa**, no se usa como inspiración. No sustituir estética, composición, iconografía, jerarquía o densidad aprobadas por una versión "más simple". Sólo se omiten o adaptan **datos/acciones inexistentes**, justificando la excepción específica y conservando el resto del diseño.
-- **No claim without evidence**: SHA exacto + CI para GREEN técnico; Browser real para certificación visual.
-- Merge y deployment son gates separados.
-- Deployment: **NOT AUTHORIZED**.
-- **Hostinger sólo al final:** no preparar ni publicar previews, hPanel, DNS, bases o despliegues durante desarrollo. Instalar únicamente el sistema completo tras QA integral + UAT y autorización final separada del owner.
-- Convención del owner: `continua` autoriza ejecutar el siguiente gate inequívocamente preparado —incluido merge— sólo si sigue GREEN, sin drift y dentro del alcance ya auditado.
-- `checkpoint y para` = persistir/verificar checkpoint y detenerse.
+**Nota de temporalidad:** este documento se publica mediante un **nuevo commit exclusivamente documental**. Su nuevo SHA tendrá CI propio; las capturas y hashes evidencian el **código de producto sin cambios** de `aa9b2619d34451d406f05a019842da81f458d7a1`, no se deben atribuir falsamente a capturas de otro SHA.
 
-## 2. Autoridad viva y base integrada
+## 2. Leyes y forma de trabajo
 
-Orden operativo:
+1. **KISS:** simple, eficiente, optimizado y eficaz. Reutilizar PHP SSR/Slim4/PDO/MySQL-MariaDB; no SPA, servicios paralelos, tablas o abstracciones sin evidencia de necesidad.
+2. **Cero ruido:** `ELIMINAR → UNIR/CONVERGER → SIMPLIFICAR → MEJORAR/OPTIMIZAR → AGREGAR`. Antes de eliminar, demostrar que el comportamiento queda cubierto y que no se pierden contratos ni pruebas.
+3. **Anti-parche:** `REPRODUCIR → CAUSA RAÍZ → OWNER → DUPLICADOS → RED CAUSAL → GREEN MÍNIMO → RETIRAR SOBRANTES → REGRESIONES`. No acumular reglas CSS laterales ni debilitar tests.
+4. **Diseño/Human-First:** UI moderna, móvil y entendible; no Infinite Excel ni estados, acciones o datos inventados. El sistema de diseño debe respetar la SPEC y la referencia visual aprobada. La instalación/versionado exacto de UI UX Pro Max no está demostrado en el árbol de esta rama; no presumirlo ni instalar a ciegas.
+5. **Ley complementaria de fidelidad verificable:** el PNG aprobado es contrato visual, no inspiración. Comparar contra captura REAL del SHA servido, geometría y 17 regiones, evitando autoaprobar por DOM, HTTP 200, CI o encaje básico. Excepciones funcionales requieren soporte en SPEC/rutas y no justifican desfigurar el resto del diseño.
 
-1. GitHub del repositorio canónico.
-2. CI del SHA exacto.
-3. este checkpoint.
-4. SPEC / PLAN aprobado aplicable.
-5. `AGENTS.md` + README.
-6. handoffs/chats sólo como recuperación.
+**Interacción:** ChatGPT resuelve análisis, contrato, código remoto y verificación de GitHub directamente siempre que sea seguro. Usar Codex **al final y sólo** cuando el entorno local, base de datos o Browser QA real lo requieran. Si es imprescindible, un único lote autocontenido y auditable; evitar ping-pong. `continua` ejecuta el siguiente gate preparado, pero jamás implica ignorar un RED ni autorizar despliegue.
 
-Repositorio canónico: `sierraglobalcompany-rgb/AlquilaPro`.
+## 3. Contrato actual de CAND-01
 
-```text
-CAND01_PRODUCT_BASE = 7caf82e910edec4153f5cc49dcfb404f8f372b37
-MAIN_AT_PR45_OPEN = 7caf82e910edec4153f5cc49dcfb404f8f372b37
-MAIN_CURRENT = REVALIDATE_LIVE_BEFORE_ACTION
-PR_44 = MERGED / CLOSED
-DEPLOYMENT = NOT_AUTHORIZED
-```
+- **SPEC aprobada:** `docs/superpowers/specs/2026-10-17-candidates-human-first-redesign.md`.
+- **Baseline:** `docs/design/CANDIDATES_VISUAL_BASELINE_2026-10-17.md`; imagen `01_SOLICITUD.png`, SHA256 `8f7b16a46cb9decf905c218a35e5535aa3acad29041f02840a93c5228c103d15`.
+- **Arquitectura:** GET `/admin/candidates/{id}?section=overview|work|household|references|documents|screening|contracts|manage`; una sola vista SSR activa.
+- **Owners reales:** `app/Candidates/routes.php`, `resources/views/candidate_detail.php`, `app/UI/HumanLabels.php`, `resources/views/layouts/app.php`, `assets/app.css`; services ya existentes para propiedades, medios, candidatos, seguros y contratos. No crear una segunda autoridad.
+- **Permisos:** `candidates.view` no implica `properties.view`; foto/canon/dirección privados fail-closed. Secciones `contracts`/`manage` sólo con sus permisos; nunca presentar `Sin registro` cuando el resultado es `Sin acceso`.
+- **No inventar:** editar candidato, enviar mensaje, búsqueda global, campana, menú con acciones ficticias, `Continuar evaluación` o porcentaje de progreso sin endpoint/contrato. Las exclusiones se derivan de SPEC; cada excepción visual conserva el resto de composición y jerarquía.
+- **Layout esencial:** fila A (1 resumen/estado), fila B (2 progreso + consulta), fila C (3 datos personales/contacto/inmueble). No ocultar ni suprimir tarjetas para simular fit.
 
-PR #44 integró la baseline visual aprobada, la spec y el plan de implementación de Candidatos. `main` puede avanzar después por commits/merges exclusivamente documentales sin cambiar la base funcional de CAND-01; por eso este checkpoint **no fija como perpetuo** el HEAD vivo de `main`: debe revalidarse en GitHub antes de actuar.
+## 4. Evidencia G3 heredada y cambios nuevos
 
-## 3. Trabajo activo — CAND-01 / PR #45
+Los paquetes históricos se conservan en Git/Library y la descripción del PR, no se duplican aquí. **Gates cerrados y evidencia única**:
 
-```text
-ACTIVE_BLOCK = CAND-01
-PR_45 = OPEN / DRAFT / NOT_MERGED
-PR_45_BRANCH = impl/cand-01-shell-overview-20261017
-PR_45_BASE = 7caf82e910edec4153f5cc49dcfb404f8f372b37
-PR_45_HEAD = a186b0ab765a9547def7501905486f18159c6982
-PR_45_CHANGED_FILES = 11
-PR_45_COMMITS = 19
-```
+| Gate | Prueba | Veredicto acotado |
+| --- | --- | --- |
+| Autenticación/permisos V6 | `candidates.view` candidato 200, medio privado 403; `+properties.view` medio 200; ZIP SHA-256 `0131d7c8ac73d6ad9f19d3561eed34907a24f5398dc2d93e07d4a83308fb234e` | PASS |
+| Tipografía V9/V11 | Antes/después 5 viewports; fuente `system-ui` heredada del ERP; V9 ZIP SHA-256 `4a0f2039c6fc13018ed91909aa204b9d0b6a9f6abb915cb931e3ef36afc050a2` | PASS causal |
+| Ocho secciones / responsive V12 | 8 rutas GET 200, desktop 1448×1086 y móvil 375×812; ZIP SHA-256 `f6e9d090bee5b7938866e56f7eb1d5e978ea81b810cdae82541ef480adf2b89b` | PASS funcional/estructural, no 17/17 visual |
+| Hitos de progreso D1 | PNG SHA-256 `ad22f76c9cfde260d1cbccc726226df786528fe97565d7af92c00278bf0e6eb9`; sólo `completed` verde; CI #1163 | PASS focal |
+| Fila C desktop | PNG SHA-256 `3a53702e043967008db88b3304688d209e0c23d586b9ba8d47eaace74facf916`; anchos 362.837/362.837/399.125 px, gaps 16/16 px, termina en y=1072.35; CI #1164 | PASS focal |
+| QA residual final A/B/C | ZIP `CAND01_QA_RESIDUAL_20261022.zip` SHA-256 `ea135eac4b574055565e32f2764cf9c59ddee05a44ca89b730a21e8760220c8a`; CRC PASS; JSON y dos PNG íntegros | PASS A/B/C |
+| CI producto actual | #1164 exacto para `aa9b2619d34451d406f05a019842da81f458d7a1`, tres versiones PHP SUCCESS | GREEN |
 
-Alcance implementado:
+**QA residual A/B/C detallado:** A: menú `768×1024` abierto con 8 enlaces y estado activo correcto, sin overflow; B: en `375×812`, contenido final y=715.85 antes de barra y=740, botón Administrar alcanzable con 7 Tabs y foco visible, sin POST; C: foto sintética privada GET autenticado `200 image/jpeg`, 182879 bytes, SHA-256 `5e804b0dfcebbc26fdbbf612ba86d8bbf4633533909916b5c43a25ecfbbde74d`, naturalWidth 1280. La foto se restauró **únicamente en staging QA**, sin cambiar producto ni datos de negocio.
 
-- shell único del candidato;
-- navegación contextual por `?section=`;
-- exactamente una sección activa;
-- `overview` / Solicitud como default;
-- permisos fail-closed para `contracts` y `manage`;
-- navegación compacta móvil y tabs desde desktop amplio;
-- estado humano + descripción humana;
-- eliminación de redundancias de estado/unidad/cards;
-- wrapping de textos largos;
-- sin SPA, nuevo JS, migration, servicio, API o dependencia.
+**La Dirección visual de Solicitud está aprobada por el owner.** Eso no aprueba las siete pantallas secundarias ni certifica todas las 17 regiones.
 
-Owners conservados:
+## 5. Bloqueos y decisiones pendientes
 
-```text
-CandidateService
-CandidateDocumentService
-ScreeningService
-ContractService
-Permissions
-HumanLabels
-View + candidate_detail.php
-assets/app.css
-```
+| Tema | Dictamen y siguiente acción |
+| --- | --- |
+| Producto, permisos, CI, ocho rutas y QA focal/residual | **GREEN dentro del alcance medido**; no repetir sin causa nueva |
+| `VISUAL_GLOBAL` | **RED_ESENCIAL_NOT_CERTIFIED**; no declarar 17/17 PASS. El owner aprobó dirección de Solicitud, no certificación de fidelidad completa |
+| Accesibilidad integral | Foco y semántica básica PASS en recorridos observados; **WCAG integral/lector de pantalla NO certificados**. La Definition of Done del **módulo Candidatos entero** (§21 SPEC) excede CAND-01 Solicitud |
+| Barra fija móvil | Solapamiento temporal de contenido durante desplazamiento, sin último elemento o foco permanentemente cubiertos en gate B; registrar reserva, **sin parche CSS automático** |
+| Foto QA histórica 404 | Falta de bytes en staging V12, corregida al reponer JPEG sintético aislado y obtener 200; no defecto demostrado del producto |
+| CAND-02..CAND-08 | Mockups originales disponibles y backend existente; trabajo visual posterior, NO iniciado ni autorizado para este PR |
 
-No crear presenter/dashboard service ni arquitectura paralela.
+**Sin otros P0 de código demostrados.** No sumar capas, servicios, rutas, estilos ni tests por rutina.
 
-## 4. Evidencia CAND-01
+## 6. NEXT exacto y gates
 
-TDD / reparación:
+`NEXT=OWNER_FINAL_CAND01_ACCEPTANCE_DECISION`
+
+1. Presentar al owner en un dictamen único: **QA residual PASS**, **dirección visual de Solicitud aprobada**, y **fidelidad/accessibilidad completas sin certificar**. La aceptación de CAND-01 con reservas debe ser **explícita**.
+2. Si el owner exige `VISUAL_GLOBAL=PASS`, identificar únicamente las regiones de imagen que aún carecen de equivalencia o justificación; autorizar QA causal y acotado. No repetir V6/V9/V12/fila C/progreso/A-B-C.
+3. Cualquier merge del PR #45 requiere autorización explícita y CI del nuevo HEAD documental exacto. Hostinger queda bloqueado y CAND-02 no empieza por inferencia.
+
+**Leyes:** KISS (simple y eficaz), cero ruido (eliminar/unir/simplificar con evidencia), antiparches (RED→causa→GREEN + regresiones), Human-First/UX/UI Pro (sin capacidades falsas), fidelidad visual verificable (no autodeclarar PASS).
+
+## 7. Semáforo de recuperación
 
 ```text
-RED_ORIGINAL = ee79d6714ee0b77bf6ec7cd7c77184d673608780
-GREEN_CURRENT = 95fcbf472bf3caedbfccc23867585ee0644122f0
+PR45 = OPEN_DRAFT_NOT_MERGED
+PR45_BRANCH = impl/cand-01-shell-overview-20261017
+AUDITED_PRODUCT_HEAD = aa9b2619d34451d406f05a019842da81f458d7a1
+PRODUCT_CI = 1164_SUCCESS_PHP_8.3_8.4_8.5
+CAND01_DIRECTION_VISUAL = OWNER_APPROVED
+CAND01_QA_RESIDUAL = PASS
+CAND01_TECHNICAL_GATES = PASS_WITH_SCOPE
+VISUAL_GLOBAL = RED_ESENCIAL_NOT_CERTIFIED
+ACCESSIBILITY_FULL = NOT_CERTIFIED
+PR45_MERGE_AUTHORIZATION = NO
+HOSTINGER_DEPLOY = NO
+CAND02 = NOT_STARTED
+NEXT = OWNER_FINAL_CAND01_ACCEPTANCE_DECISION
 ```
 
-Defectos corregidos por RED→GREEN durante CAND-01:
-
-- navegación duplicada;
-- estado repetido;
-- unidad repetida;
-- exceso de cards;
-- targets pequeños;
-- `<main>` anidado;
-- wrapping de textos largos.
-
-CI exact-head:
-
-```text
-CI_RUN_NUMBER = 1121
-CI_RUN_ID = 39044229519
-PHP_8_3 = SUCCESS
-PHP_8_4 = SUCCESS
-PHP_8_5 = SUCCESS
-TESTS = 666
-FAILURES = 0
-ERRORS = 0
-SKIPPED = 1
-```
-
-Checkpoint durable:
-
-```text
-checkpoint/cand-01-ci-green-browser-pending-20261017
-→ 95fcbf472bf3caedbfccc23867585ee0644122f0
-```
-
-Estado del gate:
-
-```text
-CAND_01_AUTOMATED_QA = GREEN
-CAND_01_BROWSER_QA = G1_GREEN_G2_PENDING
-CAND_01_HUMAN_FIRST_FINAL = NOT_CERTIFIED
-PR_45_MERGE = NO
-CAND_02 = NOT_STARTED
-```
-
-**Un test verde o contratos CSS no certifican UX.** No mergear PR #45 sin Browser QA real de la **versión G2** y aprobación visual explícita del owner. G1 pasó QA técnico pero **fue rechazado visualmente** por su falta de fidelidad al mockup.
-
-**Auditoría visual V2 — 2026-10-18/19 (evidencia nueva):** el paquete externo `AlquilaPro-Auditoria-Completa-2026-10-18.zip` contiene **889 PNG** (352 escritorio 1440×900 y 537 móvil emulado 390×844), con integridad de archivos/hashes verificada. Hay capturas de Candidatos y otras áreas, pero **no certificación integral**, ni prueba independiente de que el SHA servido fuese el PR45; faltan 375×812 y 768×1024, permisos/teclado/foco/acciones y aceptación visual final. Se confirmó **divergencia de composición en CAND-01/overview** contra el mockup `01_SOLICITUD.png`; otras siete secciones son microbloques CAND02–08 todavía planificados, no regresiones imputables a CAND-01. La portada pública también difiere del baseline, pero R3/PR33 continúa FROZEN. Los análisis externos `ALQUILAPRO_AUDITORIA_FORENSE_V2_2026-10-19.md`, `ALQUILAPRO_PLAN_MAESTRO_V2_DETALLADO_2026-10-19.md` y la matriz CSV documentan el detalle; **no** sustituir la spec aprobada ni integrar sus ejemplos sin verdad del backend.
-
-Intentos documentados (2026-10-17): Codex/Antigravity y Work no consiguieron una instancia autorizada y observable; **cero capturas reales de producto**. El paquete SERVER_READY de PR #45 se construyó y auditó localmente, pero no hubo rehearsal, preview ni publicación. Los preflights de Hostinger quedan **SUSPENDIDOS por decisión del owner**, no son el siguiente gate. No repetir la misma ruta bloqueada ni sustituir Browser QA por inferencias estáticas.
-
-## 5. Fidelidad al mockup y Browser QA pendiente — CAND-01
-
-**G1 técnico cerrado / visual REJECTED por el owner (2026-10-19):** `PR45@a186b0ab765a9547def7501905486f18159c6982`, CI manual #1131 run `39204913575` SUCCESS en PHP 8.3/8.4/8.5; 670 tests, 7893 assertions, 0 failures, 1 skipped; 31 capturas reales del HEAD G1 y 2 capturas de baseline recreada; evidencia de SHA servido en ZIP. G1 resolvió fallos estructurales y foco móvil, pero **no reprodujo sidebar/topbar/hero/tabs/panel verde/card-grid/densidad del mockup aprobado**. `OWNER_VISUAL_APPROVAL=REJECTED_G1`, `HUMAN_FIRST_FINAL=NOT_CERTIFIED`; no merge. G2 es la corrección obligatoria de fidelidad: `ALQUILAPRO_CODEX_LUNA_G2_FIDELIDAD_MOCKUP_OBLIGATORIA_2026-10-19.md` (prompt externo), acompañado de `01_SOLICITUD.png` exacto. RED causal → GREEN con owners existentes → CI exact HEAD 8.3/8.4/8.5 → Browser QA de G2 a 375/390/768/1440 → comparación completa → **owner review**. Preservar 7 secciones legacy hasta CAND02–08, PR43 supersedido, R3 congelado y Hostinger al final.
-
-Viewports obligatorios:
-
-```text
-1440×900
-768×1024
-375×812
-```
-
-Validar con instancia real renderizada:
-
-- carga correcta;
-- shell único;
-- navegación real entre secciones;
-- una sola sección activa;
-- fallback seguro de sección inválida/no autorizada;
-- permisos/capabilities;
-- comparación contra baseline `01_SOLICITUD.png`;
-- responsive y ausencia de overflow;
-- teclado, foco visible y targets cómodos;
-- consola/network sin errores relevantes;
-- comprensión humana y jerarquía visual.
-
-Si aparece defecto:
-
-`REPRODUCE → ROOT CAUSE → OWNER → DUPLICACIÓN → RED → VERIFY RED → MINIMAL GREEN → REGRESSION → CI FRESCO → BROWSER QA OTRA VEZ`.
-
-## 6. Diseño aprobado de Candidatos
-
-Arquitectura:
-
-```text
-GET /admin/candidates/{id}?section=<key>
-```
-
-Keys:
-
-```text
-overview
-work
-household
-references
-documents
-screening
-contracts
-manage
-```
-
-Regla de no redundancia:
-
-```text
-Nombre + estado + unidad -> shell
-Identidad/contacto       -> Solicitud
-Trabajo                  -> Información laboral
-Hogar/mascotas           -> Ocupantes y mascotas
-Referencias              -> Referencias
-Archivos                 -> Documentos
-Aseguradora              -> Estudio de aseguradora
-Contratos                -> Contratos
-Acciones sensibles       -> Administrar
-```
-
-Mockups mandan en arte/jerarquía/densidad; backend + permisos mandan en funciones. No inventar scores, ratings, mensajería, firmas, historial, pre-aprobación, datos estructurados de ocupantes/mascotas ni acciones inexistentes.
-
-## 7. Spec / plan — estado documental
-
-La spec `docs/superpowers/specs/2026-10-17-candidates-human-first-redesign.md` fue **aprobada por el owner el 2026-10-17** y su plan posterior ya registra esa aprobación.
-
-El drift puramente documental del header/final de la spec fue cerrado por PR #47, sin modificar el contrato técnico/UX.
-
-```text
-SPEC_EFFECTIVE_STATUS = OWNER_APPROVED
-SPEC_HEADER_DRIFT = CLOSED
-SPEC_STATUS_CONVERGENCE_PR = 47_MERGED
-SPEC_STATUS_CI = 1124_GREEN_8_3_8_4_8_5
-TECHNICAL_CONTRACT_CHANGE = NO
-```
-
-No reabrir este drift salvo contradicción nueva y demostrable entre la spec, el plan y la verdad viva.
-
-## 8. PR #43 — evidencia supersedida
-
-```text
-PR_43 = OPEN / DRAFT / DO_NOT_MERGE
-PR_43_HEAD = e9594ef1e431eff2f3fc3193bb16a4533a1820af
-HF_P1D_TECHNICAL_GREEN = YES
-HF_P1D_PRODUCT_DESIGN_APPROVAL = REJECTED_FOR_DETAILS_STACK
-```
-
-Preservar su evidencia técnica/Browser histórica. **No reutilizar la solución de siete `<details>` como dirección visual.** Lección: colapsar un Excel no lo vuelve Human-First.
-
-## 9. R3 / PR #33
-
-```text
-PR_33 = OPEN / DRAFT / FROZEN / NOT_MERGED
-PR_33_HEAD = 845295c777151216655b7a7866bc0dc9d93f3e2e
-R3_FUNCTIONAL = GREEN_HISTORICAL
-R3_BROWSER_QA = BLOCKED / NOT_CERTIFIED
-R4 = NOT_STARTED
-```
-
-No usar Browser QA de otra fase para certificar R3. No descongelar R3 por inferencia.
-
-## 10. Gobernanza pendiente
-
-Gaps conocidos en `main`:
-
-```text
-docs/ERP_HUMAN_FIRST_UI_UX_MASTER_SKILL.md
-design-system/alquilapro/MASTER.md
-.github/pull_request_template.md
-.github/skills/erp-human-first-ui-ux/SKILL.md
-```
-
-Master Human-First V2.1 exacto respaldado externamente:
-
-```text
-SHA256 = 55265c92b7a49a4ac2ac976afb6789074b5f95ff5760f6d08b7b1d0e817f6940
-```
-
-No resumir, truncar ni fragmentar el Master para evadir bloqueos de seguridad.
-
-`main` fue observado sin branch protection/required checks activos; no afirmar lo contrario sin nueva evidencia.
-
-## 11. Próximos gates exactos
-
-Orden obligatorio:
-
-1. convergencia documental de checkpoint + estado formal de la spec: **CLOSED**;
-2. **G2 FIDELIDAD MOCKUP APROBADO**: ejecutar reparación visual de CAND01 Solicitud en PR #45 contra `01_SOLICITUD.png` mediante RED causal, GREEN mínimo y, si es necesario, ajuste del layout compartido con regresión transversal. No inventar botones/funciones; la estética del shell existente no justifica diferencias visuales. Repetir CI del HEAD G2 y Browser QA real 375/390/768/1440, SHA servido, accesibilidad/roles/capturas. Presentar al owner para aprobación visual explícita;
-3. sólo con Browser GREEN + Human-First CERTIFIED + HEAD exacto + CI requerido + reviews limpios + owner gate: merge PR #45;
-4. verificar `main` post-merge y persistir checkpoint;
-5. abrir CAND-02.
-
-Microbloques posteriores:
-
-```text
-CAND-02 Información laboral
-CAND-03 Ocupantes y mascotas
-CAND-04 Referencias
-CAND-05 Documentos
-CAND-06 Estudio de aseguradora
-CAND-07 Contratos
-CAND-08 Administrar + convergencia de transiciones
-CAND-09 Lista Candidatos — visual, sin HF-P2A
-```
-
-Cada bloque:
-
-`TRUTH → UX CONTRACT → RED → VERIFY RED → MINIMAL GREEN → FOCAL → FULL SUITE → CI 8.3/8.4/8.5 → BROWSER QA → HUMAN-FIRST → CHECKPOINT → OWNER GATE → MERGE`.
-
-No abrir el siguiente antes de cerrar el anterior.
-
-Backlog posterior, no absorber ahora:
-
-- HF-P1E obligations disclosure;
-- HF-P1F tenant portal IA;
-- HF-P2A candidates pagination/filter;
-- HF-P2B feedback consistency.
-
-## 12. Recuperación rápida
-
-Al abrir un chat/sesión nueva:
-
-1. leer este checkpoint;
-2. revalidar `main` en GitHub;
-3. confirmar PR #45 + HEAD + CI #1121;
-4. confirmar PR #43 supersedido y PR #33 frozen;
-5. cargar la spec/plan de Candidatos y el Master Human-First exacto;
-6. aplicar KISS + Cero Ruido + Anti-parche + Human-First;
-7. no mergear PR #45 mientras falten Browser QA de G2 y aprobación Human-First explícita del owner; el Browser QA técnico G1 fue GREEN pero el diseño G1 fue rechazado;
-8. deployment sigue **NOT AUTHORIZED**; **Hostinger es la última fase**, tras completar producto, QA integral y UAT aprobado por el owner.
-
-## 13. Estado resumido
-
-```text
-REPO = sierraglobalcompany-rgb/AlquilaPro
-CAND01_PRODUCT_BASE = 7caf82e910edec4153f5cc49dcfb404f8f372b37
-MAIN_CURRENT = REVALIDATE_LIVE_BEFORE_ACTION
-ACTIVE_WORK = CAND-01
-PR_45_HEAD = a186b0ab765a9547def7501905486f18159c6982
-PR_45_CI = 1131_GREEN_8_3_8_4_8_5_G1
-CAND_01_AUTOMATED_QA = GREEN
-CAND_01_BROWSER_QA = G1_GREEN_G2_PENDING
-CAND_01_HUMAN_FIRST_FINAL = NOT_CERTIFIED
-PR_43 = DRAFT_DO_NOT_MERGE_VISUAL_SUPERSEDED
-PR_33_R3 = FROZEN_BROWSER_BLOCKED
-R4 = NOT_STARTED
-DEPLOYMENT = NOT_AUTHORIZED
-HOSTINGER_PHASE = FINAL_ONLY_AFTER_COMPLETE_SYSTEM_AND_OWNER_UAT
-REMOTE_QA_PREVIEW = SUSPENDED_BY_OWNER
-VISUAL_AUDIT_V2 = 889_PNG_INTEGRITY_VERIFIED_MISMATCH_CONFIRMED
-G1_SERVED_SHA = EVIDENCE_REPORTED_VERIFIED_BY_CODEX
-G2_SERVED_SHA = MUST_VERIFY_FRESH
-G1_VIEWPORTS = 375x812_390x844_768x1024_1440x900
-G2_VIEWPORTS = RECHECK_REQUIRED_AFTER_CHANGES
-G1_VISUAL_GATE = REJECTED_BY_OWNER_MOCKUP_FIDELITY
-G2_TARGET = IMPLEMENT_01_SOLICITUD_APPROVED_MOCKUP_WITH_REAL_BACKEND
-CAND01_VISUAL_GATE = RED_G2_REQUIRED_OWNER_APPROVAL
-NEXT_SAFE_ACTION = G2_FIDELITY_IMPLEMENTATION_RED_FIRST_PR45
-```

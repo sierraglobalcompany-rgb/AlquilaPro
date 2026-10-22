@@ -16,6 +16,7 @@ $title = $pageTitle !== '' ? $pageTitle . ' · ' . $branding['app_name'] : $bran
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title><?= $escape($title) ?></title>
+    <link rel="icon" type="image/svg+xml" href="<?= $escape($basePath) ?>/assets/favicon.svg">
     <link rel="stylesheet" href="<?= $escape($basePath) ?>/assets/app.css">
 </head>
 <body class="public-page" style="--brand-primary: <?= $escape($branding['primary_color']) ?>;">

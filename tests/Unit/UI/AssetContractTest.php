@@ -38,6 +38,17 @@ final class AssetContractTest extends TestCase
         self::assertStringContainsString('@media (prefers-reduced-motion: reduce)', $this->css);
     }
 
+    public function testBottomNavUsesOpaqueSurfaceBackground(): void
+    {
+        self::assertMatchesRegularExpression('/\.bottom-nav\s*\{([^}]*)\}/s', $this->css, 'The shared bottom navigation must have an explicit background owner.');
+        preg_match('/\.bottom-nav\s*\{([^}]*)\}/s', $this->css, $matches);
+        self::assertArrayHasKey(1, $matches);
+        self::assertMatchesRegularExpression('/background\s*:\s*var\(--color-surface\)\s*;/i', $matches[1]);
+        preg_match('/background\s*:\s*([^;]+)\s*;/i', $matches[1], $background);
+        self::assertArrayHasKey(1, $background);
+        self::assertStringNotContainsString('transparent', strtolower($background[1]));
+    }
+
     public function testCssDefinesVisibleFocusAndMinimumTouchTarget(): void
     {
         self::assertStringContainsString(':focus-visible', $this->css);
@@ -53,6 +64,77 @@ final class AssetContractTest extends TestCase
         );
     }
 
+    public function testCandidateNavigationVariantsAreMutuallyExclusiveAtTheShellBreakpoint(): void
+    {
+        self::assertMatchesRegularExpression('/\.candidate-tabs\s*\{[^}]*display:\s*none\s*;/s', $this->css);
+        self::assertMatchesRegularExpression('/\.candidate-section-menu\s*\{[^}]*display:\s*block\s*;/s', $this->css);
+        self::assertMatchesRegularExpression('/@media \(min-width: 1200px\)\s*\{\s*\.candidate-tabs\s*\{[^}]*display:\s*block\s*;\s*\}\s*\.candidate-section-menu\s*\{[^}]*display:\s*none\s*;/s', $this->css);
+    }
+
+    public function testCandidateNavigationPreservesTheExistingTouchTargetMinimum(): void
+    {
+        foreach (['.candidate-tab', '.candidate-section-menu > summary', '.candidate-section-menu__link'] as $selector) {
+            self::assertMatchesRegularExpression('/' . preg_quote($selector, '/') . '\s*\{[^}]*min-height:\s*48px\s*;/s', $this->css);
+        }
+    }
+
+    public function testEveryFocusedControlReservesSpaceForFixedNavigation(): void
+    {
+        self::assertMatchesRegularExpression(
+            '/:focus-visible\s*\{[^}]*scroll-margin-block:\s*100px\s*;/s',
+            $this->css,
+            'Native keyboard focus must scroll every control clear of the fixed bars, not just candidate menu links.',
+        );
+    }
+
+    public function testCandidateDesktopDensityUsesCompactLayoutWithoutZoomOrHiddenCards(): void
+    {
+        // Guard the previously measured sources of 234px of extra document height.
+        // This does NOT certify the rendered mockup: Browser QA at 1448x1086 is mandatory.
+        self::assertMatchesRegularExpression('/\.candidate-page\s*\{[^}]*gap:\s*14px;/s', $this->css);
+        self::assertMatchesRegularExpression('/\.candidate-back\s*\{[^}]*min-height:\s*44px;/s', $this->css);
+        self::assertMatchesRegularExpression('/\.candidate-card\s*\{[^}]*padding:\s*18px;/s', $this->css);
+        self::assertMatchesRegularExpression('/\.candidate-fact-grid\s*\{[^}]*gap:\s*14px 24px;[^}]*margin-top:\s*16px;/s', $this->css);
+        self::assertMatchesRegularExpression('/\.candidate-card--progress\s*\{[^}]*gap:\s*9px;/s', $this->css);
+        self::assertStringContainsString('.candidate-progress-footer', $this->css);
+        self::assertStringContainsString('.candidate-detail-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr); }', $this->css, 'Desktop property facts need the wider approved third column.');
+        self::assertStringNotContainsString('zoom:', $this->css);
+    }
+
+    public function testUnfinishedCandidateMilestonesStayNeutral(): void
+    {
+        self::assertMatchesRegularExpression(
+            '/\.candidate-milestone-marker\s*\{[^}]*background:\s*#e3e7e5\s*;/s',
+            $this->css,
+            'Los hitos sin completar deben conservar una superficie neutra.',
+        );
+        self::assertStringNotContainsString(
+            '.candidate-milestone--recorded .candidate-milestone-marker',
+            $this->css,
+            'Tener un registro no debe simular una etapa completada.',
+        );
+        self::assertMatchesRegularExpression(
+            '/\.candidate-milestone--completed \.candidate-milestone-marker\s*\{[^}]*background:\s*var\(--brand-primary\)\s*;/s',
+            $this->css,
+            'Solo el estado realmente completado usa el marcador verde.',
+        );
+    }
+
+    public function testCandidateSurfaceInheritsCanonicalSystemFont(): void
+    {
+        self::assertMatchesRegularExpression(
+            '/:root\s*\{[^}]*font-family:\s*system-ui,/',
+            $this->css,
+            'La tipografia base del ERP debe ser la autoridad.',
+        );
+        self::assertSame(1, preg_match('/\.candidate-surface\s*\{([^}]*)\}/s', $this->css, $matches));
+        self::assertDoesNotMatchRegularExpression(
+            '/\bfont-family\s*:/i',
+            $matches[1],
+            'Candidatos no debe forzar una segunda tipografia.',
+        );
+    }
+
     public function testLongPublicLinksCanWrapWithinCards(): void
     {
         self::assertMatchesRegularExpression(
@@ -63,6 +145,10 @@ final class AssetContractTest extends TestCase
 
     public function testCandidateDetailLongValuesCanWrapOnNarrowScreens(): void
     {
+        self::assertMatchesRegularExpression(
+            '/\.candidate-shell__copy\s*\{[^}]*overflow-wrap\s*:\s*anywhere\s*;/s',
+            $this->css,
+        );
         self::assertMatchesRegularExpression(
             '/dl\s+dd[^\{]*\{[^}]*overflow-wrap\s*:\s*anywhere\s*;/s',
             $this->css,

@@ -87,7 +87,7 @@ final class HumanFirstContractOperatorRoutesTest extends TestCase
         $candidateHtml = (string) $this->request(
             $app,
             'GET',
-            '/sub/admin/candidates/' . $fixture['candidate_id'],
+            '/sub/admin/candidates/' . $fixture['candidate_id'] . '?section=contracts',
         )->getBody();
         self::assertStringContainsString(
             'href="/sub/admin/contracts?candidate_id=' . $fixture['candidate_id'] . '"',

@@ -10,6 +10,7 @@ use AlquilaPro\Candidates\CandidateService;
 use AlquilaPro\Candidates\ScreeningService;
 use AlquilaPro\Contracts\ContractService;
 use AlquilaPro\Properties\PropertyService;
+use AlquilaPro\Properties\UnitMediaService;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -25,6 +26,8 @@ return static function (App $app, array $deps): void {
     $screening = $deps['screening'];
     /** @var PropertyService $properties */
     $properties = $deps['properties'];
+    /** @var UnitMediaService $media */
+    $media = $deps['unit_media'];
     /** @var ContractService $contracts */
     $contracts = $deps['contracts'];
     /** @var View $view */
@@ -288,7 +291,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($adminGuard, $candidates, $candidateDocuments, $screening, $contracts, $view, $csrf): ResponseInterface {
+    ) use ($adminGuard, $candidates, $candidateDocuments, $screening, $contracts, $properties, $media, $view, $csrf): ResponseInterface {
         $user = $adminGuard($response, 'candidates.view');
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -300,6 +303,39 @@ return static function (App $app, array $deps): void {
         }
 
         $candidateId = (int) $candidate['id'];
+        $propertyDetails = null;
+        $coverPhotoId = null;
+        // Candidate access does not imply access to private property details.
+        if (Permissions::allows($user, 'properties.view')) {
+            $unit = $properties->findUnit((int) $candidate['unit_id']);
+            $property = $unit !== null ? $properties->findProperty((int) $unit['property_id']) : null;
+            if ($unit !== null && $property !== null) {
+                $propertyDetails = [
+                    'unit_id' => (int) $unit['id'],
+                    'unit_code' => $unit['code'],
+                    'type' => $unit['type'],
+                    'address' => $property['address'],
+                    'city' => $property['city'],
+                    'sector' => $property['sector'],
+                    'monthly_price' => $unit['monthly_price'],
+                    'administration_fee' => $unit['administration_fee'],
+                    'area_m2' => $unit['area_m2'],
+                    'bedrooms' => $unit['bedrooms'],
+                    'bathrooms' => $unit['bathrooms'],
+                ];
+                foreach ($media->listForUnit((int) $unit['id']) as $item) {
+                    if ($item['type'] !== 'photo') {
+                        continue;
+                    }
+                    if ($coverPhotoId === null || $item['is_cover']) {
+                        $coverPhotoId = (int) $item['id'];
+                    }
+                    if ($item['is_cover']) {
+                        break;
+                    }
+                }
+            }
+        }
         $contractContext = null;
         if (Permissions::allows($user, 'contracts.view')) {
             $contractContext = [
@@ -307,6 +343,29 @@ return static function (App $app, array $deps): void {
                 'can_create' => $contracts->canCreateDraftForCandidate($candidateId),
             ];
         }
+        $canManageCandidates = Permissions::allows($user, 'candidates.manage');
+
+        $candidateSections = [
+            ['key' => 'overview', 'label' => 'Solicitud'],
+            ['key' => 'work', 'label' => 'Información laboral'],
+            ['key' => 'household', 'label' => 'Ocupantes y mascotas'],
+            ['key' => 'references', 'label' => 'Referencias'],
+            ['key' => 'documents', 'label' => 'Documentos'],
+            ['key' => 'screening', 'label' => 'Estudio de aseguradora'],
+        ];
+        if ($contractContext !== null) {
+            $candidateSections[] = ['key' => 'contracts', 'label' => 'Contratos'];
+        }
+        if ($canManageCandidates) {
+            $candidateSections[] = ['key' => 'manage', 'label' => 'Administrar'];
+        }
+
+        $query = $request->getQueryParams();
+        $requestedSection = $query['section'] ?? null;
+        $availableSectionKeys = array_column($candidateSections, 'key');
+        $activeSection = is_string($requestedSection) && in_array($requestedSection, $availableSectionKeys, true)
+            ? $requestedSection
+            : 'overview';
 
         $response->getBody()->write($view->renderApp('candidate_detail', [
             'pageTitle' => 'Candidato',
@@ -314,10 +373,14 @@ return static function (App $app, array $deps): void {
             'activeNav' => 'apps',
             'csrfToken' => $csrf->token(),
             'candidate' => $candidate,
+            'propertyDetails' => $propertyDetails,
+            'coverPhotoId' => $coverPhotoId,
             'documents' => $candidateDocuments->listDocumentsForCandidate($candidateId),
             'screening' => $screening->findForCandidate($candidateId),
             'contractContext' => $contractContext,
-            'canManageCandidates' => Permissions::allows($user, 'candidates.manage'),
+            'canManageCandidates' => $canManageCandidates,
+            'candidateSections' => $candidateSections,
+            'activeSection' => $activeSection,
         ]));
 
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
