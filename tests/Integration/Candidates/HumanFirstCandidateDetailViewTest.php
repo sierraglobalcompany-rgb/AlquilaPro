@@ -331,10 +331,27 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
             'employment_notes' => '<script>alert(1)</script>',
         ], '/sub', ['contracts' => [], 'can_create' => false], 'work');
         self::assertStringContainsString('$ 0 COP', $html);
+        self::assertStringNotContainsString('candidate-work-summary', $html, 'Income-only submissions must not produce a blank summary card.');
         self::assertStringContainsString('&lt;script&gt;', $html);
         self::assertStringNotContainsString('<script>', $html);
         self::assertStringNotContainsString('No se registró información laboral.', $html);
         self::assertStringContainsString('/sub/admin/candidates/1?section=work', $html);
+    }
+
+    public function testWorkNotesOnlyDoesNotRenderBlankSummaryOrFakeIncome(): void
+    {
+        $html = $this->renderOverview([
+            'employment_status' => null,
+            'employer_name' => null,
+            'occupation' => null,
+            'monthly_income' => null,
+            'employment_notes' => 'Trabajo por cuenta propia declarado.',
+        ], '', ['contracts' => [], 'can_create' => false], 'work');
+        self::assertStringContainsString('Trabajo por cuenta propia declarado.', $html);
+        self::assertStringContainsString('Observaciones laborales', $html);
+        self::assertStringNotContainsString('candidate-work-summary', $html);
+        self::assertStringNotContainsString('candidate-work-income', $html);
+        self::assertStringNotContainsString('No se registró información laboral.', $html);
     }
 
     private function renderOverview(array $overrides = [], string $basePath = '', ?array $contracts = ['contracts' => [], 'can_create' => false], string $section = 'overview'): string

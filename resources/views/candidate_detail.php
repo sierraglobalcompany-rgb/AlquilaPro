@@ -288,15 +288,17 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
         $workNotes = trim((string) ($candidate['employment_notes'] ?? ''));
         $workIncome = $humanMoney($candidate['monthly_income'] ?? null);
         $workHasFacts = $workStatus !== '' || $workEmployer !== '' || $workOccupation !== '';
+        $workShowSummary = $workHasFacts || ($workIncome === null && $workNotes === '');
         ?>
         <section class="candidate-section" data-candidate-section-body="work">
-            <div class="candidate-work-layout<?= $workIncome !== null ? ' candidate-work-layout--with-income' : '' ?>">
+            <div class="candidate-work-layout<?= $workIncome !== null && $workShowSummary ? ' candidate-work-layout--with-income' : '' ?>">
+                <?php if ($workShowSummary): ?>
                 <section class="content-card candidate-card candidate-work-summary" aria-labelledby="candidate-work-title">
                     <div class="candidate-summary-heading">
                         <h2 id="candidate-work-title"><?= $candidateIcon('briefcase') ?>Resumen laboral</h2>
                         <p class="muted">Información laboral declarada por el candidato</p>
                     </div>
-                    <?php if (!$workHasFacts && $workIncome === null && $workNotes === ''): ?>
+                    <?php if (!$workHasFacts): ?>
                         <p class="empty-state">No se registró información laboral.</p>
                     <?php elseif ($workHasFacts): ?>
                         <div class="candidate-fact-grid candidate-work-facts">
@@ -312,6 +314,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                         </div>
                     <?php endif; ?>
                 </section>
+                <?php endif; ?>
                 <?php if ($workIncome !== null): ?>
                     <section class="content-card candidate-card candidate-work-income" aria-labelledby="candidate-work-income-title">
                         <h2 id="candidate-work-income-title"><?= $candidateIcon('wallet') ?>Ingresos declarados</h2>
