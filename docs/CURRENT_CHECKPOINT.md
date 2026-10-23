@@ -1,58 +1,43 @@
 # AlquilaPro — CURRENT CHECKPOINT
 
-**Corte:** 2026-10-22. **Fuente operativa única:** GitHub HEAD → CI del SHA exacto → este checkpoint → SPEC/AGENTS. No reemplaza historial de evidencias del PR #45.
+**Corte:** 2026-10-23. Fuente operativa: GitHub y CI del SHA exacto → este checkpoint → SPEC/PLAN aprobados → historial en Git. Reemplaza el estado vivo V5; el historial de capturas/QA V5 permanece en commits anteriores y PR #52.
 
-## Estado y autoridad
-| Campo | Estado |
+## Autoridades y gates
+
+| Área | Estado verificable |
 | --- | --- |
-| Repo | `sierraglobalcompany-rgb/AlquilaPro` |
-| `main` base | `94ba5f486b158c2b1fed753f26c63f7b3570c97c` — merge de [PR #45](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/45) |
-| Fase activa | CAND-02, Información laboral (`?section=work`) |
-| Rama | `impl/cand-02-work-human-first-20261022` |
-| Fuente visual | `02_INFORMACION_LABORAL.png` (Library original) + `docs/design/CANDIDATES_VISUAL_BASELINE_2026-10-17.md` |
-| SPEC | `docs/superpowers/specs/2026-10-17-candidates-human-first-redesign.md`, §9.2, §§10–17 |
-| CI de producto CAND-02 | [#1167 / run 39816216496](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39816216496): **SUCCESS PHP 8.3 / 8.4 / 8.5** para `00d86e91e59b98c1008c2f195a5fda1be145a539` |
-| Browser QA V5 | **PASS_WITH_SCOPE**; ZIP `ALQUILAPRO_CAND02_QA_V5_20261022.zip` SHA-256 `c35454f34bbb954c61a9e5a6d2e0045703cf909e76588e4d5843e8bf4b3b283b`; sin aprobación visual global |
-| Decisión visual del owner | **PENDING**; CAND-01 aprobada ≠ CAND-02 aprobada |
-| CAND-02 merge / despliegue | NO AUTORIZADO / NO DESPLEGADO |
-| CAND-03+ | NOT_STARTED |
+| Repositorio / main | `sierraglobalcompany-rgb/AlquilaPro` · `main` `94ba5f486b158c2b1fed753f26c63f7b3570c97c`, CAND-01 integrada mediante PR #45. |
+| CAND-02 / PR #52 | [Draft](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/52), rama `impl/cand-02-work-human-first-20261022`; **SHA de producto** `b4cbe45145e6f21c07a093a27e1df8ed9ed7d922`. |
+| CAND-02 CI | [#1170](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39883431882) **SUCCESS** PHP 8.3/8.4/8.5 sobre SHA de producto. |
+| CAND-02 QA | V8 **PASS_WITH_SCOPE**; ZIP evidencias V8 SHA-256 `8d44cd8b858ba4cbd2743c51222d81367f4b266c6e3606134936e949fffcc90e`; fidelidad visual global **NO CERTIFICADA**. |
+| PR #53 / Documentos reales | [Draft](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/53), rama `impl/candidates-document-truth-20261023`, desde main, HEAD `88b0521b325ffb3ed9e78852ca1c05f1bc5122d2`. |
+| PR #53 CI | [#1171](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39891808862) **SUCCESS** PHP 8.3/8.4/8.5; Browser QA **NOT_RUN**, paridad visual **NOT_CERTIFIED**. |
+| Merge / deploy | **NO AUTORIZADOS** para #52 y #53; Hostinger sigue bloqueado. |
+| CAND-03+ | Congelado hasta gates e integración de datos y diseño. |
 
-## CAND-01 integrado
-El PR #45 fue **fusionado a `main`** por aprobación expresa del owner. HEAD de producto auditado `aa9b2619d34451d406f05a019842da81f458d7a1`; commit documental posterior `e925b24f2c318eece7bdf9c9ad5092944068916c`. CI #1165 SUCCESS PHP 8.3/8.4/8.5. La dirección visual de Solicitud y su QA residual fueron aprobados; **`VISUAL_GLOBAL` y WCAG integral no fueron certificados**. No reabrir QA V6/V9/V12/G3 salvo defecto nuevo reproducido. Hostinger no desplegado.
+## Diagnóstico de producto y datos
 
-## Contrato CAND-02
-La ruta SSR y el shell compartidos NO se modifican. La vista `resources/views/candidate_detail.php` muestra la sección de trabajo con:
-- Datos reales `employment_status`, `employer_name`, `occupation` agrupados, sin filas vacías ni valores inferidos.
-- `monthly_income` solamente cuando es numérico, en formato COP mediante **el mismo `$humanMoney` de Solicitud**, movido al scope común del view (1 owner).
-- Notas únicamente cuando son reales; escaping y saltos de línea seguros.
-- Empty state `No se registró información laboral.` si todos los hechos faltan; cero **declarado** es válido, cero por ausencia NO.
-- Sin sectores, antigüedad, fuentes extra, documentos, score/riesgo, verificación de ingresos, historial o CTAs ficticios del PNG.
-- CSS delimitado a `.candidate-work-*` dentro de `assets/app.css`; dos columnas sólo a partir de 1024px con ingreso, una en móvil/tableta.
-- Pruebas focales causales en `tests/Integration/Candidates/HumanFirstCandidateDetailViewTest.php`, manteniendo sus contratos de Solicitud.
+**Mockups:** ocho originales en Library `/AlquilaPro/Design/Candidatos/2026-10-17/`; `02_INFORMACION_LABORAL.png` SHA256 `fc889a00c6ab29324b1efb71e48ae68f0708542b8c6c7f20b81d52cd1aa9e2c1`. Son **dirección visual**, no persistencia/funcionalidad existente. El owner pidió funcionalidades útiles respaldadas por datos antes de seguir retocando arte; esta orden supera la inferencia de que bastaba una pantalla visual reducida.
 
-## Auditoría independiente y QA V5 (22-10-2026)
+**Arquitectura:** PHP SSR, Slim y PDO/MariaDB; el repo tiene tablas, servicios y pruebas para Candidatos, Documentos, Estudios, Contratos, WhatsApp asistido (contexto candidate), Notificaciones y Auditoría, además de otros módulos. Inventario de 23 migraciones, 51 archivos `app/` y 166 archivos `tests/` no certifica puesta en producción.
 
-**Dictamen:** `CAND02_BROWSER_QA=PASS_WITH_SCOPE`; **`VISUAL_GLOBAL=NOT_CERTIFIED`** y aprobación de la dirección visual por el owner **PENDING**. Revisión independiente de imágenes, manifiesto y ZIP: SHA256 ZIP `c35454f34bbb954c61a9e5a6d2e0045703cf909e76588e4d5843e8bf4b3b283b`; CRC OK, 8 entradas exactas (5 PNG, JSON, informe, manifiesto). Mockup ORIGINAL `02_INFORMACION_LABORAL.png`, 1448×1086 RGB, SHA256 `fc889a00c6ab29324b1efb71e48ae68f0708542b8c6c7f20b81d52cd1aa9e2c1`, no confundir con captura `A_REF` de igual tamaño.
+**CAND-02:** real solo `employment_status`, `employer_name`, `occupation`, `monthly_income`, `employment_notes`. V8 una card principal con ingreso y notas condicionales. El mockup contiene historial/verificación/otros ingresos/riesgos sin dueño real; no crearlos como KPI ficticio. V8 no aprobada en paridad visual original.
 
-| Evidencia | SHA-256 de captura |
-| --- | --- |
-| `A_REF_1448x1086.png` (APP real en medidas de mockup, **NO** mockup) | `c925d235fa660430711686a3dbba3ba2b6d9501caf2c324032f80e53f60caa89` |
-| `A_DESKTOP_1440x900.png` | `607b3caa49aa97d2f35379d6e71cd50538643188f12c5b7b8ee9bdfdb796e533` |
-| `A_TABLET_768x1024.png` (menú abierto; 6 enlaces disponibles para `candidates.view`) | `6015837f3edbffd8cb51d0f2d0416a7badd2f4486538581d7dabc1431f2424d1` |
-| `A_MOBILE_375x812.png` (scroll al fondo, barra fija no tapa contenido final) | `0a462275ddfddf64d77d6387431b067e730eac5d038c5626639f411d1df69e9d` |
-| `B_EMPTY_375x812.png` | `a5a50c3951b2285ecf2190a36de966a150d9abbf2ee2b72462b81267ec6ebf88` |
+**PR #53 — integración data-first realizada:** `app/Candidates/routes.php` llama `CandidateDocumentService::listRequirementsForUnit(unit_id, true)` solo para sección Documentos; `candidate_detail.php` cruza con `listDocumentsForCandidate()` mostrando recibido/pendiente, obligatorio/opcional y conteo real sin declarar revisión/aprobación; preserva apertura privada y documentos históricos de requisito inactivo. Nuevas pruebas en `CandidatesAdminRoutesTest.php`; ningún schema nuevo, nuevo servicio o cambio de permisos.
 
-**Verificado dentro del alcance V5:** usuario gestor sintético con sólo `candidates.view`, autenticación y cambio forzado, A/B 200, una única sección work, ingreso declarado `$ 5.200.000 COP`, notas veraces, estado B vacío sin inventar cero, ningún control administrativo/contratos no autorizado; CSS/JS/favicon 200 y SHA CSS servido coincidente `48a31231b6d6c8f7151318e53a8a69396f236538545774228294b3db2cc2289c`; sin errores de consola, sin overflow observado en viewport real. Foco visible `Inicio`, 52px de separación al final de móvil.
+**Redundancia real a resolver:** transición de estado en `CandidateService::transitionStatus()` y `resources/views/candidate_detail.php` duplicadas; converger a un solo owner dominio con RED/GREEN, no agregar otra lista. Mantener entidades distintas: estudio aseguradora ≠ póliza en arrendamiento; `candidate_documents` ≠ `documents` del inmueble/arriendo; precio publicado ≠ snapshot contractual. `pets_declared DEFAULT 0` exige auditar “no” frente a “no respondido”.
 
-**Comparación independiente con mockup:** la vista real usa los datos que existen: resumen laboral, ingreso y notas. El mockup enseña además *otros ingresos, antigüedad, contrato, historial, comprobaciones, documentos, análisis/score y recomendaciones* sin respaldo actual. **No inventarlos ni hacer paridad falsa.** La pantalla real es sustancialmente más simple que el PNG original; la dirección estética de esta versión requiere decisión expresa del owner, no `VISUAL_PASS` automático.
+**Mensaje:** `WhatsAppService` ya soporta `candidate_follow_up` para contexto candidate; integra solo si `whatsapp.use`, conserva confirmación humana, no afirma entrega automática. Otros mockups requieren inventario dato→origen→permiso→vista antes de implementar controles.
 
-**Observación:** `Apps` aparece con `aria-current="page"` en barra inferior; se debe evaluar semánticamente sólo si se comprueba conflicto real de navegación, no corregir por parche. El enlace `Información laboral` tiene su propio `aria-current` correcto.
+## Próximos gates
 
-**Gates cerrados:** CI #1167 PHP 8.3/8.4/8.5; QA V5 funcional + responsive de la sección work. Los tests previos cubren escape, cero declarado y notas solas; **no se volvieron a ejecutar** en V5. Ningún merge / deploy / CAND-03. El checkout efímero de Codex no pudo borrarse por política Windows; mantenerlo aislado, nunca limpiar repositorios ajenos a la ejecución.
+1. **Único NEXT:** QA real Browser de Documentos PR #53 sobre HEAD `88b0521b325ffb3ed9e78852ca1c05f1bc5122d2`, usuario sintético con `candidates.view`, requisitos recibidos, pendientes, opcionales e inactivos, más vacío; capturas desktop/tablet/móvil y referencia original `05_DOCUMENTOS.png`; ChatGPT audita después.
+2. PR #52 continúa Draft con QA V8 PASS_WITH_SCOPE, paridad no certificada. No mezclar SHA de ambas ramas sin revisar conflictos y correr CI tras integración autorizada.
+3. Tras el gate anterior, eliminar duplicación de transiciones en owner único, mejorar CAND-03 a CAND-08 con datos reales; una única QA integral final, no rondas repetitivas de CSS.
+4. Merge y Hostinger requieren autorizaciones distintas y explícitas; nunca automáticamente por CI verde.
 
-**Único NEXT:** presentar la comparación fiel **mockup original vs captura A_REF** al owner y solicitar aprobación de la *dirección visual real* con sus exclusiones. Si no aprueba, recopilar **una diferencia visual concreta y implementable con datos reales**, sin rehacer QA completo. Tras aprobación, converger documentación, confirmar CI del HEAD documental nuevo y solicitar **autorización explícita de merge**; Hostinger sigue bloqueado.
+## Cuatro leyes
 
-## Leyes durables
-KISS → Cero Ruido (eliminar/unir sólo con evidencia) → Anti-parches (causa, RED/GREEN, regresiones) → Human-First/UX/UI Pro (mockup sin capacidades falsas) → Fidelidad visual verificable.
+**KISS:** simple, eficiente, optimizado; reutilizar owners/campos existentes, no SPA ni arquitectura paralela. **Antirruido:** eliminar/unir/simplificar solo con evidencia, checkpoint único y sin estados duplicados. **Antiparches:** causa raíz, RED causal, GREEN mínimo, limpiar superseded y regresión. **UX/UI Pro:** comparación mockup original / captura real con rol, viewport y datos comparables; no atribuir aprobaciones, scores ni acciones falsas.
 
-`NEXT=CAND02_OWNER_VISUAL_DIRECTION_DECISION_ON_V5_EVIDENCE`
+`NEXT=PR53_DOCUMENTOS_BROWSER_QA_SHA_88b0521b325ffb3ed9e78852ca1c05f1bc5122d2`
