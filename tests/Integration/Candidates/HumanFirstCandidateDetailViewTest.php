@@ -395,6 +395,88 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertStringNotContainsString('No se registró información laboral.', $html);
     }
 
+    public function testHouseholdShowsOnlyRealDeclaredCountAndPetPresence(): void
+    {
+        $html = $this->renderOverview([
+            'occupants_count' => 3,
+            'occupants_notes' => 'Adultos y un menor declarados.',
+            'pets_declared' => 1,
+            'pets_notes' => 'Mascota declarada en la solicitud.',
+        ], '', ['contracts' => [], 'can_create' => false], 'household');
+
+        self::assertStringContainsString('data-candidate-section-body="household"', $html);
+        self::assertSame(1, substr_count($html, 'data-candidate-section-body='));
+        self::assertStringContainsString('class="candidate-household-grid"', $html);
+        self::assertStringContainsString('Resumen del hogar', $html);
+        self::assertStringContainsString('Ocupantes', $html);
+        self::assertStringContainsString('Mascotas', $html);
+        self::assertStringContainsString('3 ocupantes declarados', $html);
+        self::assertStringContainsString('Mascotas declaradas', $html);
+        self::assertStringContainsString('Adultos y un menor declarados.', $html);
+        self::assertStringContainsString('Mascota declarada en la solicitud.', $html);
+        foreach (['Riesgo bajo', 'Perfil familiar estable', 'Agregar ocupante', 'Agregar mascota', 'Vacunación', 'Raza:', 'Edad:', 'Política del inmueble'] as $invented) {
+            self::assertStringNotContainsString($invented, $html);
+        }
+        self::assertStringNotContainsString('data-candidate-section-body="work"', $html);
+    }
+
+    public function testHouseholdUnknownValuesDoNotTurnIntoZeroOrNoPets(): void
+    {
+        $html = $this->renderOverview([
+            'submitted_at' => null,
+            'occupants_count' => null,
+            'occupants_notes' => null,
+            'pets_declared' => 0,
+            'pets_notes' => '',
+        ], '', ['contracts' => [], 'can_create' => false], 'household');
+
+        self::assertStringContainsString('No se registró información del hogar.', $html);
+        self::assertStringNotContainsString('0 ocupantes declarados', $html);
+        self::assertStringNotContainsString('No tiene mascotas', $html);
+        self::assertStringNotContainsString('Sin mascotas declaradas', $html);
+        self::assertStringNotContainsString('Mascotas declaradas', $html);
+        self::assertStringNotContainsString('candidate-household-grid', $html);
+    }
+
+    public function testHouseholdZeroOccupantsAndSubmittedPetDefaultRemainFactual(): void
+    {
+        $html = $this->renderOverview([
+            'submitted_at' => '2026-10-20 10:00:00',
+            'occupants_count' => 0,
+            'occupants_notes' => '',
+            'pets_declared' => 0,
+            'pets_notes' => '',
+        ], '', ['contracts' => [], 'can_create' => false], 'household');
+
+        self::assertStringContainsString('0 ocupantes declarados', $html);
+        self::assertStringContainsString('Sin mascotas registradas en la solicitud', $html);
+        self::assertStringNotContainsString('Cantidad no declarada', $html);
+        self::assertStringNotContainsString('No tiene mascotas', $html);
+        self::assertStringContainsString('No hay información adicional sobre ocupantes.', $html);
+        self::assertStringContainsString('No hay información adicional sobre mascotas.', $html);
+    }
+
+    public function testHouseholdEscapesUntrustedMultilineNotesAndDoesNotCreateIndividuals(): void
+    {
+        $html = $this->renderOverview([
+            'submitted_at' => null,
+            'occupants_count' => null,
+            'occupants_notes' => "Persona de contacto\\n<script>alert(1)</script>",
+            'pets_declared' => 0,
+            'pets_notes' => '<img src=x onerror=alert(1)>',
+        ], '/sub', ['contracts' => [], 'can_create' => false], 'household');
+
+        self::assertStringContainsString('Persona de contacto', $html);
+        self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
+        self::assertStringContainsString('&lt;img src=x onerror=alert(1)&gt;', $html);
+        self::assertStringNotContainsString('<script>alert(1)</script>', $html);
+        self::assertStringNotContainsString('<img src=x onerror=alert(1)>', $html);
+        self::assertStringContainsString('Cantidad no declarada', $html);
+        self::assertStringContainsString('Declaración de mascotas no confirmada', $html);
+        self::assertStringNotContainsString('Sin mascotas registradas en la solicitud', $html);
+        self::assertStringContainsString('/sub/admin/candidates/1?section=household', $html);
+    }
+
     private function renderOverview(array $overrides = [], string $basePath = '', ?array $contracts = ['contracts' => [], 'can_create' => false], string $section = 'overview'): string
     {
         $candidate = [
