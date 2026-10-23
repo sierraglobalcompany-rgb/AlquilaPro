@@ -329,21 +329,83 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
         </section>
 
     <?php elseif ($activeSection === 'documents'): ?>
+        <?php
+        $documentRequirements = is_array($documentRequirements ?? null) ? $documentRequirements : [];
+        $documentsByRequirement = [];
+        foreach ($documents as $document) {
+            $documentsByRequirement[(int) $document['requirement_id']] = $document;
+        }
+        $requiredCount = 0;
+        $receivedRequiredCount = 0;
+        $activeRequirementIds = [];
+        foreach ($documentRequirements as $requirement) {
+            $requirementId = (int) $requirement['id'];
+            $activeRequirementIds[$requirementId] = true;
+            if ($requirement['is_required']) {
+                ++$requiredCount;
+                if (isset($documentsByRequirement[$requirementId])) {
+                    ++$receivedRequiredCount;
+                }
+            }
+        }
+        ?>
         <section class="candidate-section" data-candidate-section-body="documents">
-            <section class="content-card">
-                <div class="section-heading"><div><p class="eyebrow">Documentos</p><h2>Documentos</h2></div></div>
-                <?php if ($documents === []): ?>
-                    <p class="empty-state">No hay documentos adjuntos.</p>
-                <?php else: ?>
-                    <div class="users-grid">
-                        <?php foreach ($documents as $document): ?>
+            <section class="content-card candidate-card" aria-labelledby="candidate-documents-title">
+                <div class="section-heading">
+                    <div><p class="eyebrow">Documentación</p><h2 id="candidate-documents-title">Documentos del candidato</h2></div>
+                </div>
+                <?php if ($documentRequirements !== []): ?>
+                    <?php if ($requiredCount > 0): ?>
+                        <p class="muted" data-document-required-count="<?= $requiredCount ?>" data-document-received-count="<?= $receivedRequiredCount ?>">
+                            <?= $receivedRequiredCount ?> de <?= $requiredCount ?> requisitos obligatorios recibidos. Esto no indica revisión ni aprobación.
+                        </p>
+                    <?php else: ?>
+                        <p class="muted">Esta unidad solo tiene requisitos documentales opcionales.</p>
+                    <?php endif; ?>
+                    <div class="users-grid" aria-label="Requisitos documentales activos">
+                        <?php foreach ($documentRequirements as $requirement): ?>
+                            <?php $attached = $documentsByRequirement[(int) $requirement['id']] ?? null; ?>
                             <article class="user-card">
-                                <strong><?= $escape($document['requirement_label']) ?></strong>
-                                <div><?= $escape($document['original_name'] ?? 'Documento') ?></div>
-                                <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/documents/<?= $escape($document['id']) ?>">Abrir documento</a>
+                                <div class="user-card__head">
+                                    <strong><?= $escape($requirement['label']) ?></strong>
+                                    <span class="muted"><?= $requirement['is_required'] ? 'Obligatorio' : 'Opcional' ?></span>
+                                </div>
+                                <?php if (trim((string) ($requirement['description'] ?? '')) !== ''): ?>
+                                    <p class="muted"><?= $escape($requirement['description']) ?></p>
+                                <?php endif; ?>
+                                <?php if ($attached !== null): ?>
+                                    <p>Recibido</p>
+                                    <p class="muted"><?= $escape($attached['original_name'] ?? 'Documento') ?></p>
+                                    <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/candidates/<?= (int) $candidate['id'] ?>/documents/<?= (int) $attached['id'] ?>">Abrir documento</a>
+                                <?php else: ?>
+                                    <p class="muted"><?= $requirement['is_required'] ? 'Pendiente de recibir' : 'Opcional, no aportado' ?></p>
+                                <?php endif; ?>
                             </article>
                         <?php endforeach; ?>
                     </div>
+                <?php else: ?>
+                    <p class="muted">No hay requisitos documentales activos configurados para esta unidad.</p>
+                <?php endif; ?>
+                <?php
+                $otherDocuments = array_values(array_filter(
+                    $documents,
+                    static fn (array $document): bool => !isset($activeRequirementIds[(int) $document['requirement_id']]),
+                ));
+                ?>
+                <?php if ($otherDocuments !== []): ?>
+                    <h3>Otros documentos recibidos</h3>
+                    <div class="users-grid">
+                        <?php foreach ($otherDocuments as $document): ?>
+                            <article class="user-card">
+                                <strong><?= $escape($document['requirement_label']) ?></strong>
+                                <p class="muted"><?= $escape($document['original_name'] ?? 'Documento') ?></p>
+                                <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/candidates/<?= (int) $candidate['id'] ?>/documents/<?= (int) $document['id'] ?>">Abrir documento</a>
+                            </article>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+                <?php if ($documents === [] && $documentRequirements === []): ?>
+                    <p class="empty-state">No hay documentos adjuntos.</p>
                 <?php endif; ?>
             </section>
         </section>

@@ -227,6 +227,69 @@ final class CandidatesAdminRoutesTest extends TestCase
         self::assertSame(200, $this->request($allowed, 'GET', '/sub/admin/units/' . $unitId . '/media/' . $photoId)->getStatusCode());
     }
 
+    public function testDocumentSectionUsesActiveUnitRequirementsWithoutFakeApproval(): void
+    {
+        $candidateId = $this->insertCandidate('DOC-TRUTH-01', 'Candidato Documentos');
+        $unitId = $this->candidateUnitId($candidateId);
+        $documents = new CandidateDocumentService($this->pdo, $this->documentDirectory);
+        $received = $this->addDocument($candidateId, 'documento-real.pdf');
+        $documents->createRequirement($unitId, [
+            'code' => 'income',
+            'label' => '<script>Ingresos</script>',
+            'description' => 'Comprobante de ingresos',
+            'is_required' => 1,
+            'is_active' => 1,
+        ]);
+        $documents->createRequirement($unitId, [
+            'code' => 'pets',
+            'label' => 'Soporte mascota',
+            'is_required' => 0,
+            'is_active' => 1,
+        ]);
+        $documents->createRequirement($unitId, [
+            'code' => 'obsolete',
+            'label' => 'REQUISITO_INACTIVO_NO_MOSTRAR',
+            'is_required' => 1,
+            'is_active' => 0,
+        ]);
+
+        $this->insertUser('doc-viewer@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
+        $app = $this->app('/sub');
+        $this->login($app, 'doc-viewer@example.com', 'ViewerPassword123', '/sub');
+        $response = $this->request($app, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=documents');
+        self::assertSame(200, $response->getStatusCode());
+        $html = (string) $response->getBody();
+
+        self::assertStringContainsString('data-document-required-count="2"', $html);
+        self::assertStringContainsString('data-document-received-count="1"', $html);
+        self::assertStringContainsString('1 de 2 requisitos obligatorios recibidos', $html);
+        self::assertStringContainsString('Identidad', $html);
+        self::assertStringContainsString('documento-real.pdf', $html);
+        self::assertStringContainsString('/sub/admin/candidates/' . $candidateId . '/documents/' . $received['id'], $html);
+        self::assertStringContainsString('&lt;script&gt;Ingresos&lt;/script&gt;', $html);
+        self::assertStringNotContainsString('<script>Ingresos</script>', $html);
+        self::assertStringContainsString('Pendiente de recibir', $html);
+        self::assertStringContainsString('Opcional, no aportado', $html);
+        self::assertStringNotContainsString('REQUISITO_INACTIVO_NO_MOSTRAR', $html);
+        self::assertStringNotContainsString('Aprobado', $html);
+        self::assertStringNotContainsString('En revisión', $html);
+        self::assertStringNotContainsString('Subir documento', $html);
+        self::assertStringNotContainsString($this->documentDirectory, $html);
+    }
+
+    public function testDocumentSectionWithoutRequirementsRetainsHonestEmptyState(): void
+    {
+        $candidateId = $this->insertCandidate('DOC-TRUTH-EMPTY', 'Candidato sin documentos');
+        $this->insertUser('doc-empty@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
+        $app = $this->app();
+        $this->login($app, 'doc-empty@example.com', 'ViewerPassword123');
+
+        $html = (string) $this->request($app, 'GET', '/admin/candidates/' . $candidateId . '?section=documents')->getBody();
+        self::assertStringContainsString('No hay requisitos documentales activos configurados', $html);
+        self::assertStringContainsString('No hay documentos adjuntos.', $html);
+        self::assertStringNotContainsString('de 0 requisitos obligatorios', $html);
+    }
+
     public function testListAndDetailEscapeCandidateReferenceAndOriginalFilename(): void
     {
         $candidateId = $this->insertCandidate('ESC-1', '<script>alert(1)</script>');
