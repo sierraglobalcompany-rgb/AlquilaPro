@@ -1,3 +1,15 @@
+## Interrupción Ley 4 V3 — instalación en repo y validación Codex
+
+- **Decisión owner:** antes de implementar CAND-03 G1–G5, activar y auditar el protocolo adjunto `LEY 4 — AGENTE UNIVERSAL DE DISEÑO Y AUDITORÍA UX/UI | V3.0`.
+- **Integración documental GitHub comprobada** sobre la misma rama PR #55: `docs/ERP_HUMAN_FIRST_UI_UX_MASTER_SKILL.md` conserva íntegra y exactamente la V3 adjunta; `design-system/alquilapro/MASTER.md` describe CSS/tokens/layouts/owners reales; `AGENTS.md` §11 remite a ambos sin duplicar el protocolo y conserva las otras leyes. SHA documental **antes de este checkpoint** `d49524ede1530f6632e7bc5b06d8ca3b0d03bdda`.
+- **Ley 4 instalado en repositorio: PASS documental** (diff exacto 3 rutas Markdown respecto a `91d5d8b89c84833a03da1d57f1e35bcc1c599a40`); **Codex local AGENTS.md cargado: NOT_VERIFIED** porque no hay acceso al Windows/Codex de usuario desde este chat. Verificar en sesión nueva con checkout/worktree aislado de la rama, en raíz y `resources/views`, respetando overrides globales. No confundir instrucciones persistentes con proceso permanente.
+- **Fuentes externas revisadas como consulta, no copiadas ni instaladas:** Anti UI Slop SKILL y `reference/audit.md`, UI UX Pro Max `quick-reference.md`, documentación oficial Codex AGENTS. No crear segundo sistema CSS/JS, no usar `--persist` ni `--force` de Pro Max.
+- **Visual CAND-03:** owner mantiene veto P1 por seis regiones no fieles; QA V2 sobre tres cards sigue evidencia histórica, **no aprobación**. No tocar mockups aprobados para lograr falsos PASS.
+- **CI:** al registrar, el último HEAD L4 tiene ejecución GitHub CI #1187 en curso; verificar conclusión exacta. CI #1184 intento 1 falló prueba de concurrencia Financiera PHP 8.3; único rerun intento 2 finalmente SUCCESS, sin cambios de producto; no asumir suite verde del nuevo HEAD sin su propio resultado.
+- **NEXT ÚNICO:** Codex Luna inicia sesión aislada con archivos actualizados, demuestra lectura real de L4+Master desde raíz y subcarpeta y ejecuta `AUDITAR_EXISTENTE` focal (CAND-03 fallido conocido + control ya implementado sin falsos positivos). Entrega evidencia **sin modificar código ni diseños**. ChatGPT aplica Ley 5 y después habilita prompt CAND-03 G1–G5. `PR55=DRAFT, MERGE=NO, DEPLOY=NO, CAND04=FROZEN`.
+
+---
+
 # AlquilaPro — CURRENT CHECKPOINT (rama CAND-03)
 
 **Corte:** 2026-10-23 America/Bogota. Verdad: GitHub HEAD → CI del SHA → contratos SPEC/PLAN → evidencia primaria. **No fusionar ni desplegar.**
