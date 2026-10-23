@@ -1,26 +1,27 @@
 # AlquilaPro — CURRENT CHECKPOINT
 
-**Corte:** 2026-10-23, America/Bogota. Autoridad: SHA actual de GitHub → CI del SHA → esta nota → SPEC/plan aprobado → historial. El checkpoint canónico de esta fase vive en esta rama; `main` permanece protegido. No sustituir el estado observado por fechas o HEAD antiguos.
+**Fecha:** 2026-10-23 (America/Bogota). **Alcance:** rama activa de CAND-03. Orden de autoridad: GitHub HEAD → CI del SHA exacto → este checkpoint → SPEC/PLAN → historial. Este archivo no sustituye las evidencias externas ni autoriza merges/deploys.
 
-## Fuentes y estado recuperable
-- **Repo** `sierraglobalcompany-rgb/AlquilaPro`.
-- **Main** `414bcfeae0a3b4f8eea7262eefcb498e3f116307`: merge autorizado por squash del [PR #54](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/54); Work CAND-02 y Documentos con requisitos reales integrados. **No deploy**.
-- **QA PR #54:** CI #1177 `SUCCESS` PHP 8.3/8.4/8.5 sobre fuente pre-merge `ba152597e2fd47792fc39e96c3906cce38dc00d9`; Browser QA focal fuente de código `ffddc415c57c98588ca5c895d9e56f4eab0e1945` `PASS_WITH_SCOPE`. Tree del squash = tree de fuente validada. Paridad global y WCAG completa `NOT_CERTIFIED`.
-- **PR #52 y #53:** cerrados **sin merge** como `SUPERSEDED_BY_PR54`. Ramas/diffs/QA disponibles, pero NO fusionarlas otra vez.
-- **CAND-03:** [PR #55](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/55) Draft; rama `impl/cand-03-household-human-first-20261023`, base `main@414bcfeae0a3b4f8eea7262eefcb498e3f116307`. **SHA de código antes de este commit de documentación** `36d4161a6a442a943201ff6a5d5f9736d09db639`. Commit nuevo = solo Markdown; verificar HEAD/CI tras este commit.
-- **CI de CAND-03:** `NOT_VERIFIED` al redactar, PHP 8.3/8.4/8.5 requeridos. **Browser QA de CAND-03:** `NOT_RUN`, paridad mockup `NOT_CERTIFIED`. No inferir PASS de PR54.
+## Estado vivo y fuentes de verdad
+- **Repositorio:** `sierraglobalcompany-rgb/AlquilaPro`.
+- **Main estable:** `414bcfeae0a3b4f8eea7262eefcb498e3f116307`; [PR #54](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/54) se fusionó por squash con autorización. **Sin deploy Hostinger**. PR #52 y PR #53 cerrados sin merge como `SUPERSEDED_BY_PR54`; sus evidencias permanecen en GitHub.
+- **CAND-03 activo:** [PR #55](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/55), rama `impl/cand-03-household-human-first-20261023`, `Draft`, `mergeable=true`, no fusionado; base `main@414bcfeae0a3b4f8eea7262eefcb498e3f116307`.
+- **Último HEAD de producto auditado:** `66a0d9a856366a315813ab6c84a2954f9b8f2263`, sin cambios al código tras QA. **Esta actualización documental crea un nuevo HEAD**: verificar nuevo commit y CI; no declarar que las capturas se tomaron sobre el SHA documental nuevo.
+- **CI [#1179](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39911037860) del HEAD de producto:** `completed/success` en PHP 8.3, 8.4 y 8.5. Suite completa validada según GitHub Actions.
+- **Browser QA V2 CAND-03:** `PASS_WITH_SCOPE` sobre HEAD de producto exacto `66a0d9a...`. ZIP `ALQUILAPRO_CAND03_PR55_QA_V2_20261023.zip` SHA256 `bbef35ad9c834a73bad6d80f5033aeea512fa178483a29c484e80ae9914c6c92`; validación independiente **9/9 SHA256, bytes, 7 PNG incluyendo mockup, seis capturas de navegador en dimensiones declaradas**. Referencia `03_OCUPANTES_MASCOTAS.png` SHA256 `be9b8848afed75e31be6df6fd3e1d341b2b960b0d0ca71de68ad33efd3866ae0`.
+- **V1 Browser QA:** `BLOCKED_QA_TOOLING` exclusivamente por helpers `rect/round` fuera del contexto de `page.evaluate`; **SUPERSEDED_BY_V2**; no repetir.
 
-## Contrato CAND-03: Ocupantes y mascotas
-- Autoridades: `docs/superpowers/specs/2026-10-17-candidates-human-first-redesign.md` §9.3, plan homónimo Task 3, `docs/design/CANDIDATES_VISUAL_BASELINE_2026-10-17.md` §03 y PNG `03_OCUPANTES_MASCOTAS.png`.
-- Verdad existente de `candidates`: `occupants_count` (nulo admite no respuesta y 0 explícito), `occupants_notes`, `pets_declared`, `pets_notes`. **Riesgo conocido**: `pets_declared NOT NULL DEFAULT 0`, wizard «No» preseleccionado. Un cero en borrador no prueba una declaración. Sin migrar: diferenciar `submitted_at` para mostrar `Sin mascotas registradas en la solicitud` únicamente tras envío; en borrador vacío presentar estado vacío y con notas `Declaración de mascotas no confirmada`. No confundir «no registro» con «no tiene mascotas».
-- Un `section=household` renderiza resumen factual y cards de ocupantes y mascotas; escapar notas con saltos de línea; sin expediente de personas, fotos, raza, vacunación, política de inmueble, indicadores o riesgo inventados.
-- Únicos archivos de producto CAND-03: `resources/views/candidate_detail.php`, `assets/app.css` específico y `tests/Integration/Candidates/HumanFirstCandidateDetailViewTest.php`; RED creado antes de GREEN, pero no se ejecutó el RED local. No API ni base de datos ni servicios nuevos.
-- `main` conserva Work, Documents, permisos, contratos y componentes. Ningún cambio de esos módulos permitido en esta fase.
+## Contratos, implementación y cobertura
+- **SPEC §9.3:** `docs/superpowers/specs/2026-10-17-candidates-human-first-redesign.md`. **Plan Task 3:** `docs/superpowers/plans/2026-10-17-candidates-human-first-redesign.md`. **Diseño:** `docs/design/CANDIDATES_VISUAL_BASELINE_2026-10-17.md` §03. No inventar detalles que solo figuran en el mockup.
+- **Campos reales:** `occupants_count`, `occupants_notes`, `pets_declared`, `pets_notes`; separar `NULL` de cero legítimo. Como `pets_declared=0` es valor por defecto de DB/wizard, el cero de borrador no confirma ausencia. Si enviada, comunicar `Sin mascotas registradas en la solicitud` sin afirmar `No tiene mascotas`.
+- **Archivos del PR:** `resources/views/candidate_detail.php` (solo sección household), `assets/app.css` (reglas scoped), `tests/Integration/Candidates/HumanFirstCandidateDetailViewTest.php` (cuatro tests), este checkpoint. Sin nuevos servicios, tablas, migraciones, rutas, APIs, dependencias ni cambios de permisos.
+- **Browser QA focal:** A enviado 3 ocupantes/mascota, B borrador vacío y C enviado cero, navegación GET Work↔Household, foco y overflow horizontal `PASS` en escenarios medidos; sin errores reportados de consola. A móvil final: último contenido a ~72,85 px antes de la barra fija. C móvil fue capturado inicialmente, **no** con scroll final; no atribuirle esa prueba. Matriz de roles, WCAG integral y dispositivos físicos `NOT_CERTIFIED`.
+- **Fidelidad global:** `NOT_CERTIFIED`; mockup incluye perfiles/fotos/vacunas/acciones/scores sin persistencia ni contrato. CAND-03 cumple alcance factual/visual verificado, no paridad 1:1 ni aprobación humana integral.
 
-## Cuatro leyes, gates y NEXT
-1. **KISS:** PHP SSR/Slim/PDO; dos cards secundarias y un resumen usando datos reales, sin capas ni frontend paralelo.
-2. **Antirruido:** cerrar PRs superados con prueba de solapamiento; un único checkpoint, no multiplicar reportes ni ramas alternativas.
-3. **Antiparches:** tratar causa del falso «No mascotas» en visualización sin inferir una respuesta inexistente; una suite causal para null/0/default/XSS.
-4. **UX/UI Pro:** usar PNG original solo para composición, sin fotos/acciones/scores falsos; comparar capturas con rol, contenido y viewport. Paridad total `NOT_CERTIFIED` hasta evidencia suficiente.
+## Leyes y gates
+- **KISS:** PHP SSR/Slim/PDO y componentes existentes, sin arquitectura compleja.
+- **Antirruido:** un PR activo para CAND-03 y un checkpoint vivo; eliminar estados V1/CI pendiente como autoridad actual sin perder historial.
+- **Antiparches:** no tocar producto por defecto 0 de mascota sin reproducción causal nueva; el bloqueo corregido V2 fue de colector local, no de producto.
+- **UX/UI Pro:** respetar jerarquía del PNG sin inventar individuos/acciones/estados; evidencias y reservas reales.
 
-**NEXT ÚNICO:** revisar CI exacto de PR #55 y auditar contratos de `household`; si GREEN, ejecutar Browser QA focal solo de CAND-03 (1448,768,375 + borrador y scroll final) una vez. Si RED, reparar causa concreta y revalidar. **PR #55 Draft; NO MERGE, NO HOSTINGER/DEPLOY; no abrir CAND-04 antes del gate.**
+**NEXT ÚNICO:** validar CI del **nuevo commit solo Markdown** y que diff contra el HEAD de producto modifique únicamente este checkpoint. Luego presentar **al owner la aceptación de diseño factual con reservas y autorización explícita de merge exclusivo del PR #55 a main**. Sin esa autorización, mantener Draft/NO MERGE; Hostinger continúa NO DEPLOY. No iniciar CAND-04 hasta cerrar esta compuerta.
