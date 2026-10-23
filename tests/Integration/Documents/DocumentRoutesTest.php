@@ -158,6 +158,40 @@ final class DocumentRoutesTest extends TestCase
         self::assertSame($this->pdfBytes(), (string) $download->getBody());
         self::assertSame('private, no-store', $download->getHeaderLine('Cache-Control'));
         self::assertSame('nosniff', $download->getHeaderLine('X-Content-Type-Options'));
+
+        $manualJson = $this->request($managerApp, 'POST', '/sub/admin/documents', [
+            'scope' => 'property',
+            'scope_id' => (string) $propertyId,
+            'type' => 'manual_convivencia',
+            'title' => 'Manual JSON anterior',
+            'content_json' => '{"sections":[{"title":"Ruido","body":"Respetar el descanso."}]}',
+        ]);
+        self::assertSame(303, $manualJson->getStatusCode());
+        $manualJsonId = (int) $this->pdo->query("SELECT id FROM documents WHERE type = 'manual_convivencia' ORDER BY id DESC LIMIT 1")->fetchColumn();
+        $manualPdf = $this->request($managerApp, 'POST', '/sub/admin/documents', [
+            'scope' => 'property',
+            'scope_id' => (string) $propertyId,
+            'type' => 'manual_convivencia',
+            'title' => 'Manual PDF vigente',
+            'supersedes_document_id' => (string) $manualJsonId,
+            'content_json' => '{}',
+        ], ['document' => $this->upload($this->pdfBytes(), 'manual.pdf')]);
+        self::assertSame(303, $manualPdf->getStatusCode());
+        $manualPdfId = (int) $this->pdo->query("SELECT id FROM documents WHERE type = 'manual_convivencia' ORDER BY id DESC LIMIT 1")->fetchColumn();
+
+        $manualCurrent = (string) $this->request(
+            $managerApp,
+            'GET',
+            '/sub/admin/documents?scope=property&id=' . $propertyId,
+        )->getBody();
+        self::assertStringContainsString('Manual PDF vigente', $manualCurrent);
+        self::assertStringNotContainsString('Manual JSON anterior', $manualCurrent);
+        $manualHistory = (string) $this->request($managerApp, 'GET', '/sub/admin/documents/' . $manualPdfId)->getBody();
+        self::assertStringContainsString('Manual JSON anterior', $manualHistory);
+        self::assertStringContainsString('Manual PDF vigente', $manualHistory);
+        $manualDownload = $this->request($managerApp, 'GET', '/sub/admin/documents/' . $manualPdfId . '/file');
+        self::assertSame(200, $manualDownload->getStatusCode());
+        self::assertSame($this->pdfBytes(), (string) $manualDownload->getBody());
     }
 
     private function app(string $basePath = ''): App

@@ -341,59 +341,190 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
 
     <?php elseif ($activeSection === 'household'): ?>
         <?php
-        $occupantsCount = $candidate['occupants_count'] ?? null;
-        $occupantsCount = $occupantsCount === null ? null : (int) $occupantsCount;
+        $occupantsCount = ($candidate['occupants_count'] ?? null) === null ? null : (int) $candidate['occupants_count'];
         $occupantsNotes = trim((string) ($candidate['occupants_notes'] ?? ''));
-        $petsDeclared = !empty($candidate['pets_declared']);
         $petsNotes = trim((string) ($candidate['pets_notes'] ?? ''));
-        // pets_declared defaults to 0 in storage and wizard: an unsubmitted draft is not a confirmed 'No'.
-        $hasHouseholdData = $occupantsCount !== null
-            || $occupantsNotes !== ''
-            || $petsDeclared
-            || $petsNotes !== ''
-            || $submittedAt !== null;
-        $petDeclarationLabel = $petsDeclared
-            ? 'Mascotas declaradas'
-            : ($submittedAt !== null
-                ? 'Sin mascotas registradas en la solicitud'
-                : 'Declaración de mascotas no confirmada');
+        $householdOccupants = is_array($householdOccupants ?? null) ? $householdOccupants : [];
+        $householdPets = is_array($householdPets ?? null) ? $householdPets : [];
+        $householdCanManage = ($householdCanManage ?? $canManageCandidates ?? false) === true;
+        $householdManual = is_array($householdManual ?? null) ? $householdManual : ['authorized' => false];
+        $householdManualDocument = is_array($householdManual['document'] ?? null) ? $householdManual['document'] : null;
+        $householdPhotoPath = rtrim((string) ($householdPhotoPath ?? ($basePath . '/admin/candidates/' . (int) $candidate['id'] . '/household')), '/');
+        $petsAnswered = ($candidate['pets_answered_at'] ?? null) !== null;
+        $petDeclarationLabel = !$petsAnswered
+            ? 'Respuesta de mascotas no confirmada'
+            : (!empty($candidate['pets_declared']) ? 'Mascotas declaradas' : 'Sin mascotas declaradas en la solicitud');
+        $registeredOccupants = count($householdOccupants);
+        $registeredTotal = 1 + $registeredOccupants;
+        $occupantsMatch = $occupantsCount !== null && $occupantsCount === $registeredTotal;
+        $householdFormAction = $householdPhotoPath;
+        $householdRecordUrl = static fn (string $kind, int $recordId): string => $householdPhotoPath . '/' . rawurlencode($kind) . '/' . $recordId . '/photo';
+        $householdInitials = static function (mixed $fullName): string {
+            $parts = preg_split('/\s+/u', trim((string) $fullName)) ?: [];
+            $initials = '';
+            foreach (array_slice(array_values(array_filter($parts, static fn (string $part): bool => $part !== '')), 0, 2) as $part) {
+                $initials .= mb_strtoupper(mb_substr($part, 0, 1));
+            }
+            return $initials !== '' ? $initials : '—';
+        };
         ?>
         <section class="candidate-section" data-candidate-section-body="household">
-            <?php if (!$hasHouseholdData): ?>
-                <section class="content-card candidate-card" aria-labelledby="candidate-household-title">
-                    <h2 id="candidate-household-title">Ocupantes y mascotas</h2>
-                    <p class="empty-state">No se registró información del hogar.</p>
+            <div class="candidate-household-grid">
+                <section class="content-card candidate-card candidate-household-summary" data-household-region="summary" aria-labelledby="candidate-household-title">
+                    <div class="candidate-household-heading">
+                        <h2 id="candidate-household-title"><?= $candidateIcon('home') ?>Resumen del hogar</h2>
+                        <p class="muted">Datos declarados en la solicitud; no constituyen una evaluación de riesgo.</p>
+                    </div>
+                    <div class="candidate-household-facts">
+                        <p><span>Total declarado</span><strong><?= $occupantsCount === null ? 'Cantidad no declarada' : $escape($occupantsCount . ' ocupantes declarados') ?></strong></p>
+                        <p><span>Fichas adicionales</span><strong><?= $escape($registeredOccupants) ?> registradas</strong></p>
+                        <p><span>Mascotas</span><strong><?= $escape($petDeclarationLabel) ?></strong></p>
+                    </div>
                 </section>
-            <?php else: ?>
-                <div class="candidate-household-grid">
-                    <section class="content-card candidate-card candidate-household-summary" aria-labelledby="candidate-household-title">
-                        <div class="candidate-household-heading">
-                            <h2 id="candidate-household-title"><?= $candidateIcon('home') ?>Resumen del hogar</h2>
-                            <p class="muted">Composición declarada en la solicitud. No es una evaluación del hogar.</p>
+
+                <section class="content-card candidate-card candidate-household-information" data-household-region="information" aria-labelledby="candidate-household-information-title">
+                    <h3 id="candidate-household-information-title"><?= $candidateIcon('history') ?>Estado de la información</h3>
+                    <dl class="candidate-household-details">
+                        <div><dt>Solicitante</dt><dd><?= $escape($candidate['full_name'] ?? 'Sin nombre registrado') ?></dd></div>
+                        <div><dt>Personas en fichas</dt><dd><?= $escape($registeredTotal) ?> incluyéndote</dd></div>
+                        <div><dt>Respuesta de mascotas</dt><dd><?= $petsAnswered ? $escape($candidate['pets_answered_at']) : 'Pendiente de confirmar' ?></dd></div>
+                    </dl>
+                    <?php if (!$occupantsMatch && ($occupantsCount !== null || $householdOccupants !== [])): ?>
+                        <p class="candidate-household-notice">El total declarado y las fichas disponibles no coinciden. Revisa la información; los registros anteriores se conservan sin completar personas automáticamente.</p>
+                    <?php elseif ($occupantsCount === null): ?>
+                        <p class="muted">No hay un total de ocupantes declarado.</p>
+                    <?php endif; ?>
+                </section>
+
+                <section class="content-card candidate-card candidate-household-occupants" data-household-region="occupants" aria-labelledby="candidate-household-occupants-title">
+                    <div class="candidate-household-region-heading">
+                        <h3 id="candidate-household-occupants-title"><?= $candidateIcon('users') ?>Ocupantes adicionales</h3>
+                        <p class="muted">El solicitante se muestra en el resumen, no como una ficha adicional.</p>
+                    </div>
+                    <?php if ($householdOccupants === []): ?>
+                        <p class="empty-state">No hay fichas de otras personas registradas.</p>
+                    <?php else: ?>
+                        <div class="candidate-household-records">
+                            <?php foreach ($householdOccupants as $occupant): ?>
+                                <article class="candidate-household-record">
+                                    <?php if (!empty($occupant['has_photo'])): ?>
+                                        <img class="candidate-household-avatar" src="<?= $escape($householdRecordUrl('occupant', (int) $occupant['id'])) ?>" alt="Fotografía de <?= $escape($occupant['full_name'] ?? 'ocupante') ?>" loading="lazy">
+                                    <?php else: ?>
+                                        <span class="candidate-household-avatar candidate-household-avatar--initials" aria-label="Iniciales de <?= $escape($occupant['full_name'] ?? 'ocupante') ?>"><?= $escape($householdInitials($occupant['full_name'] ?? '')) ?></span>
+                                    <?php endif; ?>
+                                    <div class="candidate-household-record__body">
+                                        <h4><?= $escape($occupant['full_name'] ?? '') ?></h4>
+                                        <p><?= $escape($occupant['relationship'] ?? 'Relación no indicada') ?><?php if (($occupant['age_years'] ?? null) !== null): ?> · <?= $escape($occupant['age_years']) ?> años aprox.<?php endif; ?></p>
+                                        <?php if (trim((string) ($occupant['occupation_or_activity'] ?? '')) !== ''): ?><p><?= $escape($occupant['occupation_or_activity']) ?></p><?php endif; ?>
+                                        <?php if (trim((string) ($occupant['notes'] ?? '')) !== ''): ?><p class="candidate-household-record__notes"><?= nl2br($escape($occupant['notes'])) ?></p><?php endif; ?>
+                                    </div>
+                                </article>
+                            <?php endforeach; ?>
                         </div>
-                        <div class="candidate-household-facts">
-                            <p><?= $occupantsCount === null ? 'Cantidad no declarada' : $occupantsCount . ' ocupantes declarados' ?></p>
-                            <p><?= $petDeclarationLabel ?></p>
+                    <?php endif; ?>
+                    <?php if ($occupantsNotes !== ''): ?><div class="candidate-household-notes"><strong>Notas declaradas</strong><p><?= nl2br($escape($occupantsNotes)) ?></p></div><?php endif; ?>
+                    <?php if ($householdCanManage): ?>
+                        <details class="candidate-household-manager">
+                            <summary>Administrar fichas de ocupantes</summary>
+                            <?php foreach ($householdOccupants as $occupant): ?>
+                                <form class="candidate-household-edit" method="post" enctype="multipart/form-data" action="<?= $escape($householdFormAction . '/occupant') ?>">
+                                    <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>"><input type="hidden" name="record_id" value="<?= $escape($occupant['id']) ?>">
+                                    <label>Nombre<input name="full_name" maxlength="190" required value="<?= $escape($occupant['full_name'] ?? '') ?>"></label>
+                                    <label>Relación<input name="relationship" maxlength="100" required value="<?= $escape($occupant['relationship'] ?? '') ?>"></label>
+                                    <label>Edad aproximada<input type="number" name="age_years" min="0" max="120" value="<?= $escape($occupant['age_years'] ?? '') ?>"></label>
+                                    <label>Ocupación o actividad<input name="occupation_or_activity" maxlength="190" value="<?= $escape($occupant['occupation_or_activity'] ?? '') ?>"></label>
+                                    <label>Notas<textarea name="notes" maxlength="5000"><?= $escape($occupant['notes'] ?? '') ?></textarea></label>
+                                    <label>Fotografía opcional<input type="file" name="photo" accept="image/png,image/jpeg"></label>
+                                    <label><input type="checkbox" name="photo_consent" value="1"> Confirmo que existe autorización para guardar la foto.</label>
+                                    <?php if (!empty($occupant['has_photo'])): ?><label><input type="checkbox" name="remove_photo" value="1"> Retirar fotografía</label><?php endif; ?>
+                                    <button class="button button--quiet" type="submit">Guardar cambios</button>
+                                </form>
+                                <form method="post" action="<?= $escape($householdFormAction . '/occupant') ?>" onsubmit="return confirm('¿Retirar esta ficha de ocupante?')">
+                                    <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="record_id" value="<?= $escape($occupant['id']) ?>">
+                                    <button class="button button--quiet" type="submit">Retirar ficha</button>
+                                </form>
+                            <?php endforeach; ?>
+                            <form class="candidate-household-edit" method="post" enctype="multipart/form-data" action="<?= $escape($householdFormAction . '/occupant') ?>">
+                                <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                                <h4>Nueva ficha</h4>
+                                <label>Nombre<input name="full_name" maxlength="190" required></label><label>Relación<input name="relationship" maxlength="100" required></label>
+                                <label>Edad aproximada<input type="number" name="age_years" min="0" max="120"></label><label>Ocupación o actividad<input name="occupation_or_activity" maxlength="190"></label>
+                                <label>Notas<textarea name="notes" maxlength="5000"></textarea></label><label>Fotografía opcional<input type="file" name="photo" accept="image/png,image/jpeg"></label>
+                                <label><input type="checkbox" name="photo_consent" value="1"> Confirmo que existe autorización para guardar la foto.</label><button class="button" type="submit">Crear ficha</button>
+                            </form>
+                        </details>
+                    <?php endif; ?>
+                </section>
+
+                <section class="content-card candidate-card candidate-household-pets" data-household-region="pets" aria-labelledby="candidate-household-pets-title">
+                    <h3 id="candidate-household-pets-title"><?= $candidateIcon('account') ?>Mascotas</h3>
+                    <?php if ($householdPets === []): ?>
+                        <p class="empty-state">No hay fichas de mascotas registradas.</p>
+                    <?php else: ?>
+                        <div class="candidate-household-records">
+                            <?php foreach ($householdPets as $pet): ?>
+                                <article class="candidate-household-record">
+                                    <?php if (!empty($pet['has_photo'])): ?><img class="candidate-household-avatar" src="<?= $escape($householdRecordUrl('pet', (int) $pet['id'])) ?>" alt="Fotografía de <?= $escape($pet['name'] ?? 'mascota') ?>" loading="lazy">
+                                    <?php else: ?><span class="candidate-household-avatar candidate-household-avatar--initials" aria-label="Iniciales de <?= $escape($pet['name'] ?? 'mascota') ?>"><?= $escape($householdInitials($pet['name'] ?? '')) ?></span><?php endif; ?>
+                                    <div class="candidate-household-record__body"><h4><?= $escape($pet['name'] ?? '') ?></h4><p><?= $escape($pet['species'] ?? 'Especie no indicada') ?><?php if (trim((string) ($pet['breed'] ?? '')) !== ''): ?> · <?= $escape($pet['breed']) ?><?php endif; ?></p>
+                                        <?php if (($pet['age_years'] ?? null) !== null || trim((string) ($pet['size_category'] ?? '')) !== ''): ?><p><?php if (($pet['age_years'] ?? null) !== null): ?><?= $escape($pet['age_years']) ?> años aprox.<?php endif; ?><?php if (trim((string) ($pet['size_category'] ?? '')) !== ''): ?><?= ($pet['age_years'] ?? null) !== null ? ' · ' : '' ?><?= $escape($pet['size_category']) ?><?php endif; ?></p><?php endif; ?>
+                                        <?php if (($pet['vaccination_declaration'] ?? null) !== null): ?><p>Declaración: <?= $pet['vaccination_declaration'] === 'declared_vaccinated' ? 'vacunación declarada' : 'no vacunación declarada' ?></p><?php endif; ?>
+                                        <?php if (trim((string) ($pet['notes'] ?? '')) !== ''): ?><p class="candidate-household-record__notes"><?= nl2br($escape($pet['notes'])) ?></p><?php endif; ?>
+                                    </div>
+                                </article>
+                            <?php endforeach; ?>
                         </div>
-                    </section>
-                    <section class="content-card candidate-card candidate-household-occupants" aria-labelledby="candidate-household-occupants-title">
-                        <h3 id="candidate-household-occupants-title"><?= $candidateIcon('users') ?>Ocupantes</h3>
-                        <?php if ($occupantsNotes === ''): ?>
-                            <p class="muted">No hay información adicional sobre ocupantes.</p>
-                        <?php else: ?>
-                            <p><?= nl2br($escape($occupantsNotes)) ?></p>
-                        <?php endif; ?>
-                    </section>
-                    <section class="content-card candidate-card candidate-household-pets" aria-labelledby="candidate-household-pets-title">
-                        <h3 id="candidate-household-pets-title"><span aria-hidden="true">🐾</span>Mascotas</h3>
-                        <?php if ($petsNotes === ''): ?>
-                            <p class="muted">No hay información adicional sobre mascotas.</p>
-                        <?php else: ?>
-                            <p><?= nl2br($escape($petsNotes)) ?></p>
-                        <?php endif; ?>
-                    </section>
-                </div>
-            <?php endif; ?>
+                    <?php endif; ?>
+                    <?php if ($petsNotes !== ''): ?><div class="candidate-household-notes"><strong>Notas declaradas</strong><p><?= nl2br($escape($petsNotes)) ?></p></div><?php endif; ?>
+                    <?php if ($householdCanManage): ?>
+                        <details class="candidate-household-manager"><summary>Administrar fichas de mascotas</summary>
+                            <?php foreach ($householdPets as $pet): ?>
+                                <form class="candidate-household-edit" method="post" enctype="multipart/form-data" action="<?= $escape($householdFormAction . '/pet') ?>">
+                                    <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>"><input type="hidden" name="record_id" value="<?= $escape($pet['id']) ?>">
+                                    <label>Nombre<input name="name" maxlength="190" required value="<?= $escape($pet['name'] ?? '') ?>"></label><label>Especie<input name="species" maxlength="80" required value="<?= $escape($pet['species'] ?? '') ?>"></label>
+                                    <label>Raza<input name="breed" maxlength="120" value="<?= $escape($pet['breed'] ?? '') ?>"></label><label>Tamaño<input name="size_category" maxlength="32" value="<?= $escape($pet['size_category'] ?? '') ?>"></label>
+                                    <label>Edad aproximada<input type="number" name="age_years" min="0" max="100" value="<?= $escape($pet['age_years'] ?? '') ?>"></label>
+                                    <label>Declaración de vacunación<select name="vaccination_declaration"><option value="">Sin declarar</option><option value="declared_vaccinated" <?= ($pet['vaccination_declaration'] ?? '') === 'declared_vaccinated' ? 'selected' : '' ?>>Declara vacunación</option><option value="declared_not_vaccinated" <?= ($pet['vaccination_declaration'] ?? '') === 'declared_not_vaccinated' ? 'selected' : '' ?>>Declara no vacunación</option></select></label>
+                                    <label>Notas<textarea name="notes" maxlength="5000"><?= $escape($pet['notes'] ?? '') ?></textarea></label><label>Fotografía opcional<input type="file" name="photo" accept="image/png,image/jpeg"></label>
+                                    <label><input type="checkbox" name="photo_consent" value="1"> Confirmo que existe autorización para guardar la foto.</label><?php if (!empty($pet['has_photo'])): ?><label><input type="checkbox" name="remove_photo" value="1"> Retirar fotografía</label><?php endif; ?>
+                                    <button class="button button--quiet" type="submit">Guardar cambios</button>
+                                </form>
+                                <form method="post" action="<?= $escape($householdFormAction . '/pet') ?>" onsubmit="return confirm('¿Retirar esta ficha de mascota?')"><input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="record_id" value="<?= $escape($pet['id']) ?>"><button class="button button--quiet" type="submit">Retirar ficha</button></form>
+                            <?php endforeach; ?>
+                            <form class="candidate-household-edit" method="post" enctype="multipart/form-data" action="<?= $escape($householdFormAction . '/pet') ?>">
+                                <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>"><h4>Nueva ficha</h4>
+                                <label>Nombre<input name="name" maxlength="190" required></label><label>Especie<input name="species" maxlength="80" required></label><label>Raza<input name="breed" maxlength="120"></label><label>Tamaño<input name="size_category" maxlength="32"></label>
+                                <label>Edad aproximada<input type="number" name="age_years" min="0" max="100"></label><label>Declaración de vacunación<select name="vaccination_declaration"><option value="">Sin declarar</option><option value="declared_vaccinated">Declara vacunación</option><option value="declared_not_vaccinated">Declara no vacunación</option></select></label>
+                                <label>Notas<textarea name="notes" maxlength="5000"></textarea></label><label>Fotografía opcional<input type="file" name="photo" accept="image/png,image/jpeg"></label><label><input type="checkbox" name="photo_consent" value="1"> Confirmo que existe autorización para guardar la foto.</label><button class="button" type="submit">Crear ficha</button>
+                            </form>
+                        </details>
+                    <?php endif; ?>
+                </section>
+
+                <section class="content-card candidate-card candidate-household-rules" data-household-region="rules" aria-labelledby="candidate-household-rules-title">
+                    <h3 id="candidate-household-rules-title"><?= $candidateIcon('files') ?>Reglas y observaciones</h3>
+                    <?php if ($occupantsNotes === '' && $petsNotes === ''): ?><p class="muted">No hay observaciones adicionales declaradas.</p><?php endif; ?>
+                    <?php if (!$householdManual['authorized']): ?>
+                        <p class="muted">La información del manual no está disponible para este perfil.</p>
+                    <?php elseif ($householdManualDocument === null): ?>
+                        <p class="muted">Manual de convivencia no registrado.</p>
+                        <p><a class="button button--quiet" href="<?= $escape($householdManual['module_url']) ?>">Abrir Documentos de la propiedad</a></p>
+                    <?php else: ?>
+                        <p>Fuente: manual de convivencia vigente de la propiedad.</p>
+                        <p><strong><?= $escape($householdManualDocument['title']) ?></strong> · Versión #<?= $escape($householdManualDocument['id']) ?> · <?= $escape($householdManualDocument['created_at']) ?></p>
+                        <p><a class="button button--quiet" href="<?= $escape($householdManual['module_url']) ?>">Ver versión en Documentos</a></p>
+                    <?php endif; ?>
+                </section>
+
+                <section class="content-card candidate-card candidate-household-next" data-household-region="next-steps" aria-labelledby="candidate-household-next-title">
+                    <h3 id="candidate-household-next-title"><?= $candidateIcon('history') ?>Secciones para consultar</h3>
+                    <ul class="candidate-household-next-list">
+                        <?php foreach ([['work', 'Información laboral', 'Consultar datos laborales declarados'], ['references', 'Referencias', 'Consultar referencias registradas'], ['documents', 'Documentos', 'Consultar los requisitos adjuntos']] as [$key, $label, $description]): ?>
+                            <?php if (in_array($key, array_column($candidateSections, 'key'), true)): ?><li><a href="<?= $escape($sectionHref($key)) ?>"><strong><?= $escape($label) ?></strong><span><?= $escape($description) ?></span></a></li><?php endif; ?>
+                        <?php endforeach; ?>
+                    </ul>
+                </section>
+            </div>
         </section>
 
     <?php elseif ($activeSection === 'references'): ?>

@@ -26,7 +26,7 @@ final class DocumentService
         'legal_notice' => 'property',
         'other' => 'property_or_lease',
     ];
-    private const FILE_TYPES = ['property_document', 'lease_document', 'incident_evidence', 'other'];
+    private const FILE_TYPES = ['property_document', 'lease_document', 'manual_convivencia', 'incident_evidence', 'other'];
     private const CONTENT_TYPES = ['manual_convivencia', 'inventory_initial', 'inventory_final', 'legal_notice', 'other'];
     private const MIME_EXTENSIONS = [
         'application/pdf' => 'pdf',

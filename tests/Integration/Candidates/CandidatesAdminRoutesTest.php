@@ -6,6 +6,8 @@ namespace AlquilaPro\Tests\Integration\Candidates;
 
 use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Candidates\CandidateDocumentService;
+use AlquilaPro\Candidates\CandidateHouseholdService;
+use AlquilaPro\Documents\DocumentService;
 use AlquilaPro\Foundation\DatabaseConfig;
 use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
@@ -23,6 +25,8 @@ final class CandidatesAdminRoutesTest extends TestCase
     private string $directory;
     private string $lockPath;
     private string $documentDirectory;
+    private string $propertyDocumentDirectory;
+    private string $householdDirectory;
     private array $temporaryFiles = [];
 
     protected function setUp(): void
@@ -38,7 +42,7 @@ final class CandidatesAdminRoutesTest extends TestCase
         MigrationRunner::migrate($this->pdo, dirname(__DIR__, 3) . '/database/migrations');
 
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (['candidate_documents', 'candidate_references', 'unit_application_requirements', 'candidates', 'unit_media', 'units', 'properties', 'users'] as $table) {
+        foreach (['candidate_household_occupants', 'candidate_household_pets', 'candidate_documents', 'candidate_references', 'unit_application_requirements', 'documents', 'candidates', 'unit_media', 'units', 'properties', 'users'] as $table) {
             $this->pdo->exec('DELETE FROM `' . $table . '`');
         }
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
@@ -46,6 +50,8 @@ final class CandidatesAdminRoutesTest extends TestCase
         $this->directory = sys_get_temp_dir() . '/alquila_candidates_admin_' . bin2hex(random_bytes(6));
         mkdir($this->directory, 0700, true);
         $this->documentDirectory = $this->directory . '/candidate-documents';
+        $this->propertyDocumentDirectory = $this->directory . '/property-documents';
+        $this->householdDirectory = $this->directory . '/candidate-household';
         $this->lockPath = $this->directory . '/installed.lock';
         (new InstallationLock($this->lockPath))->write([
             'schema_version' => '1',
@@ -61,6 +67,12 @@ final class CandidatesAdminRoutesTest extends TestCase
         }
         foreach (glob($this->documentDirectory . '/*') ?: [] as $file) {
             @unlink($file);
+        }
+        foreach ([$this->propertyDocumentDirectory, $this->householdDirectory] as $directory) {
+            foreach (glob($directory . '/*') ?: [] as $file) {
+                @unlink($file);
+            }
+            @rmdir($directory);
         }
         @rmdir($this->documentDirectory);
         foreach (glob($this->directory . '/unit-media/*') ?: [] as $file) {
@@ -225,6 +237,129 @@ final class CandidatesAdminRoutesTest extends TestCase
         self::assertStringContainsString('2.500.000', $propertyHtml);
         self::assertStringContainsString('/sub/admin/units/' . $unitId . '/media/' . $photoId, $propertyHtml);
         self::assertSame(200, $this->request($allowed, 'GET', '/sub/admin/units/' . $unitId . '/media/' . $photoId)->getStatusCode());
+    }
+
+    public function testHouseholdManualMetadataRequiresCandidatePropertyAndDocumentViewPermissionsTogether(): void
+    {
+        $candidateId = $this->insertCandidate('HOUSEHOLD-MANUAL-1', 'Candidato Manual');
+        $unitId = $this->candidateUnitId($candidateId);
+        $propertyId = (int) $this->pdo->query('SELECT property_id FROM units WHERE id = ' . $unitId)->fetchColumn();
+        $actorId = $this->insertUser('manual-writer@example.com', 'WriterPassword123', 'owner');
+        $documents = new DocumentService($this->pdo, $this->propertyDocumentDirectory);
+        $json = $documents->createContentVersion(
+            $propertyId,
+            null,
+            'manual_convivencia',
+            'Manual JSON superseded',
+            ['sections' => [['title' => 'Ruido', 'body' => 'Respetar los horarios de descanso.']]],
+            null,
+            $actorId,
+            time(),
+        );
+        $pdf = $documents->createFileVersion(
+            $propertyId,
+            null,
+            'manual_convivencia',
+            'Manual PDF actual',
+            $this->upload($this->pdfBytes(), 'manual.pdf', 'application/pdf'),
+            (int) $json['id'],
+            $actorId,
+            time() + 1,
+        );
+        self::assertSame([$pdf['id']], array_column(
+            array_values(array_filter($documents->listCurrentForProperty($propertyId), static fn (array $document): bool => $document['type'] === 'manual_convivencia')),
+            'id',
+        ));
+
+        $restrictedProfiles = [
+            ['manual-candidate-only@example.com', ['candidates.view']],
+            ['manual-no-property@example.com', ['candidates.view', 'documents.view']],
+            ['manual-no-documents@example.com', ['candidates.view', 'properties.view']],
+        ];
+        foreach ($restrictedProfiles as [$email, $permissions]) {
+            $_SESSION = [];
+            $this->insertUser($email, 'ViewerPassword123', 'admin', $permissions);
+            $app = $this->app('/sub');
+            $this->login($app, $email, 'ViewerPassword123', '/sub');
+            $html = (string) $this->request($app, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=household')->getBody();
+            self::assertStringContainsString('La información del manual no está disponible para este perfil.', $html);
+            self::assertStringNotContainsString('Manual PDF actual', $html);
+            self::assertStringNotContainsString('Manual JSON superseded', $html);
+            self::assertStringNotContainsString('/sub/admin/documents?scope=property', $html);
+        }
+
+        $_SESSION = [];
+        $this->insertUser('manual-complete@example.com', 'ViewerPassword123', 'admin', [
+            'candidates.view', 'properties.view', 'documents.view',
+        ]);
+        $authorized = $this->app('/sub');
+        $this->login($authorized, 'manual-complete@example.com', 'ViewerPassword123', '/sub');
+        $html = (string) $this->request($authorized, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=household')->getBody();
+        self::assertStringContainsString('Manual PDF actual', $html);
+        self::assertStringNotContainsString('Manual JSON superseded', $html);
+        self::assertStringContainsString('/sub/admin/documents?scope=property&amp;id=' . $propertyId, $html);
+        self::assertStringContainsString('Versión #' . $pdf['id'], $html);
+    }
+
+    public function testHouseholdAdminCrudAndPrivatePhotoRouteAreCandidateScoped(): void
+    {
+        $candidateId = $this->insertCandidate('HOUSEHOLD-CRUD-1', 'Candidato Hogar');
+        $otherCandidateId = $this->insertCandidate('HOUSEHOLD-CRUD-2', 'Otro Candidato');
+        $household = new CandidateHouseholdService($this->pdo, $this->householdDirectory);
+        $occupant = $household->saveRecord('occupant', $candidateId, null, [
+            'full_name' => 'Acompañante Con Foto',
+            'relationship' => 'Hermano',
+            'photo_consent' => '1',
+        ], $this->upload($this->pngBytes(), 'occupant.png', 'image/png'), time());
+
+        $this->insertUser('household-viewer@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
+        $viewer = $this->app('/sub');
+        $this->login($viewer, 'household-viewer@example.com', 'ViewerPassword123', '/sub');
+        $page = (string) $this->request($viewer, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=household')->getBody();
+        self::assertStringContainsString('Acompañante Con Foto', $page);
+        self::assertStringNotContainsString('Administrar fichas de ocupantes', $page);
+        self::assertSame(403, $this->request($viewer, 'POST', '/sub/admin/candidates/' . $candidateId . '/household/occupant', [
+            'full_name' => 'No autorizado', 'relationship' => 'Nadie',
+        ])->getStatusCode());
+
+        $photoPath = '/sub/admin/candidates/' . $candidateId . '/household/occupant/' . $occupant['id'] . '/photo';
+        $photo = $this->request($viewer, 'GET', $photoPath);
+        self::assertSame(200, $photo->getStatusCode());
+        self::assertSame('image/png', $photo->getHeaderLine('Content-Type'));
+        self::assertSame('nosniff', $photo->getHeaderLine('X-Content-Type-Options'));
+        self::assertSame('private, no-store', $photo->getHeaderLine('Cache-Control'));
+        self::assertGreaterThan(0, strlen((string) $photo->getBody()));
+        self::assertSame(404, $this->request(
+            $viewer,
+            'GET',
+            '/sub/admin/candidates/' . $otherCandidateId . '/household/occupant/' . $occupant['id'] . '/photo',
+        )->getStatusCode());
+
+        $_SESSION = [];
+        $this->insertUser('household-manager@example.com', 'ManagerPassword123', 'admin', ['candidates.view', 'candidates.manage']);
+        $manager = $this->app('/sub');
+        $this->login($manager, 'household-manager@example.com', 'ManagerPassword123', '/sub');
+        $managerPage = (string) $this->request($manager, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=household')->getBody();
+        self::assertStringContainsString('Administrar fichas de ocupantes', $managerPage);
+        self::assertStringNotContainsString('Manual PDF actual', $managerPage);
+
+        $created = $this->request($manager, 'POST', '/sub/admin/candidates/' . $candidateId . '/household/occupant', [
+            'full_name' => 'Ficha Nueva', 'relationship' => 'Madre', 'age_years' => '58',
+        ]);
+        self::assertSame(303, $created->getStatusCode());
+        $createdId = (int) $this->pdo->query(
+            'SELECT id FROM candidate_household_occupants WHERE candidate_id = ' . $candidateId . ' ORDER BY id DESC LIMIT 1',
+        )->fetchColumn();
+        $updated = $this->request($manager, 'POST', '/sub/admin/candidates/' . $candidateId . '/household/occupant', [
+            'record_id' => (string) $createdId, 'full_name' => 'Ficha Actualizada', 'relationship' => 'Madre',
+        ]);
+        self::assertSame(303, $updated->getStatusCode());
+        self::assertSame('Ficha Actualizada', $household->listOccupants($candidateId)[1]['full_name']);
+        $deleted = $this->request($manager, 'POST', '/sub/admin/candidates/' . $candidateId . '/household/occupant', [
+            'action' => 'delete', 'record_id' => (string) $createdId,
+        ]);
+        self::assertSame(303, $deleted->getStatusCode());
+        self::assertCount(1, $household->listOccupants($candidateId));
     }
 
     public function testWorkAndDocumentsFromBothBranchesRemainAccessible(): void
@@ -502,6 +637,8 @@ final class CandidatesAdminRoutesTest extends TestCase
             'logo_directory' => $this->directory . '/branding',
             'unit_media_directory' => $this->directory . '/unit-media',
             'candidate_document_directory' => $this->documentDirectory,
+            'document_directory' => $this->propertyDocumentDirectory,
+            'candidate_household_media_directory' => $this->householdDirectory,
             'pdo' => $this->pdo,
         ]);
     }
@@ -621,6 +758,11 @@ final class CandidatesAdminRoutesTest extends TestCase
     private function pdfBytes(): string
     {
         return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<<>>\n%%EOF\n";
+    }
+
+    private function pngBytes(): string
+    {
+        return (string) base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
     }
 
     private function candidateUnitId(int $candidateId): int

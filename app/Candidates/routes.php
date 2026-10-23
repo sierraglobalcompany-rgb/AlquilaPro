@@ -6,9 +6,11 @@ use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Candidates\CandidateDocumentService;
+use AlquilaPro\Candidates\CandidateHouseholdService;
 use AlquilaPro\Candidates\CandidateService;
 use AlquilaPro\Candidates\ScreeningService;
 use AlquilaPro\Contracts\ContractService;
+use AlquilaPro\Documents\DocumentService;
 use AlquilaPro\Properties\PropertyService;
 use AlquilaPro\Properties\UnitMediaService;
 use AlquilaPro\UI\View;
@@ -22,6 +24,10 @@ return static function (App $app, array $deps): void {
     $candidates = $deps['candidates'];
     /** @var CandidateDocumentService $candidateDocuments */
     $candidateDocuments = $deps['candidate_documents'];
+    /** @var CandidateHouseholdService $household */
+    $household = $deps['candidate_household'];
+    /** @var DocumentService $documents */
+    $documents = $deps['documents'];
     /** @var ScreeningService $screening */
     $screening = $deps['screening'];
     /** @var PropertyService $properties */
@@ -140,7 +146,8 @@ return static function (App $app, array $deps): void {
         string $step,
         ?string $error = null,
         int $status = 200,
-    ) use ($view, $csrf, $path, $properties, $candidateDocuments, $screening, $wizardSteps): ResponseInterface {
+        array $householdForm = [],
+    ) use ($view, $csrf, $path, $properties, $candidateDocuments, $household, $screening, $wizardSteps): ResponseInterface {
         $continuePath = '/apply/continue/' . $token;
         $documentsByRequirement = [];
         foreach ($candidateDocuments->listDocumentsForCandidate((int) $candidate['id']) as $document) {
@@ -175,6 +182,9 @@ return static function (App $app, array $deps): void {
             'editable' => $editable,
             'applicationRequirements' => $candidateDocuments->listRequirementsForUnit((int) $candidate['unit_id'], true),
             'documentsByRequirement' => $documentsByRequirement,
+            'householdOccupants' => $household->listOccupants((int) $candidate['id']),
+            'householdPets' => $household->listPets((int) $candidate['id']),
+            'householdForm' => $householdForm,
             'availableUnits' => $step === 'personal' && $editable
                 ? $properties->listPublicUnits(null, null, null)
                 : [],
@@ -291,7 +301,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($adminGuard, $candidates, $candidateDocuments, $screening, $contracts, $properties, $media, $view, $csrf): ResponseInterface {
+    ) use ($adminGuard, $candidates, $candidateDocuments, $household, $documents, $screening, $contracts, $properties, $media, $view, $csrf, $path): ResponseInterface {
         $user = $adminGuard($response, 'candidates.view');
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -305,11 +315,13 @@ return static function (App $app, array $deps): void {
         $candidateId = (int) $candidate['id'];
         $propertyDetails = null;
         $coverPhotoId = null;
+        $householdPropertyId = null;
         // Candidate access does not imply access to private property details.
         if (Permissions::allows($user, 'properties.view')) {
             $unit = $properties->findUnit((int) $candidate['unit_id']);
             $property = $unit !== null ? $properties->findProperty((int) $unit['property_id']) : null;
             if ($unit !== null && $property !== null) {
+                $householdPropertyId = (int) $property['id'];
                 $propertyDetails = [
                     'unit_id' => (int) $unit['id'],
                     'unit_code' => $unit['code'],
@@ -335,6 +347,28 @@ return static function (App $app, array $deps): void {
                     }
                 }
             }
+        }
+        $householdManualAccess = Permissions::allows($user, 'properties.view')
+            && Permissions::allows($user, 'documents.view');
+        $householdManual = ['authorized' => false, 'document' => null, 'module_url' => null];
+        if ($householdManualAccess && $householdPropertyId !== null) {
+            $manual = null;
+            foreach ($documents->listCurrentForProperty($householdPropertyId) as $document) {
+                if (($document['type'] ?? null) === 'manual_convivencia') {
+                    $manual = [
+                        'id' => (int) $document['id'],
+                        'title' => (string) $document['title'],
+                        'created_at' => (string) $document['created_at'],
+                        'has_file' => is_string($document['stored_name'] ?? null),
+                    ];
+                    break;
+                }
+            }
+            $householdManual = [
+                'authorized' => true,
+                'document' => $manual,
+                'module_url' => $path('/admin/documents?scope=property&id=' . $householdPropertyId),
+            ];
         }
         $contractContext = null;
         if (Permissions::allows($user, 'contracts.view')) {
@@ -373,6 +407,11 @@ return static function (App $app, array $deps): void {
             'activeNav' => 'apps',
             'csrfToken' => $csrf->token(),
             'candidate' => $candidate,
+            'householdOccupants' => $household->listOccupants($candidateId),
+            'householdPets' => $household->listPets($candidateId),
+            'householdCanManage' => Permissions::allows($user, 'candidates.manage'),
+            'householdManual' => $householdManual,
+            'householdPhotoPath' => $path('/admin/candidates/' . $candidateId . '/household'),
             'propertyDetails' => $propertyDetails,
             'coverPhotoId' => $coverPhotoId,
             'documents' => $candidateDocuments->listDocumentsForCandidate($candidateId),
@@ -387,6 +426,83 @@ return static function (App $app, array $deps): void {
         ]));
 
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    });
+
+    $app->get('/admin/candidates/{id:[0-9]+}/household/{kind}/{recordId:[0-9]+}/photo', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminGuard, $candidates, $household): ResponseInterface {
+        $user = $adminGuard($response, 'candidates.view');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+        $candidateId = (int) $args['id'];
+        if ($candidates->findCandidate($candidateId) === null) {
+            return $response->withStatus(404);
+        }
+        $photo = $household->privatePhoto($candidateId, (string) $args['kind'], (int) $args['recordId']);
+        if ($photo === null) {
+            return $response->withStatus(404);
+        }
+        $bytes = file_get_contents($photo['path']);
+        if ($bytes === false) {
+            return $response->withStatus(404);
+        }
+        $response->getBody()->write($bytes);
+        return $response
+            ->withHeader('Content-Type', $photo['mime'])
+            ->withHeader('X-Content-Type-Options', 'nosniff')
+            ->withHeader('Cache-Control', 'private, no-store');
+    });
+
+    $app->post('/admin/candidates/{id:[0-9]+}/household/{kind}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminGuard, $candidates, $household, $path): ResponseInterface {
+        $user = $adminGuard($response, 'candidates.manage');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+        $candidateId = (int) $args['id'];
+        if ($candidates->findCandidate($candidateId) === null) {
+            return $response->withStatus(404);
+        }
+        $kind = (string) $args['kind'];
+        $body = (array) ($request->getParsedBody() ?? []);
+        $action = (string) ($body['action'] ?? 'save');
+        try {
+            if ($action === 'delete') {
+                $recordId = filter_var($body['record_id'] ?? null, FILTER_VALIDATE_INT);
+                if (!is_int($recordId) || $recordId <= 0) {
+                    return $response->withStatus(422);
+                }
+                $household->deleteRecord($kind, $candidateId, $recordId);
+            } elseif ($action === 'save') {
+                $recordId = trim((string) ($body['record_id'] ?? '')) === ''
+                    ? null
+                    : filter_var($body['record_id'], FILTER_VALIDATE_INT);
+                if ($recordId !== null && (!is_int($recordId) || $recordId <= 0)) {
+                    return $response->withStatus(422);
+                }
+                $uploads = $request->getUploadedFiles();
+                $photo = $uploads['photo'] ?? null;
+                if ($photo !== null && !$photo instanceof UploadedFileInterface) {
+                    return $response->withStatus(422);
+                }
+                unset($body['csrf_token'], $body['action'], $body['record_id']);
+                $household->saveRecord($kind, $candidateId, $recordId, $body, $photo, time());
+            } else {
+                return $response->withStatus(422);
+            }
+        } catch (RuntimeException $exception) {
+            $response->getBody()->write($exception->getMessage());
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
+        }
+        return $response
+            ->withHeader('Location', $path('/admin/candidates/' . $candidateId . '?section=household'))
+            ->withStatus(303);
     });
 
     $app->post('/admin/candidates/{id:[0-9]+}/screening', static function (
@@ -561,6 +677,31 @@ return static function (App $app, array $deps): void {
             ->withStatus(303);
     });
 
+    $app->get('/apply/continue/{token}/household/{kind}/{recordId:[0-9]+}/photo', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($candidates, $household): ResponseInterface {
+        $token = (string) ($args['token'] ?? '');
+        $candidate = $candidates->findByToken($token, time());
+        if ($candidate === null) {
+            return $response->withStatus(404);
+        }
+        $photo = $household->privatePhoto((int) $candidate['id'], (string) $args['kind'], (int) $args['recordId']);
+        if ($photo === null) {
+            return $response->withStatus(404);
+        }
+        $bytes = file_get_contents($photo['path']);
+        if ($bytes === false) {
+            return $response->withStatus(404);
+        }
+        $response->getBody()->write($bytes);
+        return $response
+            ->withHeader('Content-Type', $photo['mime'])
+            ->withHeader('X-Content-Type-Options', 'nosniff')
+            ->withHeader('Cache-Control', 'private, no-store');
+    });
+
     $app->get('/apply/continue/{token}/{step}', static function (
         ServerRequestInterface $request,
         ResponseInterface $response,
@@ -592,7 +733,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($candidates, $allowAttempt, $tooMany, $renderWizard, $path, $nextWizardStep, $continuationStepKeys): ResponseInterface {
+    ) use ($candidates, $household, $allowAttempt, $tooMany, $renderWizard, $path, $nextWizardStep, $continuationStepKeys): ResponseInterface {
         $token = (string) ($args['token'] ?? '');
         $candidate = $candidates->findByToken($token, time());
         if ($candidate === null) {
@@ -607,6 +748,40 @@ return static function (App $app, array $deps): void {
         $step = $input['wizard_step'] ?? null;
         unset($input['csrf_token']);
         unset($input['wizard_step']);
+
+        if ($step === 'occupants') {
+            $occupants = $input['occupants'] ?? null;
+            $pets = $input['pets'] ?? null;
+            if (($input['occupants_present'] ?? null) !== '1'
+                || ($input['pets_present'] ?? null) !== '1'
+                || !is_array($occupants)
+                || !is_array($pets)
+            ) {
+                return $renderWizard($response, $candidate, $token, 'occupants', 'Las fichas del hogar no son válidas.', 422);
+            }
+            $householdForm = $input;
+            unset($input['occupants'], $input['pets'], $input['occupants_present'], $input['pets_present']);
+            try {
+                $household->saveWizard(
+                    (int) $candidate['id'],
+                    $occupants,
+                    $pets,
+                    $request->getUploadedFiles(),
+                    static fn (): array => $candidates->updateByToken($token, $input, time()),
+                    time(),
+                );
+            } catch (RuntimeException $exception) {
+                return $renderWizard($response, $candidate, $token, 'occupants', $exception->getMessage(), 422, $householdForm);
+            }
+            if ($candidates->firstIncompleteWizardStep($token, time()) === 'occupants') {
+                return $response
+                    ->withHeader('Location', $path('/apply/continue/' . $token . '/occupants'))
+                    ->withStatus(303);
+            }
+            return $response
+                ->withHeader('Location', $path('/apply/continue/' . $token . '/references'))
+                ->withStatus(303);
+        }
 
         try {
             $candidates->updateByToken($token, $input, time());

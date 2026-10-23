@@ -378,7 +378,11 @@ final class ScreeningServiceTest extends TestCase
             return $candidateId;
         }
 
-        $this->candidates->submitByToken($started['continuation_token'], self::NOW + 1);
+        $this->candidates->updateByToken($started['continuation_token'], [
+            'occupants_count' => '1',
+            'pets_declared' => '0',
+        ], self::NOW + 1);
+        $this->candidates->submitByToken($started['continuation_token'], self::NOW + 2);
         if ($targetStatus === 'verification') {
             return $candidateId;
         }

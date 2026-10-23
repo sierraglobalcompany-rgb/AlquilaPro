@@ -15,6 +15,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
 use Slim\App;
 use Slim\Psr7\Factory\ServerRequestFactory;
+use Slim\Psr7\UploadedFile;
 
 final class CandidateWizardTest extends TestCase
 {
@@ -23,6 +24,9 @@ final class CandidateWizardTest extends TestCase
     private PDO $pdo;
     private string $directory;
     private string $lockPath;
+    private string $householdDirectory;
+    /** @var list<string> */
+    private array $temporaryFiles = [];
 
     protected function setUp(): void
     {
@@ -38,6 +42,7 @@ final class CandidateWizardTest extends TestCase
 
         $this->directory = sys_get_temp_dir() . '/alquila_candidate_wizard_' . bin2hex(random_bytes(6));
         mkdir($this->directory, 0700, true);
+        $this->householdDirectory = $this->directory . '/candidate-household';
         $this->lockPath = $this->directory . '/installed.lock';
         (new InstallationLock($this->lockPath))->write([
             'schema_version' => '1',
@@ -48,6 +53,13 @@ final class CandidateWizardTest extends TestCase
     protected function tearDown(): void
     {
         $_SESSION = [];
+        foreach (glob($this->householdDirectory . '/*') ?: [] as $file) {
+            @unlink($file);
+        }
+        foreach ($this->temporaryFiles as $file) {
+            @unlink($file);
+        }
+        @rmdir($this->householdDirectory);
         @unlink($this->lockPath);
         @unlink($this->lockPath . '.tmp');
         @rmdir($this->directory);
@@ -107,8 +119,12 @@ final class CandidateWizardTest extends TestCase
         $occupantsSaved = $this->request($app, 'POST', '/apply/continue/' . $token, [
             'csrf_token' => $this->csrfToken(),
             'wizard_step' => 'occupants',
-            'occupants_count' => '2',
+            'occupants_count' => '1',
             'pets_declared' => '0',
+            'occupants_present' => '1',
+            'pets_present' => '1',
+            'occupants' => [],
+            'pets' => [],
         ]);
         self::assertSame('/apply/continue/' . $token . '/references', $occupantsSaved->getHeaderLine('Location'));
 
@@ -132,6 +148,159 @@ final class CandidateWizardTest extends TestCase
         self::assertSame('verification', $final['status']);
     }
 
+    public function testNewHouseholdAnswerIsNotPreselectedAndCountIncludesApplicant(): void
+    {
+        $app = $this->app();
+        [, $token] = $this->startThroughPublicRoute();
+
+        $response = $this->request($app, 'GET', '/apply/continue/' . $token . '/occupants');
+        $html = (string) $response->getBody();
+
+        self::assertStringContainsString('incluyéndote', mb_strtolower($html));
+        self::assertDoesNotMatchRegularExpression('/name="pets_declared" value="[01]"[^>]*checked/i', $html);
+    }
+
+    public function testWizardSavesMultipleRealOccupantsAndPetsBeforeAdvancing(): void
+    {
+        $app = $this->app();
+        [, $token, $candidateId] = $this->startThroughPublicRoute();
+        $response = $this->request($app, 'POST', '/apply/continue/' . $token, [
+            'csrf_token' => $this->csrfToken(),
+            'wizard_step' => 'occupants',
+            'occupants_present' => '1',
+            'pets_present' => '1',
+            'occupants_count' => '3',
+            'occupants_notes' => 'Total declarado con el solicitante.',
+            'pets_declared' => '1',
+            'pets_notes' => 'Declaración libre de la familia.',
+            'occupants' => [
+                ['full_name' => 'Acompañante Uno', 'relationship' => 'Pareja', 'age_years' => '34'],
+                ['full_name' => 'Acompañante Dos', 'relationship' => 'Hijo', 'age_years' => '9'],
+            ],
+            'pets' => [
+                ['name' => 'Luna', 'species' => 'Gato'],
+                ['name' => 'Nube', 'species' => 'Perro'],
+            ],
+        ]);
+
+        self::assertSame(303, $response->getStatusCode());
+        self::assertSame('/apply/continue/' . $token . '/references', $response->getHeaderLine('Location'));
+        self::assertSame(2, (int) $this->pdo->query(
+            'SELECT COUNT(*) FROM candidate_household_occupants WHERE candidate_id = ' . $candidateId,
+        )->fetchColumn());
+        self::assertSame(2, (int) $this->pdo->query(
+            'SELECT COUNT(*) FROM candidate_household_pets WHERE candidate_id = ' . $candidateId,
+        )->fetchColumn());
+        $candidate = (new CandidateService($this->pdo))->findByToken($token, time());
+        self::assertSame('3', (string) $candidate['occupants_count']);
+        self::assertNotNull($candidate['pets_answered_at']);
+    }
+
+    public function testWizardKeepsHouseholdStepOpenWhenDeclaredTotalDoesNotMatchRealFiches(): void
+    {
+        $app = $this->app();
+        [, $token] = $this->startThroughPublicRoute();
+        $response = $this->request($app, 'POST', '/apply/continue/' . $token, [
+            'csrf_token' => $this->csrfToken(),
+            'wizard_step' => 'occupants',
+            'occupants_present' => '1',
+            'pets_present' => '1',
+            'occupants_count' => '3',
+            'pets_declared' => '0',
+            'occupants' => [['full_name' => 'Acompañante Real', 'relationship' => 'Hermana']],
+            'pets' => [],
+        ]);
+
+        self::assertSame('/apply/continue/' . $token . '/occupants', $response->getHeaderLine('Location'));
+        $html = (string) $this->request($app, 'GET', '/apply/continue/' . $token . '/occupants')->getBody();
+        self::assertStringContainsString('value="3"', $html);
+        self::assertStringContainsString('Acompañante Real', $html);
+        self::assertStringContainsString('El total declarado debe coincidir con el solicitante y las fichas de las personas adicionales.', $html);
+    }
+
+    public function testWizardPhotoUploadRequiresConsentAndIsPrivate(): void
+    {
+        $app = $this->app();
+        [, $token, $candidateId] = $this->startThroughPublicRoute();
+        $body = [
+            'csrf_token' => $this->csrfToken(),
+            'wizard_step' => 'occupants',
+            'occupants_present' => '1',
+            'pets_present' => '1',
+            'occupants_count' => '2',
+            'pets_declared' => '0',
+            'occupants' => [['full_name' => 'Acompañante con imagen', 'relationship' => 'Hermana']],
+            'pets' => [],
+        ];
+        $uploads = ['occupants' => [0 => ['photo' => $this->upload($this->pngBytes(), 'person.png')]]];
+        $rejected = $this->request($app, 'POST', '/apply/continue/' . $token, $body, $uploads);
+        self::assertSame(422, $rejected->getStatusCode());
+        self::assertStringContainsString('Confirma que cuentas con autorización', (string) $rejected->getBody());
+        self::assertSame(0, (int) $this->pdo->query(
+            'SELECT COUNT(*) FROM candidate_household_occupants WHERE candidate_id = ' . $candidateId,
+        )->fetchColumn());
+
+        $body['csrf_token'] = $this->csrfToken();
+        $body['occupants'][0]['photo_consent'] = '1';
+        $accepted = $this->request($app, 'POST', '/apply/continue/' . $token, $body, [
+            'occupants' => [0 => ['photo' => $this->upload($this->pngBytes(), 'person.png')]],
+        ]);
+        self::assertSame(303, $accepted->getStatusCode());
+        $recordId = (int) $this->pdo->query(
+            'SELECT id FROM candidate_household_occupants WHERE candidate_id = ' . $candidateId,
+        )->fetchColumn();
+        $photo = $this->request($app, 'GET', '/apply/continue/' . $token . '/household/occupant/' . $recordId . '/photo');
+        self::assertSame(200, $photo->getStatusCode());
+        self::assertSame('image/png', $photo->getHeaderLine('Content-Type'));
+        self::assertSame('private, no-store', $photo->getHeaderLine('Cache-Control'));
+        self::assertSame('nosniff', $photo->getHeaderLine('X-Content-Type-Options'));
+    }
+
+    public function testSubmissionRequiresAnExplicitPetAnswer(): void
+    {
+        [, $token] = $this->startThroughPublicRoute();
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Debes indicar si tienes mascotas.');
+        (new CandidateService($this->pdo))->submitByToken($token, time());
+    }
+
+    public function testExplicitPetAnswerIsTimestampedAndLegacyFalseRemainsUnconfirmed(): void
+    {
+        [, $token] = $this->startThroughPublicRoute();
+        $candidates = new CandidateService($this->pdo);
+        $before = $candidates->findByToken($token, time());
+        self::assertNull($before['pets_answered_at']);
+
+        $now = time();
+        $updated = $candidates->updateByToken($token, ['pets_declared' => '0'], $now);
+
+        self::assertFalse($updated['pets_declared']);
+        self::assertSame(gmdate('Y-m-d H:i:s', $now), $updated['pets_answered_at']);
+    }
+
+    public function testSubmissionRequiresPetRowsAndMatchingDeclaredOccupantCount(): void
+    {
+        [, $token] = $this->startThroughPublicRoute();
+        $candidates = new CandidateService($this->pdo);
+        $candidates->updateByToken($token, ['occupants_count' => '1', 'pets_declared' => '1'], time());
+
+        try {
+            $candidates->submitByToken($token, time());
+            self::fail('A positive pet answer requires a real pet row.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Registra al menos una mascota antes de enviar la solicitud.', $exception->getMessage());
+        }
+
+        $candidates->updateByToken($token, ['occupants_count' => '2', 'pets_declared' => '0'], time());
+        try {
+            $candidates->submitByToken($token, time());
+            self::fail('The declared household count must match the applicant plus occupant rows.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Completa las fichas de las personas adicionales antes de enviar.', $exception->getMessage());
+        }
+    }
+
     public function testCompatibilityRouteRedirectsToFirstIncompleteStepFromCurrentData(): void
     {
         [, $token] = $this->startThroughPublicRoute();
@@ -145,13 +314,17 @@ final class CandidateWizardTest extends TestCase
         $service->updateByToken($token, ['employment_status' => 'Independiente'], time());
         $response = $this->request($this->app(), 'GET', '/apply/continue/' . $token);
         self::assertSame(303, $response->getStatusCode());
-        self::assertSame('/apply/continue/' . $token . '/review', $response->getHeaderLine('Location'));
+        self::assertSame('/apply/continue/' . $token . '/occupants', $response->getHeaderLine('Location'));
     }
 
     public function testSubmittedCandidateCanOnlyOpenReadOnlyReview(): void
     {
         $app = $this->app();
         [, $token] = $this->startThroughPublicRoute();
+        (new CandidateService($this->pdo))->updateByToken($token, [
+            'occupants_count' => '1',
+            'pets_declared' => '0',
+        ], time());
         $submission = $this->request($app, 'POST', '/apply/continue/' . $token . '/submit', [
             'csrf_token' => $this->csrfToken(),
         ]);
@@ -242,10 +415,11 @@ final class CandidateWizardTest extends TestCase
             'pdo' => $this->pdo,
             'logo_directory' => $this->directory . '/branding',
             'unit_media_directory' => $this->directory . '/unit-media',
+            'candidate_household_media_directory' => $this->householdDirectory,
         ]);
     }
 
-    private function request(App $app, string $method, string $path, array $body = []): ResponseInterface
+    private function request(App $app, string $method, string $path, array $body = [], array $uploads = []): ResponseInterface
     {
         $request = (new ServerRequestFactory())->createServerRequest(
             $method,
@@ -254,8 +428,26 @@ final class CandidateWizardTest extends TestCase
         if (strtoupper($method) === 'POST') {
             $request = $request->withParsedBody($body);
         }
+        if ($uploads !== []) {
+            $request = $request->withUploadedFiles($uploads);
+        }
 
         return $app->handle($request);
+    }
+
+    private function upload(string $bytes, string $filename): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'alquila_wizard_household_');
+        if ($path === false || file_put_contents($path, $bytes) !== strlen($bytes)) {
+            self::fail('Unable to create household upload fixture.');
+        }
+        $this->temporaryFiles[] = $path;
+        return new UploadedFile($path, $filename, 'image/png', strlen($bytes), UPLOAD_ERR_OK, false);
+    }
+
+    private function pngBytes(): string
+    {
+        return (string) base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
     }
 
     private function csrfToken(): string

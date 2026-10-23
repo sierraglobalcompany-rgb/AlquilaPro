@@ -54,6 +54,8 @@ final class MigrationRunnerTest extends TestCase
             'contract_templates',
             'screening_processes',
             'candidate_documents',
+            'candidate_household_occupants',
+            'candidate_household_pets',
             'candidate_references',
             'unit_application_requirements',
             'candidates',
@@ -104,6 +106,7 @@ final class MigrationRunnerTest extends TestCase
                 '021_create_lease_termination.sql',
                 '022_create_audit_log.sql',
                 '023_extend_users_login_identifiers.sql',
+                '024_create_candidate_household.sql',
         ];
         self::assertSame(count($expectedMigrations), $first['applied']);
         self::assertSame($expectedMigrations, $first['migrations']);
@@ -119,6 +122,8 @@ final class MigrationRunnerTest extends TestCase
         self::assertSame(1, $this->tableExists('candidate_references'));
         self::assertSame(1, $this->tableExists('unit_application_requirements'));
         self::assertSame(1, $this->tableExists('candidate_documents'));
+        self::assertSame(1, $this->tableExists('candidate_household_occupants'));
+        self::assertSame(1, $this->tableExists('candidate_household_pets'));
         self::assertSame(1, $this->tableExists('screening_processes'));
         self::assertSame(1, $this->tableExists('contract_templates'));
         self::assertSame(1, $this->tableExists('contract_template_versions'));
