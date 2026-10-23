@@ -766,9 +766,9 @@ ul { padding-left: 22px; }
     .candidate-surface .app-main { padding: 12px 32px 40px; }
 }
 @media (min-width: 1200px) {
-    .candidate-surface .app-shell { grid-template-columns: 212px minmax(0, 1fr); }
     .candidate-tabs { display: block; }
     .candidate-section-menu { display: none; }
+    .candidate-surface .app-shell { grid-template-columns: 212px minmax(0, 1fr); }
 }
 
 /* Candidate documents: factual received/pending list, not the generic user-card grid. */
