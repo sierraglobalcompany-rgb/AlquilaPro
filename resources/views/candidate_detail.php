@@ -340,16 +340,60 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
         </section>
 
     <?php elseif ($activeSection === 'household'): ?>
+        <?php
+        $occupantsCount = $candidate['occupants_count'] ?? null;
+        $occupantsCount = $occupantsCount === null ? null : (int) $occupantsCount;
+        $occupantsNotes = trim((string) ($candidate['occupants_notes'] ?? ''));
+        $petsDeclared = !empty($candidate['pets_declared']);
+        $petsNotes = trim((string) ($candidate['pets_notes'] ?? ''));
+        // pets_declared defaults to 0 in storage and wizard: an unsubmitted draft is not a confirmed 'No'.
+        $hasHouseholdData = $occupantsCount !== null
+            || $occupantsNotes !== ''
+            || $petsDeclared
+            || $petsNotes !== ''
+            || $submittedAt !== null;
+        $petDeclarationLabel = $petsDeclared
+            ? 'Mascotas declaradas'
+            : ($submittedAt !== null
+                ? 'Sin mascotas registradas en la solicitud'
+                : 'Declaración de mascotas no confirmada');
+        ?>
         <section class="candidate-section" data-candidate-section-body="household">
-            <section class="content-card">
-                <div class="section-heading"><div><p class="eyebrow">Hogar</p><h2>Ocupantes y mascotas</h2></div></div>
-                <dl class="account-details">
-                    <div><dt>Ocupantes</dt><dd><?= $escape($candidate['occupants_count'] ?? '') ?></dd></div>
-                    <div><dt>Detalle de ocupantes</dt><dd><?= $escape($candidate['occupants_notes'] ?? '') ?></dd></div>
-                    <div><dt>Mascotas</dt><dd><?= !empty($candidate['pets_declared']) ? 'Sí' : 'No' ?></dd></div>
-                    <div><dt>Detalle de mascotas</dt><dd><?= $escape($candidate['pets_notes'] ?? '') ?></dd></div>
-                </dl>
-            </section>
+            <?php if (!$hasHouseholdData): ?>
+                <section class="content-card candidate-card" aria-labelledby="candidate-household-title">
+                    <h2 id="candidate-household-title">Ocupantes y mascotas</h2>
+                    <p class="empty-state">No se registró información del hogar.</p>
+                </section>
+            <?php else: ?>
+                <div class="candidate-household-grid">
+                    <section class="content-card candidate-card candidate-household-summary" aria-labelledby="candidate-household-title">
+                        <div class="candidate-household-heading">
+                            <h2 id="candidate-household-title"><?= $candidateIcon('home') ?>Resumen del hogar</h2>
+                            <p class="muted">Composición declarada en la solicitud. No es una evaluación del hogar.</p>
+                        </div>
+                        <div class="candidate-household-facts">
+                            <p><?= $occupantsCount === null ? 'Cantidad no declarada' : $occupantsCount . ' ocupantes declarados' ?></p>
+                            <p><?= $petDeclarationLabel ?></p>
+                        </div>
+                    </section>
+                    <section class="content-card candidate-card candidate-household-occupants" aria-labelledby="candidate-household-occupants-title">
+                        <h3 id="candidate-household-occupants-title"><?= $candidateIcon('users') ?>Ocupantes</h3>
+                        <?php if ($occupantsNotes === ''): ?>
+                            <p class="muted">No hay información adicional sobre ocupantes.</p>
+                        <?php else: ?>
+                            <p><?= nl2br($escape($occupantsNotes)) ?></p>
+                        <?php endif; ?>
+                    </section>
+                    <section class="content-card candidate-card candidate-household-pets" aria-labelledby="candidate-household-pets-title">
+                        <h3 id="candidate-household-pets-title"><?= $candidateIcon('heart') ?>Mascotas</h3>
+                        <?php if ($petsNotes === ''): ?>
+                            <p class="muted">No hay información adicional sobre mascotas.</p>
+                        <?php else: ?>
+                            <p><?= nl2br($escape($petsNotes)) ?></p>
+                        <?php endif; ?>
+                    </section>
+                </div>
+            <?php endif; ?>
         </section>
 
     <?php elseif ($activeSection === 'references'): ?>
