@@ -338,6 +338,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
         $requiredCount = 0;
         $receivedRequiredCount = 0;
         $activeRequirementIds = [];
+        $pendingRequired = [];
         foreach ($documentRequirements as $requirement) {
             $requirementId = (int) $requirement['id'];
             $activeRequirementIds[$requirementId] = true;
@@ -345,69 +346,109 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                 ++$requiredCount;
                 if (isset($documentsByRequirement[$requirementId])) {
                     ++$receivedRequiredCount;
+                } else {
+                    $pendingRequired[] = $requirement;
                 }
             }
         }
+        $otherDocuments = array_values(array_filter(
+            $documents,
+            static fn (array $document): bool => !isset($activeRequirementIds[(int) $document['requirement_id']]),
+        ));
         ?>
         <section class="candidate-section" data-candidate-section-body="documents">
-            <section class="content-card candidate-card" aria-labelledby="candidate-documents-title">
-                <div class="section-heading">
-                    <div><p class="eyebrow">Documentación</p><h2 id="candidate-documents-title">Documentos del candidato</h2></div>
-                </div>
-                <?php if ($documentRequirements !== []): ?>
-                    <?php if ($requiredCount > 0): ?>
-                        <p class="muted" data-document-required-count="<?= $requiredCount ?>" data-document-received-count="<?= $receivedRequiredCount ?>">
-                            <?= $receivedRequiredCount ?> de <?= $requiredCount ?> requisitos obligatorios recibidos. Esto no indica revisión ni aprobación.
-                        </p>
+            <div class="candidate-documents-layout">
+                <section class="content-card candidate-card candidate-documents-main" aria-labelledby="candidate-documents-title">
+                    <div class="candidate-documents-heading">
+                        <div>
+                            <p class="eyebrow">Documentación</p>
+                            <h2 id="candidate-documents-title">Documentos del candidato</h2>
+                            <p class="muted">Archivos recibidos y requisitos reales de esta unidad.</p>
+                        </div>
+                    </div>
+                    <?php if ($documentRequirements !== []): ?>
+                        <div class="candidate-document-list" aria-label="Requisitos documentales activos">
+                            <?php foreach ($documentRequirements as $requirement): ?>
+                                <?php
+                                $attached = $documentsByRequirement[(int) $requirement['id']] ?? null;
+                                $received = $attached !== null;
+                                ?>
+                                <article class="candidate-document-row" data-document-status="<?= $received ? 'received' : ($requirement['is_required'] ? 'pending' : 'optional') ?>">
+                                    <span class="candidate-document-icon" aria-hidden="true"><?= $candidateIcon('files') ?></span>
+                                    <div class="candidate-document-info">
+                                        <h3><?= $escape($requirement['label']) ?></h3>
+                                        <?php if (trim((string) ($requirement['description'] ?? '')) !== ''): ?>
+                                            <p class="muted"><?= $escape($requirement['description']) ?></p>
+                                        <?php endif; ?>
+                                        <?php if ($received): ?>
+                                            <p class="muted"><?= $escape($attached['original_name'] ?? 'Documento') ?></p>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="candidate-document-actions">
+                                        <span class="candidate-document-state"><?= $received ? 'Recibido' : ($requirement['is_required'] ? 'Pendiente de recibir' : 'Opcional, no aportado') ?></span>
+                                        <span class="candidate-document-kind"><?= $requirement['is_required'] ? 'Obligatorio' : 'Opcional' ?></span>
+                                        <?php if ($received): ?>
+                                            <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/candidates/<?= (int) $candidate['id'] ?>/documents/<?= (int) $attached['id'] ?>">Abrir documento</a>
+                                        <?php endif; ?>
+                                    </div>
+                                </article>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php elseif ($documents === []): ?>
+                        <p class="empty-state">No hay requisitos documentales activos configurados para esta unidad. No hay documentos adjuntos.</p>
                     <?php else: ?>
-                        <p class="muted">Esta unidad solo tiene requisitos documentales opcionales.</p>
+                        <p class="muted">No hay requisitos documentales activos configurados para esta unidad.</p>
                     <?php endif; ?>
-                    <div class="users-grid" aria-label="Requisitos documentales activos">
-                        <?php foreach ($documentRequirements as $requirement): ?>
-                            <?php $attached = $documentsByRequirement[(int) $requirement['id']] ?? null; ?>
-                            <article class="user-card">
-                                <div class="user-card__head">
-                                    <strong><?= $escape($requirement['label']) ?></strong>
-                                    <span class="muted"><?= $requirement['is_required'] ? 'Obligatorio' : 'Opcional' ?></span>
-                                </div>
-                                <?php if (trim((string) ($requirement['description'] ?? '')) !== ''): ?>
-                                    <p class="muted"><?= $escape($requirement['description']) ?></p>
-                                <?php endif; ?>
-                                <?php if ($attached !== null): ?>
-                                    <p>Recibido</p>
-                                    <p class="muted"><?= $escape($attached['original_name'] ?? 'Documento') ?></p>
-                                    <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/candidates/<?= (int) $candidate['id'] ?>/documents/<?= (int) $attached['id'] ?>">Abrir documento</a>
-                                <?php else: ?>
-                                    <p class="muted"><?= $requirement['is_required'] ? 'Pendiente de recibir' : 'Opcional, no aportado' ?></p>
-                                <?php endif; ?>
-                            </article>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <p class="muted">No hay requisitos documentales activos configurados para esta unidad.</p>
+                    <?php if ($otherDocuments !== []): ?>
+                        <section class="candidate-document-history" aria-labelledby="candidate-document-history-title">
+                            <h3 id="candidate-document-history-title">Otros documentos recibidos</h3>
+                            <p class="muted">Se conservan los documentos aportados a requisitos que ya no están activos.</p>
+                            <div class="candidate-document-list">
+                                <?php foreach ($otherDocuments as $document): ?>
+                                    <article class="candidate-document-row">
+                                        <span class="candidate-document-icon" aria-hidden="true"><?= $candidateIcon('files') ?></span>
+                                        <div class="candidate-document-info">
+                                            <h3><?= $escape($document['requirement_label']) ?></h3>
+                                            <p class="muted"><?= $escape($document['original_name'] ?? 'Documento') ?></p>
+                                        </div>
+                                        <div class="candidate-document-actions">
+                                            <span class="candidate-document-state">Recibido anteriormente</span>
+                                            <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/candidates/<?= (int) $candidate['id'] ?>/documents/<?= (int) $document['id'] ?>">Abrir documento</a>
+                                        </div>
+                                    </article>
+                                <?php endforeach; ?>
+                            </div>
+                        </section>
+                    <?php endif; ?>
+                </section>
+                <?php if ($documentRequirements !== []): ?>
+                    <aside class="candidate-documents-side" aria-label="Resumen documental">
+                        <section class="content-card candidate-card candidate-documents-summary" aria-labelledby="candidate-documents-summary-title">
+                            <h3 id="candidate-documents-summary-title">Estado de recepción</h3>
+                            <?php if ($requiredCount > 0): ?>
+                                <p class="candidate-documents-count" data-document-required-count="<?= $requiredCount ?>" data-document-received-count="<?= $receivedRequiredCount ?>">
+                                    <strong><?= $receivedRequiredCount ?> de <?= $requiredCount ?></strong>
+                                    <span>requisitos obligatorios recibidos</span>
+                                </p>
+                                <progress value="<?= $receivedRequiredCount ?>" max="<?= $requiredCount ?>" aria-label="Requisitos obligatorios recibidos"></progress>
+                                <p class="muted"><?= $receivedRequiredCount ?> de <?= $requiredCount ?> requisitos obligatorios recibidos. Esto no indica revisión ni aprobación.</p>
+                            <?php else: ?>
+                                <p class="muted">Esta unidad solo tiene requisitos documentales opcionales.</p>
+                            <?php endif; ?>
+                        </section>
+                        <?php if ($pendingRequired !== []): ?>
+                            <section class="content-card candidate-card candidate-documents-pending" aria-labelledby="candidate-documents-pending-title">
+                                <h3 id="candidate-documents-pending-title">Requisitos pendientes</h3>
+                                <ul>
+                                    <?php foreach ($pendingRequired as $requirement): ?>
+                                        <li><?= $escape($requirement['label']) ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </section>
+                        <?php endif; ?>
+                    </aside>
                 <?php endif; ?>
-                <?php
-                $otherDocuments = array_values(array_filter(
-                    $documents,
-                    static fn (array $document): bool => !isset($activeRequirementIds[(int) $document['requirement_id']]),
-                ));
-                ?>
-                <?php if ($otherDocuments !== []): ?>
-                    <h3>Otros documentos recibidos</h3>
-                    <div class="users-grid">
-                        <?php foreach ($otherDocuments as $document): ?>
-                            <article class="user-card">
-                                <strong><?= $escape($document['requirement_label']) ?></strong>
-                                <p class="muted"><?= $escape($document['original_name'] ?? 'Documento') ?></p>
-                                <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/candidates/<?= (int) $candidate['id'] ?>/documents/<?= (int) $document['id'] ?>">Abrir documento</a>
-                            </article>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-                <?php if ($documents === [] && $documentRequirements === []): ?>
-                    <p class="empty-state">No hay documentos adjuntos.</p>
-                <?php endif; ?>
-            </section>
+            </div>
         </section>
 
     <?php elseif ($activeSection === 'screening'): ?>

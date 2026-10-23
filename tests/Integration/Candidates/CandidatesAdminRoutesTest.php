@@ -260,6 +260,15 @@ final class CandidatesAdminRoutesTest extends TestCase
         self::assertSame(200, $response->getStatusCode());
         $html = (string) $response->getBody();
 
+        self::assertStringContainsString('class="candidate-documents-layout"', $html);
+        self::assertStringContainsString('class="candidate-document-list"', $html);
+        self::assertSame(3, substr_count($html, 'class="candidate-document-row" data-document-status='));
+        self::assertSame(1, substr_count($html, 'data-document-status="pending"'));
+        self::assertSame(1, substr_count($html, 'data-document-status="optional"'));
+        self::assertStringContainsString('aria-label="Resumen documental"', $html);
+        self::assertStringContainsString('<progress value="1" max="2"', $html);
+        self::assertStringContainsString('Requisitos pendientes', $html);
+        self::assertStringNotContainsString('class="users-grid" aria-label="Requisitos documentales activos"', $html);
         self::assertStringContainsString('data-document-required-count="2"', $html);
         self::assertStringContainsString('data-document-received-count="1"', $html);
         self::assertStringContainsString('1 de 2 requisitos obligatorios recibidos', $html);
