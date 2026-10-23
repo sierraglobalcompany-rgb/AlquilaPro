@@ -646,14 +646,14 @@ ul { padding-left: 22px; }
 .candidate-work-facts { display: grid; gap: 18px; align-content: center; min-width: 0; border: 1px solid var(--color-border); border-radius: 12px; padding: 20px; background: color-mix(in srgb, var(--color-background) 50%, white); }
 .candidate-work-facts .candidate-fact dd { font-weight: 650; }
 .candidate-work-income { display: grid; gap: 12px; align-content: center; min-width: 0; border: 1px solid color-mix(in srgb, var(--brand-primary) 19%, white); border-radius: 12px; padding: 20px; background: color-mix(in srgb, var(--brand-primary) 7%, white); }
-.candidate-work-income h3 { display: flex; align-items: center; gap: 9px; margin: 0; font-size: 15px; }
+.candidate-work-panel .candidate-work-income h3 { display: flex; align-items: center; gap: 9px; margin: 0; font-size: 15px; }
 .candidate-work-income h3 .nav-icon { width: 20px; height: 20px; flex: 0 0 20px; color: var(--brand-primary); }
 .candidate-work-money { margin: 0; }
 .candidate-work-money dt { color: var(--color-muted); font-size: 12px; }
 .candidate-work-money dd { margin: 5px 0 0; font-size: clamp(1.5rem, 2.5vw, 2rem); font-weight: 750; line-height: 1.2; overflow-wrap: anywhere; }
 .candidate-work-income-context { margin: 0; color: var(--color-muted); font-size: 12px; line-height: 1.5; }
 .candidate-work-notes { display: grid; gap: 8px; border-top: 1px solid var(--color-border); padding-top: 17px; }
-.candidate-work-notes h3 { margin: 0; font-size: 14px; }
+.candidate-work-panel .candidate-work-notes h3 { margin: 0; font-size: 14px; }
 .candidate-work-notes p { margin: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.6; }
 .candidate-overview-grid { display: grid; gap: 16px; min-width: 0; }
 .candidate-card { display: grid; align-content: start; gap: 14px; min-width: 0; padding: 18px; border-radius: 12px; }
