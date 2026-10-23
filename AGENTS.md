@@ -138,9 +138,17 @@ Mantener:
 - tenant fail-closed y sin permisos administrativos;
 - SSR como arquitectura pública/privada, sin SPA paralela.
 
-## 11. Diseño público aprobado
+## 11. Ley 4 V3.0 — Diseño Human-First y mockups aprobados
 
-La implementación visual pública debe respetar la spec versionada aprobada. No reinterpretar mockups por memoria. Si una imagen y la spec textual se contradicen, resolver la contradicción y congelar una autoridad antes de implementar la superficie afectada.
+**Obligatoria para cualquier tarea que afecte UX/UI en Codex:**
+1. Leer el **canon único L4** `docs/ERP_HUMAN_FIRST_UI_UX_MASTER_SKILL.md` y la aplicación factual `design-system/alquilapro/MASTER.md`.
+2. Leer el mockup/PNG aprobado, la SPEC, la baseline vigente y `docs/CURRENT_CHECKPOINT.md` de la fase; comprobar ruta, rol, permiso, estado y datos reales antes de cambiar la vista.
+3. Seleccionar un único modo L4: `AUDITAR_EXISTENTE`, `DISEÑAR_NUEVO`, `IMPLEMENTAR_APROBADO`, `REFINAR` o `INSTALAR_AGENTE`. Ante conflicto entre referencia y backend, documentar el contrato; **no omitir regiones ni inventar funciones por comodidad**.
+4. Consultar **un** playbook pertinente de Anti UI Slop y solo consultas focales de UI UX Pro Max cuando haya acceso y una duda concreta; registrar `NO_ACCESIBLE` si corresponde. No instalar paquetes, generar otro design system ni sobreescribir el Master automáticamente.
+5. Verificar UX humana, estados, responsive (móvil/tableta/escritorio), foco y acciones con **capturas reales** del mismo SHA, datos, rol y viewport. Una captura, test de CI o mockup aislado no certifica fidelidad.
+6. Entregar hallazgos/materiales y evidencias a **Ley 5** para dictamen independiente; Codex no se autocertifica. Diseño aprobado no se sustituye sin decisión humana.
+
+La implementación pública conserva la baseline en `docs/design/APPROVED_PUBLIC_UI_BASELINE_2026-10-15.md` y los PNG allí identificados. Candidatos usa `docs/design/CANDIDATES_VISUAL_BASELINE_2026-10-17.md`. Una imagen aprobada guía apariencia y estados; no autoriza por sí sola una nueva API, permisos, cobro o operación. La simplificación KISS nunca justifica perder capacidades aprobadas.
 
 ## 12. Delegación a Codex
 
