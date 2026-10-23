@@ -376,6 +376,9 @@ return static function (App $app, array $deps): void {
             'propertyDetails' => $propertyDetails,
             'coverPhotoId' => $coverPhotoId,
             'documents' => $candidateDocuments->listDocumentsForCandidate($candidateId),
+            'documentRequirements' => $activeSection === 'documents'
+                ? $candidateDocuments->listRequirementsForUnit((int) $candidate['unit_id'], true)
+                : [],
             'screening' => $screening->findForCandidate($candidateId),
             'contractContext' => $contractContext,
             'canManageCandidates' => $canManageCandidates,

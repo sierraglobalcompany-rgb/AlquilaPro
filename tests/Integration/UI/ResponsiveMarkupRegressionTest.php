@@ -63,6 +63,26 @@ final class ResponsiveMarkupRegressionTest extends TestCase
         self::assertStringContainsString('--brand-primary: var(--color-primary);', $css);
     }
 
+    public function testCandidateDesktopGridStartsOnlyAfterFixedBottomNavigationEnds(): void
+    {
+        $css = $this->file('assets/app.css');
+        $tabletIndex = strpos($css, '@media (min-width: 1024px) {');
+        self::assertNotFalse($tabletIndex);
+        $desktopIndex = strpos($css, '@media (min-width: 1200px) {', $tabletIndex);
+        self::assertNotFalse($desktopIndex);
+
+        $tabletRules = substr($css, $tabletIndex, $desktopIndex - $tabletIndex);
+        self::assertStringNotContainsString(
+            '.candidate-surface .app-shell',
+            $tabletRules,
+            'Keep base app-shell bottom spacing while fixed bottom-nav is still visible at 1024-1199px.',
+        );
+        self::assertStringContainsString(
+            '.candidate-surface .app-shell { grid-template-columns: 212px minmax(0, 1fr); }',
+            substr($css, $desktopIndex),
+        );
+    }
+
     private function file(string $path): string
     {
         $contents = file_get_contents($this->root . '/' . $path);

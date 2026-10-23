@@ -280,7 +280,122 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertStringContainsString('/sub/admin/candidates"', $html);
     }
 
-    private function renderOverview(array $overrides = [], string $basePath = '', ?array $contracts = ['contracts' => [], 'can_create' => false]): string
+    public function testWorkSectionShowsOnlyDeclaredFactsAndHumanMoney(): void
+    {
+        $html = $this->renderOverview([
+            'employment_status' => 'Empleado',
+            'employer_name' => 'Empresa Demo',
+            'occupation' => 'Analista',
+            'monthly_income' => '5200000',
+            'employment_notes' => "Contrato vigente\nDeclaración del candidato",
+        ], '', ['contracts' => [], 'can_create' => false], 'work');
+
+        self::assertStringContainsString('data-candidate-section-body="work"', $html);
+        self::assertSame(1, substr_count($html, 'data-candidate-section-body='));
+        self::assertStringContainsString('aria-labelledby="candidate-work-title"', $html);
+        self::assertStringContainsString('Empresa Demo', $html);
+        self::assertStringContainsString('Analista', $html);
+        self::assertStringContainsString('$ 5.200.000 COP', $html);
+        self::assertStringNotContainsString('>5200000<', $html);
+        self::assertStringContainsString('Observaciones laborales', $html);
+        self::assertStringContainsString('Contrato vigente', $html);
+        foreach (['Riesgo bajo', 'Perfil laboral sólido', 'Historial laboral', 'Otros ingresos', 'Verificación de ingresos'] as $invented) {
+            self::assertStringNotContainsString($invented, $html);
+        }
+        self::assertStringNotContainsString('data-candidate-section-body="overview"', $html);
+    }
+
+    public function testWorkSectionKeepsIncomeAndNotesInsideOneSemanticPanel(): void
+    {
+        $html = $this->renderOverview([
+            'employment_status' => 'Empleado',
+            'employer_name' => 'Empresa Demo',
+            'occupation' => 'Analista',
+            'monthly_income' => '5200000',
+            'employment_notes' => "Observación uno\nObservación dos",
+        ], '', ['contracts' => [], 'can_create' => false], 'work');
+
+        $dom = new \DOMDocument();
+        @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        $xpath = new \DOMXPath($dom);
+        $panel = '//section[@data-candidate-section-body="work"]/section[contains(concat(" ", normalize-space(@class), " "), " candidate-work-panel ")]';
+        self::assertSame(1, $xpath->query($panel)->length);
+        self::assertSame(1, $xpath->query($panel . '//h2[@id="candidate-work-title"][contains(., "Información laboral")]')->length);
+        self::assertSame(1, $xpath->query($panel . '//div[contains(concat(" ", normalize-space(@class), " "), " candidate-work-income ")]')->length);
+        self::assertSame(1, $xpath->query($panel . '//div[contains(concat(" ", normalize-space(@class), " "), " candidate-work-notes ")]')->length);
+        self::assertSame(0, $xpath->query('//section[contains(concat(" ", normalize-space(@class), " "), " candidate-work-income ")]')->length);
+        self::assertSame(1, substr_count($html, 'Estado laboral'));
+        self::assertSame(1, substr_count($html, 'Empresa Demo'));
+        self::assertSame(1, substr_count($html, 'Analista'));
+        self::assertStringContainsString('candidate-work-layout--split', $html);
+    }
+
+    public function testWorkStatusOnlyUsesSinglePanelWithoutInventedDetailAndIncome(): void
+    {
+        $html = $this->renderOverview([
+            'employment_status' => 'Independiente',
+            'employer_name' => '',
+            'occupation' => null,
+            'monthly_income' => null,
+            'employment_notes' => '',
+        ], '', ['contracts' => [], 'can_create' => false], 'work');
+        self::assertStringContainsString('candidate-work-panel', $html);
+        self::assertStringContainsString('Independiente', $html);
+        self::assertStringNotContainsString('candidate-work-income', $html);
+        self::assertStringNotContainsString('candidate-work-facts', $html);
+        self::assertStringNotContainsString('No se registró información laboral.', $html);
+    }
+
+    public function testWorkSectionShowsTrueEmptyStateWithoutFalseZeroOrUnknownIncome(): void
+    {
+        $html = $this->renderOverview([
+            'employment_status' => null,
+            'employer_name' => '',
+            'occupation' => null,
+            'monthly_income' => null,
+            'employment_notes' => '',
+        ], '', ['contracts' => [], 'can_create' => false], 'work');
+        self::assertStringContainsString('No se registró información laboral.', $html);
+        self::assertSame(0, substr_count($html, 'candidate-work-income"'));
+        self::assertStringNotContainsString('Ingreso mensual', $html);
+        self::assertStringNotContainsString('Observaciones laborales', $html);
+        self::assertStringNotContainsString('$ 0 COP', $html);
+    }
+
+    public function testWorkSectionKeepsDeclaredZeroAndEscapesNotes(): void
+    {
+        $html = $this->renderOverview([
+            'employment_status' => null,
+            'employer_name' => null,
+            'occupation' => '',
+            'monthly_income' => '0',
+            'employment_notes' => '<script>alert(1)</script>',
+        ], '/sub', ['contracts' => [], 'can_create' => false], 'work');
+        self::assertStringContainsString('$ 0 COP', $html);
+        self::assertStringNotContainsString('candidate-work-summary', $html, 'Income-only submissions must not produce a blank summary card.');
+        self::assertStringContainsString('&lt;script&gt;', $html);
+        self::assertStringNotContainsString('<script>', $html);
+        self::assertStringNotContainsString('No se registró información laboral.', $html);
+        self::assertStringContainsString('/sub/admin/candidates/1?section=work', $html);
+    }
+
+    public function testWorkNotesOnlyDoesNotRenderBlankSummaryOrFakeIncome(): void
+    {
+        $html = $this->renderOverview([
+            'employment_status' => null,
+            'employer_name' => null,
+            'occupation' => null,
+            'monthly_income' => null,
+            'employment_notes' => 'Trabajo por cuenta propia declarado.',
+        ], '', ['contracts' => [], 'can_create' => false], 'work');
+        self::assertStringContainsString('Trabajo por cuenta propia declarado.', $html);
+        self::assertStringContainsString('Observaciones laborales', $html);
+        self::assertStringNotContainsString('candidate-work-summary', $html);
+        self::assertStringNotContainsString('candidate-work-income', $html);
+        self::assertStringNotContainsString('No se registró información laboral.', $html);
+    }
+
+    private function renderOverview(array $overrides = [], string $basePath = '', ?array $contracts = ['contracts' => [], 'can_create' => false], string $section = 'overview'): string
     {
         $candidate = [
             'id' => 1,
@@ -316,7 +431,7 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         $contractContext = $contracts;
         $canManageCandidates = true;
         $csrfToken = 'csrf-demo';
-        $activeSection = 'overview';
+        $activeSection = $section;
         $candidateSections = [
             ['key' => 'overview', 'label' => 'Solicitud'],
             ['key' => 'work', 'label' => 'Información laboral'],

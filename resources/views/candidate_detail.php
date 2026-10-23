@@ -67,6 +67,10 @@ $humanDate = static function (mixed $value, bool $withTime = false): ?string {
     return $date->format($withTime ? 'd/m/Y · H:i' : 'd/m/Y');
 };
 
+$humanMoney = static function (mixed $amount): ?string {
+    return is_numeric($amount) ? '$ ' . number_format((float) $amount, 0, ',', '.') . ' COP' : null;
+};
+
 $birthDate = $humanDate($candidate['birth_date'] ?? null);
 $createdAt = $humanDate($candidate['created_at'] ?? null, true);
 $submittedAt = $humanDate($candidate['submitted_at'] ?? null, true);
@@ -143,9 +147,6 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
     <?php if ($activeSection === 'overview'): ?>
         <?php
         $coverPhotoId = is_int($coverPhotoId ?? null) && $coverPhotoId > 0 ? $coverPhotoId : null;
-        $humanMoney = static function (mixed $amount): ?string {
-            return is_numeric($amount) ? '$ ' . number_format((float) $amount, 0, ',', '.') . ' COP' : null;
-        };
         $milestones = [
             ['label' => 'Solicitud', 'verified' => $createdAt !== null, 'completed' => $submittedAt !== null, 'detail' => $createdAt, 'raw_date' => $candidate['created_at'] ?? null],
             ['label' => 'Información laboral', 'verified' => trim((string) ($candidate['employment_status'] ?? '')) !== '', 'completed' => false, 'detail' => null, 'raw_date' => null],
@@ -280,16 +281,61 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
         </section>
 
     <?php elseif ($activeSection === 'work'): ?>
+        <?php
+        $workStatus = trim((string) ($candidate['employment_status'] ?? ''));
+        $workEmployer = trim((string) ($candidate['employer_name'] ?? ''));
+        $workOccupation = trim((string) ($candidate['occupation'] ?? ''));
+        $workNotes = trim((string) ($candidate['employment_notes'] ?? ''));
+        $workIncome = $humanMoney($candidate['monthly_income'] ?? null);
+        $workHasDetails = $workEmployer !== '' || $workOccupation !== '';
+        $workHasAnything = $workStatus !== '' || $workHasDetails || $workIncome !== null || $workNotes !== '';
+        ?>
         <section class="candidate-section" data-candidate-section-body="work">
-            <section class="content-card">
-                <div class="section-heading"><div><p class="eyebrow">Información laboral</p><h2>Información laboral</h2></div></div>
-                <dl class="account-details">
-                    <div><dt>Estado laboral</dt><dd><?= $escape($candidate['employment_status'] ?? '') ?></dd></div>
-                    <div><dt>Empresa</dt><dd><?= $escape($candidate['employer_name'] ?? '') ?></dd></div>
-                    <div><dt>Ocupación</dt><dd><?= $escape($candidate['occupation'] ?? '') ?></dd></div>
-                    <div><dt>Ingreso mensual</dt><dd><?= $escape($candidate['monthly_income'] ?? '') ?></dd></div>
-                    <div><dt>Notas</dt><dd><?= $escape($candidate['employment_notes'] ?? '') ?></dd></div>
-                </dl>
+            <section class="content-card candidate-card candidate-work-panel" aria-labelledby="candidate-work-title">
+                <div class="candidate-work-heading">
+                    <div class="candidate-work-heading__copy">
+                        <h2 id="candidate-work-title"><?= $candidateIcon('briefcase') ?>Información laboral</h2>
+                        <p class="muted">Información declarada por el candidato</p>
+                    </div>
+                    <?php if ($workStatus !== ''): ?>
+                        <div class="candidate-work-status"><span>Estado laboral</span><strong><?= $escape($workStatus) ?></strong></div>
+                    <?php endif; ?>
+                </div>
+
+                <?php if (!$workHasAnything): ?>
+                    <p class="empty-state">No se registró información laboral.</p>
+                <?php else: ?>
+                    <?php if ($workHasDetails || $workIncome !== null): ?>
+                        <div class="candidate-work-layout<?= $workHasDetails && $workIncome !== null ? ' candidate-work-layout--split' : '' ?>">
+                            <?php if ($workHasDetails): ?>
+                                <div class="candidate-work-facts" aria-label="Datos laborales declarados">
+                                    <?php if ($workEmployer !== ''): ?>
+                                        <div class="candidate-fact"><?= $candidateIcon('building') ?><dl><dt>Empresa</dt><dd><?= $escape($workEmployer) ?></dd></dl></div>
+                                    <?php endif; ?>
+                                    <?php if ($workOccupation !== ''): ?>
+                                        <div class="candidate-fact"><?= $candidateIcon('account') ?><dl><dt>Ocupación</dt><dd><?= $escape($workOccupation) ?></dd></dl></div>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+                            <?php if ($workIncome !== null): ?>
+                                <div class="candidate-work-income" aria-label="Ingresos declarados">
+                                    <h3><?= $candidateIcon('wallet') ?>Ingresos declarados</h3>
+                                    <dl class="candidate-work-money">
+                                        <div><dt>Ingreso mensual</dt><dd><?= $escape($workIncome) ?></dd></div>
+                                    </dl>
+                                    <p class="candidate-work-income-context">Monto declarado, no verificado. No representa una evaluación de solvencia.</p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if ($workNotes !== ''): ?>
+                        <div class="candidate-work-notes" aria-labelledby="candidate-work-notes-title">
+                            <h3 id="candidate-work-notes-title">Observaciones laborales</h3>
+                            <p><?= nl2br($escape($workNotes)) ?></p>
+                        </div>
+                    <?php endif; ?>
+                <?php endif; ?>
             </section>
         </section>
 
@@ -329,23 +375,126 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
         </section>
 
     <?php elseif ($activeSection === 'documents'): ?>
+        <?php
+        $documentRequirements = is_array($documentRequirements ?? null) ? $documentRequirements : [];
+        $documentsByRequirement = [];
+        foreach ($documents as $document) {
+            $documentsByRequirement[(int) $document['requirement_id']] = $document;
+        }
+        $requiredCount = 0;
+        $receivedRequiredCount = 0;
+        $activeRequirementIds = [];
+        $pendingRequired = [];
+        foreach ($documentRequirements as $requirement) {
+            $requirementId = (int) $requirement['id'];
+            $activeRequirementIds[$requirementId] = true;
+            if ($requirement['is_required']) {
+                ++$requiredCount;
+                if (isset($documentsByRequirement[$requirementId])) {
+                    ++$receivedRequiredCount;
+                } else {
+                    $pendingRequired[] = $requirement;
+                }
+            }
+        }
+        $otherDocuments = array_values(array_filter(
+            $documents,
+            static fn (array $document): bool => !isset($activeRequirementIds[(int) $document['requirement_id']]),
+        ));
+        ?>
         <section class="candidate-section" data-candidate-section-body="documents">
-            <section class="content-card">
-                <div class="section-heading"><div><p class="eyebrow">Documentos</p><h2>Documentos</h2></div></div>
-                <?php if ($documents === []): ?>
-                    <p class="empty-state">No hay documentos adjuntos.</p>
-                <?php else: ?>
-                    <div class="users-grid">
-                        <?php foreach ($documents as $document): ?>
-                            <article class="user-card">
-                                <strong><?= $escape($document['requirement_label']) ?></strong>
-                                <div><?= $escape($document['original_name'] ?? 'Documento') ?></div>
-                                <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/documents/<?= $escape($document['id']) ?>">Abrir documento</a>
-                            </article>
-                        <?php endforeach; ?>
+            <div class="candidate-documents-layout">
+                <section class="content-card candidate-card candidate-documents-main" aria-labelledby="candidate-documents-title">
+                    <div class="candidate-documents-heading">
+                        <div>
+                            <p class="eyebrow">Documentación</p>
+                            <h2 id="candidate-documents-title">Documentos del candidato</h2>
+                            <p class="muted">Archivos recibidos y requisitos reales de esta unidad.</p>
+                        </div>
                     </div>
+                    <?php if ($documentRequirements !== []): ?>
+                        <div class="candidate-document-list" aria-label="Requisitos documentales activos">
+                            <?php foreach ($documentRequirements as $requirement): ?>
+                                <?php
+                                $attached = $documentsByRequirement[(int) $requirement['id']] ?? null;
+                                $received = $attached !== null;
+                                ?>
+                                <article class="candidate-document-row" data-document-status="<?= $received ? 'received' : ($requirement['is_required'] ? 'pending' : 'optional') ?>">
+                                    <span class="candidate-document-icon" aria-hidden="true"><?= $candidateIcon('files') ?></span>
+                                    <div class="candidate-document-info">
+                                        <h3><?= $escape($requirement['label']) ?></h3>
+                                        <?php if (trim((string) ($requirement['description'] ?? '')) !== ''): ?>
+                                            <p class="muted"><?= $escape($requirement['description']) ?></p>
+                                        <?php endif; ?>
+                                        <?php if ($received): ?>
+                                            <p class="muted"><?= $escape($attached['original_name'] ?? 'Documento') ?></p>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="candidate-document-actions">
+                                        <span class="candidate-document-state"><?= $received ? 'Recibido' : ($requirement['is_required'] ? 'Pendiente de recibir' : 'Opcional, no aportado') ?></span>
+                                        <span class="candidate-document-kind"><?= $requirement['is_required'] ? 'Obligatorio' : 'Opcional' ?></span>
+                                        <?php if ($received): ?>
+                                            <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/candidates/<?= (int) $candidate['id'] ?>/documents/<?= (int) $attached['id'] ?>">Abrir documento</a>
+                                        <?php endif; ?>
+                                    </div>
+                                </article>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php elseif ($documents === []): ?>
+                        <p class="empty-state">No hay requisitos documentales activos configurados para esta unidad. No hay documentos adjuntos.</p>
+                    <?php else: ?>
+                        <p class="muted">No hay requisitos documentales activos configurados para esta unidad.</p>
+                    <?php endif; ?>
+                    <?php if ($otherDocuments !== []): ?>
+                        <section class="candidate-document-history" aria-labelledby="candidate-document-history-title">
+                            <h3 id="candidate-document-history-title">Otros documentos recibidos</h3>
+                            <p class="muted">Se conservan los documentos aportados a requisitos que ya no están activos.</p>
+                            <div class="candidate-document-list">
+                                <?php foreach ($otherDocuments as $document): ?>
+                                    <article class="candidate-document-row">
+                                        <span class="candidate-document-icon" aria-hidden="true"><?= $candidateIcon('files') ?></span>
+                                        <div class="candidate-document-info">
+                                            <h3><?= $escape($document['requirement_label']) ?></h3>
+                                            <p class="muted"><?= $escape($document['original_name'] ?? 'Documento') ?></p>
+                                        </div>
+                                        <div class="candidate-document-actions">
+                                            <span class="candidate-document-state">Recibido anteriormente</span>
+                                            <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/candidates/<?= (int) $candidate['id'] ?>/documents/<?= (int) $document['id'] ?>">Abrir documento</a>
+                                        </div>
+                                    </article>
+                                <?php endforeach; ?>
+                            </div>
+                        </section>
+                    <?php endif; ?>
+                </section>
+                <?php if ($documentRequirements !== []): ?>
+                    <aside class="candidate-documents-side" aria-label="Resumen documental">
+                        <section class="content-card candidate-card candidate-documents-summary" aria-labelledby="candidate-documents-summary-title">
+                            <h3 id="candidate-documents-summary-title">Estado de recepción</h3>
+                            <?php if ($requiredCount > 0): ?>
+                                <p class="candidate-documents-count" data-document-required-count="<?= $requiredCount ?>" data-document-received-count="<?= $receivedRequiredCount ?>">
+                                    <strong><?= $receivedRequiredCount ?> de <?= $requiredCount ?></strong>
+                                    <span>requisitos obligatorios recibidos</span>
+                                </p>
+                                <progress value="<?= $receivedRequiredCount ?>" max="<?= $requiredCount ?>" aria-label="Requisitos obligatorios recibidos"></progress>
+                                <p class="muted"><?= $receivedRequiredCount ?> de <?= $requiredCount ?> requisitos obligatorios recibidos. Esto no indica revisión ni aprobación.</p>
+                            <?php else: ?>
+                                <p class="muted">Esta unidad solo tiene requisitos documentales opcionales.</p>
+                            <?php endif; ?>
+                        </section>
+                        <?php if ($pendingRequired !== []): ?>
+                            <section class="content-card candidate-card candidate-documents-pending" aria-labelledby="candidate-documents-pending-title">
+                                <h3 id="candidate-documents-pending-title">Requisitos pendientes</h3>
+                                <ul>
+                                    <?php foreach ($pendingRequired as $requirement): ?>
+                                        <li><?= $escape($requirement['label']) ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </section>
+                        <?php endif; ?>
+                    </aside>
                 <?php endif; ?>
-            </section>
+            </div>
         </section>
 
     <?php elseif ($activeSection === 'screening'): ?>
