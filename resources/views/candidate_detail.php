@@ -287,50 +287,56 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
         $workOccupation = trim((string) ($candidate['occupation'] ?? ''));
         $workNotes = trim((string) ($candidate['employment_notes'] ?? ''));
         $workIncome = $humanMoney($candidate['monthly_income'] ?? null);
-        $workHasFacts = $workStatus !== '' || $workEmployer !== '' || $workOccupation !== '';
-        $workShowSummary = $workHasFacts || ($workIncome === null && $workNotes === '');
+        $workHasDetails = $workEmployer !== '' || $workOccupation !== '';
+        $workHasAnything = $workStatus !== '' || $workHasDetails || $workIncome !== null || $workNotes !== '';
         ?>
         <section class="candidate-section" data-candidate-section-body="work">
-            <div class="candidate-work-layout<?= $workIncome !== null && $workShowSummary ? ' candidate-work-layout--with-income' : '' ?>">
-                <?php if ($workShowSummary): ?>
-                <section class="content-card candidate-card candidate-work-summary" aria-labelledby="candidate-work-title">
-                    <div class="candidate-summary-heading">
-                        <h2 id="candidate-work-title"><?= $candidateIcon('briefcase') ?>Resumen laboral</h2>
-                        <p class="muted">Información laboral declarada por el candidato</p>
+            <section class="content-card candidate-card candidate-work-panel" aria-labelledby="candidate-work-title">
+                <div class="candidate-work-heading">
+                    <div class="candidate-work-heading__copy">
+                        <h2 id="candidate-work-title"><?= $candidateIcon('briefcase') ?>Información laboral</h2>
+                        <p class="muted">Información declarada por el candidato</p>
                     </div>
-                    <?php if (!$workHasFacts): ?>
-                        <p class="empty-state">No se registró información laboral.</p>
-                    <?php elseif ($workHasFacts): ?>
-                        <div class="candidate-fact-grid candidate-work-facts">
-                            <?php if ($workStatus !== ''): ?>
-                                <div class="candidate-fact"><?= $candidateIcon('briefcase') ?><dl><dt>Estado laboral</dt><dd><?= $escape($workStatus) ?></dd></dl></div>
+                    <?php if ($workStatus !== ''): ?>
+                        <div class="candidate-work-status"><span>Estado laboral</span><strong><?= $escape($workStatus) ?></strong></div>
+                    <?php endif; ?>
+                </div>
+
+                <?php if (!$workHasAnything): ?>
+                    <p class="empty-state">No se registró información laboral.</p>
+                <?php else: ?>
+                    <?php if ($workHasDetails || $workIncome !== null): ?>
+                        <div class="candidate-work-layout<?= $workHasDetails && $workIncome !== null ? ' candidate-work-layout--split' : '' ?>">
+                            <?php if ($workHasDetails): ?>
+                                <div class="candidate-work-facts" aria-label="Datos laborales declarados">
+                                    <?php if ($workEmployer !== ''): ?>
+                                        <div class="candidate-fact"><?= $candidateIcon('building') ?><dl><dt>Empresa</dt><dd><?= $escape($workEmployer) ?></dd></dl></div>
+                                    <?php endif; ?>
+                                    <?php if ($workOccupation !== ''): ?>
+                                        <div class="candidate-fact"><?= $candidateIcon('account') ?><dl><dt>Ocupación</dt><dd><?= $escape($workOccupation) ?></dd></dl></div>
+                                    <?php endif; ?>
+                                </div>
                             <?php endif; ?>
-                            <?php if ($workEmployer !== ''): ?>
-                                <div class="candidate-fact"><?= $candidateIcon('building') ?><dl><dt>Empresa</dt><dd><?= $escape($workEmployer) ?></dd></dl></div>
-                            <?php endif; ?>
-                            <?php if ($workOccupation !== ''): ?>
-                                <div class="candidate-fact"><?= $candidateIcon('account') ?><dl><dt>Ocupación</dt><dd><?= $escape($workOccupation) ?></dd></dl></div>
+                            <?php if ($workIncome !== null): ?>
+                                <div class="candidate-work-income" aria-label="Ingresos declarados">
+                                    <h3><?= $candidateIcon('wallet') ?>Ingresos declarados</h3>
+                                    <dl class="candidate-work-money">
+                                        <div><dt>Ingreso mensual</dt><dd><?= $escape($workIncome) ?></dd></div>
+                                    </dl>
+                                    <p class="candidate-work-income-context">Monto declarado, no verificado. No representa una evaluación de solvencia.</p>
+                                </div>
                             <?php endif; ?>
                         </div>
                     <?php endif; ?>
-                </section>
+
+                    <?php if ($workNotes !== ''): ?>
+                        <div class="candidate-work-notes" aria-labelledby="candidate-work-notes-title">
+                            <h3 id="candidate-work-notes-title">Observaciones laborales</h3>
+                            <p><?= nl2br($escape($workNotes)) ?></p>
+                        </div>
+                    <?php endif; ?>
                 <?php endif; ?>
-                <?php if ($workIncome !== null): ?>
-                    <section class="content-card candidate-card candidate-work-income" aria-labelledby="candidate-work-income-title">
-                        <h2 id="candidate-work-income-title"><?= $candidateIcon('wallet') ?>Ingresos declarados</h2>
-                        <dl class="candidate-work-money">
-                            <div><dt>Ingreso mensual</dt><dd><?= $escape($workIncome) ?></dd></div>
-                        </dl>
-                        <p class="candidate-work-income-context">Monto informado por el candidato. No constituye aprobación ni verificación de solvencia.</p>
-                    </section>
-                <?php endif; ?>
-            </div>
-            <?php if ($workNotes !== ''): ?>
-                <section class="content-card candidate-card candidate-work-notes" aria-labelledby="candidate-work-notes-title">
-                    <h2 id="candidate-work-notes-title">Observaciones laborales</h2>
-                    <p><?= nl2br($escape($workNotes)) ?></p>
-                </section>
-            <?php endif; ?>
+            </section>
         </section>
 
     <?php elseif ($activeSection === 'household'): ?>

@@ -305,6 +305,47 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertStringNotContainsString('data-candidate-section-body="overview"', $html);
     }
 
+    public function testWorkSectionKeepsIncomeAndNotesInsideOneSemanticPanel(): void
+    {
+        $html = $this->renderOverview([
+            'employment_status' => 'Empleado',
+            'employer_name' => 'Empresa Demo',
+            'occupation' => 'Analista',
+            'monthly_income' => '5200000',
+            'employment_notes' => "Observación uno\nObservación dos",
+        ], '', ['contracts' => [], 'can_create' => false], 'work');
+
+        $dom = new \DOMDocument();
+        @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        $xpath = new \DOMXPath($dom);
+        $panel = '//section[@data-candidate-section-body="work"]/section[contains(concat(" ", normalize-space(@class), " "), " candidate-work-panel ")]';
+        self::assertSame(1, $xpath->query($panel)->length);
+        self::assertSame(1, $xpath->query($panel . '//h2[@id="candidate-work-title"][contains(., "Información laboral")]')->length);
+        self::assertSame(1, $xpath->query($panel . '//div[contains(concat(" ", normalize-space(@class), " "), " candidate-work-income ")]')->length);
+        self::assertSame(1, $xpath->query($panel . '//div[contains(concat(" ", normalize-space(@class), " "), " candidate-work-notes ")]')->length);
+        self::assertSame(0, $xpath->query('//section[contains(concat(" ", normalize-space(@class), " "), " candidate-work-income ")]')->length);
+        self::assertSame(1, substr_count($html, 'Estado laboral'));
+        self::assertSame(1, substr_count($html, 'Empresa Demo'));
+        self::assertSame(1, substr_count($html, 'Analista'));
+        self::assertStringContainsString('candidate-work-layout--split', $html);
+    }
+
+    public function testWorkStatusOnlyUsesSinglePanelWithoutInventedDetailAndIncome(): void
+    {
+        $html = $this->renderOverview([
+            'employment_status' => 'Independiente',
+            'employer_name' => '',
+            'occupation' => null,
+            'monthly_income' => null,
+            'employment_notes' => '',
+        ], '', ['contracts' => [], 'can_create' => false], 'work');
+        self::assertStringContainsString('candidate-work-panel', $html);
+        self::assertStringContainsString('Independiente', $html);
+        self::assertStringNotContainsString('candidate-work-income', $html);
+        self::assertStringNotContainsString('candidate-work-facts', $html);
+        self::assertStringNotContainsString('No se registró información laboral.', $html);
+    }
+
     public function testWorkSectionShowsTrueEmptyStateWithoutFalseZeroOrUnknownIncome(): void
     {
         $html = $this->renderOverview([
