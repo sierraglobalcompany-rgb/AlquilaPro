@@ -440,6 +440,19 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertStringNotContainsString('data-candidate-section-body="work"', $html);
     }
 
+    public function testHouseholdUsesSingularForOneDeclaredOccupant(): void
+    {
+        $html = $this->renderOverview([
+            'submitted_at' => '2026-10-20 10:00:00',
+            'occupants_count' => 1,
+            'pets_declared' => 0,
+            'pets_answered_at' => '2026-10-20 10:00:00',
+        ], '', ['contracts' => [], 'can_create' => false], 'household');
+
+        self::assertStringContainsString('1 ocupante declarado', $html);
+        self::assertStringNotContainsString('1 ocupantes declarados', $html);
+    }
+
     public function testHouseholdUnknownValuesDoNotTurnIntoZeroOrNoPets(): void
     {
         $html = $this->renderOverview([

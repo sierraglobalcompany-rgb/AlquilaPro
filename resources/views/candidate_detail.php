@@ -376,7 +376,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                         <p class="muted">Datos declarados en la solicitud; no constituyen una evaluación de riesgo.</p>
                     </div>
                     <div class="candidate-household-facts">
-                        <p><span>Total declarado</span><strong><?= $occupantsCount === null ? 'Cantidad no declarada' : $escape($occupantsCount . ' ocupantes declarados') ?></strong></p>
+                        <p><span>Total declarado</span><strong><?= $occupantsCount === null ? 'Cantidad no declarada' : $escape($occupantsCount . ($occupantsCount === 1 ? ' ocupante declarado' : ' ocupantes declarados')) ?></strong></p>
                         <p><span>Fichas adicionales</span><strong><?= $escape($registeredOccupants) ?> registradas</strong></p>
                         <p><span>Mascotas</span><strong><?= $escape($petDeclarationLabel) ?></strong></p>
                     </div>
