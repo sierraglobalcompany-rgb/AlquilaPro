@@ -427,45 +427,41 @@ Commit `feat(candidates): humanize work section`; require CI 8.3/8.4/8.5 and Bro
 
 ---
 
-### Task 3 — CAND-03: Ocupantes y mascotas
+### Task 3 — CAND-03: Ocupantes y mascotas (expansión integral autorizada 2026-10-23)
 
-**Files:**
-- Modify: `resources/views/candidate_detail.php`
-- Modify: `assets/app.css` only if needed
-- Modify: `tests/Integration/Candidates/HumanFirstCandidateDetailViewTest.php`
+**Razón del cambio:** el owner rechazó visualmente la reducción de CAND-03 a tres tarjetas y confirmó que las fichas individuales y las mascotas con fotos deben construirse **ahora**, no como backlog. Mantener PR #55, su SHA y los QA previos como evidencia histórica; el nuevo código exige pruebas/CI/Browser QA nuevos. **No merge ni deploy automático.**
 
-**Interfaces:**
-- Consumes: `occupants_count`, `occupants_notes`, `pets_declared`, `pets_notes`.
-- Produces: Human-First body for `section=household`.
+**Responsabilidades:** ChatGPT decide contratos y evalúa evidencia; Codex Luna desarrolla. Una sola rama `impl/cand-03-household-human-first-20261023`. Resolver causas integradas, no añadir parches. Alinear con SPEC §9.3 actualizada y mockup `03_OCUPANTES_MASCOTAS.png`.
 
-- [ ] **Step 1: RED factual boundary**
+**GATE 1 — Integridad del dominio (RED→GREEN)**:
+- Inspeccionar estado real del HEAD, migraciones 001–023, `CandidateService`, `CandidateDocumentService`, `DocumentService`, guards y tests. Definir tests RED verificables **antes** del cambio; confirmar RED causal.
+- Migración nueva mínima: personas adicionales, mascotas individualizadas, marca nullable de selección explícita Sí/No. Registros viejos intactos y legibles. FK/indexes y validación de pertenencia. Identidad del solicitante no duplicada.
+- Un owner focal para registrar/listar/modificar/eliminar fichas, manteniendo servicios auténticos actuales; transacciones para guardar datos relacionados. Evitar inconsistencias entre total del hogar, mascotas declaradas y filas registradas.
+- Test: nulos, 0 reales, legacy ambiguo, 1/N, cambio de respuesta, completar wizard, rechazo cuando faltan fichas obligatorias, duplicados, entradas inválidas, XSS, SQL/pertenencia cruzada y regresión CAND-01/02/Documents.
 
-Assert:
+**GATE 2 — Captura humana y archivos privados (RED→GREEN)**:
+- Wizard `occupants` con «cantidad **incluyéndote**», fichas de otras personas y mascota(s), campos opcionales y errores junto al campo; preguntas Sí/No sin respuesta preseleccionada para los nuevos. Guardado/reanudación antes de enviar; respuesta persistente y legacy no reinterpretado.
+- Subida opcional **por entidad** de fotos reales: JPEG/PNG, tamaño y dimensiones limitados, finfo+contenido real, nombres opacos, storage fuera de público, integridad y `no-store/nosniff`. Persona menor: avatar iniciales por defecto, nunca exigir foto. Reemplazo/borrado probado. No colgar foto de propiedad `unit_media` ni confundir 1 requisito documental con N mascotas.
+- Admin agrega/edita/retira usando `candidates.manage`; GET exclusivamente `candidates.view`. Asegurar CSRF, comprobación de candidate ID en todos los POST/GET de medios, 403/404, guardas de token/estado y auditoría de cambios.
+- Validar inexistencia de botones falsos y edición posterior al envío sólo mediante rol permitido.
 
-```text
-- count/notes are shown only when available
-- pet declaration and pet notes are shown without inventing animal records
-- null occupants_count does not become 0
-- no names, ages, parentescos, breed, weight, vaccination, household-risk score
-- exact empty state when no useful household details exist
-```
+**GATE 3 — Manual real y reglas (RED→GREEN)**:
+- Reutilizar `DocumentService::listCurrentForProperty` y `manual_convivencia` (JSON) y permitir PDF nativo **del mismo tipo** usando flujo existente de versión/almacenamiento; no crear un segundo dominio de manuales.
+- Consulta CAND-03 relacionando candidato→unidad→propiedad bajo `candidates.view`, `properties.view` y `documents.view`; nunca filtrar título, existencia, contenido ni enlaces privados a rol sin autorización. No deducir permisos/prohibiciones de mascotas ni «bajo riesgo» desde texto libre.
+- Tests con manual ausente/presente/actualizado, propiedad ajena, only `candidates.view`, solo `documents.view`, versión antigua, JSON/PDF, 403/404 y descarga.
 
-- [ ] **Step 2: Verify RED and commit RED**
+**GATE 4 — Fidelidad Human-First de seis regiones (RED→GREEN)**:
+- Modificar **sólo** `section=household` de `candidate_detail.php` y estilos scoped necesarios. Recuperar composición del PNG en seis regiones: resumen; estado de información verificable; ocupantes; mascotas/fotos/manual contextual; reglas/observaciones; próximos pasos reales.
+- Fichas por persona/mascota reales, solicitante principal derivado de `candidates`, imagen sólo auténtica o avatar/placeholder honesto. Todos los CTAs `Agregar / Editar` operativos/condicionados al permiso; ninguna evaluación o score inventados.
+- Desktop 1448×1086 y 1100×850; tablet 768×1024; móvil 375×812 (scroll final, foco, sin overflow); estados vacíos, notas largas, error del formulario, cambio de rol, varias mascotas y foto. No intervenir shell general ni alterar Work/Documents/Contratos.
 
-Commit `test(candidates): define Human-First household section`.
+**GATE 5 — Validación Ley 5 y decisión**:
+- PHPUnit focal del dominio, repositorio y seguridad + suite completa PHP 8.3, 8.4 y 8.5 **del HEAD nuevo exacto**. Sin FAIL/skipped nuevos salvo causa evidenciada.
+- Un Browser QA independiente o sesión separada con fixtures sintéticos: 0/1/N ocupantes adicionales, 0/1/N mascotas, foto real/ausente, manual JSON/PDF/ausente, roles view/manage, token inválido, 403/404, A/B/C legacy y nuevos. Seis regiones medibles y comparativa visual real en los cuatro viewports; capturas, hashes, manifiesto, métricas y enlace a informe.
+- ChatGPT revisa contra mockup, SPEC y capturas, diez pasadas Ley 5; `QA_FUNCIONAL` distinto de `UX_FIDELIDAD`. Sólo tras ambos gates y aceptación visual del owner proponer merge **exclusivo PR #55**. Deploy Hostinger requiere autorización distinta.
+- **STOP real:** bloqueo de arquitectura, seguridad, inconsistencia, CI o referencia => un checkpoint causal en el PR y una sola orden de corrección; no abrir CAND-04, no autorizar merge, no relanzar suites indiscriminadamente.
 
-- [ ] **Step 3: Minimal GREEN**
-
-Use no more than:
-- `Resumen del hogar`;
-- `Ocupantes`;
-- `Mascotas`.
-
-Use copy `No hay información adicional sobre ocupantes.` / `No hay información adicional sobre mascotas.` when appropriate; never fabricate individual people or animal profiles.
-
-- [ ] **Step 4: Regression / PR / CI / Browser QA**
-
-Run Human-First view test + candidate public wizard tests + full suite. Browser three viewports. Merge only after GREEN.
+**Orden de ejecución:** G1→G2→G3→G4→G5; integrar un cambio cohesivo en PR #55, sin múltiples PRs/ramas arbitrarias. Evidencia `RED_VERIFIED` no se puede declarar sin prueba realizada. `GATE5` no puede apoyarse en las capturas antiguas de 3 tarjetas.
 
 ---
 
