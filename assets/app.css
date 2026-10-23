@@ -806,3 +806,16 @@ ul { padding-left: 22px; }
 @media (min-width: 1024px) {
     .candidate-documents-layout { grid-template-columns: minmax(0, 1.65fr) minmax(270px, .75fr); }
 }
+
+/* CAND-03: factual household overview, no invented people/pet records. */
+.candidate-household-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
+.candidate-household-heading { display: grid; gap: 8px; }
+.candidate-household-heading h2, .candidate-household-grid h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0; font-size: 18px; }
+.candidate-household-heading .nav-icon, .candidate-household-grid h3 .nav-icon { color: var(--brand-primary); width: 22px; height: 22px; }
+.candidate-household-heading p, .candidate-household-occupants p, .candidate-household-pets p { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
+.candidate-household-facts { display: flex; flex-wrap: wrap; gap: 12px; }
+.candidate-household-facts p { flex: 1 1 230px; min-width: 0; margin: 0; padding: 14px; background: color-mix(in srgb, var(--brand-primary) 7%, var(--color-surface)); border-radius: 12px; font-weight: 650; overflow-wrap: anywhere; }
+@media (min-width: 768px) {
+    .candidate-household-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .candidate-household-summary { grid-column: 1 / -1; }
+}
