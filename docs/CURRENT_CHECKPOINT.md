@@ -1,32 +1,26 @@
 # AlquilaPro — CURRENT CHECKPOINT
 
-**Corte:** 2026-10-23, America/Bogota. **Autoridad:** GitHub HEAD exacto → CI del HEAD → este checkpoint → SPEC/AGENTS → historial de Git. Este documento es el estado activo de la **rama de integración**, no sustituye `main` ni autoriza merge o deploy.
+**Corte:** 2026-10-23, America/Bogota. Autoridad: SHA actual de GitHub → CI del SHA → esta nota → SPEC/plan aprobado → historial. El checkpoint canónico de esta fase vive en esta rama; `main` permanece protegido. No sustituir el estado observado por fechas o HEAD antiguos.
 
-## Identidad y estado verificable
+## Fuentes y estado recuperable
+- **Repo** `sierraglobalcompany-rgb/AlquilaPro`.
+- **Main** `414bcfeae0a3b4f8eea7262eefcb498e3f116307`: merge autorizado por squash del [PR #54](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/54); Work CAND-02 y Documentos con requisitos reales integrados. **No deploy**.
+- **QA PR #54:** CI #1177 `SUCCESS` PHP 8.3/8.4/8.5 sobre fuente pre-merge `ba152597e2fd47792fc39e96c3906cce38dc00d9`; Browser QA focal fuente de código `ffddc415c57c98588ca5c895d9e56f4eab0e1945` `PASS_WITH_SCOPE`. Tree del squash = tree de fuente validada. Paridad global y WCAG completa `NOT_CERTIFIED`.
+- **PR #52 y #53:** cerrados **sin merge** como `SUPERSEDED_BY_PR54`. Ramas/diffs/QA disponibles, pero NO fusionarlas otra vez.
+- **CAND-03:** [PR #55](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/55) Draft; rama `impl/cand-03-household-human-first-20261023`, base `main@414bcfeae0a3b4f8eea7262eefcb498e3f116307`. **SHA de código antes de este commit de documentación** `36d4161a6a442a943201ff6a5d5f9736d09db639`. Commit nuevo = solo Markdown; verificar HEAD/CI tras este commit.
+- **CI de CAND-03:** `NOT_VERIFIED` al redactar, PHP 8.3/8.4/8.5 requeridos. **Browser QA de CAND-03:** `NOT_RUN`, paridad mockup `NOT_CERTIFIED`. No inferir PASS de PR54.
 
-- **Repo:** `sierraglobalcompany-rgb/AlquilaPro`.
-- **Main verificado:** `94ba5f486b158c2b1fed753f26c63f7b3570c97c`; CAND-01 integrado anteriormente por PR #45. Sin cambios por este trabajo.
-- **PR de integración:** [#54](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/54), **Draft, mergeable=true, no merged**; rama `integration/cand02-documents-20261023-g1`. **HEAD de código verificado antes de este commit documental:** `ffddc415c57c98588ca5c895d9e56f4eab0e1945`.
-- **CI código [#1176](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39904534274): SUCCESS PHP 8.3, 8.4, 8.5**, asociado a `ffddc415c57c98588ca5c895d9e56f4eab0e1945`.
-- **Browser QA integrado:** `PASS_WITH_SCOPE` sobre `ffddc415c57c98588ca5c895d9e56f4eab0e1945`, evidencias: **seis PNG reales + dos referencias originales + métricas/manifiesto**, sin overflow horizontal ni errores inesperados de consola; validación independiente del ZIP **11/11 hashes**. **Paridad total de mockups `NOT_CERTIFIED`**. QA documenta estados sintéticos, no despliegue.
-- **Documentación actualizada:** esta edición genera un **nuevo commit documental**; requerirá CI propio antes de integración final. **No afirmar que Browser QA midió el nuevo SHA**: se conserva evidencia sobre el padre de código sin cambio funcional/visual. No repetir Playwright por una edición exclusiva de Markdown.
-- **PR #52** [Work](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/52), HEAD `0eea64d8a4fdba964d14da26345ff6e68369d36d`, Draft; V8 `PASS_WITH_SCOPE`. **PR #53** [Documentos](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/53), HEAD `4c20e6acbe88aac6a3b3714d49f4d9a598d56e41`, Draft; QA `PASS_WITH_SCOPE`. **Ambos continúan abiertos como fuentes históricas**: PR #54 ya incluye sus cambios funcionales; nunca fusionar los tres indiscriminadamente.
-- **Merge:** `NO AUTORIZADO`. **Deploy Hostinger:** `NO AUTORIZADO`. **CAND-03+ / F26:** `FROZEN` hasta integración autorizada y siguiente gate.
+## Contrato CAND-03: Ocupantes y mascotas
+- Autoridades: `docs/superpowers/specs/2026-10-17-candidates-human-first-redesign.md` §9.3, plan homónimo Task 3, `docs/design/CANDIDATES_VISUAL_BASELINE_2026-10-17.md` §03 y PNG `03_OCUPANTES_MASCOTAS.png`.
+- Verdad existente de `candidates`: `occupants_count` (nulo admite no respuesta y 0 explícito), `occupants_notes`, `pets_declared`, `pets_notes`. **Riesgo conocido**: `pets_declared NOT NULL DEFAULT 0`, wizard «No» preseleccionado. Un cero en borrador no prueba una declaración. Sin migrar: diferenciar `submitted_at` para mostrar `Sin mascotas registradas en la solicitud` únicamente tras envío; en borrador vacío presentar estado vacío y con notas `Declaración de mascotas no confirmada`. No confundir «no registro» con «no tiene mascotas».
+- Un `section=household` renderiza resumen factual y cards de ocupantes y mascotas; escapar notas con saltos de línea; sin expediente de personas, fotos, raza, vacunación, política de inmueble, indicadores o riesgo inventados.
+- Únicos archivos de producto CAND-03: `resources/views/candidate_detail.php`, `assets/app.css` específico y `tests/Integration/Candidates/HumanFirstCandidateDetailViewTest.php`; RED creado antes de GREEN, pero no se ejecutó el RED local. No API ni base de datos ni servicios nuevos.
+- `main` conserva Work, Documents, permisos, contratos y componentes. Ningún cambio de esos módulos permitido en esta fase.
 
-## Contratos integrados y reservas
+## Cuatro leyes, gates y NEXT
+1. **KISS:** PHP SSR/Slim/PDO; dos cards secundarias y un resumen usando datos reales, sin capas ni frontend paralelo.
+2. **Antirruido:** cerrar PRs superados con prueba de solapamiento; un único checkpoint, no multiplicar reportes ni ramas alternativas.
+3. **Antiparches:** tratar causa del falso «No mascotas» en visualización sin inferir una respuesta inexistente; una suite causal para null/0/default/XSS.
+4. **UX/UI Pro:** usar PNG original solo para composición, sin fotos/acciones/scores falsos; comparar capturas con rol, contenido y viewport. Paridad total `NOT_CERTIFIED` hasta evidencia suficiente.
 
-- `resources/views/candidate_detail.php`: sección **Work** contiene exclusivamente datos declarados existentes (empleo, empresa, ocupación, ingreso y notas) y sección **Documents** contiene requisitos activos, recibidos, pendientes, opcionales y documentos de requisitos inactivos. Una sola sección activa por solicitud.
-- `app/Candidates/routes.php`: requisitos reales del `CandidateDocumentService` consultados al renderizar `?section=documents`; permisos previos preservados.
-- `assets/app.css`: estilo específico para ambas secciones; corrección de navegación fija entre **1024 y 1199px** y menú/tab a partir de 1200px. Causa de CI #1175 identificada (orden de reglas del contrato de navegación), corregida en `ffddc415...`; CI #1176 verde.
-- Pruebas de **convivencia Work/Documentos** y regresión de breakpoint añadidas, sin migraciones ni módulos nuevos.
-- **En QA 1100px:** último enlace documental termina **97,5px antes** de la barra fija; resumen lateral recuperable al desplazarse hacia arriba. **No** catalogar superposición funcional si el final es accesible.
-- **Límites:** historia/verificación laboral, revisión/solicitud/aprobación documental, miniaturas/acciones de mockups **no existen como flujo completo verificado**. No añadir simulaciones visuales ni aprobación inventada; futura implementación solo con fuentes de datos, permisos y UAT. Accesibilidad integral, dispositivo físico y paridad visual global no certificados. El Browser QA integrado no reejecutó todos los escenarios de PDF privado/403 de PR #53; conservar esa distinción.
-
-## Cuatro leyes y próxima compuerta
-
-- **KISS:** PHP SSR, Slim/PDO/MariaDB, owners existentes; sin arquitectura o capas paralelas.
-- **Antirruido:** usar PR #54 como candidata única de integración; documentar supersesión y cerrar PRs anteriores **solo después de decisión autorizada**. Historial y evidencias permanecen en Git/PRs.
-- **Antiparches:** causa de fallo #1175 corregida y cubierta por regresión; prohibido reabrir arreglos CSS sin fallo nuevo probado.
-- **UX/UI Pro:** capturas reales, viewport/rol/datos, límites `PASS_WITH_SCOPE`; fidelidad global pendiente con funcionalidades sustentadas por backend.
-
-**NEXT ÚNICO:** comprobar que el **CI del nuevo HEAD exclusivamente documental** termina verde; presentar dictamen del PR #54 y solicitar **autorización expresa de merge exclusivo del PR #54** (no deploy). Sin autorización, STOP. No iniciar CAND-03 ni crear nuevas ramas/pruebas/paquetes redundantes.
+**NEXT ÚNICO:** revisar CI exacto de PR #55 y auditar contratos de `household`; si GREEN, ejecutar Browser QA focal solo de CAND-03 (1448,768,375 + borrador y scroll final) una vez. Si RED, reparar causa concreta y revalidar. **PR #55 Draft; NO MERGE, NO HOSTINGER/DEPLOY; no abrir CAND-04 antes del gate.**
