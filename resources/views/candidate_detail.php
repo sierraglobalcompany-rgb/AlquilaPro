@@ -398,13 +398,20 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
 
                 <section class="content-card candidate-card candidate-household-occupants" data-household-region="occupants" aria-labelledby="candidate-household-occupants-title">
                     <div class="candidate-household-region-heading">
-                        <h3 id="candidate-household-occupants-title"><?= $candidateIcon('users') ?>Ocupantes adicionales</h3>
-                        <p class="muted">El solicitante se muestra en el resumen, no como una ficha adicional.</p>
+                        <h3 id="candidate-household-occupants-title"><?= $candidateIcon('users') ?>Ocupantes del hogar</h3>
+                        <p class="muted">Solicitante principal y personas adicionales declaradas.</p>
                     </div>
-                    <?php if ($householdOccupants === []): ?>
-                        <p class="empty-state">No hay fichas de otras personas registradas.</p>
-                    <?php else: ?>
-                        <div class="candidate-household-records">
+                    <div class="candidate-household-records">
+                        <article class="candidate-household-record candidate-household-record--applicant" data-household-applicant>
+                            <span class="candidate-household-avatar candidate-household-avatar--initials" aria-label="Solicitante principal"><?= $escape($householdInitials($candidate['full_name'] ?? '')) ?></span>
+                            <div class="candidate-household-record__body">
+                                <h4><?= $escape($candidate['full_name'] ?? 'Solicitante principal') ?></h4>
+                                <p>Solicitante principal</p>
+                            </div>
+                        </article>
+                        <?php if ($householdOccupants === []): ?>
+                            <p class="empty-state">No hay fichas de otras personas registradas.</p>
+                        <?php else: ?>
                             <?php foreach ($householdOccupants as $occupant): ?>
                                 <article class="candidate-household-record">
                                     <?php if (!empty($occupant['has_photo'])): ?>
@@ -420,8 +427,8 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                                     </div>
                                 </article>
                             <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
+                        <?php endif; ?>
+                    </div>
                     <?php if ($occupantsNotes !== ''): ?><div class="candidate-household-notes"><strong>Notas declaradas</strong><p><?= nl2br($escape($occupantsNotes)) ?></p></div><?php endif; ?>
                     <?php if ($householdCanManage): ?>
                         <details class="candidate-household-manager">

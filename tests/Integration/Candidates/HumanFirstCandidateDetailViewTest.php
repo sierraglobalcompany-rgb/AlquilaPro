@@ -407,6 +407,7 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         foreach (['summary', 'information', 'occupants', 'pets', 'rules', 'next-steps'] as $region) {
             self::assertSame(1, substr_count($html, 'data-household-region="' . $region . '"'), $region . ' region must render once.');
         }
+        self::assertSame(1, substr_count($html, 'data-household-applicant'));
         self::assertStringContainsString('Cantidad no declarada', $html);
         self::assertStringContainsString('Respuesta de mascotas no confirmada', $html);
         self::assertStringNotContainsString('🐾', $html);
@@ -537,6 +538,9 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         }
         self::assertSame(1, substr_count($html, 'data-household-region="occupants"'));
         self::assertSame(1, substr_count($html, 'data-household-region="pets"'));
+        self::assertSame(1, substr_count($html, 'data-household-applicant'));
+        self::assertStringContainsString('candidate-household-record--applicant', $html);
+        self::assertStringContainsString('Camilo Demo UAT', $html);
         self::assertStringNotContainsString('No hay fichas de otras personas registradas.', $html);
     }
 
