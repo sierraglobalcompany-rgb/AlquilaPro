@@ -385,7 +385,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                         <?php endif; ?>
                     </section>
                     <section class="content-card candidate-card candidate-household-pets" aria-labelledby="candidate-household-pets-title">
-                        <h3 id="candidate-household-pets-title"><?= $candidateIcon('heart') ?>Mascotas</h3>
+                        <h3 id="candidate-household-pets-title"><span aria-hidden="true">🐾</span>Mascotas</h3>
                         <?php if ($petsNotes === ''): ?>
                             <p class="muted">No hay información adicional sobre mascotas.</p>
                         <?php else: ?>
