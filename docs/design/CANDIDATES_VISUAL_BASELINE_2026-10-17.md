@@ -149,20 +149,17 @@ Eliminar/no inventar:
 - documentos de soporte laborales especializados;
 - “perfil sólido”, riesgo o recomendación.
 
-### 03 — Ocupantes y mascotas
+### 03 — Ocupantes y mascotas — revisión funcional ratificada 2026-10-23
 
-Conservar:
-- separación hogar/mascotas;
-- resumen visual simple.
+**Fuente visual permanece INTACTA**: `03_OCUPANTES_MASCOTAS.png`, 1448×1086. El owner rechazó la reducción a tres cards y autorizó completar el módulo con fichas de ocupantes, mascotas individuales y fotografías opcionales reales **en CAND-03**, sin diferirlas. La restricción histórica siguiente ("sin fichas ni fotos porque no hay backend") quedó **supersedida por la nueva SPEC §9.3 y plan Task 3**, no por cambio de imagen.
 
-Eliminar/no inventar:
-- personas individuales;
-- edades;
-- parentescos;
-- fotos;
-- nombre/raza/tamaño/edad/vacunación de mascota;
-- indicadores de riesgo;
-- política del inmueble si no es truth disponible en esa ruta.
+**Preservar** seis regiones, jerarquía, disposición y densidad visual: Resumen (ancho), Estado de la información (lateral), Ocupantes con ficha del solicitante y personas adicionales, Mascotas con fotos reales/placeholder y manual contextual, Reglas/observaciones, Próximos pasos útiles. Misma experiencia en responsive sin ocultar regiones.
+
+**No inventar**: perfiles, edad, parentesco, raza, foto, vacunas, «riesgo bajo», «hogar estable», «sin alertas», política de mascotas, envío de mensajes ni aprobaciones automáticas. Los nuevos campos capturados voluntariamente alimentan solo las fichas que realmente existen. Vacunación, cuando se capture, significa **declaración no verificada**. Para ausencia mostrar un estado vacío humano en la región aprobada, **no borrar la región**.
+
+**Acciones** Agregar/Editar reales para gestor con `candidates.manage`; lectura `candidates.view`; privados de inmueble exigen también `properties.view` y `documents.view`. Manual real `manual_convivencia` JSON/PDF según tipo/versionado del producto; no adjudicar permisos jurídicos ni calcular riesgo. Fotos privadas por persona adulta/mascota opcionales, menores con iniciales por defecto.
+
+**Regla de aceptación:** el PNG es autoridad visual, no datos de prueba; comparar cada una de las seis regiones contra captura real a 1448/1100/768/375 y gates funcionales de formulario, fotos, permisos, manual y navegación. QA PHP verde por sí solo no certifica fidelidad visual.
 
 ### 04 — Referencias
 
