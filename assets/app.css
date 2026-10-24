@@ -126,6 +126,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
     color: #7f2929;
     background: #fff7f7;
 }
+.stack-form .form-field-error { display: block; margin-top: 6px; color: var(--color-danger); font-size: 14px; line-height: 1.45; }
+.stack-form [aria-invalid="true"] { border-color: var(--color-danger); }
 .notice--success {
     border: 1px solid color-mix(in srgb, var(--color-success) 38%, white);
     border-radius: var(--radius-control);

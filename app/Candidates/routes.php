@@ -750,8 +750,8 @@ return static function (App $app, array $deps): void {
         unset($input['wizard_step']);
 
         if ($step === 'occupants') {
-            $occupants = $input['occupants'] ?? null;
-            $pets = $input['pets'] ?? null;
+            $occupants = $input['occupants'] ?? [];
+            $pets = $input['pets'] ?? [];
             if (($input['occupants_present'] ?? null) !== '1'
                 || ($input['pets_present'] ?? null) !== '1'
                 || !is_array($occupants)

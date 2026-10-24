@@ -148,6 +148,30 @@ final class CandidateWizardTest extends TestCase
         self::assertSame('verification', $final['status']);
     }
 
+    public function testPublicWizardLoadsScriptForDynamicHouseholdRows(): void
+    {
+        [, $token] = $this->startThroughPublicRoute();
+        $html = (string) $this->request($this->app(), 'GET', '/apply/continue/' . $token . '/occupants')->getBody();
+
+        self::assertStringContainsString('<script src="/assets/app.js" defer></script>', $html);
+    }
+
+    public function testWizardAcceptsAnExplicitlyEmptyHouseholdList(): void
+    {
+        [, $token] = $this->startThroughPublicRoute();
+        $response = $this->request($this->app(), 'POST', '/apply/continue/' . $token, [
+            'csrf_token' => $this->csrfToken(),
+            'wizard_step' => 'occupants',
+            'occupants_count' => '1',
+            'pets_declared' => '0',
+            'occupants_present' => '1',
+            'pets_present' => '1',
+        ]);
+
+        self::assertSame(303, $response->getStatusCode());
+        self::assertSame('/apply/continue/' . $token . '/references', $response->getHeaderLine('Location'));
+    }
+
     public function testNewHouseholdAnswerIsNotPreselectedAndCountIncludesApplicant(): void
     {
         $app = $this->app();

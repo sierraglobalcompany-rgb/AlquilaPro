@@ -7,6 +7,10 @@ $scope = $scope === 'lease' ? 'lease' : 'property';
 $documents = is_array($documents ?? null) ? $documents : [];
 $history = is_array($history ?? null) ? $history : [];
 $scopeId = is_int($scopeId ?? null) ? $scopeId : null;
+$formValues = is_array($formValues ?? null) ? $formValues : [];
+$formErrors = is_array($formErrors ?? null) ? $formErrors : [];
+$formValue = static fn (string $key, mixed $default = ''): string => $escape($formValues[$key] ?? $default);
+$fieldError = static fn (string $field): ?string => is_string($formErrors[$field] ?? null) ? $formErrors[$field] : null;
 $prettyJson = static fn (array $content): string => (string) json_encode(
     $content,
     JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
@@ -21,12 +25,16 @@ $typeOptions = $scope === 'lease'
     <p class="hint">Consulta versiones vigentes e historial. Los archivos se entregan mediante una ruta autenticada.</p>
     <form class="stack-form" method="get" action="<?= $escape($basePath) ?>/admin/documents">
         <label>Ámbito
-            <select name="scope">
+            <select id="document-scope" name="scope" aria-invalid="<?= $fieldError('scope') !== null ? 'true' : 'false' ?>"<?= $fieldError('scope') !== null ? ' aria-describedby="document-scope-error"' : '' ?>>
                 <option value="property" <?= $scope === 'property' ? 'selected' : '' ?>>Propiedad</option>
                 <option value="lease" <?= $scope === 'lease' ? 'selected' : '' ?>>Arrendamiento</option>
             </select>
+            <?php if ($fieldError('scope') !== null): ?><span class="form-field-error" id="document-scope-error"><?= $escape($fieldError('scope')) ?></span><?php endif; ?>
         </label>
-        <label>ID de propiedad o arrendamiento<input type="number" name="id" min="1" value="<?= $escape($scopeId ?? '') ?>" required></label>
+        <label>ID de propiedad o arrendamiento
+            <input id="document-scope_id" type="number" name="id" min="1" value="<?= $formValue('scope_id', $scopeId ?? '') ?>" required aria-invalid="<?= $fieldError('scope_id') !== null ? 'true' : 'false' ?>"<?= $fieldError('scope_id') !== null ? ' aria-describedby="document-scope_id-error"' : '' ?>>
+            <?php if ($fieldError('scope_id') !== null): ?><span class="form-field-error" id="document-scope_id-error"><?= $escape($fieldError('scope_id')) ?></span><?php endif; ?>
+        </label>
         <button class="button button--quiet" type="submit">Consultar</button>
     </form>
 </section>
@@ -80,34 +88,42 @@ $typeOptions = $scope === 'lease'
         <?php endif; ?>
     </section>
 
-    <?php if ($canManage): ?>
+    <?php if ($canManage && ($scopeId !== null || $formErrors !== [])): ?>
         <section class="surface">
             <h2>Agregar versión</h2>
-            <form class="stack-form" method="post" enctype="multipart/form-data" action="<?= $escape($basePath) ?>/admin/documents">
+            <?php if ($fieldError('form') !== null): ?><p class="error" id="document-form-error" role="alert"><?= $escape($fieldError('form')) ?></p><?php endif; ?>
+            <form id="document-version-form" class="stack-form" method="post" enctype="multipart/form-data" action="<?= $escape($basePath) ?>/admin/documents"<?= $fieldError('form') !== null ? ' aria-describedby="document-form-error"' : '' ?>>
                 <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
                 <input type="hidden" name="scope" value="<?= $escape($scope) ?>">
-                <input type="hidden" name="scope_id" value="<?= $escape($scopeId) ?>">
+                <input type="hidden" name="scope_id" value="<?= $formValue('scope_id', $scopeId ?? '') ?>">
                 <label>Tipo
-                    <select name="type" required>
+                    <select id="document-type" name="type" required aria-invalid="<?= $fieldError('type') !== null ? 'true' : 'false' ?>"<?= $fieldError('type') !== null ? ' aria-describedby="document-type-error"' : '' ?>>
                         <?php foreach ($typeOptions as $type => $label): ?>
-                            <option value="<?= $escape($type) ?>"><?= $escape($label) ?></option>
+                            <option value="<?= $escape($type) ?>" <?= ($formValues['type'] ?? '') === $type ? 'selected' : '' ?>><?= $escape($label) ?></option>
                         <?php endforeach; ?>
                     </select>
+                    <?php if ($fieldError('type') !== null): ?><span class="form-field-error" id="document-type-error"><?= $escape($fieldError('type')) ?></span><?php endif; ?>
                 </label>
-                <label>Título<input name="title" maxlength="190" required></label>
+                <label>Título
+                    <input id="document-title" name="title" maxlength="190" required value="<?= $formValue('title') ?>" aria-invalid="<?= $fieldError('title') !== null ? 'true' : 'false' ?>"<?= $fieldError('title') !== null ? ' aria-describedby="document-title-error"' : '' ?>>
+                    <?php if ($fieldError('title') !== null): ?><span class="form-field-error" id="document-title-error"><?= $escape($fieldError('title')) ?></span><?php endif; ?>
+                </label>
                 <label>Reemplaza versión
-                    <select name="supersedes_document_id">
-                        <option value="">Documento nuevo</option>
+                    <select id="document-supersedes_document_id" name="supersedes_document_id" aria-invalid="<?= $fieldError('supersedes_document_id') !== null ? 'true' : 'false' ?>"<?= $fieldError('supersedes_document_id') !== null ? ' aria-describedby="document-supersedes_document_id-error"' : '' ?>>
+                        <option value="" <?= ($formValues['supersedes_document_id'] ?? '') === '' ? 'selected' : '' ?>>Documento nuevo</option>
                         <?php foreach ($documents as $document): ?>
-                            <option value="<?= $escape($document['id']) ?>">#<?= $escape($document['id']) ?> · <?= $escape($document['title']) ?></option>
+                            <option value="<?= $escape($document['id']) ?>" <?= ($formValues['supersedes_document_id'] ?? '') === (string) $document['id'] ? 'selected' : '' ?>>#<?= $escape($document['id']) ?> · <?= $escape($document['title']) ?></option>
                         <?php endforeach; ?>
                     </select>
+                    <?php if ($fieldError('supersedes_document_id') !== null): ?><span class="form-field-error" id="document-supersedes_document_id-error"><?= $escape($fieldError('supersedes_document_id')) ?></span><?php endif; ?>
                 </label>
                 <label>Archivo privado (PNG, JPEG, WebP o PDF; máximo 10 MiB)
-                    <input type="file" name="document" accept="application/pdf,image/png,image/jpeg,image/webp">
+                    <input id="document-file" type="file" name="document" accept="application/pdf,image/png,image/jpeg,image/webp" aria-invalid="<?= $fieldError('document') !== null ? 'true' : 'false' ?>"<?= $fieldError('document') !== null ? ' aria-describedby="document-file-error"' : '' ?>>
+                    <?php if ($fieldError('document') !== null): ?><span class="form-field-error" id="document-file-error"><?= $escape($fieldError('document')) ?></span><?php endif; ?>
                 </label>
                 <label>Contenido JSON para manual o inventario
-                    <textarea name="content_json" rows="8" maxlength="100000">{}</textarea>
+                    <textarea id="document-content_json" name="content_json" rows="8" maxlength="100000" aria-invalid="<?= $fieldError('content_json') !== null ? 'true' : 'false' ?>"<?= $fieldError('content_json') !== null ? ' aria-describedby="document-content_json-error"' : '' ?>><?= $formValue('content_json', '{}') ?></textarea>
+                    <?php if ($fieldError('content_json') !== null): ?><span class="form-field-error" id="document-content_json-error"><?= $escape($fieldError('content_json')) ?></span><?php endif; ?>
                 </label>
                 <button class="button" type="submit">Guardar versión</button>
             </form>
