@@ -172,7 +172,8 @@ Antes de afirmar GREEN/PASS/MERGEABLE/DEPLOYED:
 
 - Antes de implementar: revisar contexto suficiente -> contrastar GitHub/owner/SPEC -> descartar duplicación -> plan mínimo -> ejecutar o delegar solo el residuo inaccesible. **Auditoría proporcional:** diez pasadas si el owner las solicita o hay riesgo transversal demostrado; para cambios acotados basta chequeo focal y QA obligatoria. No repetir análisis que no cambie una decisión.
 - `continua` significa ejecutar el siguiente gate inequívocamente preparado; no reiniciar el análisis desde cero.
-- Si el owner pide `crea un checkpoint y para
+- Si el owner pide `crea un checkpoint y para`: crear/verificar checkpoint durable y detenerse, sin seguir implementando.
+- Si el owner pide un archivo: generarlo directamente como archivo descargable.
 
 ## Integración PingPongLaw — seis leyes (piloto documental F4)
 
