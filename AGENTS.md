@@ -174,3 +174,6 @@ Antes de afirmar GREEN/PASS/MERGEABLE/DEPLOYED:
 - `continua` significa ejecutar el siguiente gate inequívocamente preparado; no reiniciar el análisis desde cero.
 - Si el owner pide `crea un checkpoint y para`: crear/verificar checkpoint durable y detenerse, sin seguir implementando.
 - Si el owner pide un archivo: generarlo directamente como archivo descargable.
+
+## Ley 1 — KISS + Ponytail (adaptación, 2026-10-24)
+Antes de modificar código, consultar `.agents/skills/kiss-ponytail/SKILL.md` si está disponible y conservar las seis leyes del canon existente. Preferir NO CREAR → REUTILIZAR repo → stdlib/nativo → dependencia existente → código mínimo claro. Trazar consumidores/contratos y preservar seguridad, auth/tenants, validación, datos, accesibilidad y QA. Ponytail no altera el diseño ni funcionalidades aprobadas; `ponytail-audit` no se ejecuta por rutina. El plugin global en Codex y sus hooks requieren instalación y confianza separadas: este archivo no prueba que estén activos.
