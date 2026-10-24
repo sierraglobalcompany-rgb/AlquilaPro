@@ -811,29 +811,31 @@ ul { padding-left: 22px; }
 
 /* CAND-03 household: three paired rows on desktop, one readable column on small screens. */
 .candidate-household-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
-.candidate-household-grid > .content-card { min-width: 0; overflow-wrap: anywhere; }
+.candidate-household-grid > .content-card { min-width: 0; padding: 16px; gap: 10px; overflow-wrap: anywhere; }
 .candidate-household-heading, .candidate-household-region-heading { display: grid; gap: 8px; }
 .candidate-household-heading h2, .candidate-household-grid h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0; font-size: 18px; }
 .candidate-household-heading .nav-icon, .candidate-household-grid h3 .nav-icon { color: var(--brand-primary); width: 22px; height: 22px; flex: 0 0 auto; }
 .candidate-household-heading p, .candidate-household-region-heading p, .candidate-household-occupants p, .candidate-household-pets p { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
 .candidate-household-facts { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
-.candidate-household-facts p { display: grid; gap: 6px; flex: 1 1 150px; min-width: 0; margin: 0; padding: 14px; background: color-mix(in srgb, var(--brand-primary) 7%, var(--color-surface)); border-radius: 12px; overflow-wrap: anywhere; }
+.candidate-household-facts p { display: grid; gap: 6px; flex: 1 1 150px; min-width: 0; margin: 0; padding: 12px; background: color-mix(in srgb, var(--brand-primary) 7%, var(--color-surface)); border-radius: 12px; overflow-wrap: anywhere; }
 .candidate-household-facts span, .candidate-household-details dt { color: var(--color-muted); font-size: 12px; }
 .candidate-household-facts strong, .candidate-household-details dd { color: var(--color-text); font-weight: 650; }
+.candidate-household-count { margin-left: auto; padding: 4px 8px; border-radius: 999px; background: color-mix(in srgb, var(--brand-primary) 8%, var(--color-surface)); color: var(--color-muted); font-size: 12px; font-weight: 600; }
+.candidate-household-response-date { display: block; margin-top: 3px; color: var(--color-muted); font-size: 12px; font-weight: 400; }
 .candidate-household-details { display: grid; gap: 12px; margin: 14px 0 0; }
 .candidate-household-details > div { display: grid; gap: 4px; }
 .candidate-household-details dt, .candidate-household-details dd { margin: 0; }
 .candidate-household-notice { margin: 14px 0 0; padding: 12px; border-left: 3px solid var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 7%, var(--color-surface)); line-height: 1.5; }
-.candidate-household-records { display: grid; gap: 12px; margin-top: 14px; }
-.candidate-household-record { display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: start; gap: 12px; padding: 12px 0; border-top: 1px solid var(--color-border); }
-.candidate-household-avatar { display: grid; width: 52px; height: 52px; place-items: center; object-fit: cover; border-radius: 50%; background: color-mix(in srgb, var(--brand-primary) 12%, var(--color-surface)); color: var(--brand-primary); font-weight: 700; }
-.candidate-household-record__body { min-width: 0; display: grid; gap: 5px; }
+.candidate-household-records { display: grid; gap: 8px; margin-top: 10px; }
+.candidate-household-record { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: start; gap: 9px; padding: 7px 8px; border: 1px solid var(--color-border); border-radius: 10px; }
+.candidate-household-avatar { display: grid; width: 44px; height: 44px; place-items: center; object-fit: cover; border-radius: 50%; background: color-mix(in srgb, var(--brand-primary) 12%, var(--color-surface)); color: var(--brand-primary); font-weight: 700; }
+.candidate-household-record__body { min-width: 0; display: grid; gap: 3px; }
 .candidate-household-record__body h4, .candidate-household-record__body p { margin: 0; overflow-wrap: anywhere; }
 .candidate-household-record__notes, .candidate-household-notes { line-height: 1.5; }
-.candidate-household-notes { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--color-border); }
-.candidate-household-notes p { margin: 6px 0 0; }
+.candidate-household-notes { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--color-border); }
+.candidate-household-notes p { margin: 4px 0 0; }
 .candidate-household-photo { display: block; width: min(100%, 320px); max-height: 240px; margin: 10px 0; object-fit: contain; border-radius: 10px; background: var(--color-surface); }
-.candidate-household-manager { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--color-border); }
+.candidate-household-manager { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--color-border); }
 .candidate-household-manager > summary { cursor: pointer; font-weight: 650; }
 .candidate-household-edit { display: grid; gap: 12px; margin: 14px 0; padding: 14px; border: 1px solid var(--color-border); border-radius: 12px; }
 .candidate-household-edit label { min-width: 0; }
@@ -844,4 +846,9 @@ ul { padding-left: 22px; }
 .candidate-household-next-list span { color: var(--color-muted); font-size: 13px; line-height: 1.4; }
 @media (min-width: 1024px) {
     .candidate-household-grid { grid-template-columns: minmax(0, 1.55fr) minmax(260px, .85fr); align-items: start; }
+}
+@media (min-width: 1200px) {
+    .candidate-household-occupants .candidate-household-record__body { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 12px; row-gap: 2px; }
+    .candidate-household-occupants .candidate-household-record__body h4, .candidate-household-occupants .candidate-household-record__notes { flex: 0 0 100%; }
+    .candidate-household-occupants .candidate-household-record__body p { line-height: 1.35; }
 }

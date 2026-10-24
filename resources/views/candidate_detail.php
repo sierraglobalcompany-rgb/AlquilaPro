@@ -354,8 +354,12 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
         $petDeclarationLabel = !$petsAnswered
             ? 'Respuesta de mascotas no confirmada'
             : (!empty($candidate['pets_declared']) ? 'Mascotas declaradas' : 'Sin mascotas declaradas en la solicitud');
+        $petDeclarationResponse = !$petsAnswered
+            ? 'No confirmado'
+            : (!empty($candidate['pets_declared']) ? 'Sí, se declararon mascotas' : 'No se declararon mascotas');
         $registeredOccupants = count($householdOccupants);
         $registeredTotal = 1 + $registeredOccupants;
+        $registeredPetCount = count($householdPets);
         $occupantsMatch = $occupantsCount !== null && $occupantsCount === $registeredTotal;
         $householdFormAction = $householdPhotoPath;
         $householdRecordUrl = static fn (string $kind, int $recordId): string => $householdPhotoPath . '/' . rawurlencode($kind) . '/' . $recordId . '/photo';
@@ -386,8 +390,8 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                     <h3 id="candidate-household-information-title"><?= $candidateIcon('history') ?>Estado de la información</h3>
                     <dl class="candidate-household-details">
                         <div><dt>Solicitante</dt><dd><?= $escape($candidate['full_name'] ?? 'Sin nombre registrado') ?></dd></div>
-                        <div><dt>Personas en fichas</dt><dd><?= $escape($registeredTotal) ?> incluyéndote</dd></div>
-                        <div><dt>Respuesta de mascotas</dt><dd><?= $petsAnswered ? $escape($candidate['pets_answered_at']) : 'Pendiente de confirmar' ?></dd></div>
+                        <div><dt>Personas en fichas</dt><dd><?= $escape($registeredTotal) ?>, incluido el solicitante</dd></div>
+                        <div><dt>Respuesta de mascotas</dt><dd><?= $escape($petDeclarationResponse) ?><?php if ($petsAnswered): ?> <small class="candidate-household-response-date">Registrada <time datetime="<?= $escape(str_replace(' ', 'T', (string) $candidate['pets_answered_at'])) ?>"><?= $escape($candidate['pets_answered_at']) ?></time></small><?php endif; ?></dd></div>
                     </dl>
                     <?php if (!$occupantsMatch && ($occupantsCount !== null || $householdOccupants !== [])): ?>
                         <p class="candidate-household-notice">El total declarado y las fichas disponibles no coinciden. Revisa la información; los registros anteriores se conservan sin completar personas automáticamente.</p>
@@ -429,7 +433,6 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </div>
-                    <?php if ($occupantsNotes !== ''): ?><div class="candidate-household-notes"><strong>Notas declaradas</strong><p><?= nl2br($escape($occupantsNotes)) ?></p></div><?php endif; ?>
                     <?php if ($householdCanManage): ?>
                         <details class="candidate-household-manager">
                             <summary>Administrar fichas de ocupantes</summary>
@@ -464,7 +467,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                 </section>
 
                 <section class="content-card candidate-card candidate-household-pets" data-household-region="pets" aria-labelledby="candidate-household-pets-title">
-                    <h3 id="candidate-household-pets-title"><?= $candidateIcon('account') ?>Mascotas</h3>
+                    <h3 id="candidate-household-pets-title"><?= $candidateIcon('account') ?>Mascotas <span class="candidate-household-count"><?= $escape($registeredPetCount . ($registeredPetCount === 1 ? ' ficha registrada' : ' fichas registradas')) ?></span></h3>
                     <?php if ($householdPets === []): ?>
                         <p class="empty-state">No hay fichas de mascotas registradas.</p>
                     <?php else: ?>
@@ -482,7 +485,6 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                             <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
-                    <?php if ($petsNotes !== ''): ?><div class="candidate-household-notes"><strong>Notas declaradas</strong><p><?= nl2br($escape($petsNotes)) ?></p></div><?php endif; ?>
                     <?php if ($householdCanManage): ?>
                         <details class="candidate-household-manager"><summary>Administrar fichas de mascotas</summary>
                             <?php foreach ($householdPets as $pet): ?>
@@ -511,6 +513,8 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                 <section class="content-card candidate-card candidate-household-rules" data-household-region="rules" aria-labelledby="candidate-household-rules-title">
                     <h3 id="candidate-household-rules-title"><?= $candidateIcon('files') ?>Reglas y observaciones</h3>
                     <?php if ($occupantsNotes === '' && $petsNotes === ''): ?><p class="muted">No hay observaciones adicionales declaradas.</p><?php endif; ?>
+                    <?php if ($occupantsNotes !== ''): ?><div class="candidate-household-notes"><strong>Observaciones sobre ocupantes</strong><p><?= nl2br($escape($occupantsNotes)) ?></p></div><?php endif; ?>
+                    <?php if ($petsNotes !== ''): ?><div class="candidate-household-notes"><strong>Observaciones sobre mascotas</strong><p><?= nl2br($escape($petsNotes)) ?></p></div><?php endif; ?>
                     <?php if (!$householdManual['authorized']): ?>
                         <p class="muted">La información del manual no está disponible para este perfil.</p>
                     <?php elseif ($householdManualDocument === null): ?>
