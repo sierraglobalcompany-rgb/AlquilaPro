@@ -170,10 +170,15 @@ Antes de afirmar GREEN/PASS/MERGEABLE/DEPLOYED:
 
 ## 14. Método de interacción con el owner
 
-- Antes de implementar: revisar -> recuperar contexto -> contrastar GitHub -> localizar owner -> buscar duplicación -> planificar -> auditar el plan en diez pasadas -> mejorar/converger -> recién entonces implementar o delegar.
+- Antes de implementar: revisar contexto suficiente -> contrastar GitHub/owner/SPEC -> descartar duplicación -> plan mínimo -> ejecutar o delegar solo el residuo inaccesible. **Auditoría proporcional:** diez pasadas si el owner las solicita o hay riesgo transversal demostrado; para cambios acotados basta chequeo focal y QA obligatoria. No repetir análisis que no cambie una decisión.
 - `continua` significa ejecutar el siguiente gate inequívocamente preparado; no reiniciar el análisis desde cero.
-- Si el owner pide `crea un checkpoint y para`: crear/verificar checkpoint durable y detenerse, sin seguir implementando.
-- Si el owner pide un archivo: generarlo directamente como archivo descargable.
+- Si el owner pide `crea un checkpoint y para
 
-## Ley 1 — KISS + Ponytail (adaptación, 2026-10-24)
-Antes de modificar código, consultar `.agents/skills/kiss-ponytail/SKILL.md` si está disponible y conservar las seis leyes del canon existente. Preferir NO CREAR → REUTILIZAR repo → stdlib/nativo → dependencia existente → código mínimo claro. Trazar consumidores/contratos y preservar seguridad, auth/tenants, validación, datos, accesibilidad y QA. Ponytail no altera el diseño ni funcionalidades aprobadas; `ponytail-audit` no se ejecuta por rutina. El plugin global en Codex y sus hooks requieren instalación y confianza separadas: este archivo no prueba que estén activos.
+## Integración PingPongLaw — seis leyes (piloto documental F4)
+
+- **Canon central fijado:** `sierraglobalcompany-rgb/PingPongLaw@84e961cadf482d234f4c0ee2ca60e8c7e9b388e8`; archivo `docs/engineering/LEYES_IMPLEMENTACION_1_A_6.md`. No asumir actualización automática con `main` ni lectura solo por el enlace.
+- **Arranque:** leer las reglas locales de AlquilaPro y, mediante herramientas/acceso disponibles, el canon remoto **realmente**; registrar `CANON_READ=PASS/NOT_VERIFIED`, commit y la skill aplicable. Si no hay acceso remoto, conservar las reglas locales y declarar que no se verificó el canon: no inventar cumplimiento.
+- **Seis leyes:** L1 KISS + Ponytail, L2 Antirruido, L3 Antiparches, L4 Diseño humano (Anti UI Slop y UI UX Pro Max como referencias focales), L5 Verificación independiente, L6 Antiping-pong. La skill local `.agents/skills/kiss-ponytail/SKILL.md` es **adaptador L1**, no copia ni instalador de nueve skills.
+- **Prioridad de AlquilaPro:** prevalecen los contratos, permisos, TDD, matriz PHP 8.3–8.5, mockups Human-First, checkpoints, y reglas de merge/deploy de este archivo. Ponytail no los deroga.
+- **ChatGPT dirige y ejecuta lo accesible**; Codex solo recibe un lote coherente cuando exige entorno local. Antes de más auditorías, preguntar `¿para qué?, ¿qué resultado cambiará?, ¿se puede implementar ya?`. No invocar automáticamente Ponytail Audit ni ambos análisis de diseño.
+- **Aceptar solo con Ley 5:** evidencia del SHA/build y QA correspondiente. La presencia de esta cláusula **no prueba** que Codex cargó la skill, se instalaron hooks o una interfaz pasó pruebas visuales.
