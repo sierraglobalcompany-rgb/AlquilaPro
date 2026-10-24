@@ -1,20 +1,22 @@
 ---
 name: kiss-ponytail
-description: Ley 1 KISS estricta mediante Ponytail. Aplicar en tareas de programación, bug fixes y refactors; preservar leyes 2 a 6.
+description: Adaptador local de Ley 1 KISS + Ponytail para AlquilaPro. Usar en cambios de código, arquitectura, revisión de diff o simplificación justificada; no ejecutar auditoría global por rutina.
 ---
-# Ley 1 KISS + Ponytail — contrato local
-Origen: https://github.com/DietrichGebert/ponytail, fuente oficial v5.3.2 commit 09c434ab73ca43761c5d8b0c5d341926c2fba710, licencia MIT. Adaptación del proyecto, NO plugin oficial instalado.
+# Ley 1 — KISS + Ponytail (AlquilaPro)
 
-**Primero leer flujo y consumidores:** requisito actual → entradas → auth/permiso/tenant → servicio → DB/UI → errores y pruebas. No juzgar por líneas aisladas ni borrar consumidores dinámicos sin comprobar.
+**Canon completo L1–L6 (versión fijada):** https://github.com/sierraglobalcompany-rgb/PingPongLaw/blob/84e961cadf482d234f4c0ee2ca60e8c7e9b388e8/docs/engineering/LEYES_IMPLEMENTACION_1_A_6.md
 
-**Escalera de menor solución completa:** (1) no crear función no solicitada; (2) reutilizar funciones, componentes y contratos del repositorio; (3) biblioteca estándar o capacidad nativa compatible; (4) dependencia ya instalada; (5) expresión simple y legible; (6) mínimo código nuevo suficiente. La solución más corta que incumple un requisito NO cumple KISS.
+**Fuentes:** adaptación PingPongLaw `l1-kiss-ponytail`, basada en Ponytail de DietrichGebert, v5.3.2, commit `09c434ab73ca43761c5d8b0c5d341926c2fba710` (MIT). **Esta skill no instala el plugin ni activa hooks.**
 
-**Descartar con evidencia:** wrappers vacíos, factories sin necesidad, flags especulativos, helpers duplicados, dependencias para acciones triviales, complejidad y capas innecesarias. Comprobar consumidores estáticos/dinámicos, compatibilidad y pruebas antes de unir o retirar; desconocido no es basura.
+## Aplicar, sin auditoría ritual
 
-**No sacrificar:** contrato aprobado, controles de seguridad, validación, permisos/aislamiento de empresas, integridad y reversión de datos, casos negativos, acceso humano/accesibilidad y pruebas realmente necesarias. Un bug exige corregir causa raíz y consumidores, no acumular parches. Test de lógica nueva con rama/parser/dinero/auth/persistencia cuando aplique; una prueba no limita los gates de Ley 5.
+1. Leer `AGENTS.md` local, `README.md`, SPEC y checkpoint aplicables. Leer el canon central por la conexión disponible y comprobar el SHA; si no se puede acceder, declarar `CANON_READ=NOT_VERIFIED`, utilizar las reglas locales sin fingir que se cargó.
+2. Trazar `entrada → auth/tenant/permiso → servicio/owner → persistencia/UI → salida`, con consumidores, pruebas y fixtures pertinentes.
+3. Elegir en orden: **no crear lo innecesario → reutilizar repo → nativo/stdlib → dependencia existente → código mínimo completo y legible**.
+4. Si hay duplicidad, comprobar usos antes de eliminar (L2); si hay fallo, corregir causa raíz y consumidores (L3); si afecta interfaz, respetar Human-First/SPEC, usando Anti UI Slop y UI UX Pro Max **solo donde aclaren algo** (L4).
+5. Conservar CSRF, `AuthService`, políticas de contraseñas, permisos por tenant, privacidad, SSR, contratos del proyecto, PHP 8.3–8.5 y tests TDD/CI requeridos. Un cambio más corto pero inseguro **no cumple KISS**.
+6. ChatGPT resuelve con sus herramientas lo que pueda; solo delega a Codex un lote restante necesario (L6). Verificar el resultado por SHA y evidencia real (L5), no por informe del ejecutor.
 
-**Uso proporcional:** revisión Ponytail de diff/PR solo si aporta valor; auditoría de repo solo si fue solicitada o el riesgo lo exige. Su tope de 20 hallazgos no oculta P0/P1 del procedimiento forense. No invocar hooks ni instalar scripts automáticamente.
+**Salida:** decisión `NO_CAMBIAR/REUTILIZAR/SIMPLIFICAR/IMPLEMENTAR`, evidencia, archivos y consumidores, cambios reales, QA `PASS/FAIL/BLOCKED/NOT_RUN`, NEXT/NINGUNO. Sin nuevos hooks, instalaciones globales, cambios remotos de producción o permisos sin autorización.
 
-**Seis leyes:** L1 KISS Ponytail; L2 antirruido; L3 antiparches; L4 UX/UI aprobada (Anti UI Slop + UI UX Pro Max como fuentes complementarias); L5 aceptación con evidencia independiente; L6 ChatGPT primero y Codex solo como ejecutor de lote justificado. `full` es intensidad ordinaria; `ultra` no revoca contratos del usuario.
-
-**Salida:** objetivo, alternativa elegida, código/consumidores afectados, pruebas reales PASS/FAIL/BLOCKED/NOT_RUN, riesgos, NEXT/NINGUNO. No inventar PASS, no modificar ramas o producción sin permiso.
+**Modo offline:** esta skill conserva el mínimo operativo para L1, pero **no es una copia de las seis leyes**; sin lectura del canon remoto el estado es de integración parcial.
