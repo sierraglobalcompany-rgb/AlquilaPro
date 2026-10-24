@@ -33,5 +33,6 @@ $title = $pageTitle !== '' ? $pageTitle . ' · ' . $branding['app_name'] : $bran
         <?= $content ?>
     </main>
 </div>
+<script src="<?= $escape($basePath) ?>/assets/app.js" defer></script>
 </body>
 </html>

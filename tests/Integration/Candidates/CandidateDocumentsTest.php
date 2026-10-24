@@ -308,6 +308,10 @@ final class CandidateDocumentsTest extends TestCase
             $this->candidateInput('DOC-5001'),
             self::NOW,
         );
+        $candidateService->updateByToken($candidate['continuation_token'], [
+            'occupants_count' => '1',
+            'pets_declared' => '0',
+        ], self::NOW + 1);
 
         $documents->createRequirement($unit['id'], [
             'code' => 'required',
@@ -474,11 +478,18 @@ final class CandidateDocumentsTest extends TestCase
     /** @return array{candidate_id:int,continuation_token:string} */
     private function startCandidate(array $unit, string $documentNumber): array
     {
-        return (new CandidateService($this->pdo))->startCandidate(
+        $service = new CandidateService($this->pdo);
+        $candidate = $service->startCandidate(
             $unit['public_key'],
             $this->candidateInput($documentNumber),
             self::NOW,
         );
+        $service->updateByToken($candidate['continuation_token'], [
+            'occupants_count' => '1',
+            'pets_declared' => '0',
+        ], self::NOW + 1);
+
+        return $candidate;
     }
 
     /** @return array<string,mixed> */

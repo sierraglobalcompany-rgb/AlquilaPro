@@ -1,32 +1,38 @@
-# AlquilaPro — CURRENT CHECKPOINT
+# CURRENT CHECKPOINT — CAND-03 / CIERRE H01-H02 V4
 
-**Corte:** 2026-10-23, America/Bogota. **Autoridad:** GitHub HEAD exacto → CI del HEAD → este checkpoint → SPEC/AGENTS → historial de Git. Este documento es el estado activo de la **rama de integración**, no sustituye `main` ni autoriza merge o deploy.
+**Corte:** 2026-10-23 America/Bogota. Estado: PARTIAL; Codex no autocertifica Ley 5. No merge, deploy ni CAND-04.
 
-## Identidad y estado verificable
+## Repo y autoridad viva
+- Repo: sierraglobalcompany-rgb/AlquilaPro.
+- Base: main@414bcfeae0a3b4f8eea7262eefcb498e3f116307.
+- PR #55: OPEN / DRAFT / NOT MERGED; rama impl/cand-03-household-human-first-20261023.
+- Código H01/H02: 3e830163a411806ad093a35c3f6bfae30aad1538.
+- CI del SHA de código: run #1196 / 40051385506, completed/success; PHP 8.3, 8.4 y 8.5.
+- Este refresh cambia solo el checkpoint. Verificar el CI del HEAD documental resultante antes de reportar cierre de CI final.
 
-- **Repo:** `sierraglobalcompany-rgb/AlquilaPro`.
-- **Main verificado:** `94ba5f486b158c2b1fed753f26c63f7b3570c97c`; CAND-01 integrado anteriormente por PR #45. Sin cambios por este trabajo.
-- **PR de integración:** [#54](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/54), **Draft, mergeable=true, no merged**; rama `integration/cand02-documents-20261023-g1`. **HEAD de código verificado antes de este commit documental:** `ffddc415c57c98588ca5c895d9e56f4eab0e1945`.
-- **CI código [#1176](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39904534274): SUCCESS PHP 8.3, 8.4, 8.5**, asociado a `ffddc415c57c98588ca5c895d9e56f4eab0e1945`.
-- **Browser QA integrado:** `PASS_WITH_SCOPE` sobre `ffddc415c57c98588ca5c895d9e56f4eab0e1945`, evidencias: **seis PNG reales + dos referencias originales + métricas/manifiesto**, sin overflow horizontal ni errores inesperados de consola; validación independiente del ZIP **11/11 hashes**. **Paridad total de mockups `NOT_CERTIFIED`**. QA documenta estados sintéticos, no despliegue.
-- **Documentación actualizada:** esta edición genera un **nuevo commit documental**; requerirá CI propio antes de integración final. **No afirmar que Browser QA midió el nuevo SHA**: se conserva evidencia sobre el padre de código sin cambio funcional/visual. No repetir Playwright por una edición exclusiva de Markdown.
-- **PR #52** [Work](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/52), HEAD `0eea64d8a4fdba964d14da26345ff6e68369d36d`, Draft; V8 `PASS_WITH_SCOPE`. **PR #53** [Documentos](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/53), HEAD `4c20e6acbe88aac6a3b3714d49f4d9a598d56e41`, Draft; QA `PASS_WITH_SCOPE`. **Ambos continúan abiertos como fuentes históricas**: PR #54 ya incluye sus cambios funcionales; nunca fusionar los tres indiscriminadamente.
-- **Merge:** `NO AUTORIZADO`. **Deploy Hostinger:** `NO AUTORIZADO`. **CAND-03+ / F26:** `FROZEN` hasta integración autorizada y siguiente gate.
+## H02 — corregido focalmente
+Causa: la vista usaba pets_answered_at como respuesta, copy dirigido al candidato dentro de la revisión admin, no contaba fichas reales de mascotas y duplicaba observaciones; las fichas apilaban metadatos. En el owner existente se separaron respuesta/fecha, se mantuvo histórico false sin fecha como No confirmado, se corrigieron copy/conteos, se movieron notas una vez a Reglas y observaciones y se compactó el flujo de datos desktop. No se duplicó al solicitante ni se infirieron score/vacunación.
 
-## Contratos integrados y reservas
+Pruebas locales en PHP 8.5.8: HumanFirstCandidateDetailViewTest, 30 tests / 261 assertions, PASS; php -l y git diff --check PASS. Los cambios funcionales son assets/app.css, resources/views/candidate_detail.php y tests/Integration/Candidates/HumanFirstCandidateDetailViewTest.php.
 
-- `resources/views/candidate_detail.php`: sección **Work** contiene exclusivamente datos declarados existentes (empleo, empresa, ocupación, ingreso y notas) y sección **Documents** contiene requisitos activos, recibidos, pendientes, opcionales y documentos de requisitos inactivos. Una sola sección activa por solicitud.
-- `app/Candidates/routes.php`: requisitos reales del `CandidateDocumentService` consultados al renderizar `?section=documents`; permisos previos preservados.
-- `assets/app.css`: estilo específico para ambas secciones; corrección de navegación fija entre **1024 y 1199px** y menú/tab a partir de 1200px. Causa de CI #1175 identificada (orden de reglas del contrato de navegación), corregida en `ffddc415...`; CI #1176 verde.
-- Pruebas de **convivencia Work/Documentos** y regresión de breakpoint añadidas, sin migraciones ni módulos nuevos.
-- **En QA 1100px:** último enlace documental termina **97,5px antes** de la barra fija; resumen lateral recuperable al desplazarse hacia arriba. **No** catalogar superposición funcional si el final es accesible.
-- **Límites:** historia/verificación laboral, revisión/solicitud/aprobación documental, miniaturas/acciones de mockups **no existen como flujo completo verificado**. No añadir simulaciones visuales ni aprobación inventada; futura implementación solo con fuentes de datos, permisos y UAT. Accesibilidad integral, dispositivo físico y paridad visual global no certificados. El Browser QA integrado no reejecutó todos los escenarios de PDF privado/403 de PR #53; conservar esa distinción.
+Preview de componente con Playwright y datos ficticios, no ruta autenticada:
+- 1448×1086: ocupantes 360 px; fila 3 y=933; documento 1413 px.
+- Mejora en el mismo harness contra la medición pre-refinamiento: 424→360 px y y=997→933. La referencia histórica de aplicación real 592 px/y=1154 pertenece a otra corrida y no es comparación controlada.
+- 1100×850, 768×1024 y móvil táctil 375×812: seis regiones, sin overflow horizontal. Fixture largo: altura de ocupantes 589 px con crecimiento natural. Foco de teclado visible. Render solo lectura: cero controles de gestión.
+- No se incluye foto en el fixture. Las capturas no validan ACL/servicio de foto ni estado de sesión. A 1448×1086 la fila 3 empieza dentro del viewport, pero su contenido continúa bajo el viewport.
+- Evidencia V4: D:\Codex\_REPORTES\AlquilaPro\AP-CAND03-PR55-CIERRE-H01-H02-V4\.
 
-## Cuatro leyes y próxima compuerta
+Browser QA de aplicación y rutas: BLOCKED_B. La app y DB de AlquilaPro no escuchaban. El único DB container activo era erp_v14_qa de otro entorno y se dejó intacto. CandidatesAdminRoutesTest::testHouseholdAdminCrudAndPrivatePhotoRouteAreCandidateScoped falló antes de assertions por conexión DB en DatabaseConnector.php:27.
 
-- **KISS:** PHP SSR, Slim/PDO/MariaDB, owners existentes; sin arquitectura o capas paralelas.
-- **Antirruido:** usar PR #54 como candidata única de integración; documentar supersesión y cerrar PRs anteriores **solo después de decisión autorizada**. Historial y evidencias permanecen en Git/PRs.
-- **Antiparches:** causa de fallo #1175 corregida y cubierta por regresión; prohibido reabrir arreglos CSS sin fallo nuevo probado.
-- **UX/UI Pro:** capturas reales, viewport/rol/datos, límites `PASS_WITH_SCOPE`; fidelidad global pendiente con funcionalidades sustentadas por backend.
+## H01 — PDF
+BLOCKED_C. DocumentService sigue verificando tamaño/MIME sin validar estructura. El fixture sintético corrupto de 43 bytes fue rechazado por pdfinfo por trailer/xref faltantes (exit 1) en la evidencia previa; esta tarea no repitió una carga en la app. No se añadió parser casero, Composer dependency ni binario externo. El owner debe elegir una estrategia desplegable y compatible con su plan Hostinger entre parser PHP con extensiones verificadas o proceso/binario externo con soporte demostrado.
 
-**NEXT ÚNICO:** comprobar que el **CI del nuevo HEAD exclusivamente documental** termina verde; presentar dictamen del PR #54 y solicitar **autorización expresa de merge exclusivo del PR #54** (no deploy). Sin autorización, STOP. No iniciar CAND-03 ni crear nuevas ramas/pruebas/paquetes redundantes.
+## CI y límites
+- CI #1196 del SHA de código 3e83016: PHP 8.3/8.4/8.5 success.
+- El CI del commit de este checkpoint debe verificarse sobre su SHA exacto.
+- PR sigue Draft; H01 bloqueado; Browser QA real pendiente; aceptación independiente de Ley 5 pendiente. CAND-03 no está cerrado globalmente.
+- Evidencia histórica V3 conservada: D:\Codex\_REPORTES\AlquilaPro\AP-CAND03-PR55-LEY5-CIERRE-V3\FINAL_REPORT.md y su ZIP; no se regeneró ni duplicó.
+- Informe V4: AP-CAND03-PR55-CIERRE-H01-H02-V4_FINAL_REPORT.md y paquete nuevo en la carpeta externa V4 indicada arriba.
+
+## NEXT ÚNICO
+Owner: proveer/restaurar una app+DB aislada de AlquilaPro para Browser QA autenticada y decidir la estrategia de validación PDF. Después, Codex repite rutas, ACL/fotos y pruebas faltantes sobre el HEAD vigente; ChatGPT/owner audita Ley 5. No avanzar a CAND-04.

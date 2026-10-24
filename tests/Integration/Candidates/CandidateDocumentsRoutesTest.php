@@ -286,7 +286,7 @@ final class CandidateDocumentsRoutesTest extends TestCase
         $path = '/sub/apply/continue/' . $started['continuation_token'];
         $response = $this->request($app, 'GET', $path);
         self::assertSame(303, $response->getStatusCode());
-        self::assertSame($path . '/documents', $response->getHeaderLine('Location'));
+        self::assertSame($path . '/occupants', $response->getHeaderLine('Location'));
 
         $response = $this->request($app, 'GET', $path . '/documents');
         self::assertSame(200, $response->getStatusCode());
@@ -353,6 +353,18 @@ final class CandidateDocumentsRoutesTest extends TestCase
         self::assertSame(1, $this->documentCount());
         $storedName = (string) $this->pdo->query('SELECT stored_name FROM candidate_documents LIMIT 1')->fetchColumn();
         self::assertFileExists($this->documentDirectory . '/' . $storedName);
+
+        $household = $this->request($app, 'POST', $continuePath, [
+            'wizard_step' => 'occupants',
+            'occupants_present' => '1',
+            'pets_present' => '1',
+            'occupants_count' => '1',
+            'pets_declared' => '0',
+            'occupants' => [],
+            'pets' => [],
+        ]);
+        self::assertSame(303, $household->getStatusCode());
+        self::assertSame($continuePath . '/references', $household->getHeaderLine('Location'));
 
         $submit = $this->request($app, 'POST', $continuePath . '/submit');
         self::assertSame(303, $submit->getStatusCode());

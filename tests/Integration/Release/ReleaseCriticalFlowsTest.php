@@ -193,8 +193,12 @@ final class ReleaseCriticalFlowsTest extends TestCase
         self::assertSame('/apply/continue/' . $token . '/occupants', $work->getHeaderLine('Location'));
         $occupants = $this->request($app, 'POST', '/apply/continue/' . $token, [
             'wizard_step' => 'occupants',
-            'occupants_count' => '2',
+            'occupants_count' => '1',
             'pets_declared' => '0',
+            'occupants_present' => '1',
+            'pets_present' => '1',
+            'occupants' => [],
+            'pets' => [],
         ]);
         self::assertSame('/apply/continue/' . $token . '/references', $occupants->getHeaderLine('Location'));
         $references = $this->request($app, 'POST', '/apply/continue/' . $token . '/references', [

@@ -12,6 +12,17 @@ use Psr\Http\Message\UploadedFileInterface;
 use RuntimeException;
 use Throwable;
 
+final class DocumentValidationException extends RuntimeException
+{
+    public function __construct(
+        string $message,
+        public readonly string $field = 'form',
+        ?Throwable $previous = null,
+    ) {
+        parent::__construct($message, 0, $previous);
+    }
+}
+
 final class DocumentService
 {
     private const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
@@ -26,7 +37,7 @@ final class DocumentService
         'legal_notice' => 'property',
         'other' => 'property_or_lease',
     ];
-    private const FILE_TYPES = ['property_document', 'lease_document', 'incident_evidence', 'other'];
+    private const FILE_TYPES = ['property_document', 'lease_document', 'manual_convivencia', 'incident_evidence', 'other'];
     private const CONTENT_TYPES = ['manual_convivencia', 'inventory_initial', 'inventory_final', 'legal_notice', 'other'];
     private const MIME_EXTENSIONS = [
         'application/pdf' => 'pdf',
@@ -111,7 +122,7 @@ final class DocumentService
         );
         $title = trim($title);
         if (!in_array($type, self::FILE_TYPES, true)) {
-            throw $this->failure('El tipo de documento requiere contenido estructurado.');
+            throw $this->failure('El tipo de documento requiere contenido estructurado.', 'type');
         }
 
         $upload = $this->readUpload($file);
@@ -157,7 +168,7 @@ final class DocumentService
         $input = $this->validateInput($propertyId, $leaseId, $type, $title, $supersedesDocumentId, $actorUserId, $now);
         $title = trim($title);
         if (!in_array($type, self::CONTENT_TYPES, true)) {
-            throw $this->failure('El tipo de documento requiere un archivo.');
+            throw $this->failure('El tipo de documento requiere un archivo.', 'type');
         }
         if (in_array($type, ['inventory_initial', 'inventory_final'], true)) {
             $content = $this->normalizeInventory($content);
@@ -422,7 +433,7 @@ final class DocumentService
             $id = (int) $this->pdo->lastInsertId();
             $saved = $this->find($id);
             if ($saved === null) {
-                throw $this->failure('No fue posible confirmar el documento guardado.');
+                throw $this->operationFailure('No fue posible confirmar el documento guardado.');
             }
             $this->pdo->commit();
             return $saved;
@@ -485,7 +496,7 @@ final class DocumentService
         $statement = $this->pdo->prepare('SELECT id FROM ' . $table . ' WHERE id = :id LIMIT 1');
         $statement->execute(['id' => $id]);
         if ($statement->fetchColumn() === false) {
-            throw $this->failure('El alcance del documento no existe.');
+            throw $this->failure('El alcance del documento no existe.', 'scope_id');
         }
     }
 
@@ -504,7 +515,7 @@ final class DocumentService
         if (!is_array($parent) || $parent['type'] !== $type
             || $this->rowScope($parent) !== $scope
         ) {
-            throw $this->failure('La versión anterior debe tener el mismo tipo y alcance.');
+            throw $this->failure('La versión anterior debe tener el mismo tipo y alcance.', 'supersedes_document_id');
         }
 
         $child = $this->pdo->prepare(
@@ -512,7 +523,7 @@ final class DocumentService
         );
         $child->execute(['id' => $documentId]);
         if ($child->fetchColumn() !== false) {
-            throw $this->failure('Solo se puede crear una versión desde la versión actual.');
+            throw $this->failure('Solo se puede crear una versión desde la versión actual.', 'supersedes_document_id');
         }
 
         $visited = [];
@@ -520,7 +531,7 @@ final class DocumentService
         while (true) {
             $currentId = (int) $cursor['id'];
             if (isset($visited[$currentId])) {
-                throw $this->failure('La cadena de versiones no es válida.');
+                throw $this->failure('La cadena de versiones no es válida.', 'supersedes_document_id');
             }
             $visited[$currentId] = true;
             if ($cursor['supersedes_document_id'] === null) {
@@ -533,7 +544,7 @@ final class DocumentService
             $ancestorStatement->execute(['id' => (int) $cursor['supersedes_document_id']]);
             $ancestor = $ancestorStatement->fetch(PDO::FETCH_ASSOC);
             if (!is_array($ancestor) || $ancestor['type'] !== $type || $this->rowScope($ancestor) !== $scope) {
-                throw $this->failure('La cadena de versiones no conserva el tipo y alcance.');
+                throw $this->failure('La cadena de versiones no conserva el tipo y alcance.', 'supersedes_document_id');
             }
             $cursor = $ancestor;
         }
@@ -555,13 +566,13 @@ final class DocumentService
     private function readUpload(UploadedFileInterface $file): array
     {
         if ($file->getError() !== UPLOAD_ERR_OK) {
-            throw $this->failure('No fue posible recibir el archivo.');
+            throw $this->failure('No fue posible recibir el archivo. Revisa el archivo e inténtalo de nuevo.', 'document');
         }
         try {
             $stream = $file->getStream();
             $declaredSize = $stream->getSize();
             if ($declaredSize !== null && ($declaredSize < 1 || $declaredSize > self::MAX_DOCUMENT_BYTES)) {
-                throw $this->failure('El archivo supera el tamaño permitido o está vacío.');
+                throw $this->failure('El archivo supera el tamaño permitido o está vacío.', 'document');
             }
             if ($stream->isSeekable()) {
                 $stream->rewind();
@@ -571,15 +582,15 @@ final class DocumentService
                 $remaining = self::MAX_DOCUMENT_BYTES + 1 - strlen($bytes);
                 $chunk = $stream->read(min(65536, $remaining));
                 if ($chunk === '' && !$stream->eof()) {
-                    throw $this->failure('No fue posible leer el archivo completo.');
+                    throw $this->failure('No fue posible leer el archivo completo.', 'document');
                 }
                 $bytes .= $chunk;
                 if (strlen($bytes) > self::MAX_DOCUMENT_BYTES) {
-                    throw $this->failure('El archivo supera el tamaño permitido.');
+                    throw $this->failure('El archivo supera el tamaño permitido.', 'document');
                 }
             }
             if ($bytes === '' || ($declaredSize !== null && strlen($bytes) !== $declaredSize)) {
-                throw $this->failure('El tamaño recibido no coincide con el archivo.');
+                throw $this->failure('El tamaño recibido no coincide con el archivo.', 'document');
             }
         } catch (RuntimeException $exception) {
             throw $exception;
@@ -590,7 +601,7 @@ final class DocumentService
         $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
         $extension = is_string($mime) ? (self::MIME_EXTENSIONS[$mime] ?? null) : null;
         if (!is_string($mime) || $extension === null) {
-            throw $this->failure('El formato del archivo no está permitido.');
+            throw $this->failure('El formato del archivo no está permitido.', 'document');
         }
         return ['bytes' => $bytes, 'mime' => $mime, 'extension' => $extension];
     }
@@ -601,7 +612,7 @@ final class DocumentService
         $path = rtrim($this->documentDirectory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $storedName;
         $handle = @fopen($path, 'xb');
         if ($handle === false) {
-            throw $this->failure('No fue posible guardar el archivo privado.');
+            throw $this->operationFailure('No fue posible guardar el archivo privado.');
         }
         try {
             $written = 0;
@@ -609,12 +620,12 @@ final class DocumentService
             while ($written < $length) {
                 $count = fwrite($handle, substr($bytes, $written, 65536));
                 if (!is_int($count) || $count <= 0) {
-                    throw $this->failure('No fue posible guardar el archivo completo.');
+                    throw $this->operationFailure('No fue posible guardar el archivo completo.');
                 }
                 $written += $count;
             }
             if (!fflush($handle) || $written !== $length) {
-                throw $this->failure('No fue posible confirmar el archivo guardado.');
+                throw $this->operationFailure('No fue posible confirmar el archivo guardado.');
             }
         } catch (Throwable $exception) {
             fclose($handle);
@@ -633,24 +644,24 @@ final class DocumentService
             if (is_file($path) && !is_link($path)) {
                 @unlink($path);
             }
-            throw $this->failure('No fue posible verificar el archivo guardado.');
+            throw $this->operationFailure('No fue posible verificar el archivo guardado.');
         }
         return $path;
     }
 
     private function ensureDirectory(): void
     {
-        if ($this->documentDirectory === '' || is_link($this->documentDirectory)) {
-            throw $this->failure('El almacenamiento privado no es válido.');
+        if ($this->documentDirectory === '' || is_link($this->documentDirectory) || is_file($this->documentDirectory)) {
+            throw $this->operationFailure('El almacenamiento privado no es válido.');
         }
         if (!is_dir($this->documentDirectory)
             && !mkdir($this->documentDirectory, 0700, true)
             && !is_dir($this->documentDirectory)
         ) {
-            throw $this->failure('No fue posible preparar el almacenamiento privado.');
+            throw $this->operationFailure('No fue posible preparar el almacenamiento privado.');
         }
         if (is_link($this->documentDirectory)) {
-            throw $this->failure('El almacenamiento privado no es válido.');
+            throw $this->operationFailure('El almacenamiento privado no es válido.');
         }
         @chmod($this->documentDirectory, 0700);
     }
@@ -666,24 +677,24 @@ final class DocumentService
             || !array_key_exists('items', $content) || !is_array($content['items'])
             || !array_is_list($content['items']) || count($content['items']) > self::MAX_INVENTORY_ITEMS
         ) {
-            throw $this->failure('La estructura del inventario no es válida.');
+            throw $this->failure('La estructura del inventario no es válida.', 'content_json');
         }
 
         $generalNotes = $this->inventoryText($content['general_notes'], 4000, true, true);
         $items = [];
         foreach ($content['items'] as $item) {
             if (!is_array($item)) {
-                throw $this->failure('Los elementos del inventario no son válidos.');
+                throw $this->failure('Los elementos del inventario no son válidos.', 'content_json');
             }
             $itemKeys = array_keys($item);
             sort($itemKeys);
             if ($itemKeys !== ['area', 'condition', 'item', 'notes', 'quantity']) {
-                throw $this->failure('Cada elemento del inventario debe tener solo los campos permitidos.');
+                throw $this->failure('Cada elemento del inventario debe tener solo los campos permitidos.', 'content_json');
             }
 
             $quantity = $item['quantity'];
             if ($quantity !== null && (!is_int($quantity) || $quantity < 0)) {
-                throw $this->failure('La cantidad del elemento no es válida.');
+                throw $this->failure('La cantidad del elemento no es válida.', 'content_json');
             }
             $items[] = [
                 'area' => $this->inventoryText($item['area'], 100, false, false),
@@ -702,7 +713,7 @@ final class DocumentService
             return null;
         }
         if (!is_string($value)) {
-            throw $this->failure('El texto del inventario no es válido.');
+            throw $this->failure('El texto del inventario no es válido.', 'content_json');
         }
         $value = trim($value);
         if ($value === '' && $emptyIsNull) {
@@ -711,7 +722,7 @@ final class DocumentService
         if ($value === '' || mb_strlen($value, 'UTF-8') > $maxLength
             || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $value) === 1
         ) {
-            throw $this->failure('El texto del inventario está vacío o excede el límite.');
+            throw $this->failure('El texto del inventario está vacío o excede el límite.', 'content_json');
         }
         return $value;
     }
@@ -724,7 +735,7 @@ final class DocumentService
             || !array_key_exists('source_label', $content)
             || !array_key_exists('notice_text', $content)
         ) {
-            throw $this->failure('El aviso legal no tiene una estructura válida.');
+            throw $this->failure('El aviso legal no tiene una estructura válida.', 'content_json');
         }
 
         $sourceLabel = is_string($content['source_label']) ? trim($content['source_label']) : '';
@@ -734,13 +745,13 @@ final class DocumentService
             || $noticeText === '' || mb_strlen($noticeText, 'UTF-8') > 10000
             || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $noticeText) === 1
         ) {
-            throw $this->failure('El aviso legal tiene texto vacío o fuera de límite.');
+            throw $this->failure('El aviso legal tiene texto vacío o fuera de límite.', 'content_json');
         }
 
         $sourceUrl = $content['source_url'] ?? null;
         if ($sourceUrl !== null) {
             if (!is_string($sourceUrl)) {
-                throw $this->failure('La fuente del aviso legal no es válida.');
+                throw $this->failure('La fuente del aviso legal no es válida.', 'content_json');
             }
             $sourceUrl = trim($sourceUrl);
             if ($sourceUrl === '') {
@@ -750,13 +761,13 @@ final class DocumentService
                 || filter_var($sourceUrl, FILTER_VALIDATE_URL) === false
                 || !in_array(strtolower((string) parse_url($sourceUrl, PHP_URL_SCHEME)), ['http', 'https'], true)
             ) {
-                throw $this->failure('La fuente del aviso legal no es válida.');
+                throw $this->failure('La fuente del aviso legal no es válida.', 'content_json');
             }
         }
 
         $effectiveOn = $content['effective_on'] ?? null;
         if ($effectiveOn !== null && (!$this->isValidDate($effectiveOn))) {
-            throw $this->failure('La fecha de vigencia del aviso legal no es válida.');
+            throw $this->failure('La fecha de vigencia del aviso legal no es válida.', 'content_json');
         }
 
         return [
@@ -846,7 +857,12 @@ final class DocumentService
         return $normalized;
     }
 
-    private function failure(string $message = 'No fue posible guardar el documento.'): RuntimeException
+    private function failure(string $message = 'No fue posible guardar el documento.', string $field = 'form'): DocumentValidationException
+    {
+        return new DocumentValidationException($message, $field);
+    }
+
+    private function operationFailure(string $message): RuntimeException
     {
         return new RuntimeException($message);
     }

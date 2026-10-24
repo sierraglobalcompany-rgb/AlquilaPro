@@ -360,25 +360,34 @@ Composición:
 
 No inventar sector, área, contrato laboral, fecha de ingreso, antigüedad, otros ingresos, perfil sólido o nivel de riesgo.
 
-### 9.3 Ocupantes y mascotas — `household`
+### 9.3 Ocupantes y mascotas — `household` (contrato integral ratificado 2026-10-23)
 
-**Job:** entender la composición declarada del hogar sin fabricar personas.
+**Autoridad de diseño:** `03_OCUPANTES_MASCOTAS.png`, 1448×1086. El owner rechazó la simplificación a tres cards y ratificó **implementar completamente** ocupantes y mascotas individuales, fotografías reales y manual de convivencia. Este apartado prevalece sobre las antiguas exclusiones de datos ausentes **solo para CAND-03**. No alterar el PNG ni fingir contenido para imitar sus cifras.
 
-Hechos reales:
+**Objetivo humano:** desde el wizard, el postulante puede declarar el hogar completo, agregar/editar/eliminar otros ocupantes y una o varias mascotas, adjuntar fotografías opcionales, revisar y enviar; el administrador ve información veraz, puede gestionarla con autorización y consultar el manual pertinente, sin duplicar al solicitante ni cruzar propiedades.
 
-- `occupants_count`;
-- `occupants_notes`;
-- `pets_declared`;
-- `pets_notes`.
+**Seis regiones obligatorias** del cuerpo `section=household`:
+1. **Resumen del hogar**, dominante y numérico: ocupantes según cantidad declarada, mascotas según filas efectivas, y contexto factual sin «hogar estable».
+2. **Estado de información** lateral: completitud/pendientes verdaderos, sin riesgo, score, «sin alertas» ni verificación automática.
+3. **Ocupantes del hogar**: solicitante principal proveniente de `candidates` (una sola autoridad) más fichas de otros ocupantes reales, edad aproximada *opcional*, vínculo y ocupación/actividad opcional. Imagen personal opcional cuando proceda y haya consentimiento; nunca requerir fotos de menores ni documentos excesivos. Acciones agregar/editar/retirar efectivas y autorizadas.
+4. **Mascotas**: una ficha por mascota real con nombre, especie, raza/tamaño/edad aproximada opcionales, observaciones, **foto privada opcional por cada mascota**, vacunación solo como *declaración explícita* opcional, nunca «verificada» sin respaldo. Acciones reales según rol. Estado sin mascotas y fotos no aportadas.
+5. **Reglas de convivencia y observaciones**: manual real del inmueble (`DocumentService`, versionado, archivo PDF o JSON) solo con permisos `candidates.view` + `properties.view` + `documents.view`; texto descriptivo del solicitante separado y escapado. Mostrar ausencia honesta y no inferir que está permitido/prohibido tener mascotas.
+6. **Próximos pasos**: lista contextual verificable y enlaces/acciones existentes, sin CTAs muertos.
 
-Composición:
+**Modelo mínimo nuevo** (nombrar migración con siguiente índice libre, sin modificar migrations aplicadas):
+- `candidate_household_occupants`: PK; FK `candidate_id`; `full_name`, `relationship`, `age_years` opcional, `occupation_or_activity` opcional, foto opcional privada con metadatos validados, auditoría de fecha. **No duplicar** al candidato principal como fila.
+- `candidate_pets`: PK; FK `candidate_id`; `name`, `species`, `breed`, `size_category`, `age_years`, `vaccination_declaration`, `notes`, foto privada opcional con metadatos de integridad, fechas. Solo nombre/especie obligatorios; vacunación `not_provided` es diferente de vacunación comprobada.
+- `candidates.pets_answered_at NULL`: indica respuesta **explícita**, sin reinterpretar los ceros históricos de `pets_declared NOT NULL DEFAULT 0`. Nuevas selecciones Sí/No obligatorias al completar el wizard. Guardar la respuesta, fecha y cambios consistentemente. Un `pets_declared=true` histórico es una señal afirmativa, un falso histórico sin marca es **no confirmado**. Sin migración masiva inventando consentimiento.
+- Conservar `occupants_count` para historiales; para capturas nuevas aclarar en el formulario que **incluye al solicitante**, registrar además las fichas de los adicionales y señalar diferencias pendientes, sin crear personas automáticas ni normalizar conteos históricos a ciegas. Validar cardinalidad cuando un envío nuevo exige ficha de cada ocupante.
+- **Servicio único del dominio household:** preferir owner focal para entidades y fotos, integrado con `CandidateService`, `CandidateDocumentService` y rutas existentes; no nuevo framework, APIs paralelas, SPA ni motor documental duplicado. Reutilizar guardas de seguridad y almacenamiento privado, sin usar `unit_media` de propiedad para fotografías personales.
 
-- resumen del hogar;
-- card de ocupantes;
-- card de mascotas;
-- observaciones sólo desde campos reales.
+**Flujos autorizados:** en el wizard existente, editar fichas/fotos sólo con token válido y estado editable; administración sólo con `candidates.manage` para mutaciones y `candidates.view` para lectura. CSRF en cada POST, validación de pertenencia candidato→ocupante/mascota/foto, formatos/bytes/MIME/firma/dimensiones, rutas privadas sin exposición pública, limpieza y reversibilidad de reemplazos, auditoría administrativa. Roles sin permiso ven lectura permitida, sin CTA activo; 403/404 en accesos indebidos. Después de enviar, el solicitante no edita mediante token; el administrador autorizado sí.
 
-No fabricar nombres, edades, parentescos, fotos, raza, tamaño, vacunación ni “riesgo del hogar”.
+**Documento de convivencia:** `documents.type=manual_convivencia` es hoy JSON de propiedad; permitir **también PDF privado** del mismo tipo mediante el servicio documental y sus controles/versionado ya existentes, no tratar un `property_document` cualquiera como manual. Mostrar solo documentos de `candidate.unit_id → units.property_id` autorizado. La interpretación/restricción jurídica no se automatiza.
+
+**Estados obligatorios**: solicitud histórica, borrador nuevo no contestado, Sí/No explícitos, 0/1/N mascotas, 0/1/N fichas adicionales, foto ausente/presente/reemplazada, manual ausente/actualizado, rol solo lectura/administrador, errores/guardado, móvil hasta el final de scroll. No afirmar PASS global por CI sin Browser QA de seis regiones.
+
+**Diseño:** desktop retícula visual equivalente a tres filas de ancho asimétrico del PNG; mobile stack de seis cards, tipografía, iconografía y estados propios, navegación/foco visibles. El shell global conserva dueño aparte. `UX_VISUAL` y `FUNCIONAL` son gates separados.
 
 ### 9.4 Referencias — `references`
 

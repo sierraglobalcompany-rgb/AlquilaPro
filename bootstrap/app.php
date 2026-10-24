@@ -8,6 +8,7 @@ use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Auth\UserService;
 use AlquilaPro\Candidates\CandidateDocumentService;
+use AlquilaPro\Candidates\CandidateHouseholdService;
 use AlquilaPro\Candidates\CandidateService;
 use AlquilaPro\Candidates\ScreeningService;
 use AlquilaPro\Community\CommunityService;
@@ -72,6 +73,11 @@ return static function (array $settings): App {
     $documentDirectory = trim((string) ($settings['document_directory'] ?? ''));
     if ($documentDirectory === '') {
         $documentDirectory = dirname(__DIR__, 2) . '/alquilapro-private/' . basename(dirname(__DIR__)) . '/documents';
+    }
+    $candidateHouseholdMediaDirectory = trim((string) ($settings['candidate_household_media_directory'] ?? ''));
+    if ($candidateHouseholdMediaDirectory === '') {
+        $candidateHouseholdMediaDirectory = dirname(__DIR__, 2) . '/alquilapro-private/'
+            . basename(dirname(__DIR__)) . '/candidate-household';
     }
 
     $lock = new InstallationLock($lockPath);
@@ -453,6 +459,7 @@ return static function (array $settings): App {
             $properties = new PropertyService($pdo);
             $unitMedia = new UnitMediaService($pdo, $unitMediaDirectory);
             $candidateDocuments = new CandidateDocumentService($pdo, $candidateDocumentDirectory);
+            $candidateHousehold = new CandidateHouseholdService($pdo, $candidateHouseholdMediaDirectory);
             $candidates = new CandidateService(
                 $pdo,
                 candidateDocumentService: $candidateDocuments,
@@ -543,6 +550,8 @@ return static function (array $settings): App {
             $candidateRoutes($app, $shared + [
                 'candidates' => $candidates,
                 'candidate_documents' => $candidateDocuments,
+                'candidate_household' => $candidateHousehold,
+                'documents' => $documents,
                 'properties' => $properties,
                 'unit_media' => $unitMedia,
                 'screening' => $screening,

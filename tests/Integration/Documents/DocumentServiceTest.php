@@ -115,6 +115,41 @@ final class DocumentServiceTest extends TestCase
         self::assertSame(3, (int) $this->pdo->query('SELECT COUNT(*) FROM documents')->fetchColumn());
     }
 
+    public function testManualPdfUsesTheSameCurrentVersionChainAsStructuredManual(): void
+    {
+        $service = $this->service();
+        $json = $service->createContentVersion(
+            $this->propertyId,
+            null,
+            'manual_convivencia',
+            'Manual estructurado',
+            ['sections' => [['title' => 'Ruido', 'body' => 'Respetar los horarios de descanso.']]],
+            null,
+            $this->actorId,
+            1_800_000_000,
+        );
+        $pdfBytes = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<<>>\n%%EOF\n";
+        $pdf = $service->createFileVersion(
+            $this->propertyId,
+            null,
+            'manual_convivencia',
+            'Manual PDF vigente',
+            $this->upload($pdfBytes, 'manual.pdf', 'application/pdf'),
+            (int) $json['id'],
+            $this->actorId,
+            1_800_000_100,
+        );
+
+        self::assertSame($json['id'], $pdf['supersedes_document_id']);
+        self::assertSame('application/pdf', $pdf['mime_type']);
+        self::assertSame([$pdf['id']], array_column(
+            array_values(array_filter($service->listCurrentForProperty($this->propertyId), static fn (array $row): bool => $row['type'] === 'manual_convivencia')),
+            'id',
+        ));
+        self::assertSame([$json['id'], $pdf['id']], array_column($service->history((int) $json['id']), 'id'));
+        self::assertSame($pdfBytes, $service->privateFile((int) $pdf['id'])['contents']);
+    }
+
     public function testRejectsInvalidTypeScopeTitleAndCrossLineageVersions(): void
     {
         $service = $this->service();
