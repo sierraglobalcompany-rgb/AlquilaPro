@@ -409,7 +409,6 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         }
         self::assertSame(1, substr_count($html, 'data-household-applicant'));
         self::assertStringContainsString('Cantidad no declarada', $html);
-        self::assertStringContainsString('Respuesta de mascotas no confirmada', $html);
         self::assertStringContainsString('No confirmado', $html);
         self::assertStringNotContainsString('No se declararon mascotas', $html);
         self::assertStringContainsString('0 fichas registradas', $html);
@@ -433,7 +432,14 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertStringContainsString('Ocupantes', $html);
         self::assertStringContainsString('Mascotas', $html);
         self::assertStringContainsString('3 ocupantes declarados', $html);
-        self::assertStringContainsString('Mascotas declaradas', $html);
+        $dom = new \DOMDocument();
+        @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        $xpath = new \DOMXPath($dom);
+        $summaryText = $xpath->query('//section[@data-household-region="summary"]')->item(0)?->textContent ?? '';
+        $informationText = $xpath->query('//section[@data-household-region="information"]')->item(0)?->textContent ?? '';
+        self::assertStringContainsString('0 fichas registradas', $summaryText);
+        self::assertStringNotContainsString('Mascotas declaradas', $summaryText);
+        self::assertStringContainsString('Sí, se declararon mascotas', $informationText);
         self::assertStringContainsString('Adultos y un menor declarados.', $html);
         self::assertStringContainsString('Mascota declarada en la solicitud.', $html);
         self::assertSame(1, substr_count($html, 'Adultos y un menor declarados.'));
@@ -456,6 +462,110 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertStringNotContainsString('data-candidate-section-body="work"', $html);
     }
 
+    public function testHouseholdSummaryCountsPetRowsIndependentOfExplicitAnswer(): void
+    {
+        $cases = [
+            [
+                'pets' => [],
+                'declared' => 1,
+                'answered_at' => '2026-10-20 10:00:00',
+                'summary' => '0 fichas registradas',
+                'response' => 'Sí, se declararon mascotas',
+            ],
+            [
+                'pets' => [['id' => 1, 'name' => 'Nube Demo', 'species' => 'Gato']],
+                'declared' => 1,
+                'answered_at' => '2026-10-20 10:00:00',
+                'summary' => '1 ficha registrada',
+                'response' => 'Sí, se declararon mascotas',
+            ],
+            [
+                'pets' => [
+                    ['id' => 1, 'name' => 'Nube Demo', 'species' => 'Gato'],
+                    ['id' => 2, 'name' => 'Sol Demo', 'species' => 'Perro'],
+                    ['id' => 3, 'name' => 'Luna Demo', 'species' => 'Ave'],
+                ],
+                'declared' => 0,
+                'answered_at' => null,
+                'summary' => '3 fichas registradas',
+                'response' => 'No confirmado',
+            ],
+            [
+                'pets' => [],
+                'declared' => 0,
+                'answered_at' => '2026-10-20 10:00:00',
+                'summary' => '0 fichas registradas',
+                'response' => 'No se declararon mascotas',
+            ],
+        ];
+
+        foreach ($cases as $case) {
+            $html = $this->renderOverview([
+                'pets_declared' => $case['declared'],
+                'pets_answered_at' => $case['answered_at'],
+                'householdPets' => $case['pets'],
+            ], '', ['contracts' => [], 'can_create' => false], 'household');
+            $dom = new \DOMDocument();
+            @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+            $xpath = new \DOMXPath($dom);
+            $summaryText = $xpath->query('//section[@data-household-region="summary"]')->item(0)?->textContent ?? '';
+            $information = $xpath->query('//section[@data-household-region="information"]');
+            $informationText = $information->item(0)?->textContent ?? '';
+
+            self::assertStringContainsString($case['summary'], $summaryText);
+            self::assertStringNotContainsString('No tiene mascotas', $summaryText);
+            self::assertStringContainsString($case['response'], $informationText);
+            $times = $xpath->query('//section[@data-household-region="information"]//time/@datetime');
+            if ($case['answered_at'] === null) {
+                self::assertSame(0, $times->length);
+            } else {
+                self::assertSame(str_replace(' ', 'T', $case['answered_at']), $times->item(0)?->nodeValue);
+            }
+        }
+    }
+
+    public function testPetSizeLabelsTranslateKnownValuesOnlyInDisplayAndEscapeCustomValues(): void
+    {
+        $cases = [
+            ['id' => 1, 'name' => 'Nube Demo', 'raw' => 'small', 'label' => 'Pequeño'],
+            ['id' => 2, 'name' => 'Sol Demo', 'raw' => 'medium', 'label' => 'Mediano'],
+            ['id' => 3, 'name' => 'Luna Demo', 'raw' => 'large', 'label' => 'Grande'],
+            ['id' => 4, 'name' => 'Mora Demo', 'raw' => 'Gigante familiar', 'label' => 'Gigante familiar'],
+            ['id' => 5, 'name' => 'Brisa Demo', 'raw' => '', 'label' => null],
+            ['id' => 6, 'name' => 'Pipa Demo', 'raw' => '<img src=x onerror=alert(1)>', 'label' => '<img src=x onerror=alert(1)>'],
+        ];
+        $pets = array_map(static fn (array $case): array => [
+            'id' => $case['id'],
+            'name' => $case['name'],
+            'species' => 'Gato',
+            'size_category' => $case['raw'],
+            'has_photo' => false,
+        ], $cases);
+        $html = $this->renderOverview(['householdPets' => $pets], '', ['contracts' => [], 'can_create' => false], 'household');
+        $dom = new \DOMDocument();
+        @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        $xpath = new \DOMXPath($dom);
+        $records = $xpath->query('//section[@data-household-region="pets"]/div[contains(@class,"candidate-household-records")]/article');
+
+        self::assertSame(count($cases), $records->length);
+        foreach ($cases as $index => $case) {
+            $record = $records->item($index);
+            $body = $xpath->query('.//div[contains(@class,"candidate-household-record__body")]', $record)->item(0);
+            $bodyText = $body?->textContent ?? '';
+            if ($case['label'] === null) {
+                self::assertSame(1, $xpath->query('.//div[contains(@class,"candidate-household-record__body")]/p', $record)->length);
+            } else {
+                self::assertStringContainsString($case['label'], $bodyText);
+            }
+            $sizeValue = $xpath->query(
+                '//section[@data-household-region="pets"]//details[contains(@class,"candidate-household-manager")]//form[contains(@class,"candidate-household-edit")][.//input[@name="record_id" and @value="' . $case['id'] . '"]]//input[@name="size_category"]/@value',
+            )->item(0);
+            self::assertSame($case['raw'], $sizeValue?->nodeValue, 'Editing must preserve the stored free-text value.');
+        }
+        self::assertStringContainsString('&lt;img src=x onerror=alert(1)&gt;', $html);
+        self::assertStringNotContainsString('<img src=x onerror=alert(1)>', $html);
+    }
+
     public function testHouseholdSeparatesPetAnswerFromTimestampAndCountsPetRecords(): void
     {
         $html = $this->renderOverview([
@@ -471,12 +581,20 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
             ],
         ], '', ['contracts' => [], 'can_create' => false], 'household');
 
-        self::assertStringContainsString('3, incluido el solicitante', $html);
+        $dom = new \DOMDocument();
+        @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        $xpath = new \DOMXPath($dom);
+        $summaryText = $xpath->query('//section[@data-household-region="summary"]')->item(0)?->textContent ?? '';
+        $informationText = $xpath->query('//section[@data-household-region="information"]')->item(0)?->textContent ?? '';
+        $petsText = $xpath->query('//section[@data-household-region="pets"]')->item(0)?->textContent ?? '';
+
+        self::assertStringContainsString('3, incluido el solicitante', $informationText);
         self::assertStringNotContainsString('incluyéndote', $html);
-        self::assertStringContainsString('Sí, se declararon mascotas', $html);
-        self::assertStringContainsString('2026-10-20 10:00:00', $html);
+        self::assertStringContainsString('Sí, se declararon mascotas', $informationText);
+        self::assertStringContainsString('2026-10-20 10:00:00', $informationText);
         self::assertStringContainsString('datetime="2026-10-20T10:00:00"', $html);
-        self::assertStringContainsString('1 ficha registrada', $html);
+        self::assertStringContainsString('1 ficha registrada', $summaryText);
+        self::assertStringContainsString('1 ficha registrada', $petsText);
     }
 
     public function testHouseholdUsesSingularForOneDeclaredOccupant(): void
@@ -504,7 +622,7 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
 
         self::assertSame(6, substr_count($html, 'data-household-region='));
         self::assertStringContainsString('Cantidad no declarada', $html);
-        self::assertStringContainsString('Respuesta de mascotas no confirmada', $html);
+        self::assertStringContainsString('No confirmado', $html);
         self::assertStringNotContainsString('0 ocupantes declarados', $html);
         self::assertStringNotContainsString('No tiene mascotas', $html);
         self::assertStringNotContainsString('Sin mascotas declaradas', $html);
@@ -523,7 +641,7 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         ], '', ['contracts' => [], 'can_create' => false], 'household');
 
         self::assertStringContainsString('0 ocupantes declarados', $html);
-        self::assertStringContainsString('Respuesta de mascotas no confirmada', $html);
+        self::assertStringContainsString('No confirmado', $html);
         self::assertStringNotContainsString('Cantidad no declarada', $html);
         self::assertStringNotContainsString('No tiene mascotas', $html);
         self::assertStringContainsString('No hay fichas de otras personas registradas.', $html);
@@ -546,7 +664,7 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
         self::assertStringNotContainsString('<img src=x onerror=alert(1)>', $html);
         self::assertStringContainsString('Cantidad no declarada', $html);
-        self::assertStringContainsString('Respuesta de mascotas no confirmada', $html);
+        self::assertStringContainsString('No confirmado', $html);
         self::assertStringNotContainsString('Sin mascotas declaradas en la solicitud', $html);
         self::assertStringContainsString('/sub/admin/candidates/1?section=household', $html);
     }

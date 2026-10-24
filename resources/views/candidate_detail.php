@@ -351,15 +351,22 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
         $householdManualDocument = is_array($householdManual['document'] ?? null) ? $householdManual['document'] : null;
         $householdPhotoPath = rtrim((string) ($householdPhotoPath ?? ($basePath . '/admin/candidates/' . (int) $candidate['id'] . '/household')), '/');
         $petsAnswered = ($candidate['pets_answered_at'] ?? null) !== null;
-        $petDeclarationLabel = !$petsAnswered
-            ? 'Respuesta de mascotas no confirmada'
-            : (!empty($candidate['pets_declared']) ? 'Mascotas declaradas' : 'Sin mascotas declaradas en la solicitud');
         $petDeclarationResponse = !$petsAnswered
             ? 'No confirmado'
             : (!empty($candidate['pets_declared']) ? 'Sí, se declararon mascotas' : 'No se declararon mascotas');
         $registeredOccupants = count($householdOccupants);
         $registeredTotal = 1 + $registeredOccupants;
         $registeredPetCount = count($householdPets);
+        $petSizeLabel = static function (mixed $value): string {
+            $raw = trim((string) $value);
+
+            return match (strtolower($raw)) {
+                'small' => 'Pequeño',
+                'medium' => 'Mediano',
+                'large' => 'Grande',
+                default => $raw,
+            };
+        };
         $occupantsMatch = $occupantsCount !== null && $occupantsCount === $registeredTotal;
         $householdFormAction = $householdPhotoPath;
         $householdRecordUrl = static fn (string $kind, int $recordId): string => $householdPhotoPath . '/' . rawurlencode($kind) . '/' . $recordId . '/photo';
@@ -382,7 +389,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                     <div class="candidate-household-facts">
                         <p><span>Total declarado</span><strong><?= $occupantsCount === null ? 'Cantidad no declarada' : $escape($occupantsCount . ($occupantsCount === 1 ? ' ocupante declarado' : ' ocupantes declarados')) ?></strong></p>
                         <p><span>Fichas adicionales</span><strong><?= $escape($registeredOccupants) ?> registradas</strong></p>
-                        <p><span>Mascotas</span><strong><?= $escape($petDeclarationLabel) ?></strong></p>
+                        <p><span>Mascotas</span><strong><?= $escape($registeredPetCount . ($registeredPetCount === 1 ? ' ficha registrada' : ' fichas registradas')) ?></strong></p>
                     </div>
                 </section>
 
@@ -477,7 +484,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                                     <?php if (!empty($pet['has_photo'])): ?><img class="candidate-household-avatar" src="<?= $escape($householdRecordUrl('pet', (int) $pet['id'])) ?>" alt="Fotografía de <?= $escape($pet['name'] ?? 'mascota') ?>" loading="lazy">
                                     <?php else: ?><span class="candidate-household-avatar candidate-household-avatar--initials" aria-label="Iniciales de <?= $escape($pet['name'] ?? 'mascota') ?>"><?= $escape($householdInitials($pet['name'] ?? '')) ?></span><?php endif; ?>
                                     <div class="candidate-household-record__body"><h4><?= $escape($pet['name'] ?? '') ?></h4><p><?= $escape($pet['species'] ?? 'Especie no indicada') ?><?php if (trim((string) ($pet['breed'] ?? '')) !== ''): ?> · <?= $escape($pet['breed']) ?><?php endif; ?></p>
-                                        <?php if (($pet['age_years'] ?? null) !== null || trim((string) ($pet['size_category'] ?? '')) !== ''): ?><p><?php if (($pet['age_years'] ?? null) !== null): ?><?= $escape($pet['age_years']) ?> años aprox.<?php endif; ?><?php if (trim((string) ($pet['size_category'] ?? '')) !== ''): ?><?= ($pet['age_years'] ?? null) !== null ? ' · ' : '' ?><?= $escape($pet['size_category']) ?><?php endif; ?></p><?php endif; ?>
+                                        <?php if (($pet['age_years'] ?? null) !== null || trim((string) ($pet['size_category'] ?? '')) !== ''): ?><p><?php if (($pet['age_years'] ?? null) !== null): ?><?= $escape($pet['age_years']) ?> años aprox.<?php endif; ?><?php if (trim((string) ($pet['size_category'] ?? '')) !== ''): ?><?= ($pet['age_years'] ?? null) !== null ? ' · ' : '' ?><?= $escape($petSizeLabel($pet['size_category'] ?? null)) ?><?php endif; ?></p><?php endif; ?>
                                         <?php if (($pet['vaccination_declaration'] ?? null) !== null): ?><p>Declaración: <?= $pet['vaccination_declaration'] === 'declared_vaccinated' ? 'vacunación declarada' : 'no vacunación declarada' ?></p><?php endif; ?>
                                         <?php if (trim((string) ($pet['notes'] ?? '')) !== ''): ?><p class="candidate-household-record__notes"><?= nl2br($escape($pet['notes'])) ?></p><?php endif; ?>
                                     </div>
