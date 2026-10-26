@@ -44,7 +44,7 @@ final class ObligationSecurityRegressionTest extends TestCase
         $composer = json_decode($this->file('composer.json'), true, 32, JSON_THROW_ON_ERROR);
         $runtimeRequirements = array_keys($composer['require'] ?? []);
         sort($runtimeRequirements);
-        self::assertSame(['dompdf/dompdf', 'php', 'phpmailer/phpmailer', 'slim/psr7', 'slim/slim'], $runtimeRequirements);
+        self::assertSame(['dompdf/dompdf', 'php', 'phpmailer/phpmailer', 'slim/psr7', 'slim/slim', 'smalot/pdfparser'], $runtimeRequirements);
 
         $financeRoutes = $this->file('app/Finance/routes.php');
         $leaseRoutes = $this->file('app/Leases/routes.php');

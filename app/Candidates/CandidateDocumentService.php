@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AlquilaPro\Candidates;
 
+use AlquilaPro\Documents\PdfUploadValidator;
 use PDO;
 use PDOException;
 use Psr\Http\Message\UploadedFileInterface;
@@ -380,6 +381,9 @@ final class CandidateDocumentService
         $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
         if (!is_string($mime) || !isset(self::MIME_EXTENSIONS[$mime])) {
             throw new RuntimeException('El formato del documento no es válido.');
+        }
+        if ($mime === 'application/pdf' && !PdfUploadValidator::isValid($bytes)) {
+            throw new RuntimeException('El PDF no pasó la validación de integridad.');
         }
 
         return [$bytes, $mime, self::MIME_EXTENSIONS[$mime]];

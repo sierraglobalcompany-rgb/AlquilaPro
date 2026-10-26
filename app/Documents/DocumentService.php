@@ -603,6 +603,9 @@ final class DocumentService
         if (!is_string($mime) || $extension === null) {
             throw $this->failure('El formato del archivo no está permitido.', 'document');
         }
+        if ($mime === 'application/pdf' && !PdfUploadValidator::isValid($bytes)) {
+            throw $this->failure('El PDF no pasó la validación de integridad.', 'document');
+        }
         return ['bytes' => $bytes, 'mime' => $mime, 'extension' => $extension];
     }
 

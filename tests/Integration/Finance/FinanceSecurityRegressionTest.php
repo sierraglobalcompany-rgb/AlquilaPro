@@ -114,7 +114,7 @@ final class FinanceSecurityRegressionTest extends TestCase
         $composer = json_decode($this->file('composer.json'), true, 32, JSON_THROW_ON_ERROR);
         $runtimeRequirements = array_keys($composer['require'] ?? []);
         sort($runtimeRequirements);
-        self::assertSame(['dompdf/dompdf', 'php', 'phpmailer/phpmailer', 'slim/psr7', 'slim/slim'], $runtimeRequirements);
+        self::assertSame(['dompdf/dompdf', 'php', 'phpmailer/phpmailer', 'slim/psr7', 'slim/slim', 'smalot/pdfparser'], $runtimeRequirements);
         self::assertSame(['phpunit/phpunit'], array_keys($composer['require-dev'] ?? []));
 
         $financeSource = $this->file('app/Finance/FinanceService.php');

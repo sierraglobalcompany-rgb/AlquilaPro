@@ -349,6 +349,6 @@ final class DocumentRoutesTest extends TestCase
 
     private function pdfBytes(): string
     {
-        return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<<>>\n%%EOF\n";
+        return \AlquilaPro\Tests\Support\PdfFixtures::validPdf();
     }
 }

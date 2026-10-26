@@ -38,7 +38,7 @@ final class ContractSecurityRegressionTest extends TestCase
         $direct = array_keys($composer['require'] ?? []);
         sort($direct);
         self::assertSame(
-            ['dompdf/dompdf', 'php', 'phpmailer/phpmailer', 'slim/psr7', 'slim/slim'],
+            ['dompdf/dompdf', 'php', 'phpmailer/phpmailer', 'slim/psr7', 'slim/slim', 'smalot/pdfparser'],
             $direct,
             'F7 must not grow a second runtime stack beyond Dompdf.',
         );

@@ -535,7 +535,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                 </section>
 
                 <section class="content-card candidate-card candidate-household-next" data-household-region="next-steps" aria-labelledby="candidate-household-next-title">
-                    <h3 id="candidate-household-next-title"><?= $candidateIcon('history') ?>Secciones para consultar</h3>
+                    <h3 id="candidate-household-next-title"><?= $candidateIcon('history') ?>Próximos pasos</h3>
                     <ul class="candidate-household-next-list">
                         <?php foreach ([['work', 'Información laboral', 'Consultar datos laborales declarados'], ['references', 'Referencias', 'Consultar referencias registradas'], ['documents', 'Documentos', 'Consultar los requisitos adjuntos']] as [$key, $label, $description]): ?>
                             <?php if (in_array($key, array_column($candidateSections, 'key'), true)): ?><li><a href="<?= $escape($sectionHref($key)) ?>"><strong><?= $escape($label) ?></strong><span><?= $escape($description) ?></span></a></li><?php endif; ?>

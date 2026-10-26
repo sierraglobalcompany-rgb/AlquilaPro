@@ -214,6 +214,7 @@ final class CandidateDocumentsTest extends TestCase
         $invalidUploads = [
             $this->upload('', 'empty.pdf', 'application/pdf'),
             $this->upload('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', 'fake.pdf', 'application/pdf'),
+            $this->upload("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<<>>\n%%EOF\n", 'truncated-structure.pdf', 'application/pdf'),
             $this->upload('<?php echo "owned"; ?>', 'fake.jpg', 'image/jpeg'),
             $this->upload(str_repeat('A', 10 * 1024 * 1024 + 1), 'too-big.pdf', 'application/pdf'),
         ];
@@ -518,7 +519,7 @@ final class CandidateDocumentsTest extends TestCase
 
     private function pdfBytes(): string
     {
-        return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<<>>\n%%EOF\n";
+        return \AlquilaPro\Tests\Support\PdfFixtures::validPdf();
     }
 
     private function pngBytes(): string

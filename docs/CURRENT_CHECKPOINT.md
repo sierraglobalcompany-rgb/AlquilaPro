@@ -1,14 +1,13 @@
-# CURRENT CHECKPOINT — CAND-03 / CIERRE H01-H02 V4
+# CURRENT CHECKPOINT — CAND-03 / H01 PDF VALIDATION · LOCAL V8
 
-**Corte:** 2026-10-23 America/Bogota. Estado: PARTIAL; Codex no autocertifica Ley 5. No merge, deploy ni CAND-04.
+**Corte:** 2026-10-25 America/Bogota. Estado: implementación local verificada con límites pendientes de Ley 5 y compatibilidad de publicación. No merge, deploy, Hostinger ni avance a CAND-04.
 
 ## Repo y autoridad viva
 - Repo: sierraglobalcompany-rgb/AlquilaPro.
 - Base: main@414bcfeae0a3b4f8eea7262eefcb498e3f116307.
-- PR #55: OPEN / DRAFT / NOT MERGED; rama impl/cand-03-household-human-first-20261023.
-- Código H01/H02: 3e830163a411806ad093a35c3f6bfae30aad1538.
-- CI del SHA de código: run #1196 / 40051385506, completed/success; PHP 8.3, 8.4 y 8.5.
-- Este refresh cambia solo el checkpoint. Verificar el CI del HEAD documental resultante antes de reportar cierre de CI final.
+- PR #55 verificado en GitHub 2026-10-25: OPEN / DRAFT / NOT MERGED; rama `impl/cand-03-household-human-first-20261023`, head `51ccc57866935be5fe31378e05fcc86f0291fe8a`.
+- Worktree local: detached HEAD sobre ese mismo SHA, cambios sin commit ni push.
+- CI #1196 / run `40051385506` corresponde al SHA anterior `3e830163a411806ad093a35c3f6bfae30aad1538`; no certifica el contenido local. CI remoto nuevo no ejecutado por instrucción explícita del owner.
 
 ## H02 — corregido focalmente
 Causa: la vista usaba pets_answered_at como respuesta, copy dirigido al candidato dentro de la revisión admin, no contaba fichas reales de mascotas y duplicaba observaciones; las fichas apilaban metadatos. En el owner existente se separaron respuesta/fecha, se mantuvo histórico false sin fecha como No confirmado, se corrigieron copy/conteos, se movieron notas una vez a Reglas y observaciones y se compactó el flujo de datos desktop. No se duplicó al solicitante ni se infirieron score/vacunación.
@@ -22,17 +21,23 @@ Preview de componente con Playwright y datos ficticios, no ruta autenticada:
 - No se incluye foto en el fixture. Las capturas no validan ACL/servicio de foto ni estado de sesión. A 1448×1086 la fila 3 empieza dentro del viewport, pero su contenido continúa bajo el viewport.
 - Evidencia V4: D:\Codex\_REPORTES\AlquilaPro\AP-CAND03-PR55-CIERRE-H01-H02-V4\.
 
-Browser QA de aplicación y rutas: BLOCKED_B. La app y DB de AlquilaPro no escuchaban. El único DB container activo era erp_v14_qa de otro entorno y se dejó intacto. CandidatesAdminRoutesTest::testHouseholdAdminCrudAndPrivatePhotoRouteAreCandidateScoped falló antes de assertions por conexión DB en DatabaseConnector.php:27.
+Browser preview de componente con fixture ficticio, sin login, sesión ni DB de aplicación: 1440×900 escritorio y 390×844 móvil emulado/táctil; seis regiones; sin overflow horizontal; consola sin mensajes/errores/warnings observados. Evidencia nueva en el paquete V8. Browser QA de aplicación autenticada sigue pendiente. Las rutas de foto/ACL pasan con DB MariaDB 11.4 aislada en la suite; la captura por sí sola no certifica ACL.
 
 ## H01 — PDF
-BLOCKED_C. DocumentService sigue verificando tamaño/MIME sin validar estructura. El fixture sintético corrupto de 43 bytes fue rechazado por pdfinfo por trailer/xref faltantes (exit 1) en la evidencia previa; esta tarea no repitió una carga en la app. No se añadió parser casero, Composer dependency ni binario externo. El owner debe elegir una estrategia desplegable y compatible con su plan Hostinger entre parser PHP con extensiones verificadas o proceso/binario externo con soporte demostrado.
+- Causa: `DocumentService` y `CandidateDocumentService` aceptaban archivos por tamaño/MIME sin validar estructura; un fixture del portal tenant también era un pseudo-PDF sin xref/trailer.
+- Ambos owners llaman a `PdfUploadValidator`, que integra `smalot/pdfparser` v2.13.1 con límites de recursos. Máximo de archivo: 10 MiB; límites internos de streams/objetos/recursión; rechaza truncados, MIME falso, ZIP/polyglot, cifrado, acciones activas y adjuntos incrustados. No modifica bytes aceptados ni afirma detectar malware.
+- Dependencia directa `smalot/pdfparser` (`^2.13.1`, lock `v2.13.1`, LGPL-3.0), necesaria para parseo estructural; requiere revisión de obligaciones de distribución. No hay dictamen legal.
+- Corpus H01: SHA-256 `f37a204b56149d2c3a331ff7242bfe305de96a747640e68084ea795ce5618f5c`; manifiesto 13/13 archivos/hashes coinciden; validador 13/13 decisiones esperadas (6 ACCEPT, 7 REJECT). La matriz está en el paquete V8.
+- RED observado antes de implementación: cinco tests nuevos fallaban porque faltaba `PdfUploadValidator`. RED de regresión completa identificó siete allowlists de arquitectura y el fixture tenant obsoleto; corregidos en los owners de tests/fixture. Focal final afectada: 8 tests / 261 assertions, PASS.
 
-## CI y límites
-- CI #1196 del SHA de código 3e83016: PHP 8.3/8.4/8.5 success.
-- El CI del commit de este checkpoint debe verificarse sobre su SHA exacto.
-- PR sigue Draft; H01 bloqueado; Browser QA real pendiente; aceptación independiente de Ley 5 pendiente. CAND-03 no está cerrado globalmente.
-- Evidencia histórica V3 conservada: D:\Codex\_REPORTES\AlquilaPro\AP-CAND03-PR55-LEY5-CIERRE-V3\FINAL_REPORT.md y su ZIP; no se regeneró ni duplicó.
-- Informe V4: AP-CAND03-PR55-CIERRE-H01-H02-V4_FINAL_REPORT.md y paquete nuevo en la carpeta externa V4 indicada arriba.
+## Verificación local y límites
+- PHP 8.5.8, PHPUnit 11.5.57, MariaDB 11.4 efímera y schema/credenciales aleatorias exclusivos; el contenedor temporal fue eliminado.
+- Suite completa final: 731 tests, 8.479 assertions, exit 0; 2 skips y 267 warnings. Los warnings vienen de `ServerReadyBuilderTest` al borrar objetos Git temporales (`unlink: Permission denied`, y directorios no vacíos); no se modificó esa suite fuera del alcance.
+- `composer validate --no-check-publish`: válido. PHP lint: sin errores. `git diff --check`: sin errores; Git avisó normalización LF→CRLF en algunos archivos.
+- La primera suite completa registró 7 fallos y 1 error; tras alinear las allowlists/owners y reemplazar el fixture tenant, la focal afectada pasó y la suite completa terminó exit 0.
+- CI remoto, commit, push, merge, deploy y cambios Hostinger no ejecutados. El CI anterior no certifica el contenido local. La compatibilidad de extensiones/Composer con Hostinger sigue sin verificar.
+- Aceptación independiente Ley 5 pendiente; Codex no autocertifica PASS global. `TEMP_SENSITIVE=BLOCKED`: no se leyó ni limpió la ruta temporal sensible.
+- Evidencia histórica V3/V4 conservada en sus carpetas previas; este cierre añade el paquete V8 sin sobrescribirlos.
 
 ## NEXT ÚNICO
-Owner: proveer/restaurar una app+DB aislada de AlquilaPro para Browser QA autenticada y decidir la estrategia de validación PDF. Después, Codex repite rutas, ACL/fotos y pruebas faltantes sobre el HEAD vigente; ChatGPT/owner audita Ley 5. No avanzar a CAND-04.
+Ley 5 independiente revisa el diff y el paquete de evidencia local; después, el owner decide si autoriza preflight de compatibilidad Hostinger y CI remoto. No avanzar a CAND-04.

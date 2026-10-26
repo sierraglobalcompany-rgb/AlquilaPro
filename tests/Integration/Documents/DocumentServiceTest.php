@@ -128,7 +128,7 @@ final class DocumentServiceTest extends TestCase
             $this->actorId,
             1_800_000_000,
         );
-        $pdfBytes = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<<>>\n%%EOF\n";
+        $pdfBytes = \AlquilaPro\Tests\Support\PdfFixtures::validPdf();
         $pdf = $service->createFileVersion(
             $this->propertyId,
             null,
@@ -148,6 +148,26 @@ final class DocumentServiceTest extends TestCase
         ));
         self::assertSame([$json['id'], $pdf['id']], array_column($service->history((int) $json['id']), 'id'));
         self::assertSame($pdfBytes, $service->privateFile((int) $pdf['id'])['contents']);
+    }
+
+    public function testRejectsMimeSpoofedPdfBeforeCreatingDocument(): void
+    {
+        $service = $this->service();
+        $invalidPdf = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<<>>\n%%EOF\n";
+
+        $this->assertRejected(fn () => $service->createFileVersion(
+            $this->propertyId,
+            null,
+            'property_document',
+            'PDF inválido',
+            $this->upload($invalidPdf, 'invalid.pdf', 'application/pdf'),
+            null,
+            $this->actorId,
+            1_800_000_300,
+        ));
+
+        self::assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM documents')->fetchColumn());
+        self::assertSame([], glob($this->documentDirectory . '/*') ?: []);
     }
 
     public function testRejectsInvalidTypeScopeTitleAndCrossLineageVersions(): void

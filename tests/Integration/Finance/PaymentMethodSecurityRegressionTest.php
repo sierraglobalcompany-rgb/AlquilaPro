@@ -113,7 +113,7 @@ final class PaymentMethodSecurityRegressionTest extends TestCase
         $composer = json_decode($this->file('composer.json'), true, 32, JSON_THROW_ON_ERROR);
         $runtimeRequirements = array_keys($composer['require'] ?? []);
         sort($runtimeRequirements);
-        self::assertSame(['dompdf/dompdf', 'php', 'phpmailer/phpmailer', 'slim/psr7', 'slim/slim'], $runtimeRequirements);
+        self::assertSame(['dompdf/dompdf', 'php', 'phpmailer/phpmailer', 'slim/psr7', 'slim/slim', 'smalot/pdfparser'], $runtimeRequirements);
 
         $bootstrap = $this->file('bootstrap/app.php');
         self::assertSame(1, substr_count($bootstrap, 'new PaymentMethodService($pdo, $paymentMethodQrDirectory)'));

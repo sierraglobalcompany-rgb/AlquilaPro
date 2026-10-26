@@ -407,6 +407,21 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         foreach (['summary', 'information', 'occupants', 'pets', 'rules', 'next-steps'] as $region) {
             self::assertSame(1, substr_count($html, 'data-household-region="' . $region . '"'), $region . ' region must render once.');
         }
+        $dom = new \DOMDocument();
+        @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        $xpath = new \DOMXPath($dom);
+        self::assertSame(
+            'Próximos pasos',
+            trim($xpath->evaluate('string(//section[@data-household-region="next-steps"]/h3)')),
+        );
+        $nextStepLinks = $xpath->query('//section[@data-household-region="next-steps"]//ul/li/a');
+        self::assertSame(3, $nextStepLinks->length, 'The household region must expose only its existing contextual links.');
+        foreach (['work', 'references', 'documents'] as $index => $section) {
+            $link = $nextStepLinks->item($index);
+            self::assertInstanceOf(\DOMElement::class, $link);
+            parse_str((string) parse_url($link->getAttribute('href'), PHP_URL_QUERY), $query);
+            self::assertSame($section, $query['section'] ?? null);
+        }
         self::assertSame(1, substr_count($html, 'data-household-applicant'));
         self::assertStringContainsString('Cantidad no declarada', $html);
         self::assertStringContainsString('No confirmado', $html);

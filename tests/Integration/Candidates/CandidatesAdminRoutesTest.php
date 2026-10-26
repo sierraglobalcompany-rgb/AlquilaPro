@@ -306,11 +306,35 @@ final class CandidatesAdminRoutesTest extends TestCase
         $candidateId = $this->insertCandidate('HOUSEHOLD-CRUD-1', 'Candidato Hogar');
         $otherCandidateId = $this->insertCandidate('HOUSEHOLD-CRUD-2', 'Otro Candidato');
         $household = new CandidateHouseholdService($this->pdo, $this->householdDirectory);
-        $occupant = $household->saveRecord('occupant', $candidateId, null, [
-            'full_name' => 'Acompañante Con Foto',
-            'relationship' => 'Hermano',
-            'photo_consent' => '1',
-        ], $this->upload($this->pngBytes(), 'occupant.png', 'image/png'), time());
+        $seedRecords = [
+            [
+                'kind' => 'occupant',
+                'name' => 'Acompañante Con Foto',
+                'table' => 'candidate_household_occupants',
+                'data' => ['full_name' => 'Acompañante Con Foto', 'relationship' => 'Hermano'],
+                'routeData' => ['full_name' => 'Nueva Ficha Ocupante', 'relationship' => 'Hermana'],
+                'photoName' => 'occupant.png',
+            ],
+            [
+                'kind' => 'pet',
+                'name' => 'Luna',
+                'table' => 'candidate_household_pets',
+                'data' => ['name' => 'Luna', 'species' => 'Gato'],
+                'routeData' => ['name' => 'Sol', 'species' => 'Perro'],
+                'photoName' => 'pet.png',
+            ],
+        ];
+        $seedRecords = array_map(function (array $record) use ($household, $candidateId): array {
+            $record['seed'] = $household->saveRecord(
+                $record['kind'],
+                $candidateId,
+                null,
+                [...$record['data'], 'photo_consent' => '1'],
+                $this->upload($this->pngBytes(), $record['photoName'], 'image/png'),
+                time(),
+            );
+            return $record;
+        }, $seedRecords);
 
         $this->insertUser('household-viewer@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
         $viewer = $this->app('/sub');
@@ -318,22 +342,35 @@ final class CandidatesAdminRoutesTest extends TestCase
         $page = (string) $this->request($viewer, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=household')->getBody();
         self::assertStringContainsString('Acompañante Con Foto', $page);
         self::assertStringNotContainsString('Administrar fichas de ocupantes', $page);
-        self::assertSame(403, $this->request($viewer, 'POST', '/sub/admin/candidates/' . $candidateId . '/household/occupant', [
-            'full_name' => 'No autorizado', 'relationship' => 'Nadie',
-        ])->getStatusCode());
+        foreach ($seedRecords as $record) {
+            $photoPath = '/sub/admin/candidates/' . $candidateId . '/household/' . $record['kind'] . '/' . $record['seed']['id'] . '/photo';
+            $photo = $this->request($viewer, 'GET', $photoPath);
+            self::assertSame(200, $photo->getStatusCode(), $record['kind']);
+            self::assertSame('image/png', $photo->getHeaderLine('Content-Type'), $record['kind']);
+            self::assertSame('nosniff', $photo->getHeaderLine('X-Content-Type-Options'), $record['kind']);
+            self::assertSame('private, no-store', $photo->getHeaderLine('Cache-Control'), $record['kind']);
+            self::assertGreaterThan(0, strlen((string) $photo->getBody()), $record['kind']);
+            self::assertSame(404, $this->request(
+                $viewer,
+                'GET',
+                '/sub/admin/candidates/' . $otherCandidateId . '/household/' . $record['kind'] . '/' . $record['seed']['id'] . '/photo',
+            )->getStatusCode(), $record['kind'] . ' photos must remain candidate-scoped.');
+            self::assertSame(403, $this->request($viewer, 'POST', '/sub/admin/candidates/' . $candidateId . '/household/' . $record['kind'], [
+                ...$record['routeData'],
+            ], true, ['photo' => $this->upload($this->pngBytes(), 'forbidden.png', 'image/png')])->getStatusCode(), $record['kind']);
+        }
 
-        $photoPath = '/sub/admin/candidates/' . $candidateId . '/household/occupant/' . $occupant['id'] . '/photo';
-        $photo = $this->request($viewer, 'GET', $photoPath);
-        self::assertSame(200, $photo->getStatusCode());
-        self::assertSame('image/png', $photo->getHeaderLine('Content-Type'));
-        self::assertSame('nosniff', $photo->getHeaderLine('X-Content-Type-Options'));
-        self::assertSame('private, no-store', $photo->getHeaderLine('Cache-Control'));
-        self::assertGreaterThan(0, strlen((string) $photo->getBody()));
-        self::assertSame(404, $this->request(
-            $viewer,
-            'GET',
-            '/sub/admin/candidates/' . $otherCandidateId . '/household/occupant/' . $occupant['id'] . '/photo',
-        )->getStatusCode());
+        $_SESSION = [];
+        $this->insertUser('household-no-view@example.com', 'NoViewPassword123', 'admin', ['properties.view']);
+        $noView = $this->app('/sub');
+        $this->login($noView, 'household-no-view@example.com', 'NoViewPassword123', '/sub');
+        foreach ($seedRecords as $record) {
+            self::assertSame(403, $this->request(
+                $noView,
+                'GET',
+                '/sub/admin/candidates/' . $candidateId . '/household/' . $record['kind'] . '/' . $record['seed']['id'] . '/photo',
+            )->getStatusCode(), $record['kind'] . ' photos require candidates.view.');
+        }
 
         $_SESSION = [];
         $this->insertUser('household-manager@example.com', 'ManagerPassword123', 'admin', ['candidates.view', 'candidates.manage']);
@@ -343,20 +380,66 @@ final class CandidatesAdminRoutesTest extends TestCase
         self::assertStringContainsString('Administrar fichas de ocupantes', $managerPage);
         self::assertStringNotContainsString('Manual PDF actual', $managerPage);
 
-        $created = $this->request($manager, 'POST', '/sub/admin/candidates/' . $candidateId . '/household/occupant', [
-            'full_name' => 'Ficha Nueva', 'relationship' => 'Madre', 'age_years' => '58',
-        ]);
-        self::assertSame(303, $created->getStatusCode());
-        $createdId = (int) $this->pdo->query(
+        foreach ($seedRecords as $record) {
+            $collectionPath = '/sub/admin/candidates/' . $candidateId . '/household/' . $record['kind'];
+            $created = $this->request($manager, 'POST', $collectionPath, $record['routeData']);
+            self::assertSame(303, $created->getStatusCode(), $record['kind']);
+            $statement = $this->pdo->prepare('SELECT id FROM ' . $record['table'] . ' WHERE candidate_id = :candidate_id ORDER BY id DESC LIMIT 1');
+            $statement->execute(['candidate_id' => $candidateId]);
+            $createdId = (int) $statement->fetchColumn();
+            $editedField = $record['kind'] === 'occupant' ? 'full_name' : 'name';
+            $editedValue = $record['kind'] === 'occupant' ? 'Ficha Ocupante Editada' : 'Ficha Mascota Editada';
+            $editBody = [...$record['routeData'], 'record_id' => (string) $createdId, $editedField => $editedValue];
+            $edited = $this->request($manager, 'POST', $collectionPath, $editBody);
+            self::assertSame(303, $edited->getStatusCode(), $record['kind'] . ' editing must redirect.');
+            $persisted = $this->pdo->prepare(
+                'SELECT ' . $editedField . ' FROM ' . $record['table'] . ' WHERE id = :id AND candidate_id = :candidate_id',
+            );
+            $persisted->execute(['id' => $createdId, 'candidate_id' => $candidateId]);
+            self::assertSame($editedValue, $persisted->fetchColumn(), $record['kind'] . ' edited field must persist.');
+            $record['routeData'][$editedField] = $editedValue;
+            $photoPath = $collectionPath . '/' . $createdId . '/photo';
+            self::assertSame(404, $this->request($manager, 'GET', $photoPath)->getStatusCode(), $record['kind'] . ' without a photo must return 404.');
+
+            $uploadBody = [...$record['routeData'], 'record_id' => (string) $createdId, 'photo_consent' => '1'];
+            $uploaded = $this->request($manager, 'POST', $collectionPath, $uploadBody, true, [
+                'photo' => $this->upload($this->pngBytes(), $record['kind'] . '.png', 'image/png'),
+            ]);
+            self::assertSame(303, $uploaded->getStatusCode(), $record['kind'] . ' upload');
+            $stored = $this->pdo->prepare('SELECT photo_stored_name FROM ' . $record['table'] . ' WHERE id = :id AND candidate_id = :candidate_id');
+            $stored->execute(['id' => $createdId, 'candidate_id' => $candidateId]);
+            $firstStoredPath = $this->householdDirectory . '/' . $stored->fetchColumn();
+            self::assertFileExists($firstStoredPath, $record['kind'] . ' upload must create private storage.');
+
+            $replacement = $this->request($manager, 'POST', $collectionPath, $uploadBody, true, [
+                'photo' => $this->upload($this->jpegBytes(), $record['kind'] . '-replacement.jpg', 'image/jpeg'),
+            ]);
+            self::assertSame(303, $replacement->getStatusCode(), $record['kind'] . ' replacement');
+            $stored->execute(['id' => $createdId, 'candidate_id' => $candidateId]);
+            $replacementName = (string) $stored->fetchColumn();
+            $replacementPath = $this->householdDirectory . '/' . $replacementName;
+            self::assertNotSame(basename($firstStoredPath), $replacementName, $record['kind'] . ' replacement must rotate the stored file.');
+            self::assertFileDoesNotExist($firstStoredPath, $record['kind'] . ' replacement must retire the previous file.');
+            self::assertFileExists($replacementPath, $record['kind'] . ' replacement must keep the new private file.');
+            $replacementPhoto = $this->request($manager, 'GET', $photoPath);
+            self::assertSame(200, $replacementPhoto->getStatusCode(), $record['kind']);
+            self::assertSame('image/jpeg', $replacementPhoto->getHeaderLine('Content-Type'), $record['kind']);
+            self::assertSame('nosniff', $replacementPhoto->getHeaderLine('X-Content-Type-Options'), $record['kind']);
+            self::assertSame('private, no-store', $replacementPhoto->getHeaderLine('Cache-Control'), $record['kind']);
+
+            $removed = $this->request($manager, 'POST', $collectionPath, [
+                ...$record['routeData'], 'record_id' => (string) $createdId, 'remove_photo' => '1',
+            ]);
+            self::assertSame(303, $removed->getStatusCode(), $record['kind'] . ' photo removal');
+            self::assertFileDoesNotExist($replacementPath, $record['kind'] . ' removal must retire the private file.');
+            self::assertSame(404, $this->request($manager, 'GET', $photoPath)->getStatusCode(), $record['kind'] . ' removed photo');
+        }
+
+        $occupantId = (int) $this->pdo->query(
             'SELECT id FROM candidate_household_occupants WHERE candidate_id = ' . $candidateId . ' ORDER BY id DESC LIMIT 1',
         )->fetchColumn();
-        $updated = $this->request($manager, 'POST', '/sub/admin/candidates/' . $candidateId . '/household/occupant', [
-            'record_id' => (string) $createdId, 'full_name' => 'Ficha Actualizada', 'relationship' => 'Madre',
-        ]);
-        self::assertSame(303, $updated->getStatusCode());
-        self::assertSame('Ficha Actualizada', $household->listOccupants($candidateId)[1]['full_name']);
         $deleted = $this->request($manager, 'POST', '/sub/admin/candidates/' . $candidateId . '/household/occupant', [
-            'action' => 'delete', 'record_id' => (string) $createdId,
+            'action' => 'delete', 'record_id' => (string) $occupantId,
         ]);
         self::assertSame(303, $deleted->getStatusCode());
         self::assertCount(1, $household->listOccupants($candidateId));
@@ -643,7 +726,14 @@ final class CandidatesAdminRoutesTest extends TestCase
         ]);
     }
 
-    private function request(App $app, string $method, string $path, array $body = [], bool $withCsrf = true): ResponseInterface
+    private function request(
+        App $app,
+        string $method,
+        string $path,
+        array $body = [],
+        bool $withCsrf = true,
+        array $uploads = [],
+    ): ResponseInterface
     {
         $request = (new ServerRequestFactory())->createServerRequest(
             $method,
@@ -654,6 +744,9 @@ final class CandidatesAdminRoutesTest extends TestCase
         }
         if ($body !== []) {
             $request = $request->withParsedBody($body);
+        }
+        if ($uploads !== []) {
+            $request = $request->withUploadedFiles($uploads);
         }
         return $app->handle($request);
     }
@@ -757,12 +850,29 @@ final class CandidatesAdminRoutesTest extends TestCase
 
     private function pdfBytes(): string
     {
-        return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<<>>\n%%EOF\n";
+        return \AlquilaPro\Tests\Support\PdfFixtures::validPdf();
     }
 
     private function pngBytes(): string
     {
         return (string) base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
+    }
+
+    private function jpegBytes(): string
+    {
+        $image = imagecreatetruecolor(2, 2);
+        if ($image === false) {
+            throw new \RuntimeException('No fue posible generar el JPEG de prueba.');
+        }
+        ob_start();
+        $encoded = imagejpeg($image, null, 85);
+        $bytes = ob_get_clean();
+        unset($image);
+        if (!$encoded || !is_string($bytes) || $bytes === '') {
+            throw new \RuntimeException('No fue posible generar el JPEG de prueba.');
+        }
+
+        return $bytes;
     }
 
     private function candidateUnitId(int $candidateId): int

@@ -48,7 +48,7 @@ final class DocumentSecurityRegressionTest extends TestCase
         $appDirectory = dirname(__DIR__, 3) . '/app/Documents';
         $files = array_map('basename', glob($appDirectory . '/*.php') ?: []);
         sort($files);
-        self::assertSame(['DocumentService.php', 'routes.php'], $files);
+        self::assertSame(['DocumentService.php', 'PdfUploadValidator.php', 'routes.php'], $files);
         self::assertSame(
             ['documents.view', 'documents.manage'],
             Permissions::sanitize(['documents.view', 'documents.manage', 'documents.delete', 'documents.admin']),
