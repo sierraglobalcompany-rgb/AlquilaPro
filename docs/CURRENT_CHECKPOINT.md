@@ -1,13 +1,14 @@
-# CURRENT CHECKPOINT — CAND-03 / H01 PDF VALIDATION · LOCAL V8
+# CURRENT CHECKPOINT — CAND-03 / G5 AUTHENTICATED BROWSER QA
 
-**Corte:** 2026-10-25 America/Bogota. Estado: implementación local verificada con límites pendientes de Ley 5 y compatibilidad de publicación. No merge, deploy, Hostinger ni avance a CAND-04.
+**Corte:** 2026-10-26 America/Bogota. Estado: preparación test-only de Browser QA autenticada en curso. `G5=EN_EJECUCION/NO_APROBADO`; la instrumentación nueva aún no tiene resultado CI. No merge, deploy, Hostinger ni avance a CAND-04.
 
 ## Repo y autoridad viva
 - Repo: sierraglobalcompany-rgb/AlquilaPro.
-- Base: main@414bcfeae0a3b4f8eea7262eefcb498e3f116307.
-- PR #55 verificado en GitHub 2026-10-25: OPEN / DRAFT / NOT MERGED; rama `impl/cand-03-household-human-first-20261023`, head `51ccc57866935be5fe31378e05fcc86f0291fe8a`.
-- Worktree local: detached HEAD sobre ese mismo SHA, cambios sin commit ni push.
-- CI #1196 / run `40051385506` corresponde al SHA anterior `3e830163a411806ad093a35c3f6bfae30aad1538`; no certifica el contenido local. CI remoto nuevo no ejecutado por instrucción explícita del owner.
+- Base de esta unidad: `6140932cfddc1d08825480b6f033651c7005aea6`.
+- PR #55 contrastado en GitHub 2026-10-26: OPEN / DRAFT / NOT MERGED; rama `impl/cand-03-household-human-first-20261023`, HEAD `6140932cfddc1d08825480b6f033651c7005aea6`.
+- `main` vivo observado: `f682d09e140e0b86f5704630712df5116dad9d09`.
+- CI #1204 / run `40346507909` certifica el HEAD anterior: 3/3 jobs success, PHP 8.3/8.4/8.5, 736 tests por job y 1 skip por job; checkout sintético `ec3e699a0d5dc3e0857cddf60081fc0719a8d057`.
+- La nueva ejecución de Browser QA se añade después de PHPUnit en el job existente PHP 8.5, con MariaDB efímera y datos sintéticos. El resultado nuevo solo será válido para el HEAD/merge SHA y run que GitHub Actions reporte.
 
 ## H02 — corregido focalmente
 Causa: la vista usaba pets_answered_at como respuesta, copy dirigido al candidato dentro de la revisión admin, no contaba fichas reales de mascotas y duplicaba observaciones; las fichas apilaban metadatos. En el owner existente se separaron respuesta/fecha, se mantuvo histórico false sin fecha como No confirmado, se corrigieron copy/conteos, se movieron notas una vez a Reglas y observaciones y se compactó el flujo de datos desktop. No se duplicó al solicitante ni se infirieron score/vacunación.
@@ -35,9 +36,9 @@ Browser preview de componente con fixture ficticio, sin login, sesión ni DB de 
 - Suite completa final: 731 tests, 8.479 assertions, exit 0; 2 skips y 267 warnings. Los warnings vienen de `ServerReadyBuilderTest` al borrar objetos Git temporales (`unlink: Permission denied`, y directorios no vacíos); no se modificó esa suite fuera del alcance.
 - `composer validate --no-check-publish`: válido. PHP lint: sin errores. `git diff --check`: sin errores; Git avisó normalización LF→CRLF en algunos archivos.
 - La primera suite completa registró 7 fallos y 1 error; tras alinear las allowlists/owners y reemplazar el fixture tenant, la focal afectada pasó y la suite completa terminó exit 0.
-- CI remoto, commit, push, merge, deploy y cambios Hostinger no ejecutados. El CI anterior no certifica el contenido local. La compatibilidad de extensiones/Composer con Hostinger sigue sin verificar.
+- Los resultados locales de 2026-10-25 son históricos; CI #1204 sí certifica el código que ya estaba en el HEAD remoto `6140932...`, pero no la instrumentación G5 nueva. En el momento de preparar este checkpoint, el commit/push de G5 y su nueva ejecución CI están pendientes. Hostinger y deploy no se ejecutaron.
 - Aceptación independiente Ley 5 pendiente; Codex no autocertifica PASS global. `TEMP_SENSITIVE=BLOCKED`: no se leyó ni limpió la ruta temporal sensible.
 - Evidencia histórica V3/V4 conservada en sus carpetas previas; este cierre añade el paquete V8 sin sobrescribirlos.
 
 ## NEXT ÚNICO
-Ley 5 independiente revisa el diff y el paquete de evidencia local; después, el owner decide si autoriza preflight de compatibilidad Hostinger y CI remoto. No avanzar a CAND-04.
+Cerrar la allowlist test-only, revalidar HEAD remoto y hashes protegidos, publicar una sola vez mediante push normal autorizado y esperar el CI asociado. Luego entregar artifact y SHA a ChatGPT para Ley 5 independiente; UAT y merge siguen pendientes por separado. No avanzar a CAND-04.

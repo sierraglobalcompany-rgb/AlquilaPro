@@ -1,0 +1,12 @@
+{
+  "name": "alquilapro-cand03-g5-browser-qa",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Ephemeral authenticated browser QA for CAND-03",
+  "scripts": {
+    "qa": "node run.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.64.0"
+  }
+}

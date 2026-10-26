@@ -8,6 +8,9 @@ jobs:
   test:
     name: PHP ${{ matrix.php }}
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -53,3 +56,66 @@ jobs:
 
       - name: Run tests
         run: vendor/bin/phpunit --testdox
+
+      - name: Setup Node.js for authenticated browser QA
+        if: matrix.php == '8.5'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tests/browser/package-lock.json
+
+      - name: Install locked Playwright browser harness
+        if: matrix.php == '8.5'
+        working-directory: tests/browser
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Chromium dependencies
+        if: matrix.php == '8.5'
+        working-directory: tests/browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Prepare isolated synthetic CAND-03 data after PHPUnit
+        if: matrix.php == '8.5'
+        run: php tests/browser/prepare.php
+
+      - name: Start real AlquilaPro PHP application on loopback
+        if: matrix.php == '8.5'
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/cand03-g5-docroot"
+          php -S 127.0.0.1:8787 -t "$RUNNER_TEMP/cand03-g5-docroot" "$GITHUB_WORKSPACE/tests/browser/router.php" >"$RUNNER_TEMP/cand03-g5-php-server.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/cand03-g5-php-server.pid"
+          for attempt in $(seq 1 45); do
+            if curl --silent --fail http://127.0.0.1:8787/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::The real AlquilaPro application did not become healthy on loopback."
+          exit 1
+
+      - name: Run authenticated CAND-03 Browser QA
+        if: matrix.php == '8.5'
+        timeout-minutes: 15
+        working-directory: tests/browser
+        env:
+          CAND03_G5_BASE_URL: http://127.0.0.1:8787
+        run: npm run qa
+
+      - name: Stop isolated PHP server
+        if: always() && matrix.php == '8.5'
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/cand03-g5-php-server.pid" ]]; then
+            kill "$(cat "$RUNNER_TEMP/cand03-g5-php-server.pid")" 2>/dev/null || true
+          fi
+
+      - name: Upload synthetic CAND-03 Browser QA evidence
+        if: always() && matrix.php == '8.5'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cand03-g5-browser-qa-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tests/browser/artifacts/
+          if-no-files-found: warn
+          retention-days: 14
