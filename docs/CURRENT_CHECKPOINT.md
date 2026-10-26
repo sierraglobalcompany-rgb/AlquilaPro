@@ -1,15 +1,15 @@
 # CURRENT CHECKPOINT — CAND-03 / G5 AUTHENTICATED BROWSER QA
 
-**Corte:** 2026-10-26 America/Bogota. Estado: primer CI de Browser QA terminó antes de Playwright sin artifact; se prepara reparación test-only de diagnóstico para una única publicación adicional autorizada. `G5=EN_EJECUCION/NO_APROBADO`. No merge, deploy, Hostinger ni avance a CAND-04.
+**Corte:** 2026-10-26 America/Bogota. Estado: CI #1206 terminó antes de Playwright; PHPUnit pasó en PHP 8.3/8.4/8.5, pero el servidor falló en `/health` por variables SMTP sintéticas ausentes y no hubo artifact. `G5=EN_EJECUCION/NO_APROBADO`. Una corrección test-only del entorno y su CI nuevo están pendientes; no merge, deploy, Hostinger ni avance a CAND-04.
 
 ## Repo y autoridad viva
 - Repo: sierraglobalcompany-rgb/AlquilaPro.
-- Base de esta unidad: `6140932cfddc1d08825480b6f033651c7005aea6`.
-- PR #55 contrastado en GitHub 2026-10-26: OPEN / DRAFT / NOT MERGED; rama `impl/cand-03-household-human-first-20261023`, HEAD `6140932cfddc1d08825480b6f033651c7005aea6`.
-- `main` vivo observado: `f682d09e140e0b86f5704630712df5116dad9d09`.
+- Base inicial de esta unidad: `6140932cfddc1d08825480b6f033651c7005aea6`.
+- PR #55 contrastado en GitHub 2026-10-26: OPEN / DRAFT / NOT MERGED; rama `impl/cand-03-household-human-first-20261023`, HEAD remoto `26d45a3123dc7164697a186bc4403704809543ed`. El `main` remoto observado es `f682d09e140e0b86f5704630712df5116dad9d09`; el checkout sintético de CI #1206 usa ese commit como primer parent.
 - CI #1204 / run `40346507909` certifica el HEAD anterior: 3/3 jobs success, PHP 8.3/8.4/8.5, 736 tests por job y 1 skip por job; checkout sintético `ec3e699a0d5dc3e0857cddf60081fc0719a8d057`.
 - CI #1205 / run `40368250835`, HEAD `3a6023a766685a430a4191f203e767ce2465bd08`, checkout sintético `9d8137ebf0586b633bcb4dbb504883df9b0f67df`: PHPUnit PHP 8.3 y 8.4 PASS; PHP 8.5 PHPUnit PASS, fixture MariaDB sintética PASS, pero el chequeo HTTP de inicio de la app no obtuvo `/health` en 45 s. Playwright `NOT_RUN`; upload reportó que no había archivos y no creó artifact. El paso no imprimió el log PHP guardado en RUNNER_TEMP, así que la causa de inicio no quedó determinada.
-- Única reparación test-only preparada: el mismo paso de health check reportará salida temprana del proceso y las últimas 80 líneas del log efímero cuando falle. Sin cambios funcionales. El segundo CI, si se publica, determinará si es harness/entorno o fallo de inicialización de la aplicación.
+- CI #1206 / run `40376198301`, HEAD `26d45a3123dc7164697a186bc4403704809543ed`, merge checkout `7305d9be58f089d0e26dc6311d4e7ed6e3e9ac17`: PHPUnit 736 tests, 1 skip por job, PASS en 8.3/8.4/8.5; fixture sintética PASS; instalación del harness Playwright y Chromium PASS. `/health` falló porque faltaban `ALQUILAPRO_SMTP_*` y `ALQUILAPRO_CRON_SECRET`; `bootstrap/app.php:417` rechazó la configuración. Ejecución Playwright `NOT_RUN`; artifact `MISSING` (ruta sin archivos).
+- Corrección test-only autorizada: añadir ocho valores sintéticos solo al paso `Start real AlquilaPro PHP application on loopback`; host loopback `127.0.0.1:2525`, valores no reales y sin SMTP sink. La conexión SMTP solo ocurriría si se invoca el transporte; no se cambia la validación del producto. Commit/push y CI nuevo aún `PENDING`; no más de una publicación bajo esta orden.
 
 ## H02 — corregido focalmente
 Causa: la vista usaba pets_answered_at como respuesta, copy dirigido al candidato dentro de la revisión admin, no contaba fichas reales de mascotas y duplicaba observaciones; las fichas apilaban metadatos. En el owner existente se separaron respuesta/fecha, se mantuvo histórico false sin fecha como No confirmado, se corrigieron copy/conteos, se movieron notas una vez a Reglas y observaciones y se compactó el flujo de datos desktop. No se duplicó al solicitante ni se infirieron score/vacunación.
@@ -37,9 +37,9 @@ Browser preview de componente con fixture ficticio, sin login, sesión ni DB de 
 - Suite completa final: 731 tests, 8.479 assertions, exit 0; 2 skips y 267 warnings. Los warnings vienen de `ServerReadyBuilderTest` al borrar objetos Git temporales (`unlink: Permission denied`, y directorios no vacíos); no se modificó esa suite fuera del alcance.
 - `composer validate --no-check-publish`: válido. PHP lint: sin errores. `git diff --check`: sin errores; Git avisó normalización LF→CRLF en algunos archivos.
 - La primera suite completa registró 7 fallos y 1 error; tras alinear las allowlists/owners y reemplazar el fixture tenant, la focal afectada pasó y la suite completa terminó exit 0.
-- Los resultados locales de 2026-10-25 son históricos; CI #1204 sí certifica el código que ya estaba en el HEAD remoto `6140932...`, pero no la instrumentación G5 nueva. En el momento de preparar este checkpoint, el commit/push de G5 y su nueva ejecución CI están pendientes. Hostinger y deploy no se ejecutaron.
+- Los resultados locales de 2026-10-25 son históricos; CI #1204 certifica el HEAD anterior `6140932...`, no la instrumentación G5. CI #1206 cubre el HEAD `26d45a3...` y dejó Browser QA sin ejecutar por el bloqueo SMTP descrito arriba. Hostinger y deploy no se ejecutaron.
 - Aceptación independiente Ley 5 pendiente; Codex no autocertifica PASS global. `TEMP_SENSITIVE=BLOCKED`: no se leyó ni limpió la ruta temporal sensible.
 - Evidencia histórica V3/V4 conservada en sus carpetas previas; este cierre añade el paquete V8 sin sobrescribirlos.
 
 ## NEXT ÚNICO
-Revalidar HEAD remoto y hashes protegidos, publicar la única reparación diagnóstica permitida mediante push normal y esperar CI. Si Browser QA produce artifact real, entregarlo a ChatGPT para Ley 5 independiente; si el servidor sigue sin iniciar, cerrar como bloqueo con log exacto, sin más publicaciones. UAT y merge siguen pendientes por separado. No avanzar a CAND-04.
+Completar la corrección SMTP sintética de este checkpoint, validar solo los dos paths permitidos y revalidar HEAD remoto `26d45a3...` más WIP protegido inmediatamente antes del único commit/push normal autorizado. Esperar CI del nuevo HEAD y revisar directamente Playwright y artifact no vacío; cualquier fallo posterior se documenta sin una segunda publicación. Ley 5 independiente, UAT y merge siguen pendientes por separado. No avanzar a CAND-04.

@@ -82,6 +82,15 @@ jobs:
       - name: Start real AlquilaPro PHP application on loopback
         if: matrix.php == '8.5'
         shell: bash
+        env:
+          ALQUILAPRO_SMTP_HOST: '127.0.0.1'
+          ALQUILAPRO_SMTP_PORT: '2525'
+          ALQUILAPRO_SMTP_USERNAME: 'g5-synthetic-only'
+          ALQUILAPRO_SMTP_PASSWORD: 'unusable-test-only-placeholder'
+          ALQUILAPRO_SMTP_ENCRYPTION: 'tls'
+          ALQUILAPRO_SMTP_FROM_EMAIL: 'no-reply@example.test'
+          ALQUILAPRO_SMTP_FROM_NAME: 'AlquilaPro QA sintetica'
+          ALQUILAPRO_CRON_SECRET: 'g5-test-only-never-production-20261026-012345'
         run: |
           mkdir -p "$RUNNER_TEMP/cand03-g5-docroot"
           php -S 127.0.0.1:8787 -t "$RUNNER_TEMP/cand03-g5-docroot" "$GITHUB_WORKSPACE/tests/browser/router.php" >"$RUNNER_TEMP/cand03-g5-php-server.log" 2>&1 &
