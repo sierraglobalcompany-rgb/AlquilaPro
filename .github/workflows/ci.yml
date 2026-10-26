@@ -90,9 +90,20 @@ jobs:
             if curl --silent --fail http://127.0.0.1:8787/health >/dev/null; then
               exit 0
             fi
+            if ! kill -0 "$(cat "$RUNNER_TEMP/cand03-g5-php-server.pid")" 2>/dev/null; then
+              echo "::error::The PHP application server exited before its health endpoint became ready."
+              break
+            fi
             sleep 1
           done
           echo "::error::The real AlquilaPro application did not become healthy on loopback."
+          echo "::group::PHP server startup log (last 80 lines)"
+          if [[ -f "$RUNNER_TEMP/cand03-g5-php-server.log" ]]; then
+            tail -n 80 "$RUNNER_TEMP/cand03-g5-php-server.log"
+          else
+            echo "The PHP server log was not created."
+          fi
+          echo "::endgroup::"
           exit 1
 
       - name: Run authenticated CAND-03 Browser QA

@@ -1,6 +1,6 @@
 # CURRENT CHECKPOINT — CAND-03 / G5 AUTHENTICATED BROWSER QA
 
-**Corte:** 2026-10-26 America/Bogota. Estado: preparación test-only de Browser QA autenticada en curso. `G5=EN_EJECUCION/NO_APROBADO`; la instrumentación nueva aún no tiene resultado CI. No merge, deploy, Hostinger ni avance a CAND-04.
+**Corte:** 2026-10-26 America/Bogota. Estado: primer CI de Browser QA terminó antes de Playwright sin artifact; se prepara reparación test-only de diagnóstico para una única publicación adicional autorizada. `G5=EN_EJECUCION/NO_APROBADO`. No merge, deploy, Hostinger ni avance a CAND-04.
 
 ## Repo y autoridad viva
 - Repo: sierraglobalcompany-rgb/AlquilaPro.
@@ -8,7 +8,8 @@
 - PR #55 contrastado en GitHub 2026-10-26: OPEN / DRAFT / NOT MERGED; rama `impl/cand-03-household-human-first-20261023`, HEAD `6140932cfddc1d08825480b6f033651c7005aea6`.
 - `main` vivo observado: `f682d09e140e0b86f5704630712df5116dad9d09`.
 - CI #1204 / run `40346507909` certifica el HEAD anterior: 3/3 jobs success, PHP 8.3/8.4/8.5, 736 tests por job y 1 skip por job; checkout sintético `ec3e699a0d5dc3e0857cddf60081fc0719a8d057`.
-- La nueva ejecución de Browser QA se añade después de PHPUnit en el job existente PHP 8.5, con MariaDB efímera y datos sintéticos. El resultado nuevo solo será válido para el HEAD/merge SHA y run que GitHub Actions reporte.
+- CI #1205 / run `40368250835`, HEAD `3a6023a766685a430a4191f203e767ce2465bd08`, checkout sintético `9d8137ebf0586b633bcb4dbb504883df9b0f67df`: PHPUnit PHP 8.3 y 8.4 PASS; PHP 8.5 PHPUnit PASS, fixture MariaDB sintética PASS, pero el chequeo HTTP de inicio de la app no obtuvo `/health` en 45 s. Playwright `NOT_RUN`; upload reportó que no había archivos y no creó artifact. El paso no imprimió el log PHP guardado en RUNNER_TEMP, así que la causa de inicio no quedó determinada.
+- Única reparación test-only preparada: el mismo paso de health check reportará salida temprana del proceso y las últimas 80 líneas del log efímero cuando falle. Sin cambios funcionales. El segundo CI, si se publica, determinará si es harness/entorno o fallo de inicialización de la aplicación.
 
 ## H02 — corregido focalmente
 Causa: la vista usaba pets_answered_at como respuesta, copy dirigido al candidato dentro de la revisión admin, no contaba fichas reales de mascotas y duplicaba observaciones; las fichas apilaban metadatos. En el owner existente se separaron respuesta/fecha, se mantuvo histórico false sin fecha como No confirmado, se corrigieron copy/conteos, se movieron notas una vez a Reglas y observaciones y se compactó el flujo de datos desktop. No se duplicó al solicitante ni se infirieron score/vacunación.
@@ -41,4 +42,4 @@ Browser preview de componente con fixture ficticio, sin login, sesión ni DB de 
 - Evidencia histórica V3/V4 conservada en sus carpetas previas; este cierre añade el paquete V8 sin sobrescribirlos.
 
 ## NEXT ÚNICO
-Cerrar la allowlist test-only, revalidar HEAD remoto y hashes protegidos, publicar una sola vez mediante push normal autorizado y esperar el CI asociado. Luego entregar artifact y SHA a ChatGPT para Ley 5 independiente; UAT y merge siguen pendientes por separado. No avanzar a CAND-04.
+Revalidar HEAD remoto y hashes protegidos, publicar la única reparación diagnóstica permitida mediante push normal y esperar CI. Si Browser QA produce artifact real, entregarlo a ChatGPT para Ley 5 independiente; si el servidor sigue sin iniciar, cerrar como bloqueo con log exacto, sin más publicaciones. UAT y merge siguen pendientes por separado. No avanzar a CAND-04.
