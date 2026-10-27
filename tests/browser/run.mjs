@@ -222,6 +222,7 @@ function classifyExpectedConsoleErrors(events, responses, checks, mainCandidateI
     { phase: 'guest-tenant-and-role-permissions', role: 'property_documents_only', path: candidatePath, method: 'GET', status: 403 },
     { phase: 'guest-tenant-and-role-permissions', role: 'tenant', path: candidatePath, method: 'GET', status: 403 },
     { phase: 'real-household-create-edit-delete-and-csrf', role: 'manager', path: candidatePath + '/household/occupant', method: 'POST', status: 422 },
+    { phase: 'real-household-create-edit-delete-and-csrf', role: 'manager', path: candidatePath + '/household/pet', method: 'POST', status: 422 },
     { phase: 'household-photo-consent-validation', role: 'manager', path: candidatePath + '/household/occupant', method: 'POST', status: 422 },
     { phase: 'household-photo-file-validation', role: 'manager', path: candidatePath + '/household/pet', method: 'POST', status: 422 }
   ] : [];
