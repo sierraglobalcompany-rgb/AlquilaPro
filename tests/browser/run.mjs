@@ -59,12 +59,22 @@ const manifest = {
     OWNER_UAT: 'PENDING',
     HOSTINGER: 'NOT_RUN'
   },
-  diagnostics: { console_errors: 0, page_errors: 0, failed_requests: 0 }
+  diagnostics: {
+    console_errors: 0,
+    unexpected_console_errors: 0,
+    page_errors: 0,
+    failed_requests: 0,
+    unexpected_failed_requests: 0
+  }
 };
 const trace = [];
-const consoleFingerprints = [];
-const pageErrorFingerprints = [];
-const failedRequestPaths = [];
+const consoleErrors = [];
+const pageErrors = [];
+const failedRequests = [];
+const responseObservations = [];
+const downloadObservations = [];
+const verifiedDownloads = [];
+let activeCheck = 'setup';
 let browser = null;
 
 function assert(condition, message) {
@@ -74,9 +84,17 @@ function sha256(bytes) {
   return crypto.createHash('sha256').update(bytes).digest('hex');
 }
 function safePathLabel(value) {
-  let pathname = String(value || '/');
-  try { pathname = new URL(pathname, baseUrl).pathname; } catch {}
+  const raw = String(value || '/');
+  let pathname;
+  try {
+    pathname = new URL(raw, baseUrl).pathname;
+  } catch (error) {
+    const candidate = raw.split(/[?#]/, 1)[0];
+    pathname = candidate.startsWith('/') ? candidate : '/[invalid-path]';
+  }
   pathname = pathname.replace(/\/apply\/continue\/[^/]+/g, '/apply/continue/[redacted]');
+  pathname = pathname.replace(/\/[^/]*@[^/]*(?=\/|$)/g, '/[redacted]');
+  pathname = pathname.replace(/\/[a-f0-9]{64}(?=\/|$)/gi, '/[redacted]');
   return pathname.replace(/[^A-Za-z0-9_./:[\]-]/g, '_').slice(0, 180);
 }
 function safeError(error) {
@@ -90,6 +108,8 @@ function note(label, role, outcome, extra = {}) {
   trace.push({ at: new Date().toISOString(), label, role, outcome, ...extra });
 }
 async function runCheck(name, action) {
+  const previousCheck = activeCheck;
+  activeCheck = name;
   try {
     const details = await action();
     manifest.checks.push({ name, status: 'PASS', details: details ?? null });
@@ -99,6 +119,8 @@ async function runCheck(name, action) {
     manifest.checks.push({ name, status: 'FAIL', error: safeError(error) });
     note(name, 'harness', 'FAIL', { error_fingerprint: sha256(Buffer.from(safeError(error))) });
     return false;
+  } finally {
+    activeCheck = previousCheck;
   }
 }
 async function makeContext(browser, viewport) {
@@ -111,25 +133,129 @@ async function makeContext(browser, viewport) {
   });
 }
 function watchPage(page, role) {
+  page.on('response', response => {
+    const request = response.request();
+    const status = response.status();
+    if (status >= 400 || request.method() === 'POST') {
+      responseObservations.push({
+        phase: activeCheck,
+        role,
+        method: request.method(),
+        path: safePathLabel(request.url()),
+        status
+      });
+    }
+  });
   page.on('console', message => {
     if (message.type() === 'error') {
       const value = message.text();
-      consoleFingerprints.push(sha256(Buffer.from(value)));
-      note('browser-console', role, 'error', { fingerprint: sha256(Buffer.from(value)) });
+      const reportedStatus = value.match(/^Failed to load resource: the server responded with a status of (\d{3})\b/i);
+      const status = reportedStatus ? Number(reportedStatus[1]) : null;
+      const response = status === null ? null : [...responseObservations].reverse().find(item =>
+        item.phase === activeCheck
+        && item.role === role
+        && item.method === 'POST'
+        && item.path === '/login'
+        && item.status === status
+      );
+      const event = {
+        phase: activeCheck,
+        role,
+        type: message.type(),
+        path: safePathLabel(message.location().url),
+        message_kind: reportedStatus ? 'browser_http_status_error' : 'unclassified_console_error',
+        error_text: reportedStatus ? 'Browser reported an HTTP status error' : 'Unclassified console error; inspect the fingerprint',
+        status: response?.status ?? status,
+        response_method: response?.method ?? null,
+        response_path: response?.path ?? null,
+        response_status: response?.status ?? null,
+        fingerprint: sha256(Buffer.from(value))
+      };
+      consoleErrors.push(event);
+      note('browser-console', role, 'error', event);
     }
   });
   page.on('pageerror', error => {
     const value = safeError(error);
-    pageErrorFingerprints.push(sha256(Buffer.from(value)));
-    note('browser-pageerror', role, 'error', { fingerprint: sha256(Buffer.from(value)) });
+    const event = {
+      phase: activeCheck,
+      role,
+      type: 'pageerror',
+      path: safePathLabel(page.url()),
+      error_text: error instanceof Error ? error.name : 'Unclassified page error',
+      fingerprint: sha256(Buffer.from(value))
+    };
+    pageErrors.push(event);
+    note('browser-pageerror', role, 'error', event);
   });
   page.on('requestfailed', request => {
-    const url = new URL(request.url());
-    if (url.pathname === '/favicon.ico') return;
-    const route = safePathLabel(url.pathname);
-    failedRequestPaths.push(route);
-    note('browser-request', role, 'failed', { path: route });
+    const route = safePathLabel(request.url());
+    const failureText = request.failure()?.errorText || 'unknown';
+    const event = {
+      phase: activeCheck,
+      role,
+      method: request.method(),
+      resource_type: request.resourceType(),
+      path: route,
+      status: null,
+      error_text: /^net::[A-Z0-9_]+$/i.test(failureText) ? failureText : 'Unclassified request failure',
+      fingerprint: sha256(Buffer.from(failureText))
+    };
+    failedRequests.push(event);
+    note('browser-request', role, 'failed', event);
   });
+  page.on('download', download => {
+    const event = { phase: activeCheck, role, path: safePathLabel(download.url()) };
+    downloadObservations.push(event);
+    note('browser-download', role, 'started', event);
+  });
+}
+function classifyExpectedBrowserEvents() {
+  const expectedConsoleErrors = [];
+  const unexpectedConsoleErrors = [];
+  let login422Classified = false;
+  for (const event of consoleErrors) {
+    const expected = !login422Classified
+      && event.phase === 'invalid-login-real-form'
+      && event.role === 'guest'
+      && event.type === 'error'
+      && event.message_kind === 'browser_http_status_error'
+      && event.status === 422
+      && event.response_method === 'POST'
+      && event.response_path === '/login'
+      && event.response_status === 422;
+    if (expected) {
+      login422Classified = true;
+      expectedConsoleErrors.push(event);
+    } else {
+      unexpectedConsoleErrors.push(event);
+    }
+  }
+
+  const expectedFailedRequests = [];
+  const unexpectedFailedRequests = [];
+  const classifiedFailureIndexes = new Set();
+  for (const download of verifiedDownloads) {
+    if (!download.hash_match || !downloadObservations.some(item =>
+      item.phase === download.phase && item.role === download.role && item.path === download.path
+    )) continue;
+    const index = failedRequests.findIndex((event, eventIndex) =>
+      !classifiedFailureIndexes.has(eventIndex)
+      && event.phase === download.phase
+      && event.role === download.role
+      && event.method === 'GET'
+      && event.path === download.path
+      && event.error_text === 'net::ERR_ABORTED'
+    );
+    if (index >= 0) {
+      classifiedFailureIndexes.add(index);
+      expectedFailedRequests.push(failedRequests[index]);
+    }
+  }
+  failedRequests.forEach((event, index) => {
+    if (!classifiedFailureIndexes.has(index)) unexpectedFailedRequests.push(event);
+  });
+  return { expectedConsoleErrors, unexpectedConsoleErrors, expectedFailedRequests, unexpectedFailedRequests };
 }
 async function settle(page) {
   await page.waitForLoadState('domcontentloaded').catch(() => {});
@@ -433,7 +559,13 @@ async function main() {
         }
       }
       if (role === 'viewer') {
-        const token = await csrfToken(page);
+        const accountResponse = await page.goto(baseUrl + '/account', { waitUntil: 'domcontentloaded' });
+        await settle(page);
+        assert(accountResponse && accountResponse.status() === 200, 'El viewer no pudo abrir su formulario real de cuenta para obtener CSRF.');
+        const logoutForm = page.locator('form[action="/logout"]');
+        assert(await logoutForm.count() === 1, 'El viewer no tiene el formulario real de cierre de sesión.');
+        const token = await logoutForm.locator('input[name="csrf_token"]').inputValue();
+        assert(token.length === 64, 'El formulario real de cuenta no entregó el token CSRF de la sesión viewer.');
         const mutation = await context.request.post(baseUrl + '/admin/candidates/' + mainCandidate.id + '/household/occupant', {
           maxRedirects: 0,
           form: { csrf_token: token, full_name: 'No debe guardarse', relationship: 'QA', action: 'save' }
@@ -562,7 +694,12 @@ async function main() {
     const { context, page } = managerDesktop;
     await openHousehold(page, mainCandidate.id);
     await page.getByText('Administrar fichas de ocupantes', { exact: true }).click();
-    let createOccupant = page.locator('form.candidate-household-edit').last();
+    const occupantsRegion = page.locator('section[data-household-region="occupants"]');
+    const createOccupantButton = occupantsRegion.getByRole('button', { name: 'Crear ficha', exact: true });
+    assert(await createOccupantButton.count() === 1, 'No se encontró el botón real para crear un ocupante en su región.');
+    const createOccupant = createOccupantButton.locator('xpath=ancestor::form[1]');
+    assert(await createOccupant.evaluate(form => form.classList.contains('candidate-household-edit')), 'El formulario de creación de ocupante no pertenece al owner esperado.');
+    assert((await createOccupant.getAttribute('action') || '').endsWith('/household/occupant'), 'El formulario de creación no apunta a la ruta de ocupantes.');
     await createOccupant.locator('input[name="full_name"]').fill('Ocupante G5 Creado');
     await createOccupant.locator('input[name="relationship"]').fill('Familiar');
     await createOccupant.locator('input[name="age_years"]').fill('29');
@@ -592,7 +729,12 @@ async function main() {
 
     await openHousehold(page, mainCandidate.id);
     await page.getByText('Administrar fichas de mascotas', { exact: true }).click();
-    const createPet = page.locator('form.candidate-household-edit').last();
+    const petsRegion = page.locator('section[data-household-region="pets"]');
+    const createPetButton = petsRegion.getByRole('button', { name: 'Crear ficha', exact: true });
+    assert(await createPetButton.count() === 1, 'No se encontró el botón real para crear una mascota en su región.');
+    const createPet = createPetButton.locator('xpath=ancestor::form[1]');
+    assert(await createPet.evaluate(form => form.classList.contains('candidate-household-edit')), 'El formulario de creación de mascota no pertenece al owner esperado.');
+    assert((await createPet.getAttribute('action') || '').endsWith('/household/pet'), 'El formulario de creación no apunta a la ruta de mascotas.');
     await createPet.locator('input[name="name"]').fill('Mascota G5 Creada');
     await createPet.locator('input[name="species"]').fill('Gato');
     await createPet.locator('input[name="breed"]').fill('Sintética');
@@ -694,7 +836,20 @@ async function main() {
     const downloadedPath = await download.path();
     assert(downloadedPath !== null, 'Playwright no produjo el archivo de descarga del navegador.');
     const downloadedBytes = await fs.readFile(downloadedPath);
-    assert(sha256(downloadedBytes) === sha256(pdfBytes), 'La descarga del navegador difiere de la respuesta PDF verificada.');
+    const downloadedSha256 = sha256(downloadedBytes);
+    const expectedPdfSha256 = sha256(pdfBytes);
+    assert(downloadedSha256 === expectedPdfSha256, 'La descarga del navegador difiere de la respuesta PDF verificada.');
+    const downloadPathLabel = safePathLabel(download.url());
+    assert(downloadObservations.some(item => item.phase === activeCheck && item.role === 'manager' && item.path === downloadPathLabel), 'El evento real de descarga no quedó registrado en los diagnósticos.');
+    verifiedDownloads.push({
+      phase: activeCheck,
+      role: 'manager',
+      path: downloadPathLabel,
+      bytes: downloadedBytes.length,
+      sha256: downloadedSha256,
+      expected_sha256: expectedPdfSha256,
+      hash_match: true
+    });
     await capture(page, 'manual-pdf-document-download', 'manager', viewportCases[0]);
 
     await openHousehold(page, emptyCandidate.id);
@@ -714,26 +869,34 @@ async function main() {
     await managerDesktop.context.close().catch(() => {});
     managerDesktop = null;
   }
+  const browserEventClassification = classifyExpectedBrowserEvents();
   manifest.diagnostics = {
-    console_errors: consoleFingerprints.length,
-    console_error_fingerprints: [...new Set(consoleFingerprints)],
-    page_errors: pageErrorFingerprints.length,
-    page_error_fingerprints: [...new Set(pageErrorFingerprints)],
-    failed_requests: failedRequestPaths.length,
-    failed_request_paths: [...new Set(failedRequestPaths)]
+    console_errors: consoleErrors.length,
+    expected_console_errors: browserEventClassification.expectedConsoleErrors.length,
+    unexpected_console_errors: browserEventClassification.unexpectedConsoleErrors.length,
+    console_events: consoleErrors,
+    page_errors: pageErrors.length,
+    page_error_events: pageErrors,
+    failed_requests: failedRequests.length,
+    expected_failed_requests: browserEventClassification.expectedFailedRequests.length,
+    unexpected_failed_requests: browserEventClassification.unexpectedFailedRequests.length,
+    failed_request_events: failedRequests,
+    response_events: responseObservations,
+    browser_downloads: downloadObservations,
+    verified_downloads: verifiedDownloads
   };
-  assert(manifest.diagnostics.console_errors === 0, 'Chromium reportó errores en consola.');
+  assert(manifest.diagnostics.unexpected_console_errors === 0, 'Chromium reportó errores inesperados en consola.');
   assert(manifest.diagnostics.page_errors === 0, 'Chromium reportó errores JavaScript.');
-  assert(manifest.diagnostics.failed_requests === 0, 'Chromium registró solicitudes fallidas.');
+  assert(manifest.diagnostics.unexpected_failed_requests === 0, 'Chromium registró solicitudes fallidas inesperadas.');
   await browser.close();
 }
 
 async function writeArtifacts() {
   manifest.finished_at = new Date().toISOString();
   manifest.status = manifest.checks.some(item => item.status === 'FAIL')
-    || manifest.diagnostics.console_errors > 0
+    || manifest.diagnostics.unexpected_console_errors > 0
     || manifest.diagnostics.page_errors > 0
-    || manifest.diagnostics.failed_requests > 0
+    || manifest.diagnostics.unexpected_failed_requests > 0
     ? 'FAIL'
     : 'PASS';
   manifest.rulings.QA_FUNCIONAL = manifest.status === 'PASS' ? 'PASS_AUTOMATED' : 'FAIL_AUTOMATED';
