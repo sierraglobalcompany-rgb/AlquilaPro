@@ -864,7 +864,7 @@ async function main() {
     assert(await page.locator('section[data-household-region="pets"] details[open]').count() === 0, 'La validación abrió una sección de mascotas ajena.');
     await capture(page, 'occupant-validation-error-422', 'manager', viewportCases[0]);
     await page.getByText('Agregar o editar mascotas', { exact: true }).click();
-    const invalidPetForm = formByRecord(page, 'pet', fixture.candidates.main.pet_id);
+    const invalidPetForm = await formByRecord(page, 'pet', fixture.candidates.main.pet_id);
     const invalidPetResponsePromise = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/household/pet'));
     await invalidPetForm.evaluate(form => {
       const name = form.querySelector('input[name="name"]');

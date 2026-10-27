@@ -433,7 +433,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                     </div>
                     <div class="candidate-household-facts">
                         <p><span>Total declarado</span><strong><?= $occupantsCount === null ? 'Cantidad no declarada' : $escape($occupantsCount . ($occupantsCount === 1 ? ' ocupante declarado' : ' ocupantes declarados')) ?></strong></p>
-                        <p><span>Fichas adicionales</span><strong><?= $escape($registeredOccupants) ?> registradas</strong></p>
+                        <p><span>Fichas adicionales</span><strong><?= $escape($registeredOccupants . ($registeredOccupants === 1 ? ' ficha registrada' : ' fichas registradas')) ?></strong></p>
                         <p><span>Mascotas</span><strong><?= $escape($registeredPetCount . ($registeredPetCount === 1 ? ' ficha registrada' : ' fichas registradas')) ?></strong></p>
                     </div>
                 </section>

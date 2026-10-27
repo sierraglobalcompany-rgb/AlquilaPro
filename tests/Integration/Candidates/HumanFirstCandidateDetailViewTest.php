@@ -500,6 +500,11 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
         $xpath = new \DOMXPath($dom);
 
+        $registeredOccupants = $xpath->query('//section[@data-household-region="summary"]//p[span[normalize-space(.)="Fichas adicionales"]]/strong');
+        self::assertSame(1, $registeredOccupants->length);
+        self::assertSame('1 ficha registrada', trim($registeredOccupants->item(0)?->textContent ?? ''));
+        self::assertStringNotContainsString('1 registradas', trim($registeredOccupants->item(0)?->textContent ?? ''));
+
         foreach ([
             'occupants' => 'Agregar o editar ocupantes',
             'pets' => 'Agregar o editar mascotas',
