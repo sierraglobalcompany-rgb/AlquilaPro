@@ -151,18 +151,19 @@ function watchPage(page, role) {
       const value = message.text();
       const reportedStatus = value.match(/^Failed to load resource: the server responded with a status of (\d{3})\b/i);
       const status = reportedStatus ? Number(reportedStatus[1]) : null;
-      const response = status === null ? null : [...responseObservations].reverse().find(item =>
+      const eventPath = safePathLabel(message.location().url);
+      const matchingResponses = status === null ? [] : responseObservations.filter(item =>
         item.phase === activeCheck
         && item.role === role
-        && item.method === 'POST'
-        && item.path === '/login'
+        && item.path === eventPath
         && item.status === status
       );
+      const response = matchingResponses.length === 1 ? matchingResponses[0] : null;
       const event = {
         phase: activeCheck,
         role,
         type: message.type(),
-        path: safePathLabel(message.location().url),
+        path: eventPath,
         message_kind: reportedStatus ? 'browser_http_status_error' : 'unclassified_console_error',
         error_text: reportedStatus ? 'Browser reported an HTTP status error' : 'Unclassified console error; inspect the fingerprint',
         status: response?.status ?? status,
@@ -210,27 +211,76 @@ function watchPage(page, role) {
     note('browser-download', role, 'started', event);
   });
 }
-function classifyExpectedBrowserEvents() {
+function classifyExpectedConsoleErrors(events, responses, checks, mainCandidateId) {
   const expectedConsoleErrors = [];
   const unexpectedConsoleErrors = [];
-  let login422Classified = false;
-  for (const event of consoleErrors) {
-    const expected = !login422Classified
-      && event.phase === 'invalid-login-real-form'
-      && event.role === 'guest'
+  const candidateId = String(mainCandidateId);
+  const candidatePath = /^[1-9]\d*$/.test(candidateId) ? '/admin/candidates/' + candidateId : null;
+  const rules = candidatePath ? [
+    { phase: 'invalid-login-real-form', role: 'guest', path: '/login', method: 'POST', status: 422 },
+    { phase: 'guest-tenant-and-role-permissions', role: 'no_access', path: candidatePath, method: 'GET', status: 403 },
+    { phase: 'guest-tenant-and-role-permissions', role: 'property_documents_only', path: candidatePath, method: 'GET', status: 403 },
+    { phase: 'guest-tenant-and-role-permissions', role: 'tenant', path: candidatePath, method: 'GET', status: 403 },
+    { phase: 'real-household-create-edit-delete-and-csrf', role: 'manager', path: candidatePath + '/household/occupant', method: 'POST', status: 422 }
+  ] : [];
+  const usedResponseIndexes = new Set();
+
+  for (const event of events) {
+    const rule = rules.find(item =>
+      item.phase === event.phase
+      && item.role === event.role
+      && item.path === event.path
+      && item.status === event.status
+    );
+    const eventMetadataMatches = rule
       && event.type === 'error'
       && event.message_kind === 'browser_http_status_error'
-      && event.status === 422
-      && event.response_method === 'POST'
-      && event.response_path === '/login'
-      && event.response_status === 422;
+      && (event.response_method === null || event.response_method === undefined || event.response_method === rule.method)
+      && (event.response_path === null || event.response_path === undefined || event.response_path === rule.path)
+      && (event.response_status === null || event.response_status === undefined || event.response_status === rule.status);
+    const completedCheck = rule && checks.filter(item => item.name === rule.phase);
+    const matchingResponseIndexes = rule ? responses.flatMap((response, index) =>
+      response.phase === rule.phase
+      && response.role === rule.role
+      && response.method === rule.method
+      && response.path === rule.path
+      && response.status === rule.status
+        ? [index]
+        : []
+    ) : [];
+    const responseFieldsMayBeAbsent = rule?.phase === 'real-household-create-edit-delete-and-csrf'
+      && rule.role === 'manager';
+    const responseFieldsPresent = event.response_method !== null && event.response_method !== undefined
+      && event.response_path !== null && event.response_path !== undefined
+      && event.response_status !== null && event.response_status !== undefined;
+    const responseFieldsValid = responseFieldsPresent || responseFieldsMayBeAbsent;
+    const responseIndex = matchingResponseIndexes.length === 1 ? matchingResponseIndexes[0] : -1;
+    const expected = Boolean(
+      eventMetadataMatches
+      && completedCheck.length === 1
+      && completedCheck[0].status === 'PASS'
+      && responseFieldsValid
+      && responseIndex >= 0
+      && !usedResponseIndexes.has(responseIndex)
+    );
+
     if (expected) {
-      login422Classified = true;
+      usedResponseIndexes.add(responseIndex);
       expectedConsoleErrors.push(event);
     } else {
       unexpectedConsoleErrors.push(event);
     }
   }
+
+  return { expectedConsoleErrors, unexpectedConsoleErrors };
+}
+function classifyExpectedBrowserEvents(mainCandidateId) {
+  const consoleClassification = classifyExpectedConsoleErrors(
+    consoleErrors,
+    responseObservations,
+    manifest.checks,
+    mainCandidateId
+  );
 
   const expectedFailedRequests = [];
   const unexpectedFailedRequests = [];
@@ -255,7 +305,11 @@ function classifyExpectedBrowserEvents() {
   failedRequests.forEach((event, index) => {
     if (!classifiedFailureIndexes.has(index)) unexpectedFailedRequests.push(event);
   });
-  return { expectedConsoleErrors, unexpectedConsoleErrors, expectedFailedRequests, unexpectedFailedRequests };
+  return {
+    ...consoleClassification,
+    expectedFailedRequests,
+    unexpectedFailedRequests
+  };
 }
 async function settle(page) {
   await page.waitForLoadState('domcontentloaded').catch(() => {});
@@ -869,7 +923,7 @@ async function main() {
     await managerDesktop.context.close().catch(() => {});
     managerDesktop = null;
   }
-  const browserEventClassification = classifyExpectedBrowserEvents();
+  const browserEventClassification = classifyExpectedBrowserEvents(mainCandidate.id);
   manifest.diagnostics = {
     console_errors: consoleErrors.length,
     expected_console_errors: browserEventClassification.expectedConsoleErrors.length,
