@@ -341,7 +341,7 @@ final class CandidatesAdminRoutesTest extends TestCase
         $this->login($viewer, 'household-viewer@example.com', 'ViewerPassword123', '/sub');
         $page = (string) $this->request($viewer, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=household')->getBody();
         self::assertStringContainsString('Acompañante Con Foto', $page);
-        self::assertStringNotContainsString('Administrar fichas de ocupantes', $page);
+        self::assertStringNotContainsString('Agregar o editar ocupantes', $page);
         foreach ($seedRecords as $record) {
             $photoPath = '/sub/admin/candidates/' . $candidateId . '/household/' . $record['kind'] . '/' . $record['seed']['id'] . '/photo';
             $photo = $this->request($viewer, 'GET', $photoPath);
@@ -377,7 +377,7 @@ final class CandidatesAdminRoutesTest extends TestCase
         $manager = $this->app('/sub');
         $this->login($manager, 'household-manager@example.com', 'ManagerPassword123', '/sub');
         $managerPage = (string) $this->request($manager, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=household')->getBody();
-        self::assertStringContainsString('Administrar fichas de ocupantes', $managerPage);
+        self::assertStringContainsString('Agregar o editar ocupantes', $managerPage);
         self::assertStringNotContainsString('Manual PDF actual', $managerPage);
 
         foreach ($seedRecords as $record) {
@@ -443,6 +443,217 @@ final class CandidatesAdminRoutesTest extends TestCase
         ]);
         self::assertSame(303, $deleted->getStatusCode());
         self::assertCount(1, $household->listOccupants($candidateId));
+    }
+
+    public function testHouseholdSaveValidationRendersFullDetailWithScopedTransientInput(): void
+    {
+        $candidateId = $this->insertCandidate('HOUSEHOLD-VALIDATION-1', 'Candidato de validación');
+        $household = new CandidateHouseholdService($this->pdo, $this->householdDirectory);
+        $occupant = $household->saveRecord('occupant', $candidateId, null, [
+            'full_name' => 'Ocupante Original',
+            'relationship' => 'Hermana',
+        ], null, time());
+        $pet = $household->saveRecord('pet', $candidateId, null, [
+            'name' => 'Mascota Original',
+            'species' => 'Gato',
+        ], null, time());
+
+        $this->insertUser('household-validation@example.com', 'ManagerPassword123', 'admin', ['candidates.view', 'candidates.manage']);
+        $app = $this->app('/sub');
+        $this->login($app, 'household-validation@example.com', 'ManagerPassword123', '/sub');
+
+        $cases = [
+            [
+                'kind' => 'occupant',
+                'record_id' => (string) $occupant['id'],
+                'field' => 'full_name',
+                'body' => [
+                    'action' => 'save',
+                    'record_id' => (string) $occupant['id'],
+                    'full_name' => '',
+                    'relationship' => 'Relación editada conservada',
+                    'notes' => 'Nota editada conservada',
+                    'request_secret' => 'NO_RENDER_SECRET_71',
+                ],
+                'preserved_field' => 'relationship',
+                'preserved_value' => 'Relación editada conservada',
+                'message' => 'El nombre del ocupante es obligatorio.',
+            ],
+            [
+                'kind' => 'occupant',
+                'record_id' => 'new',
+                'field' => 'full_name',
+                'body' => [
+                    'action' => 'save',
+                    'full_name' => '',
+                    'relationship' => 'Relación nueva conservada',
+                    'notes' => 'Nota nueva conservada',
+                ],
+                'preserved_field' => 'relationship',
+                'preserved_value' => 'Relación nueva conservada',
+                'message' => 'El nombre del ocupante es obligatorio.',
+            ],
+            [
+                'kind' => 'pet',
+                'record_id' => (string) $pet['id'],
+                'field' => 'name',
+                'body' => [
+                    'action' => 'save',
+                    'record_id' => (string) $pet['id'],
+                    'name' => '',
+                    'species' => 'Especie editada conservada',
+                    'notes' => 'Nota de mascota conservada',
+                ],
+                'preserved_field' => 'species',
+                'preserved_value' => 'Especie editada conservada',
+                'message' => 'El nombre y la especie de la mascota son obligatorios.',
+            ],
+            [
+                'kind' => 'pet',
+                'record_id' => 'new',
+                'field' => 'name',
+                'body' => [
+                    'action' => 'save',
+                    'name' => '',
+                    'species' => 'Especie nueva conservada',
+                    'notes' => 'Nota nueva de mascota conservada',
+                ],
+                'preserved_field' => 'species',
+                'preserved_value' => 'Especie nueva conservada',
+                'message' => 'El nombre y la especie de la mascota son obligatorios.',
+            ],
+        ];
+
+        foreach ($cases as $case) {
+            $response = $this->request(
+                $app,
+                'POST',
+                '/sub/admin/candidates/' . $candidateId . '/household/' . $case['kind'],
+                $case['body'],
+            );
+
+            self::assertSame(422, $response->getStatusCode(), $case['kind'] . ' validation status');
+            self::assertSame('text/html; charset=utf-8', $response->getHeaderLine('Content-Type'), $case['kind'] . ' validation response type');
+            $html = (string) $response->getBody();
+            self::assertStringContainsString('<main ', $html, $case['kind'] . ' must retain the application shell');
+            self::assertStringContainsString('Candidato de validación', $html);
+            self::assertStringContainsString('data-candidate-section-body="household"', $html);
+            self::assertStringContainsString('name="csrf_token" value="', $html);
+            self::assertStringNotContainsString('NO_RENDER_SECRET_71', $html);
+            self::assertSame(1, substr_count($html, $case['message']), $case['kind'] . ' error message should be rendered once');
+
+            $dom = new \DOMDocument();
+            @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+            $xpath = new \DOMXPath($dom);
+            $region = $case['kind'] === 'occupant' ? 'occupants' : 'pets';
+            $form = $xpath->query(
+                '//section[@data-household-region="' . $region . '"]//form[@data-household-form-kind="'
+                . $case['kind'] . '" and @data-household-form-id="' . $case['record_id'] . '"]',
+            )->item(0);
+            self::assertInstanceOf(\DOMElement::class, $form, $case['kind'] . ' validation must target the correct create/edit form');
+            self::assertSame(1, $xpath->query('ancestor::details[@open]', $form)->length, $case['kind'] . ' manager must be open');
+            self::assertSame(1, $xpath->query('.//*[@role="alert"]', $form)->length);
+            self::assertSame($case['preserved_value'], $xpath->query('.//*[@name="' . $case['preserved_field'] . '"]/@value', $form)->item(0)?->nodeValue);
+            $invalidField = $xpath->query('.//*[@name="' . $case['field'] . '"]', $form)->item(0);
+            self::assertInstanceOf(\DOMElement::class, $invalidField);
+            self::assertSame('true', $invalidField->getAttribute('aria-invalid'));
+            self::assertNotSame('', $invalidField->getAttribute('aria-describedby'));
+            self::assertTrue($invalidField->hasAttribute('autofocus'));
+        }
+
+        $detail = (string) $this->request($app, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=household')->getBody();
+        self::assertStringNotContainsString('Relación editada conservada', $detail);
+        self::assertStringNotContainsString('Relación nueva conservada', $detail);
+        self::assertStringNotContainsString('Especie editada conservada', $detail);
+        self::assertStringNotContainsString('Especie nueva conservada', $detail);
+        self::assertStringNotContainsString('data-household-validation-error', $detail);
+        self::assertSame(1, count($household->listOccupants($candidateId)), 'Invalid create must not persist an occupant.');
+        self::assertSame(1, count($household->listPets($candidateId)), 'Invalid create must not persist a pet.');
+        self::assertSame('Ocupante Original', $household->listOccupants($candidateId)[0]['full_name']);
+        self::assertSame('Mascota Original', $household->listPets($candidateId)[0]['name']);
+    }
+
+    public function testHouseholdPhotoValidationTargetsFileAndConsentWithoutRetainingUpload(): void
+    {
+        $candidateId = $this->insertCandidate('HOUSEHOLD-PHOTO-VALIDATION-1', 'Candidato foto');
+        $household = new CandidateHouseholdService($this->pdo, $this->householdDirectory);
+        $pet = $household->saveRecord('pet', $candidateId, null, [
+            'name' => 'Mascota Original',
+            'species' => 'Gato',
+        ], null, time());
+
+        $this->insertUser('household-photo-validation@example.com', 'ManagerPassword123', 'admin', ['candidates.view', 'candidates.manage']);
+        $app = $this->app('/sub');
+        $this->login($app, 'household-photo-validation@example.com', 'ManagerPassword123', '/sub');
+
+        $cases = [
+            [
+                'kind' => 'occupant',
+                'record_id' => 'new',
+                'field' => 'photo_consent',
+                'message' => 'Confirma que cuentas con autorización para guardar esta fotografía.',
+                'body' => ['full_name' => 'Ocupante Foto', 'relationship' => 'Amiga'],
+                'photo' => $this->upload($this->pngBytes(), 'DO_NOT_RENDER_CONSENT.png', 'image/png'),
+                'consent_checked' => false,
+            ],
+            [
+                'kind' => 'pet',
+                'record_id' => (string) $pet['id'],
+                'field' => 'photo',
+                'message' => 'La fotografía debe ser una imagen PNG o JPEG válida.',
+                'body' => [
+                    'record_id' => (string) $pet['id'],
+                    'name' => 'Mascota Editada',
+                    'species' => 'Gato',
+                    'photo_consent' => '1',
+                    'unlisted_secret' => 'NO_RENDER_PHOTO_SECRET',
+                ],
+                'photo' => $this->upload('not an image', 'DO_NOT_RENDER_INVALID.png', 'image/png'),
+                'consent_checked' => true,
+            ],
+        ];
+
+        foreach ($cases as $case) {
+            $response = $this->request(
+                $app,
+                'POST',
+                '/sub/admin/candidates/' . $candidateId . '/household/' . $case['kind'],
+                ['action' => 'save', ...$case['body']],
+                true,
+                ['photo' => $case['photo']],
+            );
+
+            self::assertSame(422, $response->getStatusCode());
+            $html = (string) $response->getBody();
+            self::assertSame('text/html; charset=utf-8', $response->getHeaderLine('Content-Type'));
+            self::assertSame(1, substr_count($html, $case['message']));
+            self::assertStringNotContainsString('DO_NOT_RENDER_', $html);
+            self::assertStringNotContainsString('NO_RENDER_PHOTO_SECRET', $html);
+
+            $dom = new \DOMDocument();
+            @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+            $xpath = new \DOMXPath($dom);
+            $region = $case['kind'] === 'occupant' ? 'occupants' : 'pets';
+            $form = $xpath->query(
+                '//section[@data-household-region="' . $region . '"]//form[@data-household-form-kind="'
+                . $case['kind'] . '" and @data-household-form-id="' . $case['record_id'] . '"]',
+            )->item(0);
+            self::assertInstanceOf(\DOMElement::class, $form);
+            self::assertSame(1, $xpath->query('ancestor::details[@open]', $form)->length);
+            self::assertSame(1, $xpath->query('.//*[@role="alert"]', $form)->length);
+            $invalidControl = $xpath->query('.//*[@name="' . $case['field'] . '"]', $form)->item(0);
+            self::assertInstanceOf(\DOMElement::class, $invalidControl);
+            self::assertSame('true', $invalidControl->getAttribute('aria-invalid'));
+            self::assertNotSame('', $invalidControl->getAttribute('aria-describedby'));
+            self::assertTrue($invalidControl->hasAttribute('autofocus'));
+            if ($case['field'] === 'photo_consent') {
+                self::assertSame('', $invalidControl->getAttribute('checked'));
+            }
+        }
+
+        self::assertSame([], $household->listOccupants($candidateId));
+        self::assertSame('Mascota Original', $household->listPets($candidateId)[0]['name']);
+        self::assertNull($household->privatePhoto($candidateId, 'pet', (int) $pet['id']));
     }
 
     public function testWorkAndDocumentsFromBothBranchesRemainAccessible(): void

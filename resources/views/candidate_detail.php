@@ -347,6 +347,51 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
         $householdOccupants = is_array($householdOccupants ?? null) ? $householdOccupants : [];
         $householdPets = is_array($householdPets ?? null) ? $householdPets : [];
         $householdCanManage = ($householdCanManage ?? $canManageCandidates ?? false) === true;
+        $householdFormError = is_array($householdFormError ?? null) ? $householdFormError : [];
+        $householdErrorKind = in_array($householdFormError['kind'] ?? null, ['occupant', 'pet'], true) ? $householdFormError['kind'] : '';
+        $householdErrorRecordId = filter_var($householdFormError['record_id'] ?? null, FILTER_VALIDATE_INT);
+        if ($householdErrorRecordId === false || $householdErrorRecordId <= 0) {
+            $householdErrorRecordId = null;
+        }
+        $householdErrorFormId = $householdErrorRecordId === null ? 'new' : (string) $householdErrorRecordId;
+        $householdErrorField = is_string($householdFormError['field'] ?? null) ? $householdFormError['field'] : '';
+        $householdErrorMessage = is_scalar($householdFormError['message'] ?? null) ? (string) $householdFormError['message'] : '';
+        $householdErrorFields = $householdErrorKind === 'occupant'
+            ? ['full_name', 'relationship', 'age_years', 'occupation_or_activity', 'notes', 'photo', 'photo_consent']
+            : ['name', 'species', 'breed', 'size_category', 'age_years', 'vaccination_declaration', 'notes', 'photo', 'photo_consent'];
+        $submittedHouseholdInput = is_array($householdFormError['old_input'] ?? null) ? $householdFormError['old_input'] : [];
+        $householdErrorOldInput = [];
+        foreach ($householdErrorFields as $field) {
+            $value = $submittedHouseholdInput[$field] ?? null;
+            if (array_key_exists($field, $submittedHouseholdInput) && is_scalar($value)) {
+                $householdErrorOldInput[$field] = (string) $value;
+            }
+        }
+        $householdFormHasError = static fn (string $kind, string $recordId): bool =>
+            $householdErrorMessage !== ''
+            && $householdErrorKind === $kind
+            && $householdErrorFormId === $recordId;
+        $householdErrorId = static fn (string $kind, string $recordId): string =>
+            'candidate-household-error-' . $kind . '-' . $recordId;
+        $householdFieldErrorAttributes = static function (string $kind, string $recordId, string $field) use (
+            $householdFormHasError,
+            $householdErrorField,
+            $householdErrorId,
+            $escape,
+        ): string {
+            if (!$householdFormHasError($kind, $recordId) || $householdErrorField !== $field) {
+                return '';
+            }
+            return ' aria-invalid="true" aria-describedby="' . $escape($householdErrorId($kind, $recordId)) . '" autofocus';
+        };
+        $householdInputValue = static function (string $kind, string $recordId, string $field, mixed $fallback) use (
+            $householdFormHasError,
+            $householdErrorOldInput,
+        ): mixed {
+            return $householdFormHasError($kind, $recordId) && array_key_exists($field, $householdErrorOldInput)
+                ? $householdErrorOldInput[$field]
+                : $fallback;
+        };
         $householdManual = is_array($householdManual ?? null) ? $householdManual : ['authorized' => false];
         $householdManualDocument = is_array($householdManual['document'] ?? null) ? $householdManual['document'] : null;
         $householdPhotoPath = rtrim((string) ($householdPhotoPath ?? ($basePath . '/admin/candidates/' . (int) $candidate['id'] . '/household')), '/');
@@ -441,18 +486,19 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                         <?php endif; ?>
                     </div>
                     <?php if ($householdCanManage): ?>
-                        <details class="candidate-household-manager">
-                            <summary>Administrar fichas de ocupantes</summary>
+                        <details class="candidate-household-manager" data-household-manager="occupant" <?= $householdFormHasError('occupant', $householdErrorFormId) ? 'open' : '' ?>>
+                            <summary>Agregar o editar ocupantes</summary>
                             <?php foreach ($householdOccupants as $occupant): ?>
-                                <form class="candidate-household-edit" method="post" enctype="multipart/form-data" action="<?= $escape($householdFormAction . '/occupant') ?>">
+                                <form class="candidate-household-edit" data-household-form-kind="occupant" data-household-form-id="<?= $escape((string) $occupant['id']) ?>" method="post" enctype="multipart/form-data" action="<?= $escape($householdFormAction . '/occupant') ?>">
+                                    <?php if ($householdFormHasError('occupant', (string) $occupant['id'])): ?><p class="candidate-household-validation-error" id="<?= $escape($householdErrorId('occupant', (string) $occupant['id'])) ?>" role="alert" data-household-validation-error><?= $escape($householdErrorMessage) ?></p><?php endif; ?>
                                     <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>"><input type="hidden" name="record_id" value="<?= $escape($occupant['id']) ?>">
-                                    <label>Nombre<input name="full_name" maxlength="190" required value="<?= $escape($occupant['full_name'] ?? '') ?>"></label>
-                                    <label>Relación<input name="relationship" maxlength="100" required value="<?= $escape($occupant['relationship'] ?? '') ?>"></label>
-                                    <label>Edad aproximada<input type="number" name="age_years" min="0" max="120" value="<?= $escape($occupant['age_years'] ?? '') ?>"></label>
-                                    <label>Ocupación o actividad<input name="occupation_or_activity" maxlength="190" value="<?= $escape($occupant['occupation_or_activity'] ?? '') ?>"></label>
-                                    <label>Notas<textarea name="notes" maxlength="5000"><?= $escape($occupant['notes'] ?? '') ?></textarea></label>
-                                    <label>Fotografía opcional<input type="file" name="photo" accept="image/png,image/jpeg"></label>
-                                    <label><input type="checkbox" name="photo_consent" value="1"> Confirmo que existe autorización para guardar la foto.</label>
+                                    <label>Nombre<input name="full_name" maxlength="190" required value="<?= $escape($householdInputValue('occupant', (string) $occupant['id'], 'full_name', $occupant['full_name'] ?? '')) ?>"<?= $householdFieldErrorAttributes('occupant', (string) $occupant['id'], 'full_name') ?>></label>
+                                    <label>Relación<input name="relationship" maxlength="100" required value="<?= $escape($householdInputValue('occupant', (string) $occupant['id'], 'relationship', $occupant['relationship'] ?? '')) ?>"<?= $householdFieldErrorAttributes('occupant', (string) $occupant['id'], 'relationship') ?>></label>
+                                    <label>Edad aproximada<input type="number" name="age_years" min="0" max="120" value="<?= $escape($householdInputValue('occupant', (string) $occupant['id'], 'age_years', $occupant['age_years'] ?? '')) ?>"<?= $householdFieldErrorAttributes('occupant', (string) $occupant['id'], 'age_years') ?>></label>
+                                    <label>Ocupación o actividad<input name="occupation_or_activity" maxlength="190" value="<?= $escape($householdInputValue('occupant', (string) $occupant['id'], 'occupation_or_activity', $occupant['occupation_or_activity'] ?? '')) ?>"<?= $householdFieldErrorAttributes('occupant', (string) $occupant['id'], 'occupation_or_activity') ?>></label>
+                                    <label>Notas<textarea name="notes" maxlength="5000"<?= $householdFieldErrorAttributes('occupant', (string) $occupant['id'], 'notes') ?>><?= $escape($householdInputValue('occupant', (string) $occupant['id'], 'notes', $occupant['notes'] ?? '')) ?></textarea></label>
+                                    <label>Fotografía opcional<input type="file" name="photo" accept="image/png,image/jpeg"<?= $householdFieldErrorAttributes('occupant', (string) $occupant['id'], 'photo') ?>></label>
+                                    <label><input type="checkbox" name="photo_consent" value="1" <?= $householdInputValue('occupant', (string) $occupant['id'], 'photo_consent', '') === '1' ? 'checked' : '' ?><?= $householdFieldErrorAttributes('occupant', (string) $occupant['id'], 'photo_consent') ?>> Confirmo que existe autorización para guardar la foto.</label>
                                     <?php if (!empty($occupant['has_photo'])): ?><label><input type="checkbox" name="remove_photo" value="1"> Retirar fotografía</label><?php endif; ?>
                                     <button class="button button--quiet" type="submit">Guardar cambios</button>
                                 </form>
@@ -461,13 +507,14 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                                     <button class="button button--quiet" type="submit">Retirar ficha</button>
                                 </form>
                             <?php endforeach; ?>
-                            <form class="candidate-household-edit" method="post" enctype="multipart/form-data" action="<?= $escape($householdFormAction . '/occupant') ?>">
+                            <form class="candidate-household-edit" data-household-form-kind="occupant" data-household-form-id="new" method="post" enctype="multipart/form-data" action="<?= $escape($householdFormAction . '/occupant') ?>">
+                                <?php if ($householdFormHasError('occupant', 'new')): ?><p class="candidate-household-validation-error" id="<?= $escape($householdErrorId('occupant', 'new')) ?>" role="alert" data-household-validation-error><?= $escape($householdErrorMessage) ?></p><?php endif; ?>
                                 <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
                                 <h4>Nueva ficha</h4>
-                                <label>Nombre<input name="full_name" maxlength="190" required></label><label>Relación<input name="relationship" maxlength="100" required></label>
-                                <label>Edad aproximada<input type="number" name="age_years" min="0" max="120"></label><label>Ocupación o actividad<input name="occupation_or_activity" maxlength="190"></label>
-                                <label>Notas<textarea name="notes" maxlength="5000"></textarea></label><label>Fotografía opcional<input type="file" name="photo" accept="image/png,image/jpeg"></label>
-                                <label><input type="checkbox" name="photo_consent" value="1"> Confirmo que existe autorización para guardar la foto.</label><button class="button" type="submit">Crear ficha</button>
+                                <label>Nombre<input name="full_name" maxlength="190" required value="<?= $escape($householdInputValue('occupant', 'new', 'full_name', '')) ?>"<?= $householdFieldErrorAttributes('occupant', 'new', 'full_name') ?>></label><label>Relación<input name="relationship" maxlength="100" required value="<?= $escape($householdInputValue('occupant', 'new', 'relationship', '')) ?>"<?= $householdFieldErrorAttributes('occupant', 'new', 'relationship') ?>></label>
+                                <label>Edad aproximada<input type="number" name="age_years" min="0" max="120" value="<?= $escape($householdInputValue('occupant', 'new', 'age_years', '')) ?>"<?= $householdFieldErrorAttributes('occupant', 'new', 'age_years') ?>></label><label>Ocupación o actividad<input name="occupation_or_activity" maxlength="190" value="<?= $escape($householdInputValue('occupant', 'new', 'occupation_or_activity', '')) ?>"<?= $householdFieldErrorAttributes('occupant', 'new', 'occupation_or_activity') ?>></label>
+                                <label>Notas<textarea name="notes" maxlength="5000"<?= $householdFieldErrorAttributes('occupant', 'new', 'notes') ?>><?= $escape($householdInputValue('occupant', 'new', 'notes', '')) ?></textarea></label><label>Fotografía opcional<input type="file" name="photo" accept="image/png,image/jpeg"<?= $householdFieldErrorAttributes('occupant', 'new', 'photo') ?>></label>
+                                <label><input type="checkbox" name="photo_consent" value="1" <?= $householdInputValue('occupant', 'new', 'photo_consent', '') === '1' ? 'checked' : '' ?><?= $householdFieldErrorAttributes('occupant', 'new', 'photo_consent') ?>> Confirmo que existe autorización para guardar la foto.</label><button class="button" type="submit">Crear ficha</button>
                             </form>
                         </details>
                     <?php endif; ?>
@@ -493,25 +540,27 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                         </div>
                     <?php endif; ?>
                     <?php if ($householdCanManage): ?>
-                        <details class="candidate-household-manager"><summary>Administrar fichas de mascotas</summary>
+                        <details class="candidate-household-manager" data-household-manager="pet" <?= $householdFormHasError('pet', $householdErrorFormId) ? 'open' : '' ?>><summary>Agregar o editar mascotas</summary>
                             <?php foreach ($householdPets as $pet): ?>
-                                <form class="candidate-household-edit" method="post" enctype="multipart/form-data" action="<?= $escape($householdFormAction . '/pet') ?>">
+                                <form class="candidate-household-edit" data-household-form-kind="pet" data-household-form-id="<?= $escape((string) $pet['id']) ?>" method="post" enctype="multipart/form-data" action="<?= $escape($householdFormAction . '/pet') ?>">
+                                    <?php if ($householdFormHasError('pet', (string) $pet['id'])): ?><p class="candidate-household-validation-error" id="<?= $escape($householdErrorId('pet', (string) $pet['id'])) ?>" role="alert" data-household-validation-error><?= $escape($householdErrorMessage) ?></p><?php endif; ?>
                                     <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>"><input type="hidden" name="record_id" value="<?= $escape($pet['id']) ?>">
-                                    <label>Nombre<input name="name" maxlength="190" required value="<?= $escape($pet['name'] ?? '') ?>"></label><label>Especie<input name="species" maxlength="80" required value="<?= $escape($pet['species'] ?? '') ?>"></label>
-                                    <label>Raza<input name="breed" maxlength="120" value="<?= $escape($pet['breed'] ?? '') ?>"></label><label>Tamaño<input name="size_category" maxlength="32" value="<?= $escape($pet['size_category'] ?? '') ?>"></label>
-                                    <label>Edad aproximada<input type="number" name="age_years" min="0" max="100" value="<?= $escape($pet['age_years'] ?? '') ?>"></label>
-                                    <label>Declaración de vacunación<select name="vaccination_declaration"><option value="">Sin declarar</option><option value="declared_vaccinated" <?= ($pet['vaccination_declaration'] ?? '') === 'declared_vaccinated' ? 'selected' : '' ?>>Declara vacunación</option><option value="declared_not_vaccinated" <?= ($pet['vaccination_declaration'] ?? '') === 'declared_not_vaccinated' ? 'selected' : '' ?>>Declara no vacunación</option></select></label>
-                                    <label>Notas<textarea name="notes" maxlength="5000"><?= $escape($pet['notes'] ?? '') ?></textarea></label><label>Fotografía opcional<input type="file" name="photo" accept="image/png,image/jpeg"></label>
-                                    <label><input type="checkbox" name="photo_consent" value="1"> Confirmo que existe autorización para guardar la foto.</label><?php if (!empty($pet['has_photo'])): ?><label><input type="checkbox" name="remove_photo" value="1"> Retirar fotografía</label><?php endif; ?>
+                                    <label>Nombre<input name="name" maxlength="190" required value="<?= $escape($householdInputValue('pet', (string) $pet['id'], 'name', $pet['name'] ?? '')) ?>"<?= $householdFieldErrorAttributes('pet', (string) $pet['id'], 'name') ?>></label><label>Especie<input name="species" maxlength="80" required value="<?= $escape($householdInputValue('pet', (string) $pet['id'], 'species', $pet['species'] ?? '')) ?>"<?= $householdFieldErrorAttributes('pet', (string) $pet['id'], 'species') ?>></label>
+                                    <label>Raza<input name="breed" maxlength="120" value="<?= $escape($householdInputValue('pet', (string) $pet['id'], 'breed', $pet['breed'] ?? '')) ?>"<?= $householdFieldErrorAttributes('pet', (string) $pet['id'], 'breed') ?>></label><label>Tamaño<input name="size_category" maxlength="32" value="<?= $escape($householdInputValue('pet', (string) $pet['id'], 'size_category', $pet['size_category'] ?? '')) ?>"<?= $householdFieldErrorAttributes('pet', (string) $pet['id'], 'size_category') ?>></label>
+                                    <label>Edad aproximada<input type="number" name="age_years" min="0" max="100" value="<?= $escape($householdInputValue('pet', (string) $pet['id'], 'age_years', $pet['age_years'] ?? '')) ?>"<?= $householdFieldErrorAttributes('pet', (string) $pet['id'], 'age_years') ?>></label>
+                                    <label>Declaración de vacunación<select name="vaccination_declaration"<?= $householdFieldErrorAttributes('pet', (string) $pet['id'], 'vaccination_declaration') ?>><option value="" <?= $householdInputValue('pet', (string) $pet['id'], 'vaccination_declaration', $pet['vaccination_declaration'] ?? '') === '' ? 'selected' : '' ?>>Sin declarar</option><option value="declared_vaccinated" <?= $householdInputValue('pet', (string) $pet['id'], 'vaccination_declaration', $pet['vaccination_declaration'] ?? '') === 'declared_vaccinated' ? 'selected' : '' ?>>Declara vacunación</option><option value="declared_not_vaccinated" <?= $householdInputValue('pet', (string) $pet['id'], 'vaccination_declaration', $pet['vaccination_declaration'] ?? '') === 'declared_not_vaccinated' ? 'selected' : '' ?>>Declara no vacunación</option></select></label>
+                                    <label>Notas<textarea name="notes" maxlength="5000"<?= $householdFieldErrorAttributes('pet', (string) $pet['id'], 'notes') ?>><?= $escape($householdInputValue('pet', (string) $pet['id'], 'notes', $pet['notes'] ?? '')) ?></textarea></label><label>Fotografía opcional<input type="file" name="photo" accept="image/png,image/jpeg"<?= $householdFieldErrorAttributes('pet', (string) $pet['id'], 'photo') ?>></label>
+                                    <label><input type="checkbox" name="photo_consent" value="1" <?= $householdInputValue('pet', (string) $pet['id'], 'photo_consent', '') === '1' ? 'checked' : '' ?><?= $householdFieldErrorAttributes('pet', (string) $pet['id'], 'photo_consent') ?>> Confirmo que existe autorización para guardar la foto.</label><?php if (!empty($pet['has_photo'])): ?><label><input type="checkbox" name="remove_photo" value="1"> Retirar fotografía</label><?php endif; ?>
                                     <button class="button button--quiet" type="submit">Guardar cambios</button>
                                 </form>
                                 <form method="post" action="<?= $escape($householdFormAction . '/pet') ?>" onsubmit="return confirm('¿Retirar esta ficha de mascota?')"><input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="record_id" value="<?= $escape($pet['id']) ?>"><button class="button button--quiet" type="submit">Retirar ficha</button></form>
                             <?php endforeach; ?>
-                            <form class="candidate-household-edit" method="post" enctype="multipart/form-data" action="<?= $escape($householdFormAction . '/pet') ?>">
+                            <form class="candidate-household-edit" data-household-form-kind="pet" data-household-form-id="new" method="post" enctype="multipart/form-data" action="<?= $escape($householdFormAction . '/pet') ?>">
+                                <?php if ($householdFormHasError('pet', 'new')): ?><p class="candidate-household-validation-error" id="<?= $escape($householdErrorId('pet', 'new')) ?>" role="alert" data-household-validation-error><?= $escape($householdErrorMessage) ?></p><?php endif; ?>
                                 <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>"><h4>Nueva ficha</h4>
-                                <label>Nombre<input name="name" maxlength="190" required></label><label>Especie<input name="species" maxlength="80" required></label><label>Raza<input name="breed" maxlength="120"></label><label>Tamaño<input name="size_category" maxlength="32"></label>
-                                <label>Edad aproximada<input type="number" name="age_years" min="0" max="100"></label><label>Declaración de vacunación<select name="vaccination_declaration"><option value="">Sin declarar</option><option value="declared_vaccinated">Declara vacunación</option><option value="declared_not_vaccinated">Declara no vacunación</option></select></label>
-                                <label>Notas<textarea name="notes" maxlength="5000"></textarea></label><label>Fotografía opcional<input type="file" name="photo" accept="image/png,image/jpeg"></label><label><input type="checkbox" name="photo_consent" value="1"> Confirmo que existe autorización para guardar la foto.</label><button class="button" type="submit">Crear ficha</button>
+                                <label>Nombre<input name="name" maxlength="190" required value="<?= $escape($householdInputValue('pet', 'new', 'name', '')) ?>"<?= $householdFieldErrorAttributes('pet', 'new', 'name') ?>></label><label>Especie<input name="species" maxlength="80" required value="<?= $escape($householdInputValue('pet', 'new', 'species', '')) ?>"<?= $householdFieldErrorAttributes('pet', 'new', 'species') ?>></label><label>Raza<input name="breed" maxlength="120" value="<?= $escape($householdInputValue('pet', 'new', 'breed', '')) ?>"<?= $householdFieldErrorAttributes('pet', 'new', 'breed') ?>></label><label>Tamaño<input name="size_category" maxlength="32" value="<?= $escape($householdInputValue('pet', 'new', 'size_category', '')) ?>"<?= $householdFieldErrorAttributes('pet', 'new', 'size_category') ?>></label>
+                                <label>Edad aproximada<input type="number" name="age_years" min="0" max="100" value="<?= $escape($householdInputValue('pet', 'new', 'age_years', '')) ?>"<?= $householdFieldErrorAttributes('pet', 'new', 'age_years') ?>></label><label>Declaración de vacunación<select name="vaccination_declaration"<?= $householdFieldErrorAttributes('pet', 'new', 'vaccination_declaration') ?>><option value="" <?= $householdInputValue('pet', 'new', 'vaccination_declaration', '') === '' ? 'selected' : '' ?>>Sin declarar</option><option value="declared_vaccinated" <?= $householdInputValue('pet', 'new', 'vaccination_declaration', '') === 'declared_vaccinated' ? 'selected' : '' ?>>Declara vacunación</option><option value="declared_not_vaccinated" <?= $householdInputValue('pet', 'new', 'vaccination_declaration', '') === 'declared_not_vaccinated' ? 'selected' : '' ?>>Declara no vacunación</option></select></label>
+                                <label>Notas<textarea name="notes" maxlength="5000"<?= $householdFieldErrorAttributes('pet', 'new', 'notes') ?>><?= $escape($householdInputValue('pet', 'new', 'notes', '')) ?></textarea></label><label>Fotografía opcional<input type="file" name="photo" accept="image/png,image/jpeg"<?= $householdFieldErrorAttributes('pet', 'new', 'photo') ?>></label><label><input type="checkbox" name="photo_consent" value="1" <?= $householdInputValue('pet', 'new', 'photo_consent', '') === '1' ? 'checked' : '' ?><?= $householdFieldErrorAttributes('pet', 'new', 'photo_consent') ?>> Confirmo que existe autorización para guardar la foto.</label><button class="button" type="submit">Crear ficha</button>
                             </form>
                         </details>
                     <?php endif; ?>

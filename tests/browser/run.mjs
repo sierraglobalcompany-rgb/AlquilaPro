@@ -221,7 +221,9 @@ function classifyExpectedConsoleErrors(events, responses, checks, mainCandidateI
     { phase: 'guest-tenant-and-role-permissions', role: 'no_access', path: candidatePath, method: 'GET', status: 403 },
     { phase: 'guest-tenant-and-role-permissions', role: 'property_documents_only', path: candidatePath, method: 'GET', status: 403 },
     { phase: 'guest-tenant-and-role-permissions', role: 'tenant', path: candidatePath, method: 'GET', status: 403 },
-    { phase: 'real-household-create-edit-delete-and-csrf', role: 'manager', path: candidatePath + '/household/occupant', method: 'POST', status: 422 }
+    { phase: 'real-household-create-edit-delete-and-csrf', role: 'manager', path: candidatePath + '/household/occupant', method: 'POST', status: 422 },
+    { phase: 'household-photo-consent-validation', role: 'manager', path: candidatePath + '/household/occupant', method: 'POST', status: 422 },
+    { phase: 'household-photo-file-validation', role: 'manager', path: candidatePath + '/household/pet', method: 'POST', status: 422 }
   ] : [];
   const usedResponseIndexes = new Set();
 
@@ -492,14 +494,20 @@ async function main() {
       assert(await page.getByText('Camilo Demo G5', { exact: true }).count() > 0, 'No aparece la ficha sintética principal.');
       assert(await page.getByText('Ver versión en Documentos', { exact: true }).count() === 1, 'No aparece el manual JSON autorizado.');
       assert(await page.locator('details.candidate-household-manager').count() === 2, 'El perfil manager no ve ambos formularios de gestión.');
+      for (const label of ['Agregar o editar ocupantes', 'Agregar o editar mascotas']) {
+        const action = page.getByText(label, { exact: true });
+        assert(await action.isVisible(), 'La acción de gestión no está visible: ' + label);
+        const actionBox = await action.boundingBox();
+        assert(actionBox && actionBox.height >= 44, 'La acción de gestión no tiene un área táctil de 44 px: ' + label);
+      }
       const desktopTabs = page.locator('nav[aria-label="Secciones del candidato"]');
       const responsiveMenu = page.locator('details.candidate-section-menu');
       assert(await desktopTabs.isVisible() || await responsiveMenu.isVisible(), 'No hay navegación de sección disponible en este viewport.');
       await capture(page, 'household-main', 'manager', viewport);
       if (viewport.name === 'desktop-1448x1086') {
-        await page.getByText('Administrar fichas de ocupantes', { exact: true }).click();
+        await page.getByText('Agregar o editar ocupantes', { exact: true }).click();
         await capture(page, 'occupant-management-open', 'manager', viewport);
-        await page.getByText('Administrar fichas de mascotas', { exact: true }).click();
+        await page.getByText('Agregar o editar mascotas', { exact: true }).click();
         await capture(page, 'pet-management-open', 'manager', viewport);
       }
       if (viewport.mobile) {
@@ -700,7 +708,7 @@ async function main() {
     assert(await page.locator('img[alt="Fotografía de Max Demo G5"]').count() === 1, 'La imagen del registro no aparece en la página real.');
     await capture(page, 'photo-private-original', 'manager', viewportCases[0]);
 
-    await page.getByText('Administrar fichas de mascotas', { exact: true }).click();
+    await page.getByText('Agregar o editar mascotas', { exact: true }).click();
     let editForm = await formByRecord(page, 'pet', mainPetId);
     await editForm.locator('input[name="name"]').fill('Max Demo G5 Reemplazado');
     await editForm.locator('input[name="photo"]').setInputFiles(fixture.uploads.replacement_photo);
@@ -716,7 +724,7 @@ async function main() {
     assert(await page.getByText('Max Demo G5 Reemplazado', { exact: true }).count() === 1, 'El cambio de mascota no sobrevivió a la recarga.');
     await capture(page, 'photo-replaced', 'manager', viewportCases[0]);
 
-    await page.getByText('Administrar fichas de mascotas', { exact: true }).click();
+    await page.getByText('Agregar o editar mascotas', { exact: true }).click();
     editForm = await formByRecord(page, 'pet', mainPetId);
     await editForm.locator('input[name="remove_photo"]').check();
     await submitAndWait(page, editForm, 'Guardar cambios', '/household/pet');
@@ -747,7 +755,7 @@ async function main() {
     assert(managerDesktop, 'La sesión manager desktop no quedó disponible.');
     const { context, page } = managerDesktop;
     await openHousehold(page, mainCandidate.id);
-    await page.getByText('Administrar fichas de ocupantes', { exact: true }).click();
+    await page.getByText('Agregar o editar ocupantes', { exact: true }).click();
     const occupantsRegion = page.locator('section[data-household-region="occupants"]');
     const createOccupantButton = occupantsRegion.getByRole('button', { name: 'Crear ficha', exact: true });
     assert(await createOccupantButton.count() === 1, 'No se encontró el botón real para crear un ocupante en su región.');
@@ -762,7 +770,7 @@ async function main() {
     await submitAndWait(page, createOccupant, 'Crear ficha', '/household/occupant');
     assert(await page.getByText('Ocupante G5 Creado', { exact: true }).count() === 1, 'No se creó el ocupante desde el formulario real.');
     await capture(page, 'occupant-created', 'manager', viewportCases[0]);
-    await page.getByText('Administrar fichas de ocupantes', { exact: true }).click();
+    await page.getByText('Agregar o editar ocupantes', { exact: true }).click();
     const occupantForm = page.locator('section[data-household-region="occupants"] form.candidate-household-edit:has(input[name="full_name"][value="Ocupante G5 Creado"])').first();
     const occupantId = await occupantForm.locator('input[name="record_id"]').inputValue();
     assert(/^\d+$/.test(occupantId), 'No se encontró el ID persistido del ocupante sintético.');
@@ -771,7 +779,7 @@ async function main() {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await settle(page);
     assert(await page.getByText('Ocupante G5 Editado', { exact: true }).count() === 1, 'La edición del ocupante no persistió tras recargar.');
-    await page.getByText('Administrar fichas de ocupantes', { exact: true }).click();
+    await page.getByText('Agregar o editar ocupantes', { exact: true }).click();
     const deleteOccupant = page.locator('section[data-household-region="occupants"] form:not(.candidate-household-edit):has(input[name="record_id"][value="' + occupantId + '"])');
     page.once('dialog', dialog => dialog.accept());
     const deleteOccupantPromise = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/household/occupant'));
@@ -782,7 +790,7 @@ async function main() {
     assert(await page.getByText('Ocupante G5 Editado', { exact: true }).count() === 0, 'El ocupante eliminado continúa visible.');
 
     await openHousehold(page, mainCandidate.id);
-    await page.getByText('Administrar fichas de mascotas', { exact: true }).click();
+    await page.getByText('Agregar o editar mascotas', { exact: true }).click();
     const petsRegion = page.locator('section[data-household-region="pets"]');
     const createPetButton = petsRegion.getByRole('button', { name: 'Crear ficha', exact: true });
     assert(await createPetButton.count() === 1, 'No se encontró el botón real para crear una mascota en su región.');
@@ -797,7 +805,7 @@ async function main() {
     await createPet.locator('textarea[name="notes"]').fill('Mascota de prueba ficticia.');
     await submitAndWait(page, createPet, 'Crear ficha', '/household/pet');
     assert(await page.getByText('Mascota G5 Creada', { exact: true }).count() === 1, 'No se creó la mascota desde el formulario real.');
-    await page.getByText('Administrar fichas de mascotas', { exact: true }).click();
+    await page.getByText('Agregar o editar mascotas', { exact: true }).click();
     const createdPetForm = page.locator('section[data-household-region="pets"] form.candidate-household-edit:has(input[name="name"][value="Mascota G5 Creada"])').first();
     const petId = await createdPetForm.locator('input[name="record_id"]').inputValue();
     assert(/^\d+$/.test(petId), 'No se encontró el ID persistido de la mascota sintética.');
@@ -810,7 +818,7 @@ async function main() {
     assert(await page.getByText('Mascota G5 Editada', { exact: true }).count() === 1, 'La edición de mascota no persistió tras recargar.');
     assert(await page.locator('img[alt="Fotografía de Mascota G5 Editada"]').count() === 1, 'La carga de la foto nueva no se mostró.');
     await capture(page, 'pet-created-edited-with-photo', 'manager', viewportCases[0]);
-    await page.getByText('Administrar fichas de mascotas', { exact: true }).click();
+    await page.getByText('Agregar o editar mascotas', { exact: true }).click();
     const deletePet = page.locator('section[data-household-region="pets"] form:not(.candidate-household-edit):has(input[name="record_id"][value="' + petId + '"])');
     page.once('dialog', dialog => dialog.accept());
     const deletePetPromise = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/household/pet'));
@@ -828,7 +836,7 @@ async function main() {
     });
     assert(invalidCsrf.status() === 403, 'La mutación sin CSRF válido no devolvió 403.');
     assert(token.length === 64, 'El formulario real no entregó el token CSRF de la sesión.');
-    await page.getByText('Administrar fichas de ocupantes', { exact: true }).click();
+    await page.getByText('Agregar o editar ocupantes', { exact: true }).click();
     const invalidForm = await formByRecord(page, 'occupant', fixture.candidates.main.occupant_id);
     const invalidResponsePromise = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/household/occupant'));
     await invalidForm.evaluate(form => {
@@ -843,9 +851,102 @@ async function main() {
     await settle(page);
     const invalidMessage = await page.locator('body').innerText();
     assert(invalidResponse.status() === 422, 'La validación real del formulario no rechazó datos inválidos con 422.');
+    assert((invalidResponse.headers()['content-type'] || '').includes('text/html'), 'La validación no volvió a renderizar la ficha completa.');
+    assert(invalidMessage.includes('Camilo Demo G5'), 'La validación perdió el contexto de la ficha.');
     assert(invalidMessage.includes('El nombre del ocupante es obligatorio.'), 'La respuesta de validación no identifica el campo requerido.');
+    const invalidOccupantForm = page.locator('form[data-household-form-kind="occupant"][data-household-form-id="' + fixture.candidates.main.occupant_id + '"]');
+    const invalidOccupantName = invalidOccupantForm.locator('[name="full_name"]');
+    assert(await invalidOccupantForm.count() === 1, 'El error no abrió el formulario de edición del ocupante enviado.');
+    assert(await invalidOccupantName.getAttribute('aria-invalid') === 'true', 'El campo inválido no quedó marcado para accesibilidad.');
+    assert(await invalidOccupantName.evaluate(element => element === document.activeElement), 'El foco no volvió al campo inválido.');
+    assert(await invalidOccupantForm.locator('[role="alert"]').count() === 1, 'El error accesible no se renderizó exactamente una vez.');
+    assert(await page.locator('section[data-household-region="occupants"] details[open]').count() === 1, 'La validación no abrió el detalle de ocupantes.');
+    assert(await page.locator('section[data-household-region="pets"] details[open]').count() === 0, 'La validación abrió una sección de mascotas ajena.');
     await capture(page, 'occupant-validation-error-422', 'manager', viewportCases[0]);
-    return { occupant: 'create-edit-reload-delete', pet: 'create-edit-reload-delete-photo', invalid_csrf: invalidCsrf.status(), invalid_data: invalidResponse.status(), validation_message: 'required name field' };
+    await page.getByText('Agregar o editar mascotas', { exact: true }).click();
+    const invalidPetForm = formByRecord(page, 'pet', fixture.candidates.main.pet_id);
+    const invalidPetResponsePromise = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/household/pet'));
+    await invalidPetForm.evaluate(form => {
+      const name = form.querySelector('input[name="name"]');
+      if (name) {
+        name.value = '';
+        name.removeAttribute('required');
+      }
+      form.requestSubmit();
+    });
+    const invalidPetResponse = await invalidPetResponsePromise;
+    await settle(page);
+    const invalidPetName = invalidPetForm.locator('[name="name"]');
+    assert(invalidPetResponse.status() === 422, 'La validación real de mascota no devolvió 422.');
+    assert((invalidPetResponse.headers()['content-type'] || '').includes('text/html'), 'La validación de mascota no volvió a renderizar la ficha completa.');
+    assert(await invalidPetForm.count() === 1, 'El error no abrió el formulario de edición de mascota enviado.');
+    assert(await invalidPetName.getAttribute('aria-invalid') === 'true', 'El campo inválido de mascota no quedó marcado.');
+    assert(await invalidPetName.evaluate(element => element === document.activeElement), 'El foco de mascota no volvió al campo inválido.');
+    assert(await invalidPetForm.locator('[role="alert"]').count() === 1, 'El error de mascota no se renderizó exactamente una vez.');
+    assert(await page.locator('section[data-household-region="occupants"] details[open]').count() === 0, 'El error de mascota abrió la sección de ocupantes.');
+    assert(await page.locator('section[data-household-region="pets"] details[open]').count() === 1, 'El error no abrió el detalle de mascotas.');
+    await capture(page, 'pet-validation-error-422', 'manager', viewportCases[0]);
+    return { occupant: 'create-edit-reload-delete', pet: 'create-edit-reload-delete-photo', invalid_csrf: invalidCsrf.status(), invalid_occupant: invalidResponse.status(), invalid_pet: invalidPetResponse.status(), validation_message: 'required field' };
+  });
+
+  await runCheck('household-photo-consent-validation', async () => {
+    assert(managerDesktop, 'La sesión manager desktop no quedó disponible.');
+    const { page } = managerDesktop;
+    await openHousehold(page, mainCandidate.id);
+    await page.getByText('Agregar o editar ocupantes', { exact: true }).click();
+    const region = page.locator('section[data-household-region="occupants"]');
+    const form = region.getByRole('button', { name: 'Crear ficha', exact: true }).locator('xpath=ancestor::form[1]');
+    await form.locator('input[name="full_name"]').fill('Ocupante sin consentimiento QA');
+    await form.locator('input[name="relationship"]').fill('Prueba');
+    await form.locator('input[name="photo"]').setInputFiles(fixture.uploads.added_photo);
+    assert(!(await form.locator('input[name="photo_consent"]').isChecked()), 'La prueba debe enviar la foto sin consentimiento.');
+    const responsePromise = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/household/occupant'));
+    await form.getByRole('button', { name: 'Crear ficha', exact: true }).click();
+    const response = await responsePromise;
+    await settle(page);
+    assert(response.status() === 422, 'La foto sin consentimiento no devolvió HTTP 422.');
+    assert((response.headers()['content-type'] || '').includes('text/html'), 'La falta de consentimiento no volvió a mostrar la ficha completa.');
+    const invalidForm = page.locator('form[data-household-form-kind="occupant"][data-household-form-id="new"]');
+    const consent = invalidForm.locator('input[name="photo_consent"]');
+    assert(await consent.getAttribute('aria-invalid') === 'true', 'El consentimiento faltante no quedó marcado.');
+    assert(await consent.evaluate(element => element === document.activeElement), 'El foco no volvió al consentimiento faltante.');
+    assert(!(await consent.isChecked()), 'La pantalla no debe marcar consentimiento sin confirmación del usuario.');
+    assert(await invalidForm.locator('[role="alert"]').count() === 1, 'El aviso de consentimiento no se renderizó exactamente una vez.');
+    await capture(page, 'photo-consent-validation-422', 'manager', viewportCases[0]);
+    return { status: response.status(), field: 'photo_consent', upload_retained: false };
+  });
+
+  await runCheck('household-photo-file-validation', async () => {
+    assert(managerDesktop, 'La sesión manager desktop no quedó disponible.');
+    const { page } = managerDesktop;
+    await openHousehold(page, mainCandidate.id);
+    await page.getByText('Agregar o editar mascotas', { exact: true }).click();
+    const region = page.locator('section[data-household-region="pets"]');
+    const form = region.getByRole('button', { name: 'Crear ficha', exact: true }).locator('xpath=ancestor::form[1]');
+    await form.locator('input[name="name"]').fill('Mascota archivo inválido QA');
+    await form.locator('input[name="species"]').fill('Gato');
+    await form.locator('input[name="photo"]').setInputFiles({
+      name: 'DO_NOT_RENDER_INVALID.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('not an image')
+    });
+    await form.locator('input[name="photo_consent"]').check();
+    const responsePromise = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/household/pet'));
+    await form.getByRole('button', { name: 'Crear ficha', exact: true }).click();
+    const response = await responsePromise;
+    await settle(page);
+    assert(response.status() === 422, 'La foto inválida no devolvió HTTP 422.');
+    assert((response.headers()['content-type'] || '').includes('text/html'), 'El error de foto no volvió a mostrar la ficha completa.');
+    const invalidForm = page.locator('form[data-household-form-kind="pet"][data-household-form-id="new"]');
+    const photo = invalidForm.locator('input[name="photo"]');
+    const consent = invalidForm.locator('input[name="photo_consent"]');
+    assert(await photo.getAttribute('aria-invalid') === 'true', 'El campo de foto inválida no quedó marcado.');
+    assert(await photo.evaluate(element => element === document.activeElement), 'El foco no volvió al campo de foto inválida.');
+    assert(await consent.isChecked(), 'La confirmación seleccionada se perdió al responder con error.');
+    assert(await invalidForm.locator('[role="alert"]').count() === 1, 'El aviso de foto inválida no se renderizó exactamente una vez.');
+    assert(!(await page.locator('body').innerText()).includes('DO_NOT_RENDER_INVALID.png'), 'La respuesta filtró el nombre del archivo.');
+    await capture(page, 'invalid-photo-validation-422', 'manager', viewportCases[0]);
+    return { status: response.status(), field: 'photo', upload_retained: false, consent_retained: true };
   });
 
   await runCheck('manual-json-pdf-and-private-document-acl', async () => {

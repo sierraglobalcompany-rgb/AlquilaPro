@@ -1,46 +1,40 @@
-# CURRENT CHECKPOINT — CAND-03 / G5 AUTHENTICATED BROWSER QA
+# CURRENT CHECKPOINT — CAND-03 / G5
 
-**Corte:** 2026-10-27 America/Bogota. `G5=EN_EJECUCION/NO_APROBADO`. CI #1208 ejecutó PHPUnit y Browser QA autenticado real: PHPUnit pasó en PHP 8.3/8.4/8.5; Browser QA falló solo en `browser-harness-fatal` tras los 10 checks de escenario. La causa confirmada es la asociación/clasificación incompleta de cinco errores HTTP de consola esperados (login 422, tres denegaciones 403 y validación de ocupante 422); el artifact sintético es íntegro, con 56 capturas y 61/61 hashes internos válidos. La corrección test-only de correlación y clasificación, junto con este checkpoint, está preparada localmente; su SHA futuro permanece `PENDING_CI`. No merge, deploy, Hostinger ni avance a CAND-04.
+**Corte:** 2026-10-27 America/Bogota. `G5=EN_EJECUCION / CI_PENDIENTE`; dictamen independiente Ley 5 pendiente. No declarar PASS global ni paridad visual hasta revisar el artifact del HEAD publicado.
 
-## Repo y autoridad viva
-- Repo: sierraglobalcompany-rgb/AlquilaPro.
-- Base de esta unidad: HEAD `09f114fa7cb1387958f354f8ff47581197663465`, verificado localmente y contra la rama remota `impl/cand-03-household-human-first-20261023` antes de editar. PR #55 verificado OPEN / DRAFT / NOT MERGED. El `main` remoto observado es `f682d09e140e0b86f5704630712df5116dad9d09`. La API del PR informó `base_sha=414bcfeae0a3b4f8eea7262eefcb498e3f116307`, distinto del `main` vivo; se conserva como discrepancia preexistente y se verificará el merge SHA del nuevo CI sin modificar refs ajenas.
-- CI #1204 / run `40346507909` certifica el HEAD anterior: 3/3 jobs success, PHP 8.3/8.4/8.5, 736 tests por job y 1 skip por job; checkout sintético `ec3e699a0d5dc3e0857cddf60081fc0719a8d057`.
-- CI #1205 / run `40368250835`, HEAD `3a6023a766685a430a4191f203e767ce2465bd08`, checkout sintético `9d8137ebf0586b633bcb4dbb504883df9b0f67df`: PHPUnit PHP 8.3 y 8.4 PASS; PHP 8.5 PHPUnit PASS, fixture MariaDB sintética PASS, pero el chequeo HTTP de inicio de la app no obtuvo `/health` en 45 s. Playwright `NOT_RUN`; upload reportó que no había archivos y no creó artifact. El paso no imprimió el log PHP guardado en RUNNER_TEMP, así que la causa de inicio no quedó determinada.
-- CI #1206 / run `40376198301`, HEAD `26d45a3123dc7164697a186bc4403704809543ed`, merge checkout `7305d9be58f089d0e26dc6311d4e7ed6e3e9ac17`: PHPUnit 736 tests, 1 skip por job, PASS en 8.3/8.4/8.5; fixture sintética PASS; instalación del harness Playwright y Chromium PASS. `/health` falló porque faltaban `ALQUILAPRO_SMTP_*` y `ALQUILAPRO_CRON_SECRET`; `bootstrap/app.php:417` rechazó la configuración. Ejecución Playwright `NOT_RUN`; artifact `MISSING` (ruta sin archivos).
-- CI #1207 / run `40403271208`, PR HEAD `a1c07ca374bdcad09867174e1d145995cbb2949b`, merge checkout `49dfd6f7686d9d2f1dfd61debe913793c84f653b`: PHPUnit PASS en PHP 8.3/8.4/8.5 (736 tests, 8.499 assertions, 1 skip por versión); preparación de DB sintética, servidor PHP y `/health` PASS. PHP 8.5 falla en Playwright con 8/11 checks. Dos causas del harness están confirmadas: el viewer no tiene formularios de gestión/CSRF en household, y el selector global `.last()` llega a un formulario de mascota. El tercer evento solo tiene fingerprint de consola y ruta fallida `/admin/documents/2/file`; la causa no quedó demostrada. Artifact `12691570069`, SHA-256 `6ca67fe6932600d7557be3c984e3998f432580530863dfba311472f3a4c1bd34`, 48 capturas y 53/53 hashes internos verificados.
-- CI #1208 / run `40451040817`, PR HEAD `09f114fa7cb1387958f354f8ff47581197663465`, merge checkout `1e59207f33aa04a0526b40e7acd1e8abc9de9554`: PHPUnit PASS en PHP 8.3 (736 tests / 8.500 assertions), 8.4 y 8.5 (736 / 8.498 cada uno; un skip por versión). Browser QA llegó al servidor y completó los 10 checks de escenario, pero el check final `browser-harness-fatal` falló porque el clasificador dejó como inesperados cinco errores HTTP de consola. El manifest identifica login `POST /login` 422, `GET /admin/candidates/1` 403 para roles `no_access`, `property_documents_only` y `tenant`, y `POST /admin/candidates/1/household/occupant` 422; las respuestas de backend y los escenarios correspondientes pasaron. Cero solicitudes inesperadas fallidas; el `ERR_ABORTED` del PDF coincide con descarga real y SHA verificado. Artifact `12710244633`, SHA-256 `f834b1541ca51616e584bba9460ab56c20908309851cdb6b824af7c8bc4f94be`, 56 capturas y 61/61 hashes internos verificados.
-- Configuración SMTP sintética test-only publicada en `a1c07ca…`, solo en el paso `Start real AlquilaPro PHP application on loopback`, loopback `127.0.0.1:2525`; no se instaló sink ni se conectó a proveedor externo. La instrumentación previa de `tests/browser/run.mjs` para CSRF válido viewer, formularios por región y diagnóstico de eventos se ejecutó en CI #1208. Esta unidad corrige solo la correlación de respuestas y la clasificación estricta de los cinco eventos HTTP esperados; conserva todas las observaciones, rechaza duplicados/ambigüedades y exige PASS del escenario y respuesta exacta. No se cambiarán permisos ni código de producto.
+## Estado vivo verificado
 
-## H02 — corregido focalmente
-Causa: la vista usaba pets_answered_at como respuesta, copy dirigido al candidato dentro de la revisión admin, no contaba fichas reales de mascotas y duplicaba observaciones; las fichas apilaban metadatos. En el owner existente se separaron respuesta/fecha, se mantuvo histórico false sin fecha como No confirmado, se corrigieron copy/conteos, se movieron notas una vez a Reglas y observaciones y se compactó el flujo de datos desktop. No se duplicó al solicitante ni se infirieron score/vacunación.
+- Repositorio: `sierraglobalcompany-rgb/AlquilaPro`.
+- PR #55: OPEN, Draft, no merged. Rama `impl/cand-03-household-human-first-20261023`.
+- Base local del lote y HEAD remoto antes de editar: `cd3b1d7aa72bd6a80a8ae044dcbe45e56a086e9a`; padre `09f114fa7cb1387958f354f8ff47581197663465`.
+- CI #1209, run `40500170485`, terminó success para ese HEAD. PHPUnit pasó en PHP 8.3/8.4/8.5; Browser QA corrió solo en PHP 8.5. No certifica los cambios locales de este lote.
+- `main` observado: `f682d09e140e0b86f5704630712df5116dad9d09`; GitHub API reportó para el PR una base distinta (`414bcfeae0a3b4f8eea7262eefcb498e3f116307`). Discrepancia previa conservada, no modificar.
 
-Pruebas locales en PHP 8.5.8: HumanFirstCandidateDetailViewTest, 30 tests / 261 assertions, PASS; php -l y git diff --check PASS. Los cambios funcionales son assets/app.css, resources/views/candidate_detail.php y tests/Integration/Candidates/HumanFirstCandidateDetailViewTest.php.
+## Lote local G5
 
-Preview de componente con Playwright y datos ficticios, no ruta autenticada:
-- 1448×1086: ocupantes 360 px; fila 3 y=933; documento 1413 px.
-- Mejora en el mismo harness contra la medición pre-refinamiento: 424→360 px y y=997→933. La referencia histórica de aplicación real 592 px/y=1154 pertenece a otra corrida y no es comparación controlada.
-- 1100×850, 768×1024 y móvil táctil 375×812: seis regiones, sin overflow horizontal. Fixture largo: altura de ocupantes 589 px con crecimiento natural. Foco de teclado visible. Render solo lectura: cero controles de gestión.
-- No se incluye foto en el fixture. Las capturas no validan ACL/servicio de foto ni estado de sesión. A 1448×1086 la fila 3 empieza dentro del viewport, pero su contenido continúa bajo el viewport.
-- Evidencia V4: D:\Codex\_REPORTES\AlquilaPro\AP-CAND03-PR55-CIERRE-H01-H02-V4\.
+La validación del guardado de ocupantes/mascotas vuelve a renderizar la ficha SSR completa con HTTP 422, abre únicamente el grupo y formulario afectado y presenta un aviso accesible. Conserva solo campos escalares acotados del formulario; nunca repone archivo ni datos fuera de allowlist. Los errores de consentimiento y fotografía enfocan y marcan el control correcto; el consentimiento confirmado se conserva solo durante la respuesta de error. Las acciones de gestión usan CTA visibles con foco y área táctil; no se añadieron endpoints, permisos ni datos.
 
-Browser preview de componente con fixture ficticio, sin login, sesión ni DB de aplicación: 1440×900 escritorio y 390×844 móvil emulado/táctil; seis regiones; sin overflow horizontal; consola sin mensajes/errores/warnings observados. Evidencia histórica en el paquete V8. Browser QA de aplicación autenticada corrió en CI #1207; consulta arriba para resultado y artifact. Las rutas de foto/ACL pasan con DB MariaDB 11.4 aislada en la suite; una captura por sí sola no certifica ACL.
+El Browser QA autenticado conserva las comprobaciones de CSRF, ACL y CRUD y ahora añade los estados de consentimiento ausente y archivo de foto inválido con capturas. Playwright requiere el CI real; no se ejecutó localmente con variables de CI falsificadas.
 
-## H01 — PDF
-- Causa: `DocumentService` y `CandidateDocumentService` aceptaban archivos por tamaño/MIME sin validar estructura; un fixture del portal tenant también era un pseudo-PDF sin xref/trailer.
-- Ambos owners llaman a `PdfUploadValidator`, que integra `smalot/pdfparser` v2.13.1 con límites de recursos. Máximo de archivo: 10 MiB; límites internos de streams/objetos/recursión; rechaza truncados, MIME falso, ZIP/polyglot, cifrado, acciones activas y adjuntos incrustados. No modifica bytes aceptados ni afirma detectar malware.
-- Dependencia directa `smalot/pdfparser` (`^2.13.1`, lock `v2.13.1`, LGPL-3.0), necesaria para parseo estructural; requiere revisión de obligaciones de distribución. No hay dictamen legal.
-- Corpus H01: SHA-256 `f37a204b56149d2c3a331ff7242bfe305de96a747640e68084ea795ce5618f5c`; manifiesto 13/13 archivos/hashes coinciden; validador 13/13 decisiones esperadas (6 ACCEPT, 7 REJECT). La matriz está en el paquete V8.
-- RED observado antes de implementación: cinco tests nuevos fallaban porque faltaba `PdfUploadValidator`. RED de regresión completa identificó siete allowlists de arquitectura y el fixture tenant obsoleto; corregidos en los owners de tests/fixture. Focal final afectada: 8 tests / 261 assertions, PASS.
+## Evidencia local
 
-## Verificación local y límites
-- PHP 8.5.8, PHPUnit 11.5.57, MariaDB 11.4 efímera y schema/credenciales aleatorias exclusivos; el contenedor temporal fue eliminado.
-- Suite completa final: 731 tests, 8.479 assertions, exit 0; 2 skips y 267 warnings. Los warnings vienen de `ServerReadyBuilderTest` al borrar objetos Git temporales (`unlink: Permission denied`, y directorios no vacíos); no se modificó esa suite fuera del alcance.
-- `composer validate --no-check-publish`: válido. PHP lint: sin errores. `git diff --check`: sin errores; Git avisó normalización LF→CRLF en algunos archivos.
-- La primera suite completa registró 7 fallos y 1 error; tras alinear las allowlists/owners y reemplazar el fixture tenant, la focal afectada pasó y la suite completa terminó exit 0.
-- Los resultados locales de 2026-10-25 son históricos. CI #1207 cubre el HEAD `a1c07ca…`: matriz PHPUnit verde, Browser QA incompleto y fallido; los arreglos focales del harness están pendientes de CI sobre un nuevo HEAD. Hostinger y deploy no se ejecutaron.
-- Aceptación independiente Ley 5 pendiente; Codex no autocertifica PASS global. `TEMP_SENSITIVE=BLOCKED`: no se leyó ni limpió la ruta temporal sensible.
-- Evidencia histórica V3/V4 conservada en sus carpetas previas; este cierre añade el paquete V8 sin sobrescribirlos.
+- RED antes del ajuste: la ruta devolvía `text/plain` para errores de validación y los controles mantenían el resumen «Administrar fichas…»; no cumplían el contrato SSR/CTA aprobado.
+- RED adicional: la prueba de foto/consentimiento falló porque el checkbox carecía de `aria-invalid` y foco (`expected true`, recibido vacío).
+- GREEN focal final, PHP 8.5.8 + MariaDB 11.4 aislada en loopback: 5 pruebas, 196 assertions, PASS. Incluye validación transitoria, foto inválida, consentimiento, CRUD/foto privada y permisos.
+- Suite final, PHP 8.5.8: 739 pruebas, 8.618 assertions, 2 skips, 266 warnings; PHPUnit terminó con resumen `OK`. Las advertencias corresponden al patrón preexistente de limpieza de objetos/temporales en `ServerReadyBuilderTest` (permisos `unlink`); no se cambió esa suite.
+- `php -l` en los PHP afectados, `node --check tests/browser/run.mjs` y `git diff --check`: PASS. GD se cargó con override de proceso, sin cambiar `php.ini`.
 
-## NEXT ÚNICO
-Completar verificación local focal, revalidar WIP protegidos y HEAD remoto, y usar la única publicación autorizada para `tests/browser/run.mjs` y este checkpoint. SHA de publicación y CI futuro: `PENDING_CI` hasta evidencia GitHub. Si el CI o una causa real de producto falla, documentar y detenerse sin otra publicación. Ley 5 independiente y UAT siguen pendientes; PR #55 permanece Draft. No merge, deploy ni avance a CAND-04.
+## Alcance, protección y siguiente gate
+
+Allowlist autorizada de siete rutas únicamente:
+1. `app/Candidates/routes.php`
+2. `resources/views/candidate_detail.php`
+3. `assets/app.css`
+4. `tests/Integration/Candidates/CandidatesAdminRoutesTest.php`
+5. `tests/Integration/Candidates/HumanFirstCandidateDetailViewTest.php`
+6. `tests/browser/run.mjs`
+7. `docs/CURRENT_CHECKPOINT.md`
+
+Los ocho worktrees externos estaban intactos en la última comparación con el snapshot previo al lote; repetir comparación/hash antes de publicar. La lectura remota más reciente volvió a confirmar HEAD `cd3b1d7…`, PR OPEN/Draft/no merged. Revalidar ambas condiciones justo antes de stage.
+
+Una única publicación normal autorizada: exactamente un commit y un push con esos siete archivos a la rama del PR #55. Después, verificar CI del SHA exacto (PHPUnit 8.3/8.4/8.5, Browser QA PHP 8.5), descargar/inspeccionar las capturas y manifest reales y entregar informe externo con SHA-256. Si falla un control o aparece otro defecto, detenerse sin segundo push. No force push, rebase, merge, deploy, Hostinger ni CAND-04.

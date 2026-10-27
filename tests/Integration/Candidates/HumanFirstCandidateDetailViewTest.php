@@ -472,9 +472,59 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         foreach (['Riesgo bajo', 'Perfil familiar estable', 'Vacunación', 'Política del inmueble'] as $invented) {
             self::assertStringNotContainsString($invented, $html);
         }
-        self::assertStringContainsString('Administrar fichas de ocupantes', $html);
-        self::assertStringContainsString('Administrar fichas de mascotas', $html);
+        self::assertStringContainsString('Agregar o editar ocupantes', $html);
+        self::assertStringContainsString('Agregar o editar mascotas', $html);
+        self::assertStringNotContainsString('Administrar fichas', $html);
         self::assertStringNotContainsString('data-candidate-section-body="work"', $html);
+    }
+
+    public function testHouseholdManagerActionsAreVisibleAndValidationTargetsOnlyTheMatchingForm(): void
+    {
+        $html = $this->renderOverview([
+            'householdOccupants' => [
+                ['id' => 7, 'full_name' => 'Ocupante Demo', 'relationship' => 'Hermana', 'has_photo' => false],
+            ],
+            'householdPets' => [
+                ['id' => 9, 'name' => 'Luna Demo', 'species' => 'Gato', 'has_photo' => false],
+            ],
+            'householdFormError' => [
+                'kind' => 'occupant',
+                'record_id' => 7,
+                'field' => 'full_name',
+                'message' => 'El nombre del ocupante es obligatorio.',
+                'old_input' => ['full_name' => '', 'relationship' => 'Relación conservada'],
+            ],
+        ], '', ['contracts' => [], 'can_create' => false], 'household');
+
+        $dom = new \DOMDocument();
+        @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        $xpath = new \DOMXPath($dom);
+
+        foreach ([
+            'occupants' => 'Agregar o editar ocupantes',
+            'pets' => 'Agregar o editar mascotas',
+        ] as $kind => $label) {
+            $summary = $xpath->query('//section[@data-household-region="' . $kind . '"]/details/summary');
+            self::assertSame(1, $summary->length);
+            self::assertSame($label, trim($summary->item(0)?->textContent ?? ''));
+        }
+
+        $openManagers = $xpath->query('//section[@data-household-region="occupants" or @data-household-region="pets"]//details[@open]');
+        self::assertSame(1, $openManagers->length, 'Only the manager containing the validation error should open.');
+        $targetForm = $xpath->query('//form[@data-household-form-kind="occupant" and @data-household-form-id="7"]');
+        self::assertSame(1, $targetForm->length);
+        self::assertSame(1, $xpath->query('ancestor::details[@open]', $targetForm->item(0))->length);
+        self::assertSame(0, $xpath->query('//form[@data-household-form-kind="pet" and @data-household-form-id="9"]//*[@autofocus]')->length);
+
+        $alert = $xpath->query('.//*[@role="alert"]', $targetForm->item(0));
+        self::assertSame(1, $alert->length);
+        self::assertSame('El nombre del ocupante es obligatorio.', trim($alert->item(0)?->textContent ?? ''));
+        $name = $xpath->query('.//*[@name="full_name"]', $targetForm->item(0))->item(0);
+        self::assertInstanceOf(\DOMElement::class, $name);
+        self::assertSame('true', $name->getAttribute('aria-invalid'));
+        self::assertSame($alert->item(0)?->getAttribute('id'), $name->getAttribute('aria-describedby'));
+        self::assertSame('', $name->getAttribute('value'));
+        self::assertSame('Relación conservada', $xpath->query('.//*[@name="relationship"]/@value', $targetForm->item(0))->item(0)?->nodeValue);
     }
 
     public function testHouseholdSummaryCountsPetRowsIndependentOfExplicitAnswer(): void
@@ -750,7 +800,8 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         $screening = null;
         $contractContext = $contracts;
         $canManageCandidates = true;
-        $householdCanManage = true;
+        $householdCanManage = ($overrides['householdCanManage'] ?? true) === true;
+        $householdFormError = is_array($overrides['householdFormError'] ?? null) ? $overrides['householdFormError'] : null;
         $householdOccupants = is_array($overrides['householdOccupants'] ?? null) ? $overrides['householdOccupants'] : [];
         $householdPets = is_array($overrides['householdPets'] ?? null) ? $overrides['householdPets'] : [];
         $householdManual = is_array($overrides['householdManual'] ?? null) ? $overrides['householdManual'] : ['authorized' => false];

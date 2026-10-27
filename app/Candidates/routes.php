@@ -297,22 +297,19 @@ return static function (App $app, array $deps): void {
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
     });
 
-    $app->get('/admin/candidates/{id:[0-9]+}', static function (
-        ServerRequestInterface $request,
+    $renderCandidateDetail = static function (
         ResponseInterface $response,
-        array $args,
-    ) use ($adminGuard, $candidates, $candidateDocuments, $household, $documents, $screening, $contracts, $properties, $media, $view, $csrf, $path): ResponseInterface {
-        $user = $adminGuard($response, 'candidates.view');
-        if ($user instanceof ResponseInterface) {
-            return $user;
-        }
-
-        $candidate = $candidates->findCandidate((int) $args['id']);
+        array $user,
+        int $candidateId,
+        mixed $requestedSection = null,
+        array $householdFormError = [],
+        int $status = 200,
+    ) use ($candidates, $candidateDocuments, $household, $documents, $screening, $contracts, $properties, $media, $view, $csrf, $path): ResponseInterface {
+        $candidate = $candidates->findCandidate($candidateId);
         if ($candidate === null) {
             return $response->withStatus(404);
         }
 
-        $candidateId = (int) $candidate['id'];
         $propertyDetails = null;
         $coverPhotoId = null;
         $householdPropertyId = null;
@@ -394,8 +391,6 @@ return static function (App $app, array $deps): void {
             $candidateSections[] = ['key' => 'manage', 'label' => 'Administrar'];
         }
 
-        $query = $request->getQueryParams();
-        $requestedSection = $query['section'] ?? null;
         $availableSectionKeys = array_column($candidateSections, 'key');
         $activeSection = is_string($requestedSection) && in_array($requestedSection, $availableSectionKeys, true)
             ? $requestedSection
@@ -423,9 +418,24 @@ return static function (App $app, array $deps): void {
             'canManageCandidates' => $canManageCandidates,
             'candidateSections' => $candidateSections,
             'activeSection' => $activeSection,
+            'householdFormError' => $householdFormError === [] ? null : $householdFormError,
         ]));
 
-        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8')->withStatus($status);
+    };
+
+    $app->get('/admin/candidates/{id:[0-9]+}', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ) use ($adminGuard, $renderCandidateDetail): ResponseInterface {
+        $user = $adminGuard($response, 'candidates.view');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+
+        $query = $request->getQueryParams();
+        return $renderCandidateDetail($response, $user, (int) $args['id'], $query['section'] ?? null);
     });
 
     $app->get('/admin/candidates/{id:[0-9]+}/household/{kind}/{recordId:[0-9]+}/photo', static function (
@@ -460,7 +470,7 @@ return static function (App $app, array $deps): void {
         ServerRequestInterface $request,
         ResponseInterface $response,
         array $args,
-    ) use ($adminGuard, $candidates, $household, $path): ResponseInterface {
+    ) use ($adminGuard, $candidates, $household, $path, $renderCandidateDetail): ResponseInterface {
         $user = $adminGuard($response, 'candidates.manage');
         if ($user instanceof ResponseInterface) {
             return $user;
@@ -497,6 +507,53 @@ return static function (App $app, array $deps): void {
                 return $response->withStatus(422);
             }
         } catch (RuntimeException $exception) {
+            if ($action === 'save' && in_array($kind, ['occupant', 'pet'], true)) {
+                $fields = $kind === 'occupant'
+                    ? ['full_name' => 190, 'relationship' => 100, 'age_years' => 3, 'occupation_or_activity' => 190, 'notes' => 5000, 'photo_consent' => 1]
+                    : ['name' => 190, 'species' => 80, 'breed' => 120, 'size_category' => 32, 'age_years' => 3, 'vaccination_declaration' => 32, 'notes' => 5000, 'photo_consent' => 1];
+                $oldInput = [];
+                foreach ($fields as $field => $limit) {
+                    if (!array_key_exists($field, $body)) {
+                        continue;
+                    }
+                    $value = $body[$field] ?? null;
+                    if (!is_scalar($value) && $value !== null) {
+                        continue;
+                    }
+                    $oldInput[$field] = mb_substr((string) $value, 0, $limit, 'UTF-8');
+                }
+                $message = $exception->getMessage();
+                $errorField = match ($message) {
+                    'El nombre del ocupante es obligatorio.' => 'full_name',
+                    'La relación con el solicitante es obligatoria.' => 'relationship',
+                    'El nombre y la especie de la mascota son obligatorios.' => 'name',
+                    'La declaración de vacunación no es válida.' => 'vaccination_declaration',
+                    'La edad aproximada no es válida.' => 'age_years',
+                    'Confirma que cuentas con autorización para guardar esta fotografía.' => 'photo_consent',
+                    default => null,
+                };
+                if ($message === 'El nombre y la especie de la mascota son obligatorios.') {
+                    $errorField = trim((string) ($oldInput['name'] ?? '')) === '' ? 'name' : 'species';
+                } elseif ($message === 'Uno de los datos del hogar supera el límite permitido.') {
+                    foreach ($fields as $field => $limit) {
+                        $value = $body[$field] ?? null;
+                        if (is_scalar($value) && mb_strlen(trim((string) $value), 'UTF-8') > $limit) {
+                            $errorField = $field;
+                            break;
+                        }
+                    }
+                } elseif ($errorField === null && str_contains(mb_strtolower($message, 'UTF-8'), 'fotografía')) {
+                    $errorField = 'photo';
+                }
+
+                return $renderCandidateDetail($response, $user, $candidateId, 'household', [
+                    'kind' => $kind,
+                    'record_id' => $recordId,
+                    'field' => $errorField,
+                    'message' => $message,
+                    'old_input' => $oldInput,
+                ], 422);
+            }
             $response->getBody()->write($exception->getMessage());
             return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')->withStatus(422);
         }

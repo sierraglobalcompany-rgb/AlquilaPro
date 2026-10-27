@@ -836,7 +836,10 @@ ul { padding-left: 22px; }
 .candidate-household-notes p { margin: 4px 0 0; }
 .candidate-household-photo { display: block; width: min(100%, 320px); max-height: 240px; margin: 10px 0; object-fit: contain; border-radius: 10px; background: var(--color-surface); }
 .candidate-household-manager { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--color-border); }
-.candidate-household-manager > summary { cursor: pointer; font-weight: 650; }
+.candidate-household-manager > summary { min-height: 44px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: color-mix(in srgb, var(--brand-primary) 6%, var(--color-surface)); color: var(--brand-primary); cursor: pointer; font-weight: 650; line-height: 1.4; overflow-wrap: anywhere; }
+.candidate-household-manager > summary:hover { background: color-mix(in srgb, var(--brand-primary) 10%, var(--color-surface)); }
+.candidate-household-manager > summary:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 2px; }
+.candidate-household-validation-error { margin: 0; padding: 10px 12px; border-left: 3px solid var(--color-danger); border-radius: 4px; background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface)); color: var(--color-text); line-height: 1.45; overflow-wrap: anywhere; }
 .candidate-household-edit { display: grid; gap: 12px; margin: 14px 0; padding: 14px; border: 1px solid var(--color-border); border-radius: 12px; }
 .candidate-household-edit label { min-width: 0; }
 .candidate-household-edit input, .candidate-household-edit textarea, .candidate-household-edit select { max-width: 100%; }
