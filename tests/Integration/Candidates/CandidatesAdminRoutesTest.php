@@ -341,7 +341,10 @@ final class CandidatesAdminRoutesTest extends TestCase
         $this->login($viewer, 'household-viewer@example.com', 'ViewerPassword123', '/sub');
         $page = (string) $this->request($viewer, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=household')->getBody();
         self::assertStringContainsString('Acompañante Con Foto', $page);
-        self::assertStringNotContainsString('Agregar o editar ocupantes', $page);
+        self::assertStringNotContainsString('Agregar ocupante', $page);
+        self::assertStringNotContainsString('Agregar mascota', $page);
+        self::assertStringNotContainsString('data-household-action="create"', $page);
+        self::assertStringNotContainsString('data-household-action="edit"', $page);
         foreach ($seedRecords as $record) {
             $photoPath = '/sub/admin/candidates/' . $candidateId . '/household/' . $record['kind'] . '/' . $record['seed']['id'] . '/photo';
             $photo = $this->request($viewer, 'GET', $photoPath);
@@ -377,7 +380,10 @@ final class CandidatesAdminRoutesTest extends TestCase
         $manager = $this->app('/sub');
         $this->login($manager, 'household-manager@example.com', 'ManagerPassword123', '/sub');
         $managerPage = (string) $this->request($manager, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=household')->getBody();
-        self::assertStringContainsString('Agregar o editar ocupantes', $managerPage);
+        self::assertStringContainsString('Agregar ocupante', $managerPage);
+        self::assertStringContainsString('Agregar mascota', $managerPage);
+        self::assertStringContainsString('data-household-action="create"', $managerPage);
+        self::assertStringContainsString('data-household-action="edit"', $managerPage);
         self::assertStringNotContainsString('Manual PDF actual', $managerPage);
 
         foreach ($seedRecords as $record) {
