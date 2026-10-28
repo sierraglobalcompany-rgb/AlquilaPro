@@ -812,7 +812,8 @@ ul { padding-left: 22px; }
 /* CAND-03 household: three paired rows on desktop, one readable column on small screens. */
 .candidate-household-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
 .candidate-household-grid > .content-card { min-width: 0; padding: 14px; gap: 8px; overflow-wrap: anywhere; }
-.candidate-household-heading, .candidate-household-region-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px; }
+.candidate-household-heading { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 8px; }
+.candidate-household-region-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px; }
 .candidate-household-heading h2, .candidate-household-grid h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0; font-size: 18px; }
 .candidate-household-heading .nav-icon, .candidate-household-grid h3 .nav-icon { color: var(--brand-primary); width: 22px; height: 22px; flex: 0 0 auto; }
 .candidate-household-heading p, .candidate-household-region-heading p, .candidate-household-occupants p, .candidate-household-pets p { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }

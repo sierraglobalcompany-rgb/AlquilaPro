@@ -463,9 +463,8 @@ async function openCreateForm(page, kind, touch = false) {
   if (!(await detail.evaluate(element => element.open))) {
     const summary = detail.locator('summary');
     if (touch) {
-      const box = await summary.boundingBox();
-      assert(box, 'La acción de alta no tiene un objetivo táctil visible.');
-      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+      await summary.scrollIntoViewIfNeeded();
+      await summary.tap();
     } else await summary.click();
   }
   assert(await detail.evaluate(element => element.open), 'No se abrió el formulario directo de creación para ' + kind + '.');
@@ -480,9 +479,8 @@ async function openRecordEditor(page, kind, recordId, touch = false) {
   if (!(await detail.evaluate(element => element.open))) {
     const summary = detail.locator('summary');
     if (touch) {
-      const box = await summary.boundingBox();
-      assert(box, 'El editor individual no tiene un objetivo táctil visible.');
-      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+      await summary.scrollIntoViewIfNeeded();
+      await summary.tap();
     } else await summary.click();
   }
   assert(await detail.evaluate(element => element.open), 'No se abrió el editor individual ' + recordId + '.');
@@ -518,7 +516,7 @@ async function submitInvalidEditAndCapture(page, kind, recordId, viewport) {
   assert(await invalidField.getAttribute('aria-invalid') === 'true', 'El campo inválido de ' + kind + ' no quedó marcado.');
   assert(await invalidField.evaluate(element => element === document.activeElement), 'El foco no volvió al campo inválido de ' + kind + '.');
   assert(await invalidForm.locator('[role="alert"]').count() === 1, 'El error accesible de ' + kind + ' no se renderizó exactamente una vez.');
-  const expectedMessage = kind === 'occupant' ? 'El nombre del ocupante es obligatorio.' : 'El nombre de la mascota es obligatorio.';
+  const expectedMessage = kind === 'occupant' ? 'El nombre del ocupante es obligatorio.' : 'El nombre y la especie de la mascota son obligatorios.';
   assert((await invalidForm.locator('[role="alert"]').innerText()).includes(expectedMessage), 'El error de ' + kind + ' no identifica el campo obligatorio.');
   assert(await page.locator('section[data-household-region="' + region + '"] details[data-household-action="edit"][open][data-household-record-id="' + recordId + '"]').count() === 1, 'El error no abrió la ficha inválida de ' + kind + '.');
   assert(await page.locator('section[data-household-region="' + region + '"] details[open]').count() === 1, 'La validación dejó más de un panel abierto de ' + kind + '.');
@@ -562,6 +560,25 @@ async function main() {
       await login(page, credentials.manager, 'manager');
       const response = await openHousehold(page, mainCandidate.id);
       const metrics = await inspectHousehold(page, 'main', 'manager', viewport);
+      if (viewport.mobile) {
+        const titleGeometry = await page.locator('#candidate-household-title').evaluate(title => {
+          const summary = title.closest('[data-household-region="summary"]');
+          if (!summary) return null;
+          const titleRect = title.getBoundingClientRect();
+          const summaryRect = summary.getBoundingClientRect();
+          const style = window.getComputedStyle(title);
+          const fontSize = Number.parseFloat(style.fontSize) || 0;
+          const lineHeight = Number.parseFloat(style.lineHeight) || fontSize * 1.2;
+          return {
+            titleWidth: titleRect.width,
+            summaryWidth: summaryRect.width,
+            titleHeight: titleRect.height,
+            maxTitleHeight: lineHeight * 3,
+          };
+        });
+        assert(titleGeometry && titleGeometry.titleWidth >= titleGeometry.summaryWidth * 0.6, 'El título del resumen no tiene ancho suficiente en móvil.');
+        assert(titleGeometry.titleHeight <= titleGeometry.maxTitleHeight, 'El título del resumen se fragmenta en más de tres líneas en móvil.');
+      }
       assert(await page.getByText('Camilo Demo G5', { exact: true }).count() > 0, 'No aparece la ficha sintética principal.');
       assert(await page.getByText('Ver versión en Documentos', { exact: true }).count() === 1, 'No aparece el manual JSON autorizado.');
       assert(await page.locator('details[data-household-action="create"]').count() === 2, 'El perfil manager no ve una acción de creación por región.');
