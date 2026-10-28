@@ -72,6 +72,7 @@ const consoleErrors = [];
 const pageErrors = [];
 const failedRequests = [];
 const responseObservations = [];
+let nextPageWatcherId = 0;
 const downloadObservations = [];
 const verifiedDownloads = [];
 let activeCheck = 'setup';
@@ -133,11 +134,13 @@ async function makeContext(browser, viewport) {
   });
 }
 function watchPage(page, role) {
+  const watcherId = ++nextPageWatcherId;
   page.on('response', response => {
     const request = response.request();
     const status = response.status();
     if (status >= 400 || request.method() === 'POST') {
       responseObservations.push({
+        watcher_id: watcherId,
         phase: activeCheck,
         role,
         method: request.method(),
@@ -153,13 +156,15 @@ function watchPage(page, role) {
       const status = reportedStatus ? Number(reportedStatus[1]) : null;
       const eventPath = safePathLabel(message.location().url);
       const matchingResponses = status === null ? [] : responseObservations.filter(item =>
-        item.phase === activeCheck
+        item.watcher_id === watcherId
+        && item.phase === activeCheck
         && item.role === role
         && item.path === eventPath
         && item.status === status
       );
       const response = matchingResponses.length === 1 ? matchingResponses[0] : null;
       const event = {
+        watcher_id: watcherId,
         phase: activeCheck,
         role,
         type: message.type(),
@@ -236,14 +241,15 @@ function classifyExpectedConsoleErrors(events, responses, checks, mainCandidateI
       && item.status === event.status
     );
     const eventMetadataMatches = rule
+      && Number.isSafeInteger(event.watcher_id)
+      && event.watcher_id > 0
       && event.type === 'error'
       && event.message_kind === 'browser_http_status_error'
-      && (event.response_method === null || event.response_method === undefined || event.response_method === rule.method)
-      && (event.response_path === null || event.response_path === undefined || event.response_path === rule.path)
-      && (event.response_status === null || event.response_status === undefined || event.response_status === rule.status);
+      && event.error_text === 'Browser reported an HTTP status error';
     const completedCheck = rule && checks.filter(item => item.name === rule.phase);
     const matchingResponseIndexes = rule ? responses.flatMap((response, index) =>
-      response.phase === rule.phase
+      response.watcher_id === event.watcher_id
+      && response.phase === rule.phase
       && response.role === rule.role
       && response.method === rule.method
       && response.path === rule.path
@@ -251,18 +257,18 @@ function classifyExpectedConsoleErrors(events, responses, checks, mainCandidateI
         ? [index]
         : []
     ) : [];
-    const responseFieldsMayBeAbsent = rule?.phase === 'real-household-create-edit-delete-and-csrf'
-      && rule.role === 'manager';
-    const responseFieldsPresent = event.response_method !== null && event.response_method !== undefined
-      && event.response_path !== null && event.response_path !== undefined
-      && event.response_status !== null && event.response_status !== undefined;
-    const responseFieldsValid = responseFieldsPresent || responseFieldsMayBeAbsent;
     const responseIndex = matchingResponseIndexes.length === 1 ? matchingResponseIndexes[0] : -1;
+    const response = responseIndex >= 0 ? responses[responseIndex] : null;
+    const responseFieldsMatch = response && (
+      (event.response_method === null || event.response_method === undefined || event.response_method === response.method)
+      && (event.response_path === null || event.response_path === undefined || event.response_path === response.path)
+      && (event.response_status === null || event.response_status === undefined || event.response_status === response.status)
+    );
     const expected = Boolean(
       eventMetadataMatches
       && completedCheck.length === 1
       && completedCheck[0].status === 'PASS'
-      && responseFieldsValid
+      && responseFieldsMatch
       && responseIndex >= 0
       && !usedResponseIndexes.has(responseIndex)
     );
@@ -614,15 +620,30 @@ async function main() {
       if (viewport.mobile) {
         const menu = page.locator('details.candidate-section-menu');
         assert(await menu.isVisible(), 'La navegación móvil no está visible.');
-        const menuSummary = await menu.locator('summary').boundingBox();
-        assert(menuSummary, 'El disparador de navegación móvil no tiene caja visible.');
-        await page.touchscreen.tap(menuSummary.x + menuSummary.width / 2, menuSummary.y + menuSummary.height / 2);
-        assert(await menu.locator('nav a').count() >= 6, 'El menú móvil no muestra las secciones disponibles.');
+        const menuSummary = menu.locator('summary');
+        assert(await menuSummary.isVisible(), 'El disparador de navegación móvil no está visible.');
+        await menuSummary.scrollIntoViewIfNeeded();
+        await menuSummary.tap();
+        assert(await menu.evaluate(element => element.open) === true, 'El toque no abrió el menú móvil.');
+        const menuNav = menu.locator('nav');
+        assert(await menuNav.isVisible(), 'El menú móvil abierto no muestra su navegación.');
+        assert(await menuNav.locator('a').count() >= 6, 'El menú móvil no muestra las secciones disponibles.');
+        const workLink = menu.getByRole('link', { name: /Información laboral/ });
+        assert(await workLink.isVisible(), 'El enlace Información laboral no está visible en el menú móvil abierto.');
         await capture(page, 'mobile-navigation-open', 'manager', viewport);
-        await menu.getByRole('link', { name: /Información laboral/ }).click();
+        const workHref = await workLink.getAttribute('href');
+        assert(workHref, 'El enlace Información laboral no tiene destino.');
+        const workUrl = new URL(workHref, page.url());
+        assert(workUrl.pathname === new URL(page.url()).pathname && workUrl.searchParams.get('section') === 'work', 'El enlace Información laboral no apunta a la sección correcta.');
+        await Promise.all([
+          page.waitForURL(url => url.pathname === workUrl.pathname && url.searchParams.get('section') === 'work'),
+          workLink.tap()
+        ]);
+        assert(new URL(page.url()).searchParams.get('section') === 'work', 'La navegación móvil no actualizó la URL de Información laboral.');
         assert(await page.locator('[data-candidate-section-body="work"]').count() === 1, 'La navegación móvil no abrió Información laboral.');
         await page.goBack();
         await settle(page);
+        assert(new URL(page.url()).searchParams.get('section') === 'household', 'El botón Atrás no restauró la URL de hogar.');
         assert(await page.locator('[data-candidate-section-body="household"]').count() === 1, 'El botón Atrás no restauró la sección de hogar.');
       }
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
