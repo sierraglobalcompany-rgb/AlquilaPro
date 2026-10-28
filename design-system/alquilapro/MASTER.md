@@ -6,7 +6,7 @@
 - Producto: AlquilaPro, gestión de alquiler residencial, administración e inquilinos.
 - Prioridad humana: **VERDAD → COMPRENSIÓN → DECISIÓN → ACCIÓN → DETALLE**. Diseño mobile-first, claro, cálido y sobrio; evitar marketing, tarjetas, KPIs y acciones ficticias.
 - En conflictos: seguridad/permisos/datos reales → decisión reciente del owner → SPEC aprobada → mockup aprobado para apariencia y estados → componentes/tokens existentes → recomendaciones externas. No convertir una falta de backend en licencia para **quitar** una región del mockup; reconciliar contrato y autorizar el alcance antes de rediseñar. Una imagen no crea por sí misma API, entidad ni autorización.
-- **Cinco leyes:** KISS, antirruido, antiparches, diseño Human-First (L4) y verificación independiente (L5). No autocertificar.
+- **Seis leyes:** KISS, antirruido, antiparches, diseño Human-First (L4), verificación independiente (L5) y antiping-pong (L6). No autocertificar.
 
 ## Implementación y owners existentes
 - Stack único **PHP 8.3–8.5, Slim SSR, PDO/MySQL/MariaDB, CSS y JS nativos**. Sin SPA, framework visual paralelo, motor de temas nuevo ni build Node para diseño.

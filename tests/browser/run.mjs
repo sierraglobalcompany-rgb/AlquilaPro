@@ -457,6 +457,76 @@ async function formByRecord(page, kind, recordId) {
   const section = page.locator('section[data-household-region="' + region + '"]');
   return section.locator('form.candidate-household-edit:has(input[name="record_id"][value="' + recordId + '"])').first();
 }
+async function openCreateForm(page, kind, touch = false) {
+  const detail = page.locator('details[data-household-action="create"][data-household-kind="' + kind + '"]');
+  assert(await detail.count() === 1, 'No existe una acción directa de creación para ' + kind + '.');
+  if (!(await detail.evaluate(element => element.open))) {
+    const summary = detail.locator('summary');
+    if (touch) {
+      const box = await summary.boundingBox();
+      assert(box, 'La acción de alta no tiene un objetivo táctil visible.');
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    } else await summary.click();
+  }
+  assert(await detail.evaluate(element => element.open), 'No se abrió el formulario directo de creación para ' + kind + '.');
+  assert(await page.locator('details[data-household-action="edit"][open][data-household-kind="' + kind + '"]').count() === 0, 'La creación dejó abierto un editor de ' + kind + '.');
+  const form = detail.locator('form.candidate-household-edit[data-household-form-kind="' + kind + '"][data-household-form-id="new"]');
+  assert(await form.count() === 1 && await form.isVisible(), 'No está visible el formulario de creación para ' + kind + '.');
+  return form;
+}
+async function openRecordEditor(page, kind, recordId, touch = false) {
+  const detail = page.locator('details[data-household-action="edit"][data-household-kind="' + kind + '"][data-household-record-id="' + recordId + '"]');
+  assert(await detail.count() === 1, 'La ficha ' + recordId + ' no tiene un editor individual de ' + kind + '.');
+  if (!(await detail.evaluate(element => element.open))) {
+    const summary = detail.locator('summary');
+    if (touch) {
+      const box = await summary.boundingBox();
+      assert(box, 'El editor individual no tiene un objetivo táctil visible.');
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    } else await summary.click();
+  }
+  assert(await detail.evaluate(element => element.open), 'No se abrió el editor individual ' + recordId + '.');
+  const region = kind === 'occupant' ? 'occupants' : 'pets';
+  assert(await page.locator('section[data-household-region="' + region + '"] details[data-household-action="edit"][open]').count() === 1, 'Hay más de una ficha abierta en la región ' + region + '.');
+  assert(await page.locator('section[data-household-region="' + region + '"] details[data-household-action="create"][open]').count() === 0, 'El editor dejó abierta también la creación de ' + kind + '.');
+  const form = await formByRecord(page, kind, recordId);
+  assert(await form.count() === 1 && await form.isVisible(), 'El formulario de la ficha ' + recordId + ' no quedó visible.');
+  return form;
+}
+async function submitInvalidEditAndCapture(page, kind, recordId, viewport) {
+  const region = kind === 'occupant' ? 'occupants' : 'pets';
+  const field = kind === 'occupant' ? 'full_name' : 'name';
+  const form = await openRecordEditor(page, kind, recordId, viewport.mobile);
+  const responsePromise = page.waitForResponse(response =>
+    response.request().method() === 'POST'
+    && new URL(response.url()).pathname.endsWith('/household/' + kind)
+  );
+  await form.evaluate((element, fieldName) => {
+    const input = element.querySelector('input[name="' + fieldName + '"]');
+    if (input) {
+      input.value = '';
+      input.removeAttribute('required');
+    }
+    element.requestSubmit();
+  }, field);
+  const response = await responsePromise;
+  await settle(page);
+  assert(response.status() === 422, 'La validación real de ' + kind + ' no devolvió HTTP 422.');
+  assert((response.headers()['content-type'] || '').includes('text/html'), 'La validación de ' + kind + ' no volvió a renderizar la ficha completa.');
+  const invalidForm = await formByRecord(page, kind, recordId);
+  const invalidField = invalidForm.locator('input[name="' + field + '"]');
+  assert(await invalidField.getAttribute('aria-invalid') === 'true', 'El campo inválido de ' + kind + ' no quedó marcado.');
+  assert(await invalidField.evaluate(element => element === document.activeElement), 'El foco no volvió al campo inválido de ' + kind + '.');
+  assert(await invalidForm.locator('[role="alert"]').count() === 1, 'El error accesible de ' + kind + ' no se renderizó exactamente una vez.');
+  const expectedMessage = kind === 'occupant' ? 'El nombre del ocupante es obligatorio.' : 'El nombre de la mascota es obligatorio.';
+  assert((await invalidForm.locator('[role="alert"]').innerText()).includes(expectedMessage), 'El error de ' + kind + ' no identifica el campo obligatorio.');
+  assert(await page.locator('section[data-household-region="' + region + '"] details[data-household-action="edit"][open][data-household-record-id="' + recordId + '"]').count() === 1, 'El error no abrió la ficha inválida de ' + kind + '.');
+  assert(await page.locator('section[data-household-region="' + region + '"] details[open]').count() === 1, 'La validación dejó más de un panel abierto de ' + kind + '.');
+  const otherRegion = kind === 'occupant' ? 'pets' : 'occupants';
+  assert(await page.locator('section[data-household-region="' + otherRegion + '"] details[open]').count() === 0, 'La validación abrió un panel de la región no afectada.');
+  await capture(page, kind + '-validation-error-422', 'manager', viewport);
+  return response.status();
+}
 async function createManagerContext(browser, credentials, viewport = viewportCases[0]) {
   const context = await makeContext(browser, viewport);
   const page = await context.newPage();
@@ -494,23 +564,36 @@ async function main() {
       const metrics = await inspectHousehold(page, 'main', 'manager', viewport);
       assert(await page.getByText('Camilo Demo G5', { exact: true }).count() > 0, 'No aparece la ficha sintética principal.');
       assert(await page.getByText('Ver versión en Documentos', { exact: true }).count() === 1, 'No aparece el manual JSON autorizado.');
-      assert(await page.locator('details.candidate-household-manager').count() === 2, 'El perfil manager no ve ambos formularios de gestión.');
-      for (const label of ['Agregar o editar ocupantes', 'Agregar o editar mascotas']) {
-        const action = page.getByText(label, { exact: true });
+      assert(await page.locator('details[data-household-action="create"]').count() === 2, 'El perfil manager no ve una acción de creación por región.');
+      for (const [kind, label] of [['occupant', 'Agregar ocupante'], ['pet', 'Agregar mascota']]) {
+        const action = page.locator('details[data-household-action="create"][data-household-kind="' + kind + '"] > summary');
         assert(await action.isVisible(), 'La acción de gestión no está visible: ' + label);
+        assert((await action.innerText()).trim() === label, 'La acción directa no tiene el nombre visible esperado: ' + label);
         const actionBox = await action.boundingBox();
         assert(actionBox && actionBox.height >= 44, 'La acción de gestión no tiene un área táctil de 44 px: ' + label);
+        if (viewport.mobile) {
+          const region = kind === 'occupant' ? 'occupants' : 'pets';
+          const regionBox = await page.locator('section[data-household-region="' + region + '"]').boundingBox();
+          assert(regionBox && actionBox.width >= regionBox.width - 36, 'La acción móvil no ocupa el ancho disponible: ' + label);
+        }
       }
+      assert(await page.locator('details[data-household-action="edit"]').count() >= 2, 'Las fichas reales no muestran su editor individual.');
       const desktopTabs = page.locator('nav[aria-label="Secciones del candidato"]');
       const responsiveMenu = page.locator('details.candidate-section-menu');
       assert(await desktopTabs.isVisible() || await responsiveMenu.isVisible(), 'No hay navegación de sección disponible en este viewport.');
       await capture(page, 'household-main', 'manager', viewport);
-      if (viewport.name === 'desktop-1448x1086') {
-        await page.getByText('Agregar o editar ocupantes', { exact: true }).click();
-        await capture(page, 'occupant-management-open', 'manager', viewport);
-        await page.getByText('Agregar o editar mascotas', { exact: true }).click();
-        await capture(page, 'pet-management-open', 'manager', viewport);
-      }
+      let actionForm = await openCreateForm(page, 'occupant', viewport.mobile);
+      await capture(page, 'occupant-create-open', 'manager', viewport);
+      await actionForm.locator('xpath=ancestor::details[1]/summary').click();
+      actionForm = await openCreateForm(page, 'pet', viewport.mobile);
+      await capture(page, 'pet-create-open', 'manager', viewport);
+      await actionForm.locator('xpath=ancestor::details[1]/summary').click();
+      actionForm = await openRecordEditor(page, 'occupant', mainCandidate.occupant_id, viewport.mobile);
+      await capture(page, 'occupant-edit-open', 'manager', viewport);
+      await actionForm.locator('xpath=ancestor::details[1]/summary').click();
+      actionForm = await openRecordEditor(page, 'pet', mainCandidate.pet_id, viewport.mobile);
+      await capture(page, 'pet-edit-open', 'manager', viewport);
+      await actionForm.locator('xpath=ancestor::details[1]/summary').click();
       if (viewport.mobile) {
         const menu = page.locator('details.candidate-section-menu');
         assert(await menu.isVisible(), 'La navegación móvil no está visible.');
@@ -541,24 +624,23 @@ async function main() {
         };
       });
       assert(bottomState && bottomState.bottom_visible && bottomState.unobscured, 'La última región queda oculta al final del scroll.');
+      await capture(page, 'scroll-final', 'manager', viewport);
       let keyboardFocus = null;
-      if (viewport.name === 'desktop-1448x1086') {
-        await page.evaluate(() => document.activeElement?.blur());
-        await page.keyboard.press('Tab');
-        keyboardFocus = await page.evaluate(() => {
-          const element = document.activeElement;
-          const style = element ? getComputedStyle(element) : null;
-          const rect = element?.getBoundingClientRect();
-          return {
-            tag: element?.tagName || null,
-            visible: Boolean(rect && rect.width > 0 && rect.height > 0),
-            outline: style?.outlineStyle || null,
-            outline_width: style?.outlineWidth || null
-          };
-        });
-        assert(keyboardFocus.visible && keyboardFocus.outline !== 'none' && keyboardFocus.outline_width !== '0px', 'El primer control de teclado no muestra un foco visible.');
-        await capture(page, 'keyboard-focus-visible', 'manager', viewport);
-      }
+      await page.evaluate(() => document.activeElement?.blur());
+      await page.keyboard.press('Tab');
+      keyboardFocus = await page.evaluate(() => {
+        const element = document.activeElement;
+        const style = element ? getComputedStyle(element) : null;
+        const rect = element?.getBoundingClientRect();
+        return {
+          tag: element?.tagName || null,
+          visible: Boolean(rect && rect.width > 0 && rect.height > 0),
+          outline: style?.outlineStyle || null,
+          outline_width: style?.outlineWidth || null
+        };
+      });
+      assert(keyboardFocus.visible && keyboardFocus.outline !== 'none' && keyboardFocus.outline_width !== '0px', 'El primer control de teclado no muestra un foco visible.');
+      await capture(page, 'keyboard-focus-visible', 'manager', viewport);
       if (viewport.name === 'desktop-1448x1086') {
         managerDesktop = { context, page };
       } else {
@@ -610,6 +692,7 @@ async function main() {
       } else {
         assert(response && response.status() === 200, 'El perfil con candidates.view no obtuvo 200: ' + role);
         assert(await page.locator('details.candidate-household-manager').count() === 0, 'Un perfil de solo lectura ve controles de gestión.');
+        assert(await page.locator('section[data-household-region="occupants"] form, section[data-household-region="pets"] form').count() === 0, 'El perfil de solo lectura ve formularios de mutación.');
         const propertyAddress = await page.getByText('Calle Sintética 100, Bogotá', { exact: true }).count();
         assert(propertyAddress === (role === 'viewer_property' || role === 'viewer_all' ? 1 : 0), 'La dirección de propiedad no coincide con el permiso del perfil: ' + role);
         const manualAllowed = role === 'viewer_all';
@@ -620,6 +703,7 @@ async function main() {
           assert(await page.getByText('La información del manual no está disponible para este perfil.', { exact: true }).count() === 1, 'La ACL del manual no oculta la información: ' + role);
           assert(await page.getByRole('link', { name: /Ver versión en Documentos/ }).count() === 0, 'La ACL expone el enlace al manual: ' + role);
         }
+        if (role === 'viewer') await capture(page, 'household-viewer-readonly', role, viewportCases[0]);
       }
       if (role === 'viewer') {
         const accountResponse = await page.goto(baseUrl + '/account', { waitUntil: 'domcontentloaded' });
@@ -641,6 +725,18 @@ async function main() {
       }
       roleOutcomes.push({ role, candidate_status: response?.status() ?? null, manual_visible: role === 'viewer_all' });
       note('role-acl-' + role, role, response?.status() === 200 ? 'read-only-allowed' : 'denied', { manual_visible: role === 'viewer_all' });
+      await context.close();
+    }
+    for (const viewport of viewportCases.slice(1)) {
+      const context = await makeContext(browser, viewport);
+      const page = await context.newPage();
+      watchPage(page, 'viewer');
+      await login(page, credentials.viewer, 'viewer');
+      const response = await page.goto(baseUrl + '/admin/candidates/' + mainCandidate.id + '?section=household', { waitUntil: 'domcontentloaded' });
+      await settle(page);
+      assert(response && response.status() === 200, 'El perfil viewer no obtuvo acceso de lectura en ' + viewport.name + '.');
+      assert(await page.locator('details.candidate-household-manager, section[data-household-region="occupants"] form, section[data-household-region="pets"] form').count() === 0, 'El perfil viewer ve controles de mutación en ' + viewport.name + '.');
+      await capture(page, 'household-viewer-readonly', 'viewer', viewport);
       await context.close();
     }
     const guestContext = await makeContext(browser, viewportCases[0]);
@@ -666,28 +762,33 @@ async function main() {
     const { page, context } = managerDesktop;
     for (const [key, expected] of [['long', '3 registradas'], ['empty', '0 registradas']]) {
       const candidate = fixture.candidates[key];
-      await openHousehold(page, candidate.id);
-      const metrics = await inspectHousehold(page, key, 'manager', viewportCases[0]);
-      if (key === 'long') {
-        assert(await page.getByText('Ocupante Demo G5 3', { exact: true }).count() === 1, 'No se renderizaron los N ocupantes.');
-        assert(await page.getByText('Mascota Demo G5 3', { exact: true }).count() === 1, 'No se renderizaron las N mascotas.');
-        assert(await page.locator('script').filter({ hasText: '__g5_injected' }).count() === 0, 'Las observaciones sintéticas escaparon HTML.');
-        assert(await page.evaluate(() => window.__g5_injected === undefined), 'El texto sintético se ejecutó como script.');
-      } else {
-        assert(await page.getByText('No hay fichas de otras personas registradas.', { exact: true }).count() === 1, 'No se representa el estado de 0 ocupantes.');
-        assert(await page.getByText('No hay fichas de mascotas registradas.', { exact: true }).count() === 1, 'No se representa el estado de 0 mascotas.');
-        assert(await page.getByText('Manual de convivencia no registrado.', { exact: true }).count() === 1, 'No se representa el manual ausente.');
-        assert(await page.getByText('No confirmado', { exact: true }).count() === 1, 'No se representa la respuesta histórica ambigua.');
+      let metrics = null;
+      for (const viewport of viewportCases) {
+        let targetPage = page;
+        let extraContext = null;
+        if (viewport !== viewportCases[0]) {
+          extraContext = await makeContext(browser, viewport);
+          targetPage = await extraContext.newPage();
+          watchPage(targetPage, 'manager');
+          await login(targetPage, credentials.manager, 'manager');
+        }
+        await openHousehold(targetPage, candidate.id);
+        const currentMetrics = await inspectHousehold(targetPage, key, 'manager', viewport);
+        metrics ||= currentMetrics;
+        if (key === 'long') {
+          assert(await targetPage.getByText('Ocupante Demo G5 3', { exact: true }).count() === 1, 'No se renderizaron los N ocupantes.');
+          assert(await targetPage.getByText('Mascota Demo G5 3', { exact: true }).count() === 1, 'No se renderizaron las N mascotas.');
+          assert(await targetPage.locator('script').filter({ hasText: '__g5_injected' }).count() === 0, 'Las observaciones sintéticas escaparon HTML.');
+          assert(await targetPage.evaluate(() => window.__g5_injected === undefined), 'El texto sintético se ejecutó como script.');
+        } else {
+          assert(await targetPage.getByText('No hay fichas de otras personas registradas.', { exact: true }).count() === 1, 'No se representa el estado de 0 ocupantes.');
+          assert(await targetPage.getByText('No hay fichas de mascotas registradas.', { exact: true }).count() === 1, 'No se representa el estado de 0 mascotas.');
+          assert(await targetPage.getByText('Manual de convivencia no registrado.', { exact: true }).count() === 1, 'No se representa el manual ausente.');
+          assert(await targetPage.getByText('No confirmado', { exact: true }).count() === 1, 'No se representa la respuesta histórica ambigua.');
+        }
+        await capture(targetPage, 'household-' + key, 'manager', viewport);
+        if (extraContext) await extraContext.close();
       }
-      await capture(page, 'household-' + key, 'manager', viewportCases[0]);
-      const smallContext = await makeContext(browser, viewportCases[3]);
-      const smallPage = await smallContext.newPage();
-      watchPage(smallPage, 'manager');
-      await login(smallPage, credentials.manager, 'manager');
-      await openHousehold(smallPage, candidate.id);
-      await inspectHousehold(smallPage, key, 'manager', viewportCases[3]);
-      await capture(smallPage, 'household-' + key, 'manager', viewportCases[3]);
-      await smallContext.close();
       note('fixture-state-' + key, 'manager', 'verified', { layout_height: metrics.document_height });
     }
     await openHousehold(page, mainCandidate.id);
@@ -709,8 +810,7 @@ async function main() {
     assert(await page.locator('img[alt="Fotografía de Max Demo G5"]').count() === 1, 'La imagen del registro no aparece en la página real.');
     await capture(page, 'photo-private-original', 'manager', viewportCases[0]);
 
-    await page.getByText('Agregar o editar mascotas', { exact: true }).click();
-    let editForm = await formByRecord(page, 'pet', mainPetId);
+    let editForm = await openRecordEditor(page, 'pet', mainPetId);
     await editForm.locator('input[name="name"]').fill('Max Demo G5 Reemplazado');
     await editForm.locator('input[name="photo"]').setInputFiles(fixture.uploads.replacement_photo);
     await editForm.locator('input[name="photo_consent"]').check();
@@ -725,8 +825,7 @@ async function main() {
     assert(await page.getByText('Max Demo G5 Reemplazado', { exact: true }).count() === 1, 'El cambio de mascota no sobrevivió a la recarga.');
     await capture(page, 'photo-replaced', 'manager', viewportCases[0]);
 
-    await page.getByText('Agregar o editar mascotas', { exact: true }).click();
-    editForm = await formByRecord(page, 'pet', mainPetId);
+    editForm = await openRecordEditor(page, 'pet', mainPetId);
     await editForm.locator('input[name="remove_photo"]').check();
     await submitAndWait(page, editForm, 'Guardar cambios', '/household/pet');
     assert(await page.locator('img[alt="Fotografía de Max Demo G5 Reemplazado"]').count() === 0, 'La foto retirada continúa visible.');
@@ -756,11 +855,10 @@ async function main() {
     assert(managerDesktop, 'La sesión manager desktop no quedó disponible.');
     const { context, page } = managerDesktop;
     await openHousehold(page, mainCandidate.id);
-    await page.getByText('Agregar o editar ocupantes', { exact: true }).click();
+    const createOccupant = await openCreateForm(page, 'occupant');
     const occupantsRegion = page.locator('section[data-household-region="occupants"]');
     const createOccupantButton = occupantsRegion.getByRole('button', { name: 'Crear ficha', exact: true });
     assert(await createOccupantButton.count() === 1, 'No se encontró el botón real para crear un ocupante en su región.');
-    const createOccupant = createOccupantButton.locator('xpath=ancestor::form[1]');
     assert(await createOccupant.evaluate(form => form.classList.contains('candidate-household-edit')), 'El formulario de creación de ocupante no pertenece al owner esperado.');
     assert((await createOccupant.getAttribute('action') || '').endsWith('/household/occupant'), 'El formulario de creación no apunta a la ruta de ocupantes.');
     await createOccupant.locator('input[name="full_name"]').fill('Ocupante G5 Creado');
@@ -771,16 +869,17 @@ async function main() {
     await submitAndWait(page, createOccupant, 'Crear ficha', '/household/occupant');
     assert(await page.getByText('Ocupante G5 Creado', { exact: true }).count() === 1, 'No se creó el ocupante desde el formulario real.');
     await capture(page, 'occupant-created', 'manager', viewportCases[0]);
-    await page.getByText('Agregar o editar ocupantes', { exact: true }).click();
-    const occupantForm = page.locator('section[data-household-region="occupants"] form.candidate-household-edit:has(input[name="full_name"][value="Ocupante G5 Creado"])').first();
-    const occupantId = await occupantForm.locator('input[name="record_id"]').inputValue();
+    const createdOccupantForm = page.locator('section[data-household-region="occupants"] form.candidate-household-edit:has(input[name="full_name"][value="Ocupante G5 Creado"])').first();
+    const occupantId = await createdOccupantForm.locator('input[name="record_id"]').inputValue();
     assert(/^\d+$/.test(occupantId), 'No se encontró el ID persistido del ocupante sintético.');
+    await openRecordEditor(page, 'occupant', mainCandidate.occupant_id);
+    const occupantForm = await openRecordEditor(page, 'occupant', occupantId);
     await occupantForm.locator('input[name="full_name"]').fill('Ocupante G5 Editado');
     await submitAndWait(page, occupantForm, 'Guardar cambios', '/household/occupant');
     await page.reload({ waitUntil: 'domcontentloaded' });
     await settle(page);
     assert(await page.getByText('Ocupante G5 Editado', { exact: true }).count() === 1, 'La edición del ocupante no persistió tras recargar.');
-    await page.getByText('Agregar o editar ocupantes', { exact: true }).click();
+    await openRecordEditor(page, 'occupant', occupantId);
     const deleteOccupant = page.locator('section[data-household-region="occupants"] form:not(.candidate-household-edit):has(input[name="record_id"][value="' + occupantId + '"])');
     page.once('dialog', dialog => dialog.accept());
     const deleteOccupantPromise = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/household/occupant'));
@@ -791,11 +890,10 @@ async function main() {
     assert(await page.getByText('Ocupante G5 Editado', { exact: true }).count() === 0, 'El ocupante eliminado continúa visible.');
 
     await openHousehold(page, mainCandidate.id);
-    await page.getByText('Agregar o editar mascotas', { exact: true }).click();
+    const createPet = await openCreateForm(page, 'pet');
     const petsRegion = page.locator('section[data-household-region="pets"]');
     const createPetButton = petsRegion.getByRole('button', { name: 'Crear ficha', exact: true });
     assert(await createPetButton.count() === 1, 'No se encontró el botón real para crear una mascota en su región.');
-    const createPet = createPetButton.locator('xpath=ancestor::form[1]');
     assert(await createPet.evaluate(form => form.classList.contains('candidate-household-edit')), 'El formulario de creación de mascota no pertenece al owner esperado.');
     assert((await createPet.getAttribute('action') || '').endsWith('/household/pet'), 'El formulario de creación no apunta a la ruta de mascotas.');
     await createPet.locator('input[name="name"]').fill('Mascota G5 Creada');
@@ -806,20 +904,20 @@ async function main() {
     await createPet.locator('textarea[name="notes"]').fill('Mascota de prueba ficticia.');
     await submitAndWait(page, createPet, 'Crear ficha', '/household/pet');
     assert(await page.getByText('Mascota G5 Creada', { exact: true }).count() === 1, 'No se creó la mascota desde el formulario real.');
-    await page.getByText('Agregar o editar mascotas', { exact: true }).click();
     const createdPetForm = page.locator('section[data-household-region="pets"] form.candidate-household-edit:has(input[name="name"][value="Mascota G5 Creada"])').first();
     const petId = await createdPetForm.locator('input[name="record_id"]').inputValue();
     assert(/^\d+$/.test(petId), 'No se encontró el ID persistido de la mascota sintética.');
-    await createdPetForm.locator('input[name="name"]').fill('Mascota G5 Editada');
-    await createdPetForm.locator('input[name="photo"]').setInputFiles(fixture.uploads.added_photo);
-    await createdPetForm.locator('input[name="photo_consent"]').check();
-    await submitAndWait(page, createdPetForm, 'Guardar cambios', '/household/pet');
+    const openCreatedPetForm = await openRecordEditor(page, 'pet', petId);
+    await openCreatedPetForm.locator('input[name="name"]').fill('Mascota G5 Editada');
+    await openCreatedPetForm.locator('input[name="photo"]').setInputFiles(fixture.uploads.added_photo);
+    await openCreatedPetForm.locator('input[name="photo_consent"]').check();
+    await submitAndWait(page, openCreatedPetForm, 'Guardar cambios', '/household/pet');
     await page.reload({ waitUntil: 'domcontentloaded' });
     await settle(page);
     assert(await page.getByText('Mascota G5 Editada', { exact: true }).count() === 1, 'La edición de mascota no persistió tras recargar.');
     assert(await page.locator('img[alt="Fotografía de Mascota G5 Editada"]').count() === 1, 'La carga de la foto nueva no se mostró.');
     await capture(page, 'pet-created-edited-with-photo', 'manager', viewportCases[0]);
-    await page.getByText('Agregar o editar mascotas', { exact: true }).click();
+    await openRecordEditor(page, 'pet', petId);
     const deletePet = page.locator('section[data-household-region="pets"] form:not(.candidate-household-edit):has(input[name="record_id"][value="' + petId + '"])');
     page.once('dialog', dialog => dialog.accept());
     const deletePetPromise = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/household/pet'));
@@ -837,66 +935,27 @@ async function main() {
     });
     assert(invalidCsrf.status() === 403, 'La mutación sin CSRF válido no devolvió 403.');
     assert(token.length === 64, 'El formulario real no entregó el token CSRF de la sesión.');
-    await page.getByText('Agregar o editar ocupantes', { exact: true }).click();
-    const invalidForm = await formByRecord(page, 'occupant', fixture.candidates.main.occupant_id);
-    const invalidResponsePromise = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/household/occupant'));
-    await invalidForm.evaluate(form => {
-      const name = form.querySelector('input[name="full_name"]');
-      if (name) {
-        name.value = '';
-        name.removeAttribute('required');
-      }
-      form.requestSubmit();
-    });
-    const invalidResponse = await invalidResponsePromise;
-    await settle(page);
-    const invalidMessage = await page.locator('body').innerText();
-    assert(invalidResponse.status() === 422, 'La validación real del formulario no rechazó datos inválidos con 422.');
-    assert((invalidResponse.headers()['content-type'] || '').includes('text/html'), 'La validación no volvió a renderizar la ficha completa.');
-    assert(invalidMessage.includes('Camilo Demo G5'), 'La validación perdió el contexto de la ficha.');
-    assert(invalidMessage.includes('El nombre del ocupante es obligatorio.'), 'La respuesta de validación no identifica el campo requerido.');
-    const invalidOccupantForm = page.locator('form[data-household-form-kind="occupant"][data-household-form-id="' + fixture.candidates.main.occupant_id + '"]');
-    const invalidOccupantName = invalidOccupantForm.locator('[name="full_name"]');
-    assert(await invalidOccupantForm.count() === 1, 'El error no abrió el formulario de edición del ocupante enviado.');
-    assert(await invalidOccupantName.getAttribute('aria-invalid') === 'true', 'El campo inválido no quedó marcado para accesibilidad.');
-    assert(await invalidOccupantName.evaluate(element => element === document.activeElement), 'El foco no volvió al campo inválido.');
-    assert(await invalidOccupantForm.locator('[role="alert"]').count() === 1, 'El error accesible no se renderizó exactamente una vez.');
-    assert(await page.locator('section[data-household-region="occupants"] details[open]').count() === 1, 'La validación no abrió el detalle de ocupantes.');
-    assert(await page.locator('section[data-household-region="pets"] details[open]').count() === 0, 'La validación abrió una sección de mascotas ajena.');
-    await capture(page, 'occupant-validation-error-422', 'manager', viewportCases[0]);
-    await page.getByText('Agregar o editar mascotas', { exact: true }).click();
-    const invalidPetForm = await formByRecord(page, 'pet', fixture.candidates.main.pet_id);
-    const invalidPetResponsePromise = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/household/pet'));
-    await invalidPetForm.evaluate(form => {
-      const name = form.querySelector('input[name="name"]');
-      if (name) {
-        name.value = '';
-        name.removeAttribute('required');
-      }
-      form.requestSubmit();
-    });
-    const invalidPetResponse = await invalidPetResponsePromise;
-    await settle(page);
-    const invalidPetName = invalidPetForm.locator('[name="name"]');
-    assert(invalidPetResponse.status() === 422, 'La validación real de mascota no devolvió 422.');
-    assert((invalidPetResponse.headers()['content-type'] || '').includes('text/html'), 'La validación de mascota no volvió a renderizar la ficha completa.');
-    assert(await invalidPetForm.count() === 1, 'El error no abrió el formulario de edición de mascota enviado.');
-    assert(await invalidPetName.getAttribute('aria-invalid') === 'true', 'El campo inválido de mascota no quedó marcado.');
-    assert(await invalidPetName.evaluate(element => element === document.activeElement), 'El foco de mascota no volvió al campo inválido.');
-    assert(await invalidPetForm.locator('[role="alert"]').count() === 1, 'El error de mascota no se renderizó exactamente una vez.');
-    assert(await page.locator('section[data-household-region="occupants"] details[open]').count() === 0, 'El error de mascota abrió la sección de ocupantes.');
-    assert(await page.locator('section[data-household-region="pets"] details[open]').count() === 1, 'El error no abrió el detalle de mascotas.');
-    await capture(page, 'pet-validation-error-422', 'manager', viewportCases[0]);
-    return { occupant: 'create-edit-reload-delete', pet: 'create-edit-reload-delete-photo', invalid_csrf: invalidCsrf.status(), invalid_occupant: invalidResponse.status(), invalid_pet: invalidPetResponse.status(), validation_message: 'required field' };
+    const invalidOccupant = await submitInvalidEditAndCapture(page, 'occupant', fixture.candidates.main.occupant_id, viewportCases[0]);
+    const invalidPet = await submitInvalidEditAndCapture(page, 'pet', fixture.candidates.main.pet_id, viewportCases[0]);
+    for (const viewport of viewportCases.slice(1)) {
+      const validationContext = await makeContext(browser, viewport);
+      const validationPage = await validationContext.newPage();
+      watchPage(validationPage, 'manager');
+      await login(validationPage, credentials.manager, 'manager');
+      await openHousehold(validationPage, mainCandidate.id);
+      await submitInvalidEditAndCapture(validationPage, 'occupant', fixture.candidates.main.occupant_id, viewport);
+      await submitInvalidEditAndCapture(validationPage, 'pet', fixture.candidates.main.pet_id, viewport);
+      await validationContext.close();
+    }
+    return { occupant: 'create-edit-reload-delete', pet: 'create-edit-reload-delete-photo', invalid_csrf: invalidCsrf.status(), invalid_occupant: invalidOccupant, invalid_pet: invalidPet, validation_viewports: viewportCases.map(viewport => viewport.name) };
   });
 
   await runCheck('household-photo-consent-validation', async () => {
     assert(managerDesktop, 'La sesión manager desktop no quedó disponible.');
     const { page } = managerDesktop;
     await openHousehold(page, mainCandidate.id);
-    await page.getByText('Agregar o editar ocupantes', { exact: true }).click();
+    const form = await openCreateForm(page, 'occupant');
     const region = page.locator('section[data-household-region="occupants"]');
-    const form = region.getByRole('button', { name: 'Crear ficha', exact: true }).locator('xpath=ancestor::form[1]');
     await form.locator('input[name="full_name"]').fill('Ocupante sin consentimiento QA');
     await form.locator('input[name="relationship"]').fill('Prueba');
     await form.locator('input[name="photo"]').setInputFiles(fixture.uploads.added_photo);
@@ -921,9 +980,8 @@ async function main() {
     assert(managerDesktop, 'La sesión manager desktop no quedó disponible.');
     const { page } = managerDesktop;
     await openHousehold(page, mainCandidate.id);
-    await page.getByText('Agregar o editar mascotas', { exact: true }).click();
+    const form = await openCreateForm(page, 'pet');
     const region = page.locator('section[data-household-region="pets"]');
-    const form = region.getByRole('button', { name: 'Crear ficha', exact: true }).locator('xpath=ancestor::form[1]');
     await form.locator('input[name="name"]').fill('Mascota archivo inválido QA');
     await form.locator('input[name="species"]').fill('Gato');
     await form.locator('input[name="photo"]').setInputFiles({

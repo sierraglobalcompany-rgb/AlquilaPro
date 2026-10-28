@@ -472,8 +472,10 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         foreach (['Riesgo bajo', 'Perfil familiar estable', 'Vacunación', 'Política del inmueble'] as $invented) {
             self::assertStringNotContainsString($invented, $html);
         }
-        self::assertStringContainsString('Agregar o editar ocupantes', $html);
-        self::assertStringContainsString('Agregar o editar mascotas', $html);
+        self::assertStringContainsString('Agregar ocupante', $html);
+        self::assertStringContainsString('Agregar mascota', $html);
+        self::assertStringNotContainsString('Agregar o editar ocupantes', $html);
+        self::assertStringNotContainsString('Agregar o editar mascotas', $html);
         self::assertStringNotContainsString('Administrar fichas', $html);
         self::assertStringNotContainsString('data-candidate-section-body="work"', $html);
     }
@@ -483,9 +485,11 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         $html = $this->renderOverview([
             'householdOccupants' => [
                 ['id' => 7, 'full_name' => 'Ocupante Demo', 'relationship' => 'Hermana', 'has_photo' => false],
+                ['id' => 8, 'full_name' => 'Otro Ocupante', 'relationship' => 'Familiar', 'has_photo' => false],
             ],
             'householdPets' => [
                 ['id' => 9, 'name' => 'Luna Demo', 'species' => 'Gato', 'has_photo' => false],
+                ['id' => 10, 'name' => 'Nube Demo', 'species' => 'Perro', 'has_photo' => false],
             ],
             'householdFormError' => [
                 'kind' => 'occupant',
@@ -502,20 +506,36 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
 
         $registeredOccupants = $xpath->query('//section[@data-household-region="summary"]//p[span[normalize-space(.)="Fichas adicionales"]]/strong');
         self::assertSame(1, $registeredOccupants->length);
-        self::assertSame('1 ficha registrada', trim($registeredOccupants->item(0)?->textContent ?? ''));
+        self::assertSame('2 fichas registradas', trim($registeredOccupants->item(0)?->textContent ?? ''));
         self::assertStringNotContainsString('1 registradas', trim($registeredOccupants->item(0)?->textContent ?? ''));
 
         foreach ([
-            'occupants' => 'Agregar o editar ocupantes',
-            'pets' => 'Agregar o editar mascotas',
-        ] as $kind => $label) {
-            $summary = $xpath->query('//section[@data-household-region="' . $kind . '"]/details/summary');
-            self::assertSame(1, $summary->length);
+            'occupants' => ['occupant', 'Agregar ocupante', 'household-occupants'],
+            'pets' => ['pet', 'Agregar mascota', 'household-pets'],
+        ] as $region => [$kind, $label, $groupName]) {
+            $createDetails = $xpath->query('//section[@data-household-region="' . $region . '"]//details[@data-household-action="create"]');
+            self::assertSame(1, $createDetails->length, 'Each region has one independent create disclosure.');
+            self::assertSame($groupName, $createDetails->item(0)?->getAttribute('name'));
+            self::assertSame($kind, $createDetails->item(0)?->getAttribute('data-household-kind'));
+            self::assertSame(1, $xpath->query('.//form[@data-household-form-kind="' . $kind . '" and @data-household-form-id="new"]', $createDetails->item(0))->length);
+            $summary = $xpath->query('./summary', $createDetails->item(0));
             self::assertSame($label, trim($summary->item(0)?->textContent ?? ''));
+            self::assertSame(1, $xpath->query('following::div[contains(@class,"candidate-household-records")][ancestor::section[@data-household-region="' . $region . '"]]', $createDetails->item(0))->length, 'The create action precedes the record list.');
+
+            $editors = $xpath->query('//section[@data-household-region="' . $region . '"]//article[contains(@class,"candidate-household-record")]//details[@data-household-action="edit"]');
+            self::assertSame(2, $editors->length, 'Each real record has its own editor.');
+            foreach ($editors as $editor) {
+                self::assertSame($kind, $editor->getAttribute('data-household-kind'));
+                self::assertSame($groupName, $editor->getAttribute('name'));
+                self::assertSame(1, $xpath->query('./form[@data-household-form-kind="' . $kind . '"]', $editor)->length);
+                self::assertSame(1, $xpath->query('./form[.//input[@name="action" and @value="delete"]]', $editor)->length);
+            }
         }
 
+        self::assertSame(0, $xpath->query('//summary[contains(normalize-space(.),"Agregar o editar")]')->length);
         $openManagers = $xpath->query('//section[@data-household-region="occupants" or @data-household-region="pets"]//details[@open]');
-        self::assertSame(1, $openManagers->length, 'Only the manager containing the validation error should open.');
+        self::assertSame(1, $openManagers->length, 'Only the editor containing the validation error should open.');
+        self::assertSame('7', $openManagers->item(0)?->getAttribute('data-household-record-id'));
         $targetForm = $xpath->query('//form[@data-household-form-kind="occupant" and @data-household-form-id="7"]');
         self::assertSame(1, $targetForm->length);
         self::assertSame(1, $xpath->query('ancestor::details[@open]', $targetForm->item(0))->length);
@@ -530,6 +550,47 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertSame($alert->item(0)?->getAttribute('id'), $name->getAttribute('aria-describedby'));
         self::assertSame('', $name->getAttribute('value'));
         self::assertSame('Relación conservada', $xpath->query('.//*[@name="relationship"]/@value', $targetForm->item(0))->item(0)?->nodeValue);
+    }
+
+    public function testHouseholdCreateValidationOpensOnlyItsOwnCreateDisclosure(): void
+    {
+        $html = $this->renderOverview([
+            'householdFormError' => [
+                'kind' => 'pet',
+                'record_id' => null,
+                'field' => 'name',
+                'message' => 'El nombre de la mascota es obligatorio.',
+                'old_input' => ['name' => ''],
+            ],
+        ], '', ['contracts' => [], 'can_create' => false], 'household');
+
+        $dom = new \DOMDocument();
+        @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        $xpath = new \DOMXPath($dom);
+        self::assertSame(1, $xpath->query('//section[@data-household-region="pets"]//details[@data-household-action="create"][@open]')->length);
+        self::assertSame(0, $xpath->query('//section[@data-household-region="occupants"]//details[@open]')->length);
+        self::assertSame(0, $xpath->query('//section[@data-household-region="pets"]/article//details[@open]')->length);
+        $form = $xpath->query('//form[@data-household-form-kind="pet" and @data-household-form-id="new"]');
+        self::assertSame(1, $form->length);
+        self::assertSame(1, $xpath->query('.//*[@name="name" and @aria-invalid="true" and @autofocus]', $form->item(0))->length);
+        self::assertSame('El nombre de la mascota es obligatorio.', trim($xpath->evaluate('string(.//*[@role="alert"])', $form->item(0))));
+    }
+
+    public function testHouseholdReadOnlyRoleSeesRecordsWithoutMutationDisclosures(): void
+    {
+        $html = $this->renderOverview([
+            'householdCanManage' => false,
+            'householdOccupants' => [['id' => 7, 'full_name' => 'Ocupante Lectura', 'relationship' => 'Familiar']],
+            'householdPets' => [['id' => 9, 'name' => 'Mascota Lectura', 'species' => 'Gato']],
+        ], '', ['contracts' => [], 'can_create' => false], 'household');
+
+        $dom = new \DOMDocument();
+        @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        $xpath = new \DOMXPath($dom);
+        self::assertSame(0, $xpath->query('//section[@data-household-region="occupants" or @data-household-region="pets"]//details')->length);
+        self::assertSame(0, $xpath->query('//section[@data-household-region="occupants" or @data-household-region="pets"]//form[@data-household-form-kind]')->length);
+        self::assertSame(1, $xpath->query('//section[@data-household-region="occupants"]//h4[normalize-space(.)="Ocupante Lectura"]')->length);
+        self::assertSame(1, $xpath->query('//section[@data-household-region="pets"]//h4[normalize-space(.)="Mascota Lectura"]')->length);
     }
 
     public function testHouseholdSummaryCountsPetRowsIndependentOfExplicitAnswer(): void
