@@ -434,7 +434,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                     <div class="candidate-household-facts">
                         <p><span class="candidate-household-stat-icon" aria-hidden="true"><?= $candidateIcon('home') ?></span><span class="candidate-household-stat-label">Total declarado</span><strong><?php if ($occupantsCount === null): ?>Cantidad no declarada<?php else: ?><span class="candidate-household-stat-value"><?= $escape($occupantsCount) ?></span> <span class="candidate-household-stat-copy"><?= $occupantsCount === 1 ? 'ocupante declarado' : 'ocupantes declarados' ?></span><?php endif; ?></strong></p>
                         <p><span class="candidate-household-stat-icon" aria-hidden="true"><?= $candidateIcon('users') ?></span><span class="candidate-household-stat-label">Fichas adicionales</span><strong><span class="candidate-household-stat-value"><?= $escape($registeredOccupants) ?></span> <span class="candidate-household-stat-copy"><?= $registeredOccupants === 1 ? 'ficha registrada' : 'fichas registradas' ?></span></strong></p>
-                        <p><span class="candidate-household-stat-icon" aria-hidden="true"><?= $candidateIcon('files') ?></span><span class="candidate-household-stat-label">Mascotas</span><strong><span class="candidate-household-stat-value"><?= $escape($registeredPetCount) ?></span> <span class="candidate-household-stat-copy"><?= $registeredPetCount === 1 ? 'ficha registrada' : 'fichas registradas' ?></span></strong></p>
+                        <p><span class="candidate-household-stat-icon" aria-hidden="true"><?= $candidateIcon('paw') ?></span><span class="candidate-household-stat-label">Mascotas</span><strong><span class="candidate-household-stat-value"><?= $escape($registeredPetCount) ?></span> <span class="candidate-household-stat-copy"><?= $registeredPetCount === 1 ? 'ficha registrada' : 'fichas registradas' ?></span></strong></p>
                     </div>
                 </section>
 
@@ -526,7 +526,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
 
                 <section class="content-card candidate-card candidate-household-pets" data-household-region="pets" aria-labelledby="candidate-household-pets-title">
                     <div class="candidate-household-region-heading">
-                        <div><h3 id="candidate-household-pets-title"><?= $candidateIcon('account') ?>Mascotas <span class="candidate-household-count"><?= $escape($registeredPetCount . ($registeredPetCount === 1 ? ' ficha registrada' : ' fichas registradas')) ?></span></h3></div>
+                        <div><h3 id="candidate-household-pets-title"><?= $candidateIcon('paw') ?>Mascotas <span class="candidate-household-count"><?= $escape($registeredPetCount . ($registeredPetCount === 1 ? ' ficha registrada' : ' fichas registradas')) ?></span></h3></div>
                         <?php if ($householdCanManage): ?>
                             <details class="candidate-household-manager candidate-household-manager--create" data-household-action="create" data-household-kind="pet" data-household-record-id="new" name="household-pets" <?= $householdFormHasError('pet', 'new') ? 'open' : '' ?>>
                                 <summary>Agregar mascota</summary>

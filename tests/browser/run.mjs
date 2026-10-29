@@ -6,12 +6,13 @@ import { chromium } from 'playwright';
 
 const baseUrl = (process.env.CAND03_G5_BASE_URL || 'http://127.0.0.1:8787').replace(/\/+$/, '');
 const fixturePath = process.env.CAND03_G5_FIXTURE || path.join(process.env.RUNNER_TEMP || '', 'cand03-g5-fixture.json');
-const artifactDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'artifacts');
+const localIsolated = process.env.CAND03_G5_LOCAL_ISOLATED === '1';
+const artifactDir = localIsolated ? process.env.CAND03_G5_ARTIFACT_DIR : path.join(path.dirname(fileURLToPath(import.meta.url)), 'artifacts');
 const eventPath = process.env.GITHUB_EVENT_PATH || '';
-const ciSha = process.env.GITHUB_SHA || 'unknown';
+const ciSha = localIsolated ? 'LOCAL_WORKING_TREE' : process.env.GITHUB_SHA || 'unknown';
 let eventData = {};
 try { eventData = JSON.parse(await fs.readFile(eventPath, 'utf8')); } catch {}
-const prHeadSha = eventData.pull_request?.head?.sha || ciSha;
+const prHeadSha = eventData.pull_request?.head?.sha || process.env.CAND03_G5_BASE_SHA || ciSha;
 const viewportCases = [
   { name: 'desktop-1448x1086', width: 1448, height: 1086, mobile: false },
   { name: 'desktop-1100x850', width: 1100, height: 850, mobile: false },
@@ -27,6 +28,7 @@ const regions = [
   ['next-steps', 'Próximos pasos']
 ];
 const manifest = {
+  execution_mode: localIsolated ? 'LOCAL_DOCKER_ISOLATED' : 'GITHUB_ACTIONS',
   schema_version: 1,
   task: 'AP-R7-CAND03-G5-CI-BROWSER-REAL-20261026',
   synthetic_data_only: true,
@@ -352,6 +354,18 @@ async function prepareImages(page) {
 async function capture(page, label, role, viewport) {
   await settle(page);
   await prepareImages(page);
+  const layout = await page.evaluate(() => ({
+    document_width: document.documentElement.scrollWidth,
+    viewport_width: innerWidth,
+    forms: Array.from(document.querySelectorAll('details[open][data-household-action] form')).map(form => {
+      const card = form.closest('[data-household-region]');
+      const rect = form.getBoundingClientRect();
+      const bounds = card.getBoundingClientRect();
+      return { region: card.dataset.householdRegion, left: rect.left, right: rect.right,
+        card_left: bounds.left, card_right: bounds.right };
+    })
+  }));
+  manifest.metrics.push({ label, role, viewport: viewport.name, layout });
   const safeLabel = label.replace(/[^A-Za-z0-9_-]/g, '-');
   const safeRole = role.replace(/[^A-Za-z0-9_-]/g, '-');
   const prefix = safeRole + '__' + safeLabel + '__' + viewport.name;
@@ -367,9 +381,6 @@ async function capture(page, label, role, viewport) {
     const absolute = path.join(artifactDir, 'screenshots', file);
     const pngWidth = bytes.readUInt32BE(16);
     const pngHeight = bytes.readUInt32BE(20);
-    assert(pngWidth === viewport.width, 'La captura no conserva el ancho del viewport.');
-    if (mode === 'viewport') assert(pngHeight === viewport.height, 'La captura viewport quedó recortada o alterada.');
-    if (mode === 'full-page') assert(pngHeight >= viewport.height, 'La captura full-page no cubre el viewport completo.');
     await fs.mkdir(path.dirname(absolute), { recursive: true });
     await fs.writeFile(absolute, bytes);
     manifest.screenshots.push({
@@ -384,6 +395,10 @@ async function capture(page, label, role, viewport) {
       sha256: sha256(bytes),
       route: safePathLabel(page.url())
     });
+    assert(layout.forms.every(form => form.left >= form.card_left && form.right <= form.card_right), 'Un formulario abierto sale de su región.');
+    assert(pngWidth === viewport.width, 'La captura no conserva el ancho del viewport.');
+    if (mode === 'viewport') assert(pngHeight === viewport.height, 'La captura viewport quedó recortada o alterada.');
+    if (mode === 'full-page') assert(pngHeight >= viewport.height, 'La captura full-page no cubre el viewport completo.');
   }
 }
 async function inspectHousehold(page, label, role, viewport, expectedRegions = 6) {
@@ -397,9 +412,13 @@ async function inspectHousehold(page, label, role, viewport, expectedRegions = 6
         continue;
       }
       const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      const headingStyle = getComputedStyle(element.querySelector('h2,h3'));
       boxes[key] = {
         x: Math.round(rect.x), y: Math.round(rect.y),
         width: Math.round(rect.width), height: Math.round(rect.height),
+        font_family: style.fontFamily, font_size: style.fontSize, padding: style.padding, gap: style.gap,
+        heading_font_size: headingStyle.fontSize, heading_line_height: headingStyle.lineHeight,
         text_length: (element.innerText || '').trim().length,
         heading_labelled: Boolean(element.getAttribute('aria-labelledby')
           && document.getElementById(element.getAttribute('aria-labelledby')))
@@ -434,6 +453,9 @@ async function inspectHousehold(page, label, role, viewport, expectedRegions = 6
   assert(measured.image_states.every(image => image.loaded), 'Hay imágenes de hogar sin cargar o decodificar.');
   const result = { label, role, viewport: viewport.name, ...measured };
   manifest.metrics.push(result);
+  if (label === 'main' && viewport.name === 'desktop-1448x1086') {
+    assert(Object.values(measured.regions).every(region => region.y + region.height <= viewport.height), 'Las tres filas del hogar no caben completas en el escritorio de referencia.');
+  }
   return result;
 }
 async function openHousehold(page, candidateId) {
@@ -539,20 +561,30 @@ async function createManagerContext(browser, credentials, viewport = viewportCas
   return { context, page };
 }
 async function main() {
-  assert(process.env.GITHUB_ACTIONS === 'true' && process.env.CI === 'true', 'Browser QA solo puede ejecutarse en el runner de GitHub Actions.');
-  assert(process.env.GITHUB_EVENT_NAME === 'pull_request' && eventData.pull_request?.number === 55, 'Browser QA solo acepta el evento pull_request #55.');
-  assert(eventData.pull_request?.head?.ref === 'impl/cand-03-household-human-first-20261023', 'El PR no usa la rama autorizada para CAND-03.');
-  assert(eventData.pull_request?.head?.sha === prHeadSha, 'No se pudo atribuir la ejecución al HEAD del PR.');
+  if (!localIsolated) {
+    assert(process.env.GITHUB_ACTIONS === 'true' && process.env.CI === 'true', 'Browser QA solo puede ejecutarse en el runner de GitHub Actions.');
+    assert(process.env.GITHUB_EVENT_NAME === 'pull_request' && eventData.pull_request?.number === 55, 'Browser QA solo acepta el evento pull_request #55.');
+    assert(eventData.pull_request?.head?.ref === 'impl/cand-03-household-human-first-20261023', 'El PR no usa la rama autorizada para CAND-03.');
+    assert(eventData.pull_request?.head?.sha === prHeadSha, 'No se pudo atribuir la ejecución al HEAD del PR.');
+  }
   assert(new URL(baseUrl).origin === 'http://127.0.0.1:8787', 'El servidor Browser QA debe estar enlazado al loopback autorizado.');
-  await fs.rm(artifactDir, { recursive: true, force: true });
-  await fs.mkdir(artifactDir, { recursive: true });
   const fixture = JSON.parse(await fs.readFile(fixturePath, 'utf8'));
+  assert(!localIsolated || (fixture.local_isolated === true && path.isAbsolute(artifactDir)
+    && /^[a-f0-9]{40}$/.test(prHeadSha)), 'El modo local requiere fixture Docker aislado, base SHA y carpeta de evidencia absoluta.');
+  await fs.mkdir(artifactDir, { recursive: true });
+  const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+  manifest.source_hashes = {};
+  for (const file of ['assets/app.css', 'resources/views/candidate_detail.php', 'tests/browser/run.mjs']) {
+    manifest.source_hashes[file] = sha256(await fs.readFile(path.join(repoRoot, file)));
+  }
+  const servedCss = await fetch(baseUrl + '/assets/app.css');
+  assert(servedCss.ok && sha256(Buffer.from(await servedCss.arrayBuffer())) === manifest.source_hashes['assets/app.css'], 'El CSS servido no coincide con el árbol bajo prueba.');
   browser = await chromium.launch({ headless: true });
   const mainCandidate = fixture.candidates.main;
   const longCandidate = fixture.candidates.long;
   const emptyCandidate = fixture.candidates.empty;
   const credentials = fixture.credentials;
-  let managerDesktop = null;
+  let managerDesktop = await createManagerContext(browser, credentials.manager);
 
   for (const viewport of viewportCases) {
     await runCheck('authenticated-household-' + viewport.name, async () => {
@@ -679,11 +711,7 @@ async function main() {
       });
       assert(keyboardFocus.visible && keyboardFocus.outline !== 'none' && keyboardFocus.outline_width !== '0px', 'El primer control de teclado no muestra un foco visible.');
       await capture(page, 'keyboard-focus-visible', 'manager', viewport);
-      if (viewport.name === 'desktop-1448x1086') {
-        managerDesktop = { context, page };
-      } else {
-        await context.close();
-      }
+      await context.close();
       return { http_status: response.status(), metrics, bottom_state: bottomState, keyboard_focus: keyboardFocus, authenticated_session: true };
     });
   }

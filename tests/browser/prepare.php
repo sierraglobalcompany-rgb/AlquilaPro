@@ -127,7 +127,10 @@ function g5Candidate(PDO $pdo, int $unitId, string $key, string $name, int $occu
 }
 
 try {
-    g5Require(getenv('GITHUB_ACTIONS') === 'true' && getenv('CI') === 'true', 'Este fixture solo puede ejecutarse en GitHub Actions.');
+    $localIsolated = getenv('CAND03_G5_LOCAL_ISOLATED') === '1';
+    g5Require(!$localIsolated || (is_file('/.dockerenv') && realpath(dirname(__DIR__, 2)) === '/qa/AlquilaPro'
+        && getenv('RUNNER_TEMP') === '/qa/runtime'), 'El modo local requiere el laboratorio Docker desechable /qa.');
+    g5Require($localIsolated || (getenv('GITHUB_ACTIONS') === 'true' && getenv('CI') === 'true'), 'Este fixture requiere CI o el laboratorio Docker aislado.');
     $runnerTemp = getenv('RUNNER_TEMP');
     $githubEnv = getenv('GITHUB_ENV');
     g5Require(is_string($runnerTemp) && $runnerTemp !== '' && is_string($githubEnv) && $githubEnv !== '', 'Faltan rutas efímeras del runner.');
@@ -265,6 +268,7 @@ try {
     g5Write($databaseConfigPath, $config);
     (new InstallationLock($lockPath))->write(['schema_version' => '1', 'installed_at' => date(DATE_ATOM)]);
     $fixture = [
+        'local_isolated' => $localIsolated,
         'credentials' => $credentials,
         'candidates' => [
             'main' => ['id' => $mainId, 'property_id' => $mainProperty['property_id'], 'occupant_id' => (int) $mainOccupant['id'], 'pet_id' => (int) $mainPet['id']],
