@@ -696,13 +696,14 @@ final class CandidatesAdminRoutesTest extends TestCase
         $documentPage = (string) $this->request($app, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=documents')->getBody();
         self::assertStringContainsString('data-candidate-section-body="documents"', $documentPage);
         self::assertSame(1, substr_count($documentPage, 'data-candidate-section-body='));
-        self::assertStringContainsString('Certificación de ingresos', $documentPage);
-        self::assertStringContainsString('Pendiente de recibir', $documentPage);
-        self::assertStringContainsString('candidate-documents-layout', $documentPage);
+        self::assertStringContainsString('No hay documentos adjuntos.', $documentPage);
+        self::assertFalse(str_contains($documentPage, 'Pendiente de recibir'));
+        self::assertFalse(str_contains($documentPage, 'Certificación de ingresos'));
+        self::assertStringContainsString('candidate-documents-heading', $documentPage);
         self::assertStringNotContainsString('candidate-work-panel', $documentPage);
     }
 
-    public function testDocumentSectionUsesActiveUnitRequirementsWithoutFakeApproval(): void
+    public function testDocumentSectionShowsOnlyReceivedFilesAndTheirRequirementLabels(): void
     {
         $candidateId = $this->insertCandidate('DOC-TRUTH-01', 'Candidato Documentos');
         $unitId = $this->candidateUnitId($candidateId);
@@ -735,25 +736,18 @@ final class CandidatesAdminRoutesTest extends TestCase
         self::assertSame(200, $response->getStatusCode());
         $html = (string) $response->getBody();
 
-        self::assertStringContainsString('class="candidate-documents-layout"', $html);
+        self::assertStringContainsString('class="candidate-documents-heading"', $html);
         self::assertStringContainsString('class="candidate-document-list"', $html);
-        self::assertSame(3, substr_count($html, 'class="candidate-document-row" data-document-status='));
-        self::assertSame(1, substr_count($html, 'data-document-status="pending"'));
-        self::assertSame(1, substr_count($html, 'data-document-status="optional"'));
-        self::assertStringContainsString('aria-label="Resumen documental"', $html);
-        self::assertStringContainsString('<progress value="1" max="2"', $html);
-        self::assertStringContainsString('Requisitos pendientes', $html);
-        self::assertStringNotContainsString('class="users-grid" aria-label="Requisitos documentales activos"', $html);
-        self::assertStringContainsString('data-document-required-count="2"', $html);
-        self::assertStringContainsString('data-document-received-count="1"', $html);
-        self::assertStringContainsString('1 de 2 requisitos obligatorios recibidos', $html);
+        self::assertSame(1, substr_count($html, 'class="candidate-document-row" data-document-status="received"'));
+        self::assertFalse(str_contains($html, 'aria-label="Resumen documental"'));
+        self::assertFalse(str_contains($html, '<progress'));
+        self::assertFalse(str_contains($html, 'Requisitos pendientes'));
+        self::assertFalse(str_contains($html, 'Soporte mascota'));
+        self::assertFalse(str_contains($html, '&lt;script&gt;Ingresos&lt;/script&gt;'));
         self::assertStringContainsString('Identidad', $html);
         self::assertStringContainsString('documento-real.pdf', $html);
         self::assertStringContainsString('/sub/admin/candidates/' . $candidateId . '/documents/' . $received['id'], $html);
-        self::assertStringContainsString('&lt;script&gt;Ingresos&lt;/script&gt;', $html);
         self::assertStringNotContainsString('<script>Ingresos</script>', $html);
-        self::assertStringContainsString('Pendiente de recibir', $html);
-        self::assertStringContainsString('Opcional, no aportado', $html);
         self::assertStringNotContainsString('REQUISITO_INACTIVO_NO_MOSTRAR', $html);
         self::assertStringNotContainsString('Aprobado', $html);
         self::assertStringNotContainsString('En revisión', $html);
@@ -761,7 +755,7 @@ final class CandidatesAdminRoutesTest extends TestCase
         self::assertStringNotContainsString($this->documentDirectory, $html);
     }
 
-    public function testDocumentSectionWithoutRequirementsRetainsHonestEmptyState(): void
+    public function testDocumentSectionShowsHonestEmptyStateWithoutAttachments(): void
     {
         $candidateId = $this->insertCandidate('DOC-TRUTH-EMPTY', 'Candidato sin documentos');
         $this->insertUser('doc-empty@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
@@ -769,9 +763,9 @@ final class CandidatesAdminRoutesTest extends TestCase
         $this->login($app, 'doc-empty@example.com', 'ViewerPassword123');
 
         $html = (string) $this->request($app, 'GET', '/admin/candidates/' . $candidateId . '?section=documents')->getBody();
-        self::assertStringContainsString('No hay requisitos documentales activos configurados', $html);
         self::assertStringContainsString('No hay documentos adjuntos.', $html);
-        self::assertStringNotContainsString('de 0 requisitos obligatorios', $html);
+        self::assertFalse(str_contains($html, 'requisitos documentales'));
+        self::assertFalse(str_contains($html, 'Pendiente de recibir'));
     }
 
     public function testListAndDetailEscapeCandidateReferenceAndOriginalFilename(): void

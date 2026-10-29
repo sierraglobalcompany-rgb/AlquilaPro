@@ -127,6 +127,15 @@ PRECHECK → RED → verify RED → RED commit
 
 No acumular varios microbloques sin merge intermedio.
 
+### Addendum R7 — excepción de integración para PR #55 (2026-10-29)
+
+Por autorización expresa del propietario, el PR #55 existente (`impl/cand-03-household-human-first-20261023`) es la superficie de integración de CAND-01 a CAND-09. Para esta ejecución R7 se agrupan CAND-04 a CAND-09 sin merges intermedios. Esta excepción cambia únicamente la secuencia de integración; no modifica la SPEC de negocio, permisos, seguridad, diseños aprobados, pruebas, CI, QA, gates de propietario ni la autorización de merge.
+
+- **Bloque A — CAND-04 Referencias, CAND-05 Documentos y CAND-06 Estudio de aseguradora:** un único commit y push normal, hijo directo de `d036cda5e11aea31184250213ff414d346e51e89`, limitado a las seis rutas de código autorizadas y este addendum. El checkpoint canónico no forma parte de este lote.
+- **Bloque B — CAND-07 Contratos, CAND-08 Administrar y CAND-09 Lista de candidatos:** sólo después de CI PHP verde para A y Browser QA seguro sobre los mismos blobs publicados; ejecución local en el mismo encargo, sin commit ni push.
+- Cada gate se registra en el informe/PR con SHA, pruebas y evidencia observada. Al cierre integrado de R7 se actualizará el checkpoint canónico según `AGENTS.md` §7, salvo autorización específica anterior.
+- El PR permanece Draft. Este addendum no autoriza merge, despliegue, release, producción, ni cambios de alcance funcional fuera de CAND-01–09.
+
 ---
 
 ### Task 1 — CAND-01: Shell + navegación + Solicitud

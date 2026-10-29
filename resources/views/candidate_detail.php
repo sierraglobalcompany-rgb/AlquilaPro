@@ -67,6 +67,21 @@ $humanDate = static function (mixed $value, bool $withTime = false): ?string {
     return $date->format($withTime ? 'd/m/Y · H:i' : 'd/m/Y');
 };
 
+$screeningDates = [];
+foreach (['started_at' => 'Inicio del estudio', 'result_at' => 'Resultado registrado el'] as $field => $label) {
+    $value = $screening[$field] ?? null;
+    $humanValue = $humanDate($value, true);
+    if ($humanValue === null) {
+        continue;
+    }
+    try {
+        $machineValue = (new DateTimeImmutable((string) $value))->format(DateTimeInterface::ATOM);
+    } catch (Throwable) {
+        continue;
+    }
+    $screeningDates[] = ['label' => $label, 'datetime' => $machineValue, 'value' => $humanValue];
+}
+
 $humanMoney = static function (mixed $amount): ?string {
     return is_numeric($amount) ? '$ ' . number_format((float) $amount, 0, ',', '.') . ' COP' : null;
 };
@@ -595,7 +610,7 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                 <section class="content-card candidate-card candidate-household-next" data-household-region="next-steps" aria-labelledby="candidate-household-next-title">
                     <h3 id="candidate-household-next-title"><?= $candidateIcon('history') ?>Próximos pasos</h3>
                     <ul class="candidate-household-next-list">
-                        <?php foreach ([['work', 'Información laboral', 'Consultar datos laborales declarados'], ['references', 'Referencias', 'Consultar referencias registradas'], ['documents', 'Documentos', 'Consultar los requisitos adjuntos']] as [$key, $label, $description]): ?>
+                        <?php foreach ([['work', 'Información laboral', 'Consultar datos laborales declarados'], ['references', 'Referencias', 'Consultar referencias registradas'], ['documents', 'Documentos', 'Consultar los documentos recibidos']] as [$key, $label, $description]): ?>
                             <?php if (in_array($key, array_column($candidateSections, 'key'), true)): ?><li><a href="<?= $escape($sectionHref($key)) ?>"><span class="candidate-household-next-marker" aria-hidden="true"></span><span class="candidate-household-next-copy"><strong><?= $escape($label) ?></strong><span><?= $escape($description) ?></span></span></a></li><?php endif; ?>
                         <?php endforeach; ?>
                     </ul>
@@ -614,10 +629,10 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                         <?php foreach ($candidate['references'] as $reference): ?>
                             <article class="user-card">
                                 <strong><?= $escape($reference['name']) ?></strong>
-                                <div><?= $escape($reference['reference_type'] ?? '') ?></div>
-                                <div><?= $escape($reference['relationship'] ?? '') ?></div>
-                                <div><?= $escape($reference['phone']) ?></div>
-                                <div><?= $escape($reference['email'] ?? '') ?></div>
+                                <?php foreach (['reference_type', 'relationship', 'phone', 'email'] as $field): ?>
+                                    <?php $value = trim((string) ($reference[$field] ?? '')); ?>
+                                    <?php if ($value !== ''): ?><div><?= $escape($value) ?></div><?php endif; ?>
+                                <?php endforeach; ?>
                             </article>
                         <?php endforeach; ?>
                     </div>
@@ -626,137 +641,58 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
         </section>
 
     <?php elseif ($activeSection === 'documents'): ?>
-        <?php
-        $documentRequirements = is_array($documentRequirements ?? null) ? $documentRequirements : [];
-        $documentsByRequirement = [];
-        foreach ($documents as $document) {
-            $documentsByRequirement[(int) $document['requirement_id']] = $document;
-        }
-        $requiredCount = 0;
-        $receivedRequiredCount = 0;
-        $activeRequirementIds = [];
-        $pendingRequired = [];
-        foreach ($documentRequirements as $requirement) {
-            $requirementId = (int) $requirement['id'];
-            $activeRequirementIds[$requirementId] = true;
-            if ($requirement['is_required']) {
-                ++$requiredCount;
-                if (isset($documentsByRequirement[$requirementId])) {
-                    ++$receivedRequiredCount;
-                } else {
-                    $pendingRequired[] = $requirement;
-                }
-            }
-        }
-        $otherDocuments = array_values(array_filter(
-            $documents,
-            static fn (array $document): bool => !isset($activeRequirementIds[(int) $document['requirement_id']]),
-        ));
-        ?>
+        <?php $documents = is_array($documents ?? null) ? array_values($documents) : []; ?>
         <section class="candidate-section" data-candidate-section-body="documents">
-            <div class="candidate-documents-layout">
-                <section class="content-card candidate-card candidate-documents-main" aria-labelledby="candidate-documents-title">
+            <section class="content-card candidate-card" aria-labelledby="candidate-documents-title">
                     <div class="candidate-documents-heading">
                         <div>
                             <p class="eyebrow">Documentación</p>
                             <h2 id="candidate-documents-title">Documentos del candidato</h2>
-                            <p class="muted">Archivos recibidos y requisitos reales de esta unidad.</p>
+                            <p class="muted">Archivos recibidos por el candidato.</p>
                         </div>
                     </div>
-                    <?php if ($documentRequirements !== []): ?>
-                        <div class="candidate-document-list" aria-label="Requisitos documentales activos">
-                            <?php foreach ($documentRequirements as $requirement): ?>
+                    <?php if ($documents !== []): ?>
+                        <div class="candidate-document-list" aria-label="Documentos recibidos">
+                            <?php foreach ($documents as $document): ?>
                                 <?php
-                                $attached = $documentsByRequirement[(int) $requirement['id']] ?? null;
-                                $received = $attached !== null;
+                                $requirementLabel = trim((string) ($document['requirement_label'] ?? ''));
+                                $originalName = trim((string) ($document['original_name'] ?? ''));
                                 ?>
-                                <article class="candidate-document-row" data-document-status="<?= $received ? 'received' : ($requirement['is_required'] ? 'pending' : 'optional') ?>">
+                                <article class="candidate-document-row" data-document-status="received">
                                     <span class="candidate-document-icon" aria-hidden="true"><?= $candidateIcon('files') ?></span>
                                     <div class="candidate-document-info">
-                                        <h3><?= $escape($requirement['label']) ?></h3>
-                                        <?php if (trim((string) ($requirement['description'] ?? '')) !== ''): ?>
-                                            <p class="muted"><?= $escape($requirement['description']) ?></p>
-                                        <?php endif; ?>
-                                        <?php if ($received): ?>
-                                            <p class="muted"><?= $escape($attached['original_name'] ?? 'Documento') ?></p>
-                                        <?php endif; ?>
+                                        <h3><?= $escape($requirementLabel !== '' ? $requirementLabel : 'Documento recibido') ?></h3>
+                                        <p class="muted"><?= $escape($originalName !== '' ? $originalName : 'Documento') ?></p>
                                     </div>
                                     <div class="candidate-document-actions">
-                                        <span class="candidate-document-state"><?= $received ? 'Recibido' : ($requirement['is_required'] ? 'Pendiente de recibir' : 'Opcional, no aportado') ?></span>
-                                        <span class="candidate-document-kind"><?= $requirement['is_required'] ? 'Obligatorio' : 'Opcional' ?></span>
-                                        <?php if ($received): ?>
-                                            <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/candidates/<?= (int) $candidate['id'] ?>/documents/<?= (int) $attached['id'] ?>">Abrir documento</a>
-                                        <?php endif; ?>
+                                        <span class="candidate-document-state">Recibido</span>
+                                        <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/candidates/<?= (int) $candidate['id'] ?>/documents/<?= (int) $document['id'] ?>">Abrir documento</a>
                                     </div>
                                 </article>
                             <?php endforeach; ?>
                         </div>
-                    <?php elseif ($documents === []): ?>
-                        <p class="empty-state">No hay requisitos documentales activos configurados para esta unidad. No hay documentos adjuntos.</p>
                     <?php else: ?>
-                        <p class="muted">No hay requisitos documentales activos configurados para esta unidad.</p>
+                        <p class="empty-state">No hay documentos adjuntos.</p>
                     <?php endif; ?>
-                    <?php if ($otherDocuments !== []): ?>
-                        <section class="candidate-document-history" aria-labelledby="candidate-document-history-title">
-                            <h3 id="candidate-document-history-title">Otros documentos recibidos</h3>
-                            <p class="muted">Se conservan los documentos aportados a requisitos que ya no están activos.</p>
-                            <div class="candidate-document-list">
-                                <?php foreach ($otherDocuments as $document): ?>
-                                    <article class="candidate-document-row">
-                                        <span class="candidate-document-icon" aria-hidden="true"><?= $candidateIcon('files') ?></span>
-                                        <div class="candidate-document-info">
-                                            <h3><?= $escape($document['requirement_label']) ?></h3>
-                                            <p class="muted"><?= $escape($document['original_name'] ?? 'Documento') ?></p>
-                                        </div>
-                                        <div class="candidate-document-actions">
-                                            <span class="candidate-document-state">Recibido anteriormente</span>
-                                            <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/candidates/<?= (int) $candidate['id'] ?>/documents/<?= (int) $document['id'] ?>">Abrir documento</a>
-                                        </div>
-                                    </article>
-                                <?php endforeach; ?>
-                            </div>
-                        </section>
-                    <?php endif; ?>
-                </section>
-                <?php if ($documentRequirements !== []): ?>
-                    <aside class="candidate-documents-side" aria-label="Resumen documental">
-                        <section class="content-card candidate-card candidate-documents-summary" aria-labelledby="candidate-documents-summary-title">
-                            <h3 id="candidate-documents-summary-title">Estado de recepción</h3>
-                            <?php if ($requiredCount > 0): ?>
-                                <p class="candidate-documents-count" data-document-required-count="<?= $requiredCount ?>" data-document-received-count="<?= $receivedRequiredCount ?>">
-                                    <strong><?= $receivedRequiredCount ?> de <?= $requiredCount ?></strong>
-                                    <span>requisitos obligatorios recibidos</span>
-                                </p>
-                                <progress value="<?= $receivedRequiredCount ?>" max="<?= $requiredCount ?>" aria-label="Requisitos obligatorios recibidos"></progress>
-                                <p class="muted"><?= $receivedRequiredCount ?> de <?= $requiredCount ?> requisitos obligatorios recibidos. Esto no indica revisión ni aprobación.</p>
-                            <?php else: ?>
-                                <p class="muted">Esta unidad solo tiene requisitos documentales opcionales.</p>
-                            <?php endif; ?>
-                        </section>
-                        <?php if ($pendingRequired !== []): ?>
-                            <section class="content-card candidate-card candidate-documents-pending" aria-labelledby="candidate-documents-pending-title">
-                                <h3 id="candidate-documents-pending-title">Requisitos pendientes</h3>
-                                <ul>
-                                    <?php foreach ($pendingRequired as $requirement): ?>
-                                        <li><?= $escape($requirement['label']) ?></li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            </section>
-                        <?php endif; ?>
-                    </aside>
-                <?php endif; ?>
-            </div>
+            </section>
         </section>
 
     <?php elseif ($activeSection === 'screening'): ?>
         <section class="candidate-section" data-candidate-section-body="screening">
             <section class="content-card">
                 <div class="section-heading"><div><p class="eyebrow">Aseguradora</p><h2>Estudio de aseguradora</h2></div></div>
+                <?php if ($screeningDates !== []): ?>
+                    <dl class="account-details">
+                        <?php foreach ($screeningDates as $date): ?>
+                            <div><dt><?= $escape($date['label']) ?></dt><dd><time datetime="<?= $escape($date['datetime']) ?>"><?= $escape($date['value']) ?></time></dd></div>
+                        <?php endforeach; ?>
+                    </dl>
+                <?php endif; ?>
                 <?php if ($screening === null): ?>
                     <?php if ($screeningEditable): ?>
                         <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/screening">
                             <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
-                            <label>Proveedor<input type="text" name="provider" value="SURA" maxlength="120" required></label>
+                            <label>Proveedor<input type="text" name="provider" maxlength="120" required></label>
                             <label>Producto<input type="text" name="product" maxlength="190"></label>
                             <label>Correo de contacto<input type="email" name="contact_email" maxlength="190"></label>
                             <label>URL del estudio<input type="url" name="portal_url" maxlength="2048"></label>

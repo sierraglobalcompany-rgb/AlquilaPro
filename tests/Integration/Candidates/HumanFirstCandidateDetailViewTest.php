@@ -840,6 +840,39 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertStringNotContainsString('No hay fichas de otras personas registradas.', $html);
     }
 
+    public function testReferenceCardsOmitOptionalFactsThatWereNotProvided(): void
+    {
+        $html = $this->renderOverview([
+            'references' => [[
+                'name' => 'Referencia con datos parciales',
+                'reference_type' => '',
+                'relationship' => null,
+                'phone' => '3001234567',
+                'email' => '',
+            ], [
+                'name' => 'Referencia completa',
+                'reference_type' => 'Personal',
+                'relationship' => 'Amiga',
+                'phone' => '3007654321',
+                'email' => 'amiga@example.test',
+            ]],
+        ], '', ['contracts' => [], 'can_create' => false], 'references');
+
+        $dom = new \DOMDocument();
+        @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        $xpath = new \DOMXPath($dom);
+        $partialReference = $xpath->query('//section[@data-candidate-section-body="references"]//article[contains(@class,"user-card")][1]')->item(0);
+        $completeReference = $xpath->query('//section[@data-candidate-section-body="references"]//article[contains(@class,"user-card")][2]')->item(0);
+
+        self::assertInstanceOf(\DOMElement::class, $partialReference);
+        self::assertInstanceOf(\DOMElement::class, $completeReference);
+        self::assertSame(1, $xpath->query('./div', $partialReference)->length, 'Only the required phone should render when optional facts are absent.');
+        self::assertSame(4, $xpath->query('./div', $completeReference)->length);
+        self::assertStringContainsString('Referencia con datos parciales', $partialReference->textContent);
+        self::assertStringContainsString('3001234567', $partialReference->textContent);
+        self::assertStringContainsString('amiga@example.test', $completeReference->textContent);
+    }
+
     private function renderOverview(array $overrides = [], string $basePath = '', ?array $contracts = ['contracts' => [], 'can_create' => false], string $section = 'overview'): string
     {
         $candidate = [
