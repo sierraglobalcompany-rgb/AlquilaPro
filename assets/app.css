@@ -809,63 +809,106 @@ ul { padding-left: 22px; }
     .candidate-documents-layout { grid-template-columns: minmax(0, 1.65fr) minmax(270px, .75fr); }
 }
 
-/* CAND-03 household: three paired rows on desktop, one readable column on small screens. */
-.candidate-household-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
-.candidate-household-grid > .content-card { min-width: 0; padding: 14px; gap: 8px; overflow-wrap: anywhere; }
-.candidate-household-heading { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 8px; }
-.candidate-household-region-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px; }
-.candidate-household-heading h2, .candidate-household-grid h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0; font-size: 18px; }
-.candidate-household-heading .nav-icon, .candidate-household-grid h3 .nav-icon { color: var(--brand-primary); width: 22px; height: 22px; flex: 0 0 auto; }
+/* CAND-03 household: three paired desktop rows, preserving all six regions on mobile. */
+.candidate-household-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; }
+.candidate-household-grid > .content-card { display: grid; align-content: start; gap: 14px; min-width: 0; padding: 20px; overflow-wrap: anywhere; }
+.candidate-household-heading { display: grid; gap: 8px; }
+.candidate-household-region-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-width: 0; }
+.candidate-household-heading h2, .candidate-household-grid h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0; font-size: 18px; line-height: 1.3; }
+.candidate-household-heading h2 { font-size: 20px; }
+.candidate-household-heading .nav-icon, .candidate-household-grid h3 .nav-icon { width: 22px; height: 22px; flex: 0 0 auto; color: var(--brand-primary); }
 .candidate-household-heading p, .candidate-household-region-heading p, .candidate-household-occupants p, .candidate-household-pets p { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
-.candidate-household-facts { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
-.candidate-household-facts p { display: grid; gap: 6px; flex: 1 1 150px; min-width: 0; margin: 0; padding: 12px; background: color-mix(in srgb, var(--brand-primary) 7%, var(--color-surface)); border-radius: 12px; overflow-wrap: anywhere; }
-.candidate-household-facts span, .candidate-household-details dt { color: var(--color-muted); font-size: 12px; }
-.candidate-household-facts strong, .candidate-household-details dd { color: var(--color-text); font-weight: 650; }
-.candidate-household-count { margin-left: auto; padding: 4px 8px; border-radius: 999px; background: color-mix(in srgb, var(--brand-primary) 8%, var(--color-surface)); color: var(--color-muted); font-size: 12px; font-weight: 600; }
-.candidate-household-response-date { display: block; margin-top: 3px; color: var(--color-muted); font-size: 12px; font-weight: 400; }
-.candidate-household-details { display: grid; gap: 10px; margin: 12px 0 0; }
-.candidate-household-details > div { display: grid; gap: 4px; }
+.candidate-household-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 2px 0 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
+.candidate-household-facts p { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-content: center; align-items: center; column-gap: 10px; min-width: 0; min-height: 92px; margin: 0; padding: 14px 12px; border-right: 1px solid var(--color-border); overflow-wrap: anywhere; }
+.candidate-household-facts p:first-child { padding-left: 0; }
+.candidate-household-facts p:last-child { padding-right: 0; border-right: 0; }
+.candidate-household-stat-icon { display: grid; grid-column: 1; grid-row: 1 / span 2; width: 40px; height: 40px; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--brand-primary) 10%, var(--color-surface)); color: var(--brand-primary); }
+.candidate-household-stat-icon .nav-icon { width: 20px; height: 20px; }
+.candidate-household-stat-label, .candidate-household-details dt { color: var(--color-muted); font-size: 12px; line-height: 1.35; }
+.candidate-household-facts strong { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px; color: var(--color-text); font-size: 14px; font-weight: 750; line-height: 1.25; }
+.candidate-household-stat-value { font-size: 30px; line-height: 1; }
+.candidate-household-stat-copy { font-size: 12px; line-height: 1.25; }
+.candidate-household-count { margin-left: auto; padding: 4px 8px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-background); color: var(--color-muted); font-size: 12px; font-weight: 600; }
+.candidate-household-details { display: grid; margin: 0; }
+.candidate-household-detail-row { display: grid; grid-template-columns: minmax(100px, .75fr) minmax(0, 1.25fr); align-items: start; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--color-border); }
+.candidate-household-detail-row:last-child { border-bottom: 0; }
 .candidate-household-details dt, .candidate-household-details dd { margin: 0; }
-.candidate-household-notice { margin: 14px 0 0; padding: 12px; border-left: 3px solid var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 7%, var(--color-surface)); line-height: 1.5; }
-.candidate-household-records { display: grid; gap: 6px; margin-top: 8px; }
-.candidate-household-record { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: start; gap: 8px; padding: 4px 8px; border: 1px solid var(--color-border); border-radius: 10px; }
-.candidate-household-avatar { display: grid; width: 44px; height: 44px; place-items: center; object-fit: cover; border-radius: 50%; background: color-mix(in srgb, var(--brand-primary) 12%, var(--color-surface)); color: var(--brand-primary); font-weight: 700; }
-.candidate-household-record__body { min-width: 0; display: grid; gap: 2px; }
+.candidate-household-details dd { display: grid; gap: 5px; min-width: 0; color: var(--color-text); font-weight: 650; overflow-wrap: anywhere; }
+.candidate-household-detail-state { width: fit-content; max-width: 100%; padding: 3px 8px; border-radius: 999px; background: var(--color-background); color: var(--color-muted); font-size: 11px; font-weight: 600; line-height: 1.35; }
+.candidate-household-response-date { display: block; color: var(--color-muted); font-size: 12px; font-weight: 400; overflow-wrap: anywhere; }
+.candidate-household-notice { margin: 0; padding: 12px; border-left: 3px solid var(--brand-primary); border-radius: 0 8px 8px 0; background: color-mix(in srgb, var(--brand-primary) 6%, var(--color-surface)); line-height: 1.5; }
+.candidate-household-region-heading > div { min-width: 0; }
+.candidate-household-records { display: grid; gap: 8px; margin-top: 0; }
+.candidate-household-record { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: start; gap: 12px; min-width: 0; padding: 12px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-surface); }
+.candidate-household-record--applicant { grid-template-columns: 56px minmax(0, 1fr); }
+.candidate-household-avatar { display: grid; width: 56px; height: 56px; place-items: center; object-fit: cover; border-radius: 50%; background: color-mix(in srgb, var(--brand-primary) 11%, var(--color-surface)); color: var(--brand-primary); font-weight: 700; }
+.candidate-household-record__body { display: grid; align-content: start; gap: 5px; min-width: 0; }
 .candidate-household-record__body h4, .candidate-household-record__body p { margin: 0; overflow-wrap: anywhere; }
-.candidate-household-record__notes, .candidate-household-notes { line-height: 1.5; }
-.candidate-household-notes { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--color-border); }
-.candidate-household-notes p { margin: 4px 0 0; }
-.candidate-household-photo { display: block; width: min(100%, 320px); max-height: 240px; margin: 10px 0; object-fit: contain; border-radius: 10px; background: var(--color-surface); }
+.candidate-household-record__body h4 { font-size: 15px; line-height: 1.35; }
+.candidate-household-record__metadata { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 10px; color: var(--color-muted); font-size: 13px; line-height: 1.4; }
+.candidate-household-record__relationship { width: fit-content; padding: 3px 8px; border-radius: 999px; background: color-mix(in srgb, var(--brand-primary) 8%, var(--color-surface)); color: var(--brand-primary); font-weight: 600; }
+.candidate-household-record__notes { padding-top: 7px; border-top: 1px solid var(--color-border); color: var(--color-text); line-height: 1.45; }
+.candidate-household-record--pet { grid-template-columns: 96px minmax(0, 1fr); gap: 12px; }
+.candidate-household-record--pet .candidate-household-manager--edit { grid-column: 2; }
+.candidate-household-pet-photo, .candidate-household-pet-placeholder { width: 96px; height: 96px; border-radius: 12px; }
+.candidate-household-pet-placeholder { background: var(--color-background); color: var(--color-muted); }
+.candidate-household-record__declaration { width: fit-content; max-width: 100%; padding: 3px 8px; border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-muted); }
 .candidate-household-manager { min-width: 0; }
-.candidate-household-manager--create { margin: 0; padding: 0; border: 0; }
-.candidate-household-manager--edit { flex: 1 1 100%; margin-top: 4px; }
-.candidate-household-manager > summary { display: flex; align-items: center; min-height: 44px; padding: 9px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: color-mix(in srgb, var(--brand-primary) 6%, var(--color-surface)); color: var(--brand-primary); cursor: pointer; font-weight: 650; line-height: 1.4; overflow-wrap: anywhere; }
-.candidate-household-manager--create > summary { border-color: color-mix(in srgb, var(--brand-primary) 35%, var(--color-border)); background: color-mix(in srgb, var(--brand-primary) 10%, var(--color-surface)); }
-.candidate-household-manager > summary:hover { background: color-mix(in srgb, var(--brand-primary) 10%, var(--color-surface)); }
+.candidate-household-manager--create { flex: 0 0 auto; margin: 0; padding: 0; border: 0; }
+.candidate-household-manager--edit { grid-column: 3; align-self: start; width: fit-content; max-width: 100%; margin-top: 0; }
+.candidate-household-manager--edit[open] { grid-column: 2 / -1; width: 100%; }
+.candidate-household-manager > summary { display: flex; align-items: center; width: fit-content; max-width: 100%; min-height: 44px; padding: 8px 11px; border: 1px solid var(--color-border); border-radius: 10px; background: color-mix(in srgb, var(--brand-primary) 5%, var(--color-surface)); color: var(--brand-primary); cursor: pointer; font-size: 13px; font-weight: 650; line-height: 1.35; overflow-wrap: anywhere; }
+.candidate-household-manager--create > summary { min-height: 44px; padding-inline: 14px; border-color: color-mix(in srgb, var(--brand-primary) 35%, var(--color-border)); background: color-mix(in srgb, var(--brand-primary) 9%, var(--color-surface)); }
+.candidate-household-manager > summary:hover { background: color-mix(in srgb, var(--brand-primary) 11%, var(--color-surface)); }
 .candidate-household-manager > summary:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 2px; }
 .candidate-household-validation-error { margin: 0; padding: 10px 12px; border-left: 3px solid var(--color-danger); border-radius: 4px; background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface)); color: var(--color-text); line-height: 1.45; overflow-wrap: anywhere; }
-.candidate-household-edit { display: grid; gap: 12px; margin: 14px 0; padding: 14px; border: 1px solid var(--color-border); border-radius: 12px; }
+.candidate-household-edit { display: grid; gap: 12px; width: 100%; margin: 14px 0; padding: 14px; border: 1px solid var(--color-border); border-radius: 12px; }
 .candidate-household-edit label { min-width: 0; }
 .candidate-household-edit input, .candidate-household-edit textarea, .candidate-household-edit select { max-width: 100%; }
-.candidate-household-next-list { display: grid; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
-.candidate-household-next-list a { display: grid; gap: 4px; min-height: 44px; padding: 10px 12px; border-radius: 10px; color: inherit; text-decoration: none; background: color-mix(in srgb, var(--brand-primary) 6%, var(--color-surface)); }
-.candidate-household-next-list a:hover, .candidate-household-next-list a:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 2px; }
-.candidate-household-next-list span { color: var(--color-muted); font-size: 13px; line-height: 1.4; }
+.candidate-household-rule-list { display: grid; }
+.candidate-household-rule-row { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 11px; padding: 8px 0; border-bottom: 1px solid var(--color-border); }
+.candidate-household-rule-row h4, .candidate-household-manual h4 { margin: 0 0 4px; font-size: 14px; line-height: 1.35; }
+.candidate-household-rule-row p, .candidate-household-manual p { margin: 0; color: var(--color-muted); line-height: 1.5; overflow-wrap: anywhere; }
+.candidate-household-rule-empty { margin: 0; padding: 4px 0 12px; }
+.candidate-household-rule-icon { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--brand-primary) 8%, var(--color-surface)); color: var(--brand-primary); }
+.candidate-household-rule-icon .nav-icon { width: 18px; height: 18px; }
+.candidate-household-manual { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: start; gap: 11px; padding: 12px; border-radius: 12px; background: color-mix(in srgb, var(--brand-primary) 6%, var(--color-surface)); }
+.candidate-household-manual > div { display: grid; justify-items: start; gap: 6px; min-width: 0; }
+.candidate-household-manual-version { color: var(--color-muted); font-size: 12px; font-weight: 400; }
+.candidate-household-manual .button { min-height: 44px; padding: 8px 12px; }
+.candidate-household-next-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; counter-reset: household-step; }
+.candidate-household-next-list li { position: relative; counter-increment: household-step; }
+.candidate-household-next-list li:not(:last-child)::after { position: absolute; top: 38px; bottom: -1px; left: 15px; width: 1px; background: var(--color-border); content: ""; }
+.candidate-household-next-list a { position: relative; z-index: 1; display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: start; gap: 10px; min-height: 56px; padding: 8px 0; border-radius: 10px; color: inherit; text-decoration: none; }
+.candidate-household-next-marker { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid var(--color-border); border-radius: 50%; background: var(--color-background); color: var(--color-text); font-size: 13px; font-weight: 700; }
+.candidate-household-next-marker::before { content: counter(household-step); }
+.candidate-household-next-copy { display: grid; gap: 3px; min-width: 0; padding-top: 2px; }
+.candidate-household-next-copy strong { font-size: 14px; line-height: 1.3; }
+.candidate-household-next-copy > span { color: var(--color-muted); font-size: 12px; line-height: 1.4; }
+.candidate-household-next-list a:hover .candidate-household-next-copy strong { color: var(--brand-primary); }
+.candidate-household-next-list a:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 2px; }
 @media (min-width: 1024px) {
-    .candidate-household-grid { grid-template-columns: minmax(0, 1.55fr) minmax(260px, .85fr); align-items: start; gap: 10px; }
-    .candidate-household-next { padding: 12px; gap: 6px; }
-    .candidate-household-next-list { gap: 4px; margin-top: 8px; }
-    .candidate-household-next-list a { gap: 2px; padding: 6px 10px; }
-    .candidate-household-next-list strong { font-size: 14px; line-height: 1.2; }
-    .candidate-household-next-list span { font-size: 12px; line-height: 1.25; }
-}
-@media (min-width: 1200px) {
-    .candidate-household-occupants .candidate-household-record__body { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 12px; row-gap: 2px; }
-    .candidate-household-occupants .candidate-household-record__body h4 { flex: 0 0 100%; }
-    .candidate-household-occupants .candidate-household-record__notes { flex: 1 1 220px; font-size: 13px; line-height: 1.3; }
-    .candidate-household-occupants .candidate-household-record__body p { line-height: 1.25; }
+    .candidate-household-grid { grid-template-columns: repeat(20, minmax(0, 1fr)); align-items: start; gap: 14px; }
+    .candidate-household-summary, .candidate-household-information { grid-column: span 13; }
+    .candidate-household-information { grid-column: span 7; }
+    .candidate-household-occupants, .candidate-household-rules { grid-column: span 12; }
+    .candidate-household-pets, .candidate-household-next { grid-column: span 8; }
 }
 @media (max-width: 640px) {
-    .candidate-household-region-heading { grid-template-columns: minmax(0, 1fr); }
+    .candidate-household-grid > .content-card { padding: 16px; }
+    .candidate-household-region-heading { display: grid; grid-template-columns: minmax(0, 1fr); }
     .candidate-household-manager--create, .candidate-household-manager--create > summary { width: 100%; }
+    .candidate-household-record:not(.candidate-household-record--applicant) .candidate-household-manager--edit { grid-column: 2; width: 100%; }
+    .candidate-household-manager--edit > summary { width: 100%; }
+}
+@media (max-width: 520px) {
+    .candidate-household-facts { grid-template-columns: minmax(0, 1fr); border-bottom: 0; }
+    .candidate-household-facts p, .candidate-household-facts p:first-child, .candidate-household-facts p:last-child { min-height: 68px; padding: 10px 0; border-right: 0; border-bottom: 1px solid var(--color-border); }
+    .candidate-household-facts p:last-child { border-bottom: 0; }
+    .candidate-household-detail-row { grid-template-columns: minmax(0, 1fr); gap: 5px; }
+    .candidate-household-record { grid-template-columns: 48px minmax(0, 1fr); gap: 10px; padding: 10px; }
+    .candidate-household-avatar { width: 48px; height: 48px; }
+    .candidate-household-record--pet { grid-template-columns: 72px minmax(0, 1fr); }
+    .candidate-household-pet-photo, .candidate-household-pet-placeholder { width: 72px; height: 72px; }
+    .candidate-household-next-list a { gap: 8px; }
 }
