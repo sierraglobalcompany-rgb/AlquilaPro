@@ -49,6 +49,7 @@ final class HumanLabelsContractTest extends TestCase
     {
         $variables = $this->candidateDetailVariables('new');
         $variables['activeSection'] = 'manage';
+        $variables['allowedCandidateTransitions'] = ['incomplete', 'withdrawn'];
         $body = $this->renderView('candidate_detail', $variables);
 
         self::assertStringContainsString('>Nueva</span>', $body);

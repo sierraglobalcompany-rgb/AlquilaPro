@@ -158,9 +158,122 @@ final class DocumentRoutesTest extends TestCase
         self::assertSame($this->pdfBytes(), (string) $download->getBody());
         self::assertSame('private, no-store', $download->getHeaderLine('Cache-Control'));
         self::assertSame('nosniff', $download->getHeaderLine('X-Content-Type-Options'));
+
+        $manualJson = $this->request($managerApp, 'POST', '/sub/admin/documents', [
+            'scope' => 'property',
+            'scope_id' => (string) $propertyId,
+            'type' => 'manual_convivencia',
+            'title' => 'Manual JSON anterior',
+            'content_json' => '{"sections":[{"title":"Ruido","body":"Respetar el descanso."}]}',
+        ]);
+        self::assertSame(303, $manualJson->getStatusCode());
+        $manualJsonId = (int) $this->pdo->query("SELECT id FROM documents WHERE type = 'manual_convivencia' ORDER BY id DESC LIMIT 1")->fetchColumn();
+        $manualPdf = $this->request($managerApp, 'POST', '/sub/admin/documents', [
+            'scope' => 'property',
+            'scope_id' => (string) $propertyId,
+            'type' => 'manual_convivencia',
+            'title' => 'Manual PDF vigente',
+            'supersedes_document_id' => (string) $manualJsonId,
+            'content_json' => '{}',
+        ], ['document' => $this->upload($this->pdfBytes(), 'manual.pdf')]);
+        self::assertSame(303, $manualPdf->getStatusCode());
+        $manualPdfId = (int) $this->pdo->query("SELECT id FROM documents WHERE type = 'manual_convivencia' ORDER BY id DESC LIMIT 1")->fetchColumn();
+
+        $manualCurrent = (string) $this->request(
+            $managerApp,
+            'GET',
+            '/sub/admin/documents?scope=property&id=' . $propertyId,
+        )->getBody();
+        self::assertStringContainsString('Manual PDF vigente', $manualCurrent);
+        self::assertStringNotContainsString('Manual JSON anterior', $manualCurrent);
+        $manualHistory = (string) $this->request($managerApp, 'GET', '/sub/admin/documents/' . $manualPdfId)->getBody();
+        self::assertStringContainsString('Manual JSON anterior', $manualHistory);
+        self::assertStringContainsString('Manual PDF vigente', $manualHistory);
+        $manualDownload = $this->request($managerApp, 'GET', '/sub/admin/documents/' . $manualPdfId . '/file');
+        self::assertSame(200, $manualDownload->getStatusCode());
+        self::assertSame($this->pdfBytes(), (string) $manualDownload->getBody());
     }
 
-    private function app(string $basePath = ''): App
+    public function testInvalidDocumentSubmissionRendersEscapedFieldErrorAndPreservesSafeValues(): void
+    {
+        $this->insertUser('manager@example.com', 'ManagerPassword123', 'admin', ['documents.view', 'documents.manage']);
+        $propertyId = $this->insertProperty();
+        $app = $this->app('/sub');
+        $this->login($app, 'manager@example.com', 'ManagerPassword123', '/sub');
+
+        $response = $this->request($app, 'POST', '/sub/admin/documents', [
+            'scope' => 'property',
+            'scope_id' => (string) $propertyId,
+            'type' => 'manual_convivencia',
+            'title' => '<script>alert("demo")</script>',
+            'content_json' => '{invalid json',
+        ]);
+
+        self::assertSame(422, $response->getStatusCode());
+        self::assertStringContainsString('text/html', $response->getHeaderLine('Content-Type'));
+        $html = (string) $response->getBody();
+        self::assertStringContainsString('El contenido debe ser JSON válido.', $html);
+        self::assertStringContainsString('aria-describedby="document-content_json-error"', $html);
+        self::assertStringContainsString('id="document-content_json-error"', $html);
+        self::assertStringContainsString('&lt;script&gt;alert(&quot;demo&quot;)&lt;/script&gt;', $html);
+        self::assertStringNotContainsString('<script>alert("demo")</script>', $html);
+        self::assertDoesNotMatchRegularExpression('/<input[^>]+type="file"[^>]+value=/i', $html);
+    }
+
+    public function testUnexpectedDocumentStorageFailureReturnsSanitizedServerError(): void
+    {
+        $this->insertUser('manager@example.com', 'ManagerPassword123', 'admin', ['documents.view', 'documents.manage']);
+        $propertyId = $this->insertProperty();
+        $filePath = $this->directory . '/not-a-directory';
+        file_put_contents($filePath, 'occupied');
+        $app = $this->app('/sub', $filePath);
+        $this->login($app, 'manager@example.com', 'ManagerPassword123', '/sub');
+
+        $response = $this->request($app, 'POST', '/sub/admin/documents', [
+            'scope' => 'property',
+            'scope_id' => (string) $propertyId,
+            'type' => 'property_document',
+            'title' => 'Archivo de prueba',
+        ], ['document' => $this->upload($this->pdfBytes(), 'test.pdf')]);
+
+        self::assertSame(500, $response->getStatusCode());
+        self::assertStringNotContainsString('text/html', $response->getHeaderLine('Content-Type'));
+        self::assertStringNotContainsString('SQLSTATE', (string) $response->getBody());
+        self::assertStringNotContainsString('not-a-directory', (string) $response->getBody());
+        self::assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM documents')->fetchColumn());
+    }
+
+    public function testManageOnlyValidationResponseDoesNotRevealCurrentDocuments(): void
+    {
+        $this->insertUser('manager-only@example.com', 'ManagerPassword123', 'admin', ['documents.manage']);
+        $propertyId = $this->insertProperty();
+        $actorId = (int) $this->pdo->query("SELECT id FROM users WHERE email = 'manager-only@example.com'")->fetchColumn();
+        (new \AlquilaPro\Documents\DocumentService($this->pdo, $this->documentDirectory))->createContentVersion(
+            $propertyId,
+            null,
+            'manual_convivencia',
+            'Documento no visible para gestor de escritura',
+            ['sections' => []],
+            null,
+            $actorId,
+            time(),
+        );
+        $app = $this->app('/sub');
+        $this->login($app, 'manager-only@example.com', 'ManagerPassword123', '/sub');
+
+        $response = $this->request($app, 'POST', '/sub/admin/documents', [
+            'scope' => 'property',
+            'scope_id' => (string) $propertyId,
+            'type' => 'manual_convivencia',
+            'title' => 'Nuevo título',
+            'content_json' => '{invalid json',
+        ]);
+
+        self::assertSame(422, $response->getStatusCode());
+        self::assertStringNotContainsString('Documento no visible para gestor de escritura', (string) $response->getBody());
+    }
+
+    private function app(string $basePath = '', ?string $documentDirectory = null): App
     {
         $factory = require dirname(__DIR__, 3) . '/bootstrap/app.php';
         return $factory([
@@ -171,7 +284,7 @@ final class DocumentRoutesTest extends TestCase
             'base_path' => $basePath,
             'logo_directory' => $this->directory . '/branding',
             'unit_media_directory' => $this->directory . '/unit-media',
-            'document_directory' => $this->documentDirectory,
+            'document_directory' => $documentDirectory ?? $this->documentDirectory,
             'pdo' => $this->pdo,
         ]);
     }
@@ -236,6 +349,6 @@ final class DocumentRoutesTest extends TestCase
 
     private function pdfBytes(): string
     {
-        return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<<>>\n%%EOF\n";
+        return \AlquilaPro\Tests\Support\PdfFixtures::validPdf();
     }
 }

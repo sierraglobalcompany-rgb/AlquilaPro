@@ -7,6 +7,7 @@ use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Auth\Permissions;
 use AlquilaPro\Auth\SessionGuard;
 use AlquilaPro\Documents\DocumentService;
+use AlquilaPro\Documents\DocumentValidationException;
 use AlquilaPro\Leases\LeaseService;
 use AlquilaPro\UI\View;
 use Psr\Http\Message\ResponseInterface;
@@ -76,23 +77,20 @@ return static function (App $app, array $deps): void {
         ];
     };
 
-    $app->get('/admin/documents', static function (
-        ServerRequestInterface $request,
+    $renderDocuments = static function (
         ResponseInterface $response,
-    ) use ($staffGuard, $documents, $view, $csrf, $safeProjection, $path): ResponseInterface {
-        $user = $staffGuard($response, 'documents.view');
-        if ($user instanceof ResponseInterface) {
-            return $user;
-        }
-        $query = $request->getQueryParams();
-        $scope = ($query['scope'] ?? null) === 'lease' ? 'lease' : 'property';
-        $scopeId = filter_var($query['id'] ?? null, FILTER_VALIDATE_INT);
-        $scopeId = is_int($scopeId) && $scopeId > 0 ? $scopeId : null;
+        array $user,
+        string $scope,
+        ?int $scopeId,
+        array $formValues = [],
+        array $formErrors = [],
+        int $status = 200,
+    ) use ($documents, $view, $csrf, $safeProjection, $path): ResponseInterface {
         $current = [];
-        if ($scopeId !== null) {
-            $current = $scope === 'property'
-                ? $documents->listCurrentForProperty($scopeId)
-                : $documents->listCurrentForLease($scopeId);
+        if ($scopeId !== null && Permissions::allows($user, 'documents.view')) {
+            $current = $scope === 'lease'
+                ? $documents->listCurrentForLease($scopeId)
+                : $documents->listCurrentForProperty($scopeId);
         }
         $safeCurrent = array_map(static function (array $document) use ($safeProjection, $path): array {
             $fileUrl = is_string($document['stored_name'] ?? null)
@@ -112,34 +110,82 @@ return static function (App $app, array $deps): void {
             'history' => [],
             'historyDocument' => null,
             'canManage' => Permissions::allows($user, 'documents.manage'),
+            'formValues' => $formValues,
+            'formErrors' => $formErrors,
         ]));
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8')
-            ->withHeader('Cache-Control', 'private, no-store');
+            ->withHeader('Cache-Control', 'private, no-store')
+            ->withStatus($status);
+    };
+
+    $app->get('/admin/documents', static function (
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ) use ($staffGuard, $renderDocuments): ResponseInterface {
+        $user = $staffGuard($response, 'documents.view');
+        if ($user instanceof ResponseInterface) {
+            return $user;
+        }
+        $query = $request->getQueryParams();
+        $scope = ($query['scope'] ?? null) === 'lease' ? 'lease' : 'property';
+        $scopeId = filter_var($query['id'] ?? null, FILTER_VALIDATE_INT);
+        $scopeId = is_int($scopeId) && $scopeId > 0 ? $scopeId : null;
+        return $renderDocuments($response, $user, $scope, $scopeId, [
+            'scope' => $scope,
+            'scope_id' => (string) ($scopeId ?? ''),
+        ]);
     });
 
     $app->post('/admin/documents', static function (
         ServerRequestInterface $request,
         ResponseInterface $response,
-    ) use ($staffGuard, $documents, $audit, $path): ResponseInterface {
+    ) use ($staffGuard, $documents, $audit, $path, $renderDocuments): ResponseInterface {
         $user = $staffGuard($response, 'documents.manage');
         if ($user instanceof ResponseInterface) {
             return $user;
         }
         $body = (array) ($request->getParsedBody() ?? []);
-        $scope = (string) ($body['scope'] ?? '');
-        $scopeId = filter_var($body['scope_id'] ?? null, FILTER_VALIDATE_INT);
-        $type = trim((string) ($body['type'] ?? ''));
-        $title = (string) ($body['title'] ?? '');
+        $asString = static fn (mixed $value): string => is_scalar($value) ? (string) $value : '';
+        $scopeInput = $asString($body['scope'] ?? '');
+        $scope = $scopeInput === 'lease' ? 'lease' : 'property';
+        $scopeIdValue = $body['scope_id'] ?? null;
+        $scopeId = filter_var($scopeIdValue, FILTER_VALIDATE_INT);
+        $scopeId = is_int($scopeId) && $scopeId > 0 ? $scopeId : null;
+        $type = trim($asString($body['type'] ?? ''));
+        $title = $asString($body['title'] ?? '');
+        $supersedesInput = $asString($body['supersedes_document_id'] ?? '');
+        $formValues = [
+            'scope' => $scope,
+            'scope_id' => $asString($scopeIdValue),
+            'type' => $type,
+            'title' => $title,
+            'supersedes_document_id' => $supersedesInput,
+            'content_json' => $asString($body['content_json'] ?? '{}'),
+        ];
+        $formErrors = [];
+        if (!in_array($scopeInput, ['property', 'lease'], true)) {
+            $formErrors['scope'] = 'Selecciona un ámbito válido.';
+        }
+        if ($scopeId === null) {
+            $formErrors['scope_id'] = 'Indica un ID válido para consultar el ámbito.';
+        }
+        if (trim($title) === '') {
+            $formErrors['title'] = 'Escribe un título para el documento.';
+        } elseif (mb_strlen(trim($title), 'UTF-8') > 190) {
+            $formErrors['title'] = 'El título no puede superar 190 caracteres.';
+        }
+        if ($formErrors !== []) {
+            return $renderDocuments($response, $user, $scope, $scopeId, $formValues, $formErrors, 422);
+        }
+
         $supersedes = null;
-        if (isset($body['supersedes_document_id']) && $body['supersedes_document_id'] !== '') {
-            $supersedesValue = filter_var($body['supersedes_document_id'], FILTER_VALIDATE_INT);
+        if ($supersedesInput !== '') {
+            $supersedesValue = filter_var($supersedesInput, FILTER_VALIDATE_INT);
             if (!is_int($supersedesValue) || $supersedesValue <= 0) {
-                return $response->withStatus(422);
+                $formErrors['supersedes_document_id'] = 'Selecciona una versión válida para reemplazar.';
+                return $renderDocuments($response, $user, $scope, $scopeId, $formValues, $formErrors, 422);
             }
             $supersedes = $supersedesValue;
-        }
-        if (!in_array($scope, ['property', 'lease'], true) || !is_int($scopeId) || $scopeId <= 0) {
-            return $response->withStatus(422);
         }
         $propertyId = $scope === 'property' ? $scopeId : null;
         $leaseId = $scope === 'lease' ? $scopeId : null;
@@ -161,11 +207,15 @@ return static function (App $app, array $deps): void {
             } else {
                 if ((array_key_exists('document', $uploads)
                         && (!($file instanceof UploadedFileInterface) || $file->getError() !== UPLOAD_ERR_NO_FILE))) {
-                    return $response->withStatus(422);
+                    throw new DocumentValidationException('No fue posible recibir el archivo. Revisa el archivo e inténtalo de nuevo.', 'document');
                 }
-                $content = json_decode((string) ($body['content_json'] ?? ''), true, 64, JSON_THROW_ON_ERROR);
+                try {
+                    $content = json_decode($formValues['content_json'], true, 64, JSON_THROW_ON_ERROR);
+                } catch (JsonException) {
+                    throw new DocumentValidationException('El contenido debe ser JSON válido.', 'content_json');
+                }
                 if (!is_array($content)) {
-                    return $response->withStatus(422);
+                    throw new DocumentValidationException('El contenido debe ser un objeto JSON válido.', 'content_json');
                 }
                 $createdDocument = $documents->createContentVersion(
                     $propertyId,
@@ -178,8 +228,21 @@ return static function (App $app, array $deps): void {
                     time(),
                 );
             }
+        } catch (DocumentValidationException $exception) {
+            return $renderDocuments(
+                $response,
+                $user,
+                $scope,
+                $scopeId,
+                $formValues,
+                [$exception->field => $exception->getMessage()],
+                422,
+            );
         } catch (Throwable) {
-            return $response->withStatus(422);
+            $response->getBody()->write('No fue posible guardar el documento. Inténtalo más tarde.');
+            return $response->withHeader('Content-Type', 'text/plain; charset=utf-8')
+                ->withHeader('Cache-Control', 'private, no-store')
+                ->withStatus(500);
         }
 
         $audit->record(

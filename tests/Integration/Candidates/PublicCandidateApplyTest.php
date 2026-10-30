@@ -271,6 +271,18 @@ final class PublicCandidateApplyTest extends TestCase
         ])->getStatusCode());
         self::assertSame(200, $this->request($app, 'GET', $continuePath . '/personal')->getStatusCode());
 
+        $household = $this->request($app, 'POST', $continuePath, [
+            'csrf_token' => $this->csrfToken(),
+            'wizard_step' => 'occupants',
+            'occupants_present' => '1',
+            'pets_present' => '1',
+            'occupants_count' => '1',
+            'pets_declared' => '0',
+            'occupants' => [],
+            'pets' => [],
+        ]);
+        self::assertSame(303, $household->getStatusCode());
+
         $submitted = $this->request($app, 'POST', $continuePath . '/submit', [
             'csrf_token' => $this->csrfToken(),
         ]);
@@ -349,7 +361,7 @@ final class PublicCandidateApplyTest extends TestCase
 
         $compatibility = $this->request($app, 'GET', $location);
         self::assertSame(303, $compatibility->getStatusCode());
-        self::assertSame($location . '/review', $compatibility->getHeaderLine('Location'));
+        self::assertSame($location . '/occupants', $compatibility->getHeaderLine('Location'));
 
         $continue = $this->request($app, 'GET', $location . '/personal');
         self::assertSame(200, $continue->getStatusCode());

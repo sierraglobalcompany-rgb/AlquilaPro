@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 $iconPaths = [
+    'paw' => '<ellipse cx="7" cy="7" rx="2" ry="3"></ellipse><ellipse cx="17" cy="7" rx="2" ry="3"></ellipse><ellipse cx="3.5" cy="12" rx="1.5" ry="2.5"></ellipse><ellipse cx="20.5" cy="12" rx="1.5" ry="2.5"></ellipse><path d="M7 16c1-1 2-5 5-5s4 4 5 5c3 5-1 6-5 4-4 2-8 1-5-4z"></path>',
     'home' => '<path d="m3 10 9-7 9 7"></path><path d="M5 9v12h14V9"></path><path d="M9 21v-7h6v7"></path>',
     'apps' => '<rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect>',
     'account' => '<circle cx="12" cy="8" r="4"></circle><path d="M5 21a7 7 0 0 1 14 0"></path>',

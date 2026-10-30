@@ -27,6 +27,8 @@ final class CandidatesSchemaTest extends TestCase
 
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
         foreach ([
+            'candidate_household_occupants',
+            'candidate_household_pets',
             'candidate_documents',
             'candidate_references',
             'unit_application_requirements',
@@ -52,6 +54,8 @@ final class CandidatesSchemaTest extends TestCase
             'candidate_references',
             'unit_application_requirements',
             'candidate_documents',
+            'candidate_household_occupants',
+            'candidate_household_pets',
         ] as $table) {
             self::assertSame(1, $this->tableExists($table), $table . ' must exist');
         }
@@ -66,7 +70,7 @@ final class CandidatesSchemaTest extends TestCase
         self::assertSame([
             'id', 'unit_id', 'document_type', 'document_number', 'full_name', 'birth_date', 'phone', 'email',
             'current_address', 'employment_status', 'employer_name', 'occupation', 'monthly_income', 'employment_notes',
-            'occupants_count', 'occupants_notes', 'pets_declared', 'pets_notes', 'status', 'continuation_token_hash',
+            'occupants_count', 'occupants_notes', 'pets_declared', 'pets_answered_at', 'pets_notes', 'status', 'continuation_token_hash',
             'continuation_token_expires_at', 'consent_at', 'submitted_at', 'created_at', 'updated_at',
         ], $this->columns('candidates'));
 
@@ -81,6 +85,15 @@ final class CandidatesSchemaTest extends TestCase
         self::assertSame([
             'id', 'candidate_id', 'requirement_id', 'stored_name', 'original_name', 'mime_type', 'size_bytes', 'created_at', 'updated_at',
         ], $this->columns('candidate_documents'));
+
+        self::assertSame([
+            'id', 'candidate_id', 'full_name', 'relationship', 'age_years', 'occupation_or_activity', 'notes',
+            'photo_stored_name', 'photo_mime_type', 'photo_size_bytes', 'photo_sha256', 'photo_consent_at', 'created_at', 'updated_at',
+        ], $this->columns('candidate_household_occupants'));
+        self::assertSame([
+            'id', 'candidate_id', 'name', 'species', 'breed', 'size_category', 'age_years', 'vaccination_declaration', 'notes',
+            'photo_stored_name', 'photo_mime_type', 'photo_size_bytes', 'photo_sha256', 'photo_consent_at', 'created_at', 'updated_at',
+        ], $this->columns('candidate_household_pets'));
     }
 
     public function testCandidateIdentityAndTokenHashAreUnique(): void
@@ -100,6 +113,8 @@ final class CandidatesSchemaTest extends TestCase
         self::assertContains('unit_application_requirements.unit_id->units.id', $foreignKeys);
         self::assertContains('candidate_documents.candidate_id->candidates.id', $foreignKeys);
         self::assertContains('candidate_documents.requirement_id->unit_application_requirements.id', $foreignKeys);
+        self::assertContains('candidate_household_occupants.candidate_id->candidates.id', $foreignKeys);
+        self::assertContains('candidate_household_pets.candidate_id->candidates.id', $foreignKeys);
 
         self::assertContains('unit_id,code', $this->uniqueIndexColumns('unit_application_requirements'));
         self::assertContains('candidate_id,requirement_id', $this->uniqueIndexColumns('candidate_documents'));
@@ -175,7 +190,7 @@ final class CandidatesSchemaTest extends TestCase
             'SELECT CONCAT(table_name, ".", column_name, "->", referenced_table_name, ".", referenced_column_name) '
             . 'FROM information_schema.key_column_usage '
             . 'WHERE table_schema = DATABASE() AND referenced_table_name IS NOT NULL '
-            . "AND table_name IN ('candidates', 'candidate_references', 'unit_application_requirements', 'candidate_documents')",
+            . "AND table_name IN ('candidates', 'candidate_references', 'unit_application_requirements', 'candidate_documents', 'candidate_household_occupants', 'candidate_household_pets')",
         );
 
         return array_values(array_map('strval', $statement->fetchAll(PDO::FETCH_COLUMN)));

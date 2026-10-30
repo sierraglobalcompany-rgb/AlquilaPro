@@ -228,7 +228,8 @@ final class ContractFinalizationRoutesTest extends TestCase
         $finalDetail = $this->request($viewerApp, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=contracts');
         $finalHtml = (string) $finalDetail->getBody();
         self::assertStringContainsString('/sub/admin/contracts/' . (int) $draft['id'], $finalHtml);
-        self::assertStringContainsString('finalized', $finalHtml);
+        self::assertStringContainsString('Finalizado', $finalHtml);
+        self::assertStringNotContainsString('<span class="status-pill">finalized</span>', $finalHtml);
         self::assertStringNotContainsString('Crear contrato', $finalHtml);
     }
 

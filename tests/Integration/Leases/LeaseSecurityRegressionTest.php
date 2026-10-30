@@ -110,7 +110,7 @@ final class LeaseSecurityRegressionTest extends TestCase
         self::assertIsArray($composer);
         $direct = array_keys($composer['require'] ?? []);
         sort($direct);
-        self::assertSame(['dompdf/dompdf', 'php', 'phpmailer/phpmailer', 'slim/psr7', 'slim/slim'], $direct);
+        self::assertSame(['dompdf/dompdf', 'php', 'phpmailer/phpmailer', 'slim/psr7', 'slim/slim', 'smalot/pdfparser'], $direct);
     }
 
     public function testActivationLocksCanonicalUnitBeforeTenantOrLeaseSideEffects(): void

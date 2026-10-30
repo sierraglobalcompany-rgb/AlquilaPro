@@ -136,6 +136,12 @@ final class CandidateService
         }
 
         try {
+            $this->assertHouseholdCompleteness($row);
+        } catch (RuntimeException) {
+            return 'occupants';
+        }
+
+        try {
             $this->assertDocumentCompleteness($row);
         } catch (RuntimeException) {
             return 'documents';
@@ -201,6 +207,9 @@ final class CandidateService
             'pets_declared' => array_key_exists('pets_declared', $input)
                 ? $this->strictBoolean($input['pets_declared'])
                 : (bool) $row['pets_declared'],
+            'pets_answered_at' => array_key_exists('pets_declared', $input)
+                ? $this->dateTime($now)
+                : $row['pets_answered_at'],
             'pets_notes' => array_key_exists('pets_notes', $input)
                 ? $this->optionalText($input['pets_notes'])
                 : $row['pets_notes'],
@@ -215,7 +224,8 @@ final class CandidateService
             . 'current_address = :current_address, employment_status = :employment_status, '
             . 'employer_name = :employer_name, occupation = :occupation, monthly_income = :monthly_income, '
             . 'employment_notes = :employment_notes, occupants_count = :occupants_count, occupants_notes = :occupants_notes, '
-            . 'pets_declared = :pets_declared, pets_notes = :pets_notes, status = :status, updated_at = :updated_at '
+            . 'pets_declared = :pets_declared, pets_answered_at = :pets_answered_at, pets_notes = :pets_notes, '
+            . 'status = :status, updated_at = :updated_at '
             . 'WHERE id = :id',
         );
         $statement->execute([
@@ -362,6 +372,7 @@ final class CandidateService
         $this->assertBasicCompleteness($row);
         $this->assertLaborCompleteness($row);
         $this->assertDocumentCompleteness($row);
+        $this->assertHouseholdCompleteness($row);
 
         $this->pdo->beginTransaction();
         try {
@@ -437,14 +448,7 @@ final class CandidateService
             throw new RuntimeException('El candidato no existe.');
         }
 
-        $allowed = match ($candidate['status']) {
-            'new' => ['incomplete', 'withdrawn'],
-            'incomplete' => ['withdrawn'],
-            'verification' => ['pending_screening', 'withdrawn'],
-            'pending_screening' => ['withdrawn'],
-            'withdrawn' => [],
-            default => [],
-        };
+        $allowed = $this->allowedTransitionsForStatus((string) $candidate['status']);
 
         if (!in_array($status, $allowed, true)) {
             throw new RuntimeException('La transición de estado no es válida.');
@@ -464,6 +468,18 @@ final class CandidateService
         }
 
         return $updated;
+    }
+
+    public function allowedTransitionsForStatus(string $status): array
+    {
+        return match ($status) {
+            'new' => ['incomplete', 'withdrawn'],
+            'incomplete' => ['withdrawn'],
+            'verification' => ['pending_screening', 'withdrawn'],
+            'pending_screening' => ['withdrawn'],
+            'withdrawn' => [],
+            default => [],
+        };
     }
 
     public function regenerateToken(int $candidateId, int $now): string
@@ -737,6 +753,39 @@ final class CandidateService
                 || $this->candidateDocumentService->privateDocument((int) $row['id'], $documentId) === null) {
                 throw new RuntimeException('Debes adjuntar los documentos obligatorios antes de enviar.');
             }
+        }
+    }
+
+    private function assertHouseholdCompleteness(array $row): void
+    {
+        if (($row['pets_answered_at'] ?? null) === null) {
+            throw new RuntimeException('Debes indicar si tienes mascotas.');
+        }
+
+        $occupantsCount = $row['occupants_count'] === null ? null : (int) $row['occupants_count'];
+        if ($occupantsCount === null || $occupantsCount < 1) {
+            throw new RuntimeException('Indica el número de ocupantes incluyendo al solicitante.');
+        }
+
+        $occupantsStatement = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM candidate_household_occupants WHERE candidate_id = :candidate_id',
+        );
+        $occupantsStatement->execute(['candidate_id' => (int) $row['id']]);
+        $registeredPeople = 1 + (int) $occupantsStatement->fetchColumn();
+        if ($registeredPeople !== $occupantsCount) {
+            throw new RuntimeException('Completa las fichas de las personas adicionales antes de enviar.');
+        }
+
+        $petsStatement = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM candidate_household_pets WHERE candidate_id = :candidate_id',
+        );
+        $petsStatement->execute(['candidate_id' => (int) $row['id']]);
+        $petCount = (int) $petsStatement->fetchColumn();
+        if ((bool) $row['pets_declared'] && $petCount === 0) {
+            throw new RuntimeException('Registra al menos una mascota antes de enviar la solicitud.');
+        }
+        if (!(bool) $row['pets_declared'] && $petCount > 0) {
+            throw new RuntimeException('Retira las fichas de mascotas o confirma la respuesta Sí antes de enviar.');
         }
     }
 

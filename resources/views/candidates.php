@@ -24,13 +24,19 @@ $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, 
                     <strong><?= $escape($candidate['full_name']) ?></strong>
                     <span class="status-pill"><?= $escape(HumanLabels::candidateStatus((string) $candidate['status'])) ?></span>
                 </div>
-                <div><?= $escape(strtoupper((string) $candidate['document_type'])) ?> <?= $escape($candidate['document_number']) ?></div>
-                <div><?= $escape($candidate['property_name'] ?? '') ?> · <?= $escape($candidate['unit_code'] ?? $candidate['unit_id']) ?></div>
-                <div><?= $escape($candidate['phone']) ?></div>
-                <div class="hint">
-                    Creado: <?= $escape($candidate['created_at']) ?>
-                    <?php if (($candidate['submitted_at'] ?? null) !== null): ?> · Enviado: <?= $escape($candidate['submitted_at']) ?><?php endif; ?>
-                </div>
+                <?php
+                $unitLabel = trim((string) ($candidate['unit_code'] ?? $candidate['unit_id'] ?? ''));
+                $location = array_values(array_filter([
+                    trim((string) ($candidate['property_name'] ?? '')),
+                    $unitLabel,
+                ], static fn (string $value): bool => $value !== ''));
+                $contact = array_values(array_filter([
+                    trim((string) ($candidate['phone'] ?? '')),
+                    trim((string) ($candidate['email'] ?? '')),
+                ], static fn (string $value): bool => $value !== ''));
+                ?>
+                <?php if ($location !== []): ?><div><?= $escape(implode(' · ', $location)) ?></div><?php endif; ?>
+                <?php if ($contact !== []): ?><div class="hint"><?= $escape(implode(' · ', $contact)) ?></div><?php endif; ?>
                 <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>">Ver candidato</a>
             </article>
         <?php endforeach; ?>

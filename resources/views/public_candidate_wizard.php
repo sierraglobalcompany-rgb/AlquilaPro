@@ -19,6 +19,54 @@ $applicationRequirements = is_array($applicationRequirements ?? null) ? array_va
 $documentsByRequirement = is_array($documentsByRequirement ?? null) ? $documentsByRequirement : [];
 $availableUnits = is_array($availableUnits ?? null) ? $availableUnits : [];
 $references = is_array($candidate['references'] ?? null) ? array_values($candidate['references']) : [];
+$householdForm = is_array($householdForm ?? null) ? $householdForm : [];
+$householdOccupants = is_array($householdOccupants ?? null) ? $householdOccupants : [];
+$householdPets = is_array($householdPets ?? null) ? $householdPets : [];
+$mergeHouseholdRows = static function (array $saved, mixed $submitted): array {
+    if (!is_array($submitted)) {
+        return $saved;
+    }
+    $savedById = [];
+    foreach ($saved as $row) {
+        if (is_array($row) && isset($row['id'])) {
+            $savedById[(string) $row['id']] = $row;
+        }
+    }
+    $rows = [];
+    $keptIds = [];
+    foreach ($submitted as $index => $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $id = trim((string) ($row['id'] ?? ''));
+        if ($id !== '' && isset($savedById[$id])) {
+            $rows[$index] = array_replace($savedById[$id], $row);
+            $keptIds[$id] = true;
+        } else {
+            $rows[$index] = $row;
+        }
+    }
+    foreach ($savedById as $id => $row) {
+        if (!isset($keptIds[$id])) {
+            $rows[] = $row;
+        }
+    }
+    return $rows;
+};
+$householdOccupants = $mergeHouseholdRows($householdOccupants, $householdForm['occupants'] ?? null);
+$householdPets = $mergeHouseholdRows($householdPets, $householdForm['pets'] ?? null);
+$householdOccupants = $householdOccupants === [] ? [[]] : $householdOccupants;
+$householdPets = $householdPets === [] ? [[]] : $householdPets;
+$householdNextIndex = static function (array $rows): int {
+    $indexes = array_filter(array_map('intval', array_keys($rows)), static fn (int $index): bool => $index >= 0);
+    return $indexes === [] ? 1 : max($indexes) + 1;
+};
+$petsAnswer = array_key_exists('pets_declared', $householdForm)
+    ? (string) $householdForm['pets_declared']
+    : (($candidate['pets_answered_at'] ?? null) !== null ? (!empty($candidate['pets_declared']) ? '1' : '0') : '');
+$declaredOccupants = filter_var($householdForm['occupants_count'] ?? $candidate['occupants_count'] ?? null, FILTER_VALIDATE_INT);
+$realOccupantRows = array_filter($householdOccupants, static fn (array $row): bool => trim((string) ($row['id'] ?? $row['full_name'] ?? '')) !== '');
+$realPetRows = array_filter($householdPets, static fn (array $row): bool => trim((string) ($row['id'] ?? $row['name'] ?? '')) !== '');
 $screening = is_array($screening ?? null) ? $screening : null;
 $csrfToken = (string) ($csrfToken ?? '');
 $error = is_string($error ?? null) ? $error : null;
@@ -59,6 +107,13 @@ $screeningStatusLabel = match ((string) ($screening['status'] ?? '')) {
 
     <?php if ($error !== null): ?>
         <p role="alert"><?= $escape($error) ?></p>
+    <?php endif; ?>
+
+    <?php if ($step === 'occupants' && $declaredOccupants !== false && $declaredOccupants !== null && $declaredOccupants !== 1 + count($realOccupantRows)): ?>
+        <p class="hint" role="status">El total declarado debe coincidir con el solicitante y las fichas de las personas adicionales.</p>
+    <?php endif; ?>
+    <?php if ($step === 'occupants' && $petsAnswer === '1' && $realPetRows === []): ?>
+        <p class="hint" role="status">Registra al menos una ficha de mascota para continuar con la respuesta Sí.</p>
     <?php endif; ?>
 
     <?php if ($step === 'personal'): ?>
@@ -119,19 +174,113 @@ $screeningStatusLabel = match ((string) ($screening['status'] ?? '')) {
 
     <?php elseif ($step === 'occupants'): ?>
         <?php if ($editable): ?>
-            <form class="stack-form" method="post" action="<?= $escape($action) ?>">
+            <form class="stack-form candidate-household-form" method="post" enctype="multipart/form-data" action="<?= $escape($action) ?>">
                 <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
                 <input type="hidden" name="wizard_step" value="occupants">
-                <label>Número de ocupantes<input type="number" name="occupants_count" min="0" max="65535" step="1" value="<?= $escape($candidate['occupants_count'] ?? '') ?>"></label>
-                <label>Notas sobre ocupantes<textarea name="occupants_notes"><?= $escape($candidate['occupants_notes'] ?? '') ?></textarea></label>
+                <input type="hidden" name="occupants_present" value="1">
+                <input type="hidden" name="pets_present" value="1">
+                <label>Número total de ocupantes, incluyéndote
+                    <input type="number" name="occupants_count" min="1" max="26" step="1" required
+                        value="<?= $escape($householdForm['occupants_count'] ?? $candidate['occupants_count'] ?? '') ?>">
+                </label>
+                <p class="hint">Incluye al solicitante en el total. Registra abajo solo a las personas adicionales. No necesitas ingresar cédulas ni fechas exactas de nacimiento.</p>
+                <label>Notas del hogar<textarea name="occupants_notes" maxlength="5000"><?= $escape($householdForm['occupants_notes'] ?? $candidate['occupants_notes'] ?? '') ?></textarea></label>
+                <section class="candidate-household-editor" aria-labelledby="wizard-occupants-title">
+                    <div class="section-heading">
+                        <div><h2 id="wizard-occupants-title">Personas adicionales</h2><p class="hint">Puedes continuar sin fichas si solo vive el solicitante.</p></div>
+                        <button type="button" class="button button--quiet" data-household-add="occupants">Añadir persona</button>
+                    </div>
+                    <div class="candidate-household-editor__list" data-household-list="occupants" data-next-index="<?= $escape($householdNextIndex($householdOccupants)) ?>">
+                        <?php foreach ($householdOccupants as $index => $occupant): ?>
+                            <?php if (!is_array($occupant)) { continue; } $recordId = trim((string) ($occupant['id'] ?? '')); ?>
+                            <fieldset class="surface candidate-household-entry" data-household-entry data-persisted="<?= $recordId !== '' ? '1' : '0' ?>">
+                                <legend data-household-label>Persona adicional</legend>
+                                <input type="hidden" name="occupants[<?= $escape($index) ?>][id]" value="<?= $escape($recordId) ?>">
+                                <label>Nombre completo<input name="occupants[<?= $escape($index) ?>][full_name]" maxlength="190" value="<?= $escape($occupant['full_name'] ?? '') ?>"></label>
+                                <label>Relación con el solicitante<input name="occupants[<?= $escape($index) ?>][relationship]" maxlength="100" value="<?= $escape($occupant['relationship'] ?? '') ?>"></label>
+                                <label>Edad aproximada en años<input type="number" name="occupants[<?= $escape($index) ?>][age_years]" min="0" max="120" step="1" value="<?= $escape($occupant['age_years'] ?? '') ?>"></label>
+                                <label>Ocupación o actividad<input name="occupants[<?= $escape($index) ?>][occupation_or_activity]" maxlength="190" value="<?= $escape($occupant['occupation_or_activity'] ?? '') ?>"></label>
+                                <label>Notas<textarea name="occupants[<?= $escape($index) ?>][notes]" maxlength="5000"><?= $escape($occupant['notes'] ?? '') ?></textarea></label>
+                                <?php if (!empty($occupant['has_photo']) && $recordId !== ''): ?><img class="candidate-household-photo" src="<?= $escape($continuePath . '/household/occupant/' . rawurlencode($recordId) . '/photo') ?>" alt="Fotografía de <?= $escape($occupant['full_name'] ?? 'persona acompañante') ?>" loading="lazy"><?php endif; ?>
+                                <label>Fotografía opcional (PNG o JPEG, máximo 5 MiB)<input type="file" name="occupants[<?= $escape($index) ?>][photo]" accept="image/png,image/jpeg"></label>
+                                <label><input type="checkbox" name="occupants[<?= $escape($index) ?>][photo_consent]" value="1"> Cuento con autorización para guardar esta fotografía.</label>
+                                <?php if (!empty($occupant['has_photo'])): ?><label><input type="checkbox" name="occupants[<?= $escape($index) ?>][remove_photo]" value="1"> Retirar fotografía guardada</label><?php endif; ?>
+                                <button type="button" class="button button--quiet" data-household-remove>Retirar persona</button>
+                            </fieldset>
+                        <?php endforeach; ?>
+                    </div>
+                </section>
                 <fieldset>
                     <legend>¿Tienes mascotas?</legend>
-                    <label><input type="radio" name="pets_declared" value="1" <?= !empty($candidate['pets_declared']) ? 'checked' : '' ?>> Sí</label>
-                    <label><input type="radio" name="pets_declared" value="0" <?= empty($candidate['pets_declared']) ? 'checked' : '' ?>> No</label>
+                    <label><input type="radio" name="pets_declared" value="1" <?= $petsAnswer === '1' ? 'checked' : '' ?>> Sí</label>
+                    <label><input type="radio" name="pets_declared" value="0" <?= $petsAnswer === '0' ? 'checked' : '' ?>> No</label>
                 </fieldset>
-                <label>Notas sobre mascotas<textarea name="pets_notes"><?= $escape($candidate['pets_notes'] ?? '') ?></textarea></label>
+                <label>Notas sobre mascotas<textarea name="pets_notes" maxlength="5000"><?= $escape($householdForm['pets_notes'] ?? $candidate['pets_notes'] ?? '') ?></textarea></label>
+                <section class="candidate-household-editor" aria-labelledby="wizard-pets-title">
+                    <div class="section-heading">
+                        <div><h2 id="wizard-pets-title">Mascotas declaradas</h2><p class="hint">Al responder Sí, completa al menos una ficha. La declaración de vacunación es informativa.</p></div>
+                        <button type="button" class="button button--quiet" data-household-add="pets">Añadir mascota</button>
+                    </div>
+                    <div class="candidate-household-editor__list" data-household-list="pets" data-next-index="<?= $escape($householdNextIndex($householdPets)) ?>">
+                        <?php foreach ($householdPets as $index => $pet): ?>
+                            <?php if (!is_array($pet)) { continue; } $recordId = trim((string) ($pet['id'] ?? '')); ?>
+                            <fieldset class="surface candidate-household-entry" data-household-entry data-persisted="<?= $recordId !== '' ? '1' : '0' ?>">
+                                <legend data-household-label>Mascota</legend>
+                                <input type="hidden" name="pets[<?= $escape($index) ?>][id]" value="<?= $escape($recordId) ?>">
+                                <label>Nombre<input name="pets[<?= $escape($index) ?>][name]" maxlength="190" value="<?= $escape($pet['name'] ?? '') ?>"></label>
+                                <label>Especie<input name="pets[<?= $escape($index) ?>][species]" maxlength="80" value="<?= $escape($pet['species'] ?? '') ?>"></label>
+                                <label>Raza (opcional)<input name="pets[<?= $escape($index) ?>][breed]" maxlength="120" value="<?= $escape($pet['breed'] ?? '') ?>"></label>
+                                <label>Tamaño (opcional)<input name="pets[<?= $escape($index) ?>][size_category]" maxlength="32" value="<?= $escape($pet['size_category'] ?? '') ?>"></label>
+                                <label>Edad aproximada en años<input type="number" name="pets[<?= $escape($index) ?>][age_years]" min="0" max="100" step="1" value="<?= $escape($pet['age_years'] ?? '') ?>"></label>
+                                <label>Declaración de vacunación
+                                    <select name="pets[<?= $escape($index) ?>][vaccination_declaration]">
+                                        <option value="">Sin declarar</option>
+                                        <option value="declared_vaccinated" <?= ($pet['vaccination_declaration'] ?? '') === 'declared_vaccinated' ? 'selected' : '' ?>>Declara vacunación</option>
+                                        <option value="declared_not_vaccinated" <?= ($pet['vaccination_declaration'] ?? '') === 'declared_not_vaccinated' ? 'selected' : '' ?>>Declara no vacunación</option>
+                                    </select>
+                                </label>
+                                <label>Notas<textarea name="pets[<?= $escape($index) ?>][notes]" maxlength="5000"><?= $escape($pet['notes'] ?? '') ?></textarea></label>
+                                <?php if (!empty($pet['has_photo']) && $recordId !== ''): ?><img class="candidate-household-photo" src="<?= $escape($continuePath . '/household/pet/' . rawurlencode($recordId) . '/photo') ?>" alt="Fotografía de <?= $escape($pet['name'] ?? 'mascota') ?>" loading="lazy"><?php endif; ?>
+                                <label>Fotografía opcional (PNG o JPEG, máximo 5 MiB)<input type="file" name="pets[<?= $escape($index) ?>][photo]" accept="image/png,image/jpeg"></label>
+                                <label><input type="checkbox" name="pets[<?= $escape($index) ?>][photo_consent]" value="1"> Cuento con autorización para guardar esta fotografía.</label>
+                                <?php if (!empty($pet['has_photo'])): ?><label><input type="checkbox" name="pets[<?= $escape($index) ?>][remove_photo]" value="1"> Retirar fotografía guardada</label><?php endif; ?>
+                                <button type="button" class="button button--quiet" data-household-remove>Retirar mascota</button>
+                            </fieldset>
+                        <?php endforeach; ?>
+                    </div>
+                </section>
                 <button type="submit">Guardar y continuar</button>
             </form>
+            <template data-household-template="occupants">
+                <fieldset class="surface candidate-household-entry" data-household-entry data-persisted="0">
+                    <legend data-household-label>Persona adicional</legend>
+                    <input type="hidden" name="occupants[__INDEX__][id]" value="">
+                    <label>Nombre completo<input name="occupants[__INDEX__][full_name]" maxlength="190"></label>
+                    <label>Relación con el solicitante<input name="occupants[__INDEX__][relationship]" maxlength="100"></label>
+                    <label>Edad aproximada en años<input type="number" name="occupants[__INDEX__][age_years]" min="0" max="120" step="1"></label>
+                    <label>Ocupación o actividad<input name="occupants[__INDEX__][occupation_or_activity]" maxlength="190"></label>
+                    <label>Notas<textarea name="occupants[__INDEX__][notes]" maxlength="5000"></textarea></label>
+                    <label>Fotografía opcional (PNG o JPEG, máximo 5 MiB)<input type="file" name="occupants[__INDEX__][photo]" accept="image/png,image/jpeg"></label>
+                    <label><input type="checkbox" name="occupants[__INDEX__][photo_consent]" value="1"> Cuento con autorización para guardar esta fotografía.</label>
+                    <button type="button" class="button button--quiet" data-household-remove>Retirar persona</button>
+                </fieldset>
+            </template>
+            <template data-household-template="pets">
+                <fieldset class="surface candidate-household-entry" data-household-entry data-persisted="0">
+                    <legend data-household-label>Mascota</legend>
+                    <input type="hidden" name="pets[__INDEX__][id]" value="">
+                    <label>Nombre<input name="pets[__INDEX__][name]" maxlength="190"></label>
+                    <label>Especie<input name="pets[__INDEX__][species]" maxlength="80"></label>
+                    <label>Raza (opcional)<input name="pets[__INDEX__][breed]" maxlength="120"></label>
+                    <label>Tamaño (opcional)<input name="pets[__INDEX__][size_category]" maxlength="32"></label>
+                    <label>Edad aproximada en años<input type="number" name="pets[__INDEX__][age_years]" min="0" max="100" step="1"></label>
+                    <label>Declaración de vacunación<select name="pets[__INDEX__][vaccination_declaration]"><option value="">Sin declarar</option><option value="declared_vaccinated">Declara vacunación</option><option value="declared_not_vaccinated">Declara no vacunación</option></select></label>
+                    <label>Notas<textarea name="pets[__INDEX__][notes]" maxlength="5000"></textarea></label>
+                    <label>Fotografía opcional (PNG o JPEG, máximo 5 MiB)<input type="file" name="pets[__INDEX__][photo]" accept="image/png,image/jpeg"></label>
+                    <label><input type="checkbox" name="pets[__INDEX__][photo_consent]" value="1"> Cuento con autorización para guardar esta fotografía.</label>
+                    <button type="button" class="button button--quiet" data-household-remove>Retirar mascota</button>
+                </fieldset>
+            </template>
         <?php endif; ?>
 
     <?php elseif ($step === 'references'): ?>

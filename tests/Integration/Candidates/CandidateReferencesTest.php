@@ -213,7 +213,11 @@ final class CandidateReferencesTest extends TestCase
         $this->assertUnitChangeRejected($service, $withDocument['continuation_token'], $target['public_key']);
 
         $submitted = $service->startCandidate($current['public_key'], $this->candidateInput('7006'), self::NOW + 30);
-        $service->submitByToken($submitted['continuation_token'], self::NOW + 31);
+        $service->updateByToken($submitted['continuation_token'], [
+            'occupants_count' => '1',
+            'pets_declared' => '0',
+        ], self::NOW + 31);
+        $service->submitByToken($submitted['continuation_token'], self::NOW + 32);
         $this->assertUnitChangeRejected($service, $submitted['continuation_token'], $target['public_key']);
     }
 

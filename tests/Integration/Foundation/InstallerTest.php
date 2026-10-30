@@ -92,7 +92,8 @@ final class InstallerTest extends TestCase
         }
 
         $installer = $this->installer();
-        $result = $installer->install($this->validInput());
+        $input = $this->validInput();
+        $result = $installer->install($input);
 
         self::assertSame('Alquila Pro', $result['app_name']);
         self::assertSame('https://alquilapro.sierraglobalcompany.com', $result['base_url']);
@@ -113,10 +114,10 @@ final class InstallerTest extends TestCase
         self::assertSame('https://alquilapro.sierraglobalcompany.com', $settings['app.base_url']);
 
         $database = require $this->configPath;
-        self::assertSame('127.0.0.1', $database['host']);
-        self::assertSame('alquila_test', $database['database']);
-        self::assertSame('root', $database['username']);
-        self::assertSame('root', $database['password']);
+        self::assertSame($input['database']['host'], $database['host']);
+        self::assertSame($input['database']['database'], $database['database']);
+        self::assertSame($input['database']['username'], $database['username']);
+        self::assertSame($input['database']['password'], $database['password']);
     }
 
     public function testSecondInstallationIsRefused(): void

@@ -117,6 +117,8 @@ final class CandidateServiceTest extends TestCase
             'phone' => '3001112233',
             'email' => 'actualizado@example.com',
             'current_address' => 'Calle 10 # 20-30',
+            'occupants_count' => '1',
+            'pets_declared' => '0',
         ], self::NOW + 20);
         self::assertSame('Nombre Actualizado', $updated['full_name']);
         self::assertSame('2001', $updated['document_number']);
@@ -160,7 +162,11 @@ final class CandidateServiceTest extends TestCase
             self::assertSame('La transición de estado no es válida.', $exception->getMessage());
         }
 
-        $service->updateByToken($started['continuation_token'], ['employer_name' => 'Empresa Uno'], self::NOW + 10);
+        $service->updateByToken($started['continuation_token'], [
+            'employer_name' => 'Empresa Uno',
+            'occupants_count' => '1',
+            'pets_declared' => '0',
+        ], self::NOW + 10);
         try {
             $service->submitByToken($started['continuation_token'], self::NOW + 20);
             self::fail('Started labor data requires employment_status.');
@@ -168,7 +174,11 @@ final class CandidateServiceTest extends TestCase
             self::assertSame('Debes completar el estado laboral antes de enviar.', $exception->getMessage());
         }
 
-        $service->updateByToken($started['continuation_token'], ['employment_status' => 'Empleado'], self::NOW + 30);
+        $service->updateByToken($started['continuation_token'], [
+            'employment_status' => 'Empleado',
+            'occupants_count' => '1',
+            'pets_declared' => '0',
+        ], self::NOW + 30);
         $submitted = $service->submitByToken($started['continuation_token'], self::NOW + 40);
 
         self::assertSame('verification', $submitted['status']);
@@ -196,7 +206,11 @@ final class CandidateServiceTest extends TestCase
         }
 
         $second = $service->startCandidate($unit['public_key'], $this->candidateInput('cc', '5002'), self::NOW + 1);
-        $service->submitByToken($second['continuation_token'], self::NOW + 2);
+        $service->updateByToken($second['continuation_token'], [
+            'occupants_count' => '1',
+            'pets_declared' => '0',
+        ], self::NOW + 2);
+        $service->submitByToken($second['continuation_token'], self::NOW + 3);
         self::assertSame(
             'pending_screening',
             $service->transitionStatus((int) $second['candidate_id'], 'pending_screening')['status'],
@@ -209,6 +223,23 @@ final class CandidateServiceTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('La transición de estado no es válida.');
         $service->transitionStatus((int) $third['candidate_id'], 'approved');
+    }
+
+    public function testAllowedTransitionsForStatusMatchesCanonicalCandidateMatrix(): void
+    {
+        $service = $this->service();
+        self::assertTrue(is_callable([$service, 'allowedTransitionsForStatus']));
+
+        foreach ([
+            'new' => ['incomplete', 'withdrawn'],
+            'incomplete' => ['withdrawn'],
+            'verification' => ['pending_screening', 'withdrawn'],
+            'pending_screening' => ['withdrawn'],
+            'withdrawn' => [],
+            'unknown' => [],
+        ] as $status => $expected) {
+            self::assertSame($expected, $service->allowedTransitionsForStatus($status), $status);
+        }
     }
 
     public function testFindByTokenIncludesOnlyPublicReferenceFieldsWithoutInternalIds(): void

@@ -214,6 +214,7 @@ final class CandidateDocumentsTest extends TestCase
         $invalidUploads = [
             $this->upload('', 'empty.pdf', 'application/pdf'),
             $this->upload('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', 'fake.pdf', 'application/pdf'),
+            $this->upload("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<<>>\n%%EOF\n", 'truncated-structure.pdf', 'application/pdf'),
             $this->upload('<?php echo "owned"; ?>', 'fake.jpg', 'image/jpeg'),
             $this->upload(str_repeat('A', 10 * 1024 * 1024 + 1), 'too-big.pdf', 'application/pdf'),
         ];
@@ -308,6 +309,10 @@ final class CandidateDocumentsTest extends TestCase
             $this->candidateInput('DOC-5001'),
             self::NOW,
         );
+        $candidateService->updateByToken($candidate['continuation_token'], [
+            'occupants_count' => '1',
+            'pets_declared' => '0',
+        ], self::NOW + 1);
 
         $documents->createRequirement($unit['id'], [
             'code' => 'required',
@@ -474,11 +479,18 @@ final class CandidateDocumentsTest extends TestCase
     /** @return array{candidate_id:int,continuation_token:string} */
     private function startCandidate(array $unit, string $documentNumber): array
     {
-        return (new CandidateService($this->pdo))->startCandidate(
+        $service = new CandidateService($this->pdo);
+        $candidate = $service->startCandidate(
             $unit['public_key'],
             $this->candidateInput($documentNumber),
             self::NOW,
         );
+        $service->updateByToken($candidate['continuation_token'], [
+            'occupants_count' => '1',
+            'pets_declared' => '0',
+        ], self::NOW + 1);
+
+        return $candidate;
     }
 
     /** @return array<string,mixed> */
@@ -507,7 +519,7 @@ final class CandidateDocumentsTest extends TestCase
 
     private function pdfBytes(): string
     {
-        return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<<>>\n%%EOF\n";
+        return \AlquilaPro\Tests\Support\PdfFixtures::validPdf();
     }
 
     private function pngBytes(): string

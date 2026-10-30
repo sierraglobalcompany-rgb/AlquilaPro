@@ -1,32 +1,52 @@
-# AlquilaPro — CURRENT CHECKPOINT
+# CURRENT CHECKPOINT — R7 / BLOQUE A PUBLICADO, BLOQUE B LOCAL_ONLY
 
-**Corte:** 2026-10-23, America/Bogota. **Autoridad:** GitHub HEAD exacto → CI del HEAD → este checkpoint → SPEC/AGENTS → historial de Git. Este documento es el estado activo de la **rama de integración**, no sustituye `main` ni autoriza merge o deploy.
+**Actualizado:** 2026-10-29 (America/Bogota)
+**Repositorio:** sierraglobalcompany-rgb/AlquilaPro
+**PR:** #55, OPEN/DRAFT, no merged
+**Rama remota:** impl/cand-03-household-human-first-20261023
+**HEAD local y remoto:** 4231e7b1015f24b5bd1baf51311fd78550778360
+**Checkout de trabajo:** detached HEAD; sin cambios staged
+**MERGE=NO; DEPLOY=NO; RELEASE=NO; PRODUCCIÓN=NO.**
 
-## Identidad y estado verificable
+## Bloque A — CAND-04/05/06 publicado
 
-- **Repo:** `sierraglobalcompany-rgb/AlquilaPro`.
-- **Main verificado:** `94ba5f486b158c2b1fed753f26c63f7b3570c97c`; CAND-01 integrado anteriormente por PR #45. Sin cambios por este trabajo.
-- **PR de integración:** [#54](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/54), **Draft, mergeable=true, no merged**; rama `integration/cand02-documents-20261023-g1`. **HEAD de código verificado antes de este commit documental:** `ffddc415c57c98588ca5c895d9e56f4eab0e1945`.
-- **CI código [#1176](https://github.com/sierraglobalcompany-rgb/AlquilaPro/actions/runs/39904534274): SUCCESS PHP 8.3, 8.4, 8.5**, asociado a `ffddc415c57c98588ca5c895d9e56f4eab0e1945`.
-- **Browser QA integrado:** `PASS_WITH_SCOPE` sobre `ffddc415c57c98588ca5c895d9e56f4eab0e1945`, evidencias: **seis PNG reales + dos referencias originales + métricas/manifiesto**, sin overflow horizontal ni errores inesperados de consola; validación independiente del ZIP **11/11 hashes**. **Paridad total de mockups `NOT_CERTIFIED`**. QA documenta estados sintéticos, no despliegue.
-- **Documentación actualizada:** esta edición genera un **nuevo commit documental**; requerirá CI propio antes de integración final. **No afirmar que Browser QA midió el nuevo SHA**: se conserva evidencia sobre el padre de código sin cambio funcional/visual. No repetir Playwright por una edición exclusiva de Markdown.
-- **PR #52** [Work](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/52), HEAD `0eea64d8a4fdba964d14da26345ff6e68369d36d`, Draft; V8 `PASS_WITH_SCOPE`. **PR #53** [Documentos](https://github.com/sierraglobalcompany-rgb/AlquilaPro/pull/53), HEAD `4c20e6acbe88aac6a3b3714d49f4d9a598d56e41`, Draft; QA `PASS_WITH_SCOPE`. **Ambos continúan abiertos como fuentes históricas**: PR #54 ya incluye sus cambios funcionales; nunca fusionar los tres indiscriminadamente.
-- **Merge:** `NO AUTORIZADO`. **Deploy Hostinger:** `NO AUTORIZADO`. **CAND-03+ / F26:** `FROZEN` hasta integración autorizada y siguiente gate.
+- Commit 4231e7b1015f24b5bd1baf51311fd78550778360, hijo directo de d036cda5e11aea31184250213ff414d346e51e89; un push normal. PR permanece OPEN/DRAFT.
+- CI #1219, run 40895207989, terminado SUCCESS en el SHA exacto: PHPUnit PHP 8.3, 8.4 y 8.5; Browser QA autenticado en PHP 8.5.
+- Artifact: cand03-g5-browser-qa-40895207989-1, id 12907801102, SHA-256 sha256:adf11483f07da813ea7064218a802f9a8479d99b05cc24e9dfe4bcd87cad7bc7.
+- Browser QA local posterior a publicación: 14 estados, 36/36 comprobaciones, 28 PNG; CSS servido coincide con su SHA. 0 diagnósticos inesperados; el 403 de ACL esperado está correlacionado. 28/28 hashes de capturas verificados.
+- Cinco capturas móviles adicionales son de la copia previa a publicación y están etiquetadas así; no se atribuyen al SHA publicado.
+- Aceptación visual provisional del propietario; no equivale a dictamen independiente Ley 5 ni UAT.
 
-## Contratos integrados y reservas
+## Bloque B — CAND-07/08/09 LOCAL_ONLY
 
-- `resources/views/candidate_detail.php`: sección **Work** contiene exclusivamente datos declarados existentes (empleo, empresa, ocupación, ingreso y notas) y sección **Documents** contiene requisitos activos, recibidos, pendientes, opcionales y documentos de requisitos inactivos. Una sola sección activa por solicitud.
-- `app/Candidates/routes.php`: requisitos reales del `CandidateDocumentService` consultados al renderizar `?section=documents`; permisos previos preservados.
-- `assets/app.css`: estilo específico para ambas secciones; corrección de navegación fija entre **1024 y 1199px** y menú/tab a partir de 1200px. Causa de CI #1175 identificada (orden de reglas del contrato de navegación), corregida en `ffddc415...`; CI #1176 verde.
-- Pruebas de **convivencia Work/Documentos** y regresión de breakpoint añadidas, sin migraciones ni módulos nuevos.
-- **En QA 1100px:** último enlace documental termina **97,5px antes** de la barra fija; resumen lateral recuperable al desplazarse hacia arriba. **No** catalogar superposición funcional si el final es accesible.
-- **Límites:** historia/verificación laboral, revisión/solicitud/aprobación documental, miniaturas/acciones de mockups **no existen como flujo completo verificado**. No añadir simulaciones visuales ni aprobación inventada; futura implementación solo con fuentes de datos, permisos y UAT. Accesibilidad integral, dispositivo físico y paridad visual global no certificados. El Browser QA integrado no reejecutó todos los escenarios de PDF privado/403 de PR #53; conservar esa distinción.
+Implementación local basada en 4231e7b1015f24b5bd1baf51311fd78550778360. Sin commit ni push. Alcance: transiciones y contexto de contratos; administración con transiciones permitidas y acción de regenerar token secundaria; lista de candidatos con CTA único, contacto opcional, estado vacío y escape de contenido.
 
-## Cuatro leyes y próxima compuerta
+Cambios locales de código/pruebas en 11 rutas: CandidateService, rutas de candidatos, HumanLabels, vistas de detalle/lista, pruebas de servicio/rutas/vista, prueba de lista nueva y el fixture de HumanLabelsContractTest. Se actualizó este checkpoint como documentación local. El directorio tests/browser/node_modules ya existía sin seguimiento; se conservó intacto y se excluyó de los entregables.
 
-- **KISS:** PHP SSR, Slim/PDO/MariaDB, owners existentes; sin arquitectura o capas paralelas.
-- **Antirruido:** usar PR #54 como candidata única de integración; documentar supersesión y cerrar PRs anteriores **solo después de decisión autorizada**. Historial y evidencias permanecen en Git/PRs.
-- **Antiparches:** causa de fallo #1175 corregida y cubierta por regresión; prohibido reabrir arreglos CSS sin fallo nuevo probado.
-- **UX/UI Pro:** capturas reales, viewport/rol/datos, límites `PASS_WITH_SCOPE`; fidelidad global pendiente con funcionalidades sustentadas por backend.
+### Pruebas
 
-**NEXT ÚNICO:** comprobar que el **CI del nuevo HEAD exclusivamente documental** termina verde; presentar dictamen del PR #54 y solicitar **autorización expresa de merge exclusivo del PR #54** (no deploy). Sin autorización, STOP. No iniciar CAND-03 ni crear nuevas ramas/pruebas/paquetes redundantes.
+- Suite PHPUnit completa local: PHP 8.5.12, MariaDB 11.4.13 efímera en tmpfs, base sintética aislada alquila_test_b. Resultado: 749 pruebas, 8.765 aserciones, 0 errores, 0 fallos, 1 omitida; PHPUnit reportó 03:39.351. La prueba omitida es ServerReadyArtifactAuditTest::testCandidateZipPassesStaticAuditAndExtractsCleanly.
+- HumanLabelsContractTest focal tras corregir su fixture para pasar las transiciones que la ruta real entrega: 4 pruebas, 14 aserciones, PASS.
+- git diff --check: PASS.
+- Se descartaron intentos parciales del runner por lentitud del montaje o configuración DB incorrecta; no cuentan como resultado de producto. El único PASS es la ejecución completa final, con la base tmpfs aislada y 11 archivos de código/prueba cotejados por SHA-256.
+
+### Browser QA local
+
+- Aplicación real en loopback, fixtures sintéticos aislados; SHA de los cinco archivos PHP servidos coincide con la copia de trabajo.
+- 16 estados contratos/administración en 1448x1086, 1100x850, 768x1024 y 375x812: HTTP 200 en 16/16, overflow horizontal 0/16, errores de consola/página/red/HTTP 0; 32 PNG.
+- Lista de candidatos single/empty: ocho estados adicionales en los mismos cuatro tamaños, HTTP 200 y 0 errores; 16 PNG.
+- Captura móvil focal adicional del botón de regeneración: viewport 375x812, un gesto táctil cambió scrollY 0→198; el botón quedó completo en viewport, document.elementFromPoint alcanzó el control y no hubo overlay fijo en su centro. 0 diagnósticos; el formulario no se envió en esta medición. Captura SHA-256 f2cd92dcb14f7fbcff17565b543ea853d64b303f81f5faba4abcb477e1aefc40.
+- Total del paquete de evidencia Bloque B: 24 estados estándar, 48 PNG, más 1 captura focal móvil (49). Las 82 capturas combinadas de A, B y móviles prepublicación verifican 82/82 SHA-256. Las 32 capturas de detalle/contrato se tomaron tras la corrección de estilo de acción; las 16 de lista provienen de una captura anterior del mismo código de lista, que no cambió con esa corrección.
+- Incidencia local: en un primer intento de diagnóstico la interceptación del click no quedó confirmada; pudo regenerarse el token de la ficha sintética local. La medición final solo hizo scroll y hit-test; no envió el formulario ni contactó servicios externos.
+- No existe CI remoto para el Bloque B, que sigue sin publicar.
+
+## Integridad de worktrees y WIP
+
+- Nueve worktrees visibles. Los ocho no ejecutores conservan HEAD, rama y cantidad de entradas de estado del snapshot inicial.
+- 259/259 archivos WIP protegidos coinciden por SHA-256 con el snapshot; no se editaron otros worktrees.
+- En el checkout ejecutor: detached HEAD 4231e7b; cambios locales no staged; tests/browser/node_modules excluido.
+- La rama remota sigue en 4231e7b. No hubo commit, push, merge ni despliegue para el Bloque B.
+
+## Próximo gate
+
+Entregar evidencia de Bloque B para revisión independiente Ley 5 y aceptación/UAT humano. No publicar el Bloque B sin nueva autorización. Mantener PR #55 OPEN/DRAFT. No iniciar CAND-10 ni producción.

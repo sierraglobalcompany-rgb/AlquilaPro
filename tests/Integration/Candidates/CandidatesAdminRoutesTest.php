@@ -6,6 +6,8 @@ namespace AlquilaPro\Tests\Integration\Candidates;
 
 use AlquilaPro\Auth\Csrf;
 use AlquilaPro\Candidates\CandidateDocumentService;
+use AlquilaPro\Candidates\CandidateHouseholdService;
+use AlquilaPro\Documents\DocumentService;
 use AlquilaPro\Foundation\DatabaseConfig;
 use AlquilaPro\Foundation\DatabaseConnector;
 use AlquilaPro\Foundation\InstallationLock;
@@ -23,6 +25,8 @@ final class CandidatesAdminRoutesTest extends TestCase
     private string $directory;
     private string $lockPath;
     private string $documentDirectory;
+    private string $propertyDocumentDirectory;
+    private string $householdDirectory;
     private array $temporaryFiles = [];
 
     protected function setUp(): void
@@ -38,7 +42,7 @@ final class CandidatesAdminRoutesTest extends TestCase
         MigrationRunner::migrate($this->pdo, dirname(__DIR__, 3) . '/database/migrations');
 
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (['candidate_documents', 'candidate_references', 'unit_application_requirements', 'candidates', 'unit_media', 'units', 'properties', 'users'] as $table) {
+        foreach (['candidate_household_occupants', 'candidate_household_pets', 'candidate_documents', 'candidate_references', 'unit_application_requirements', 'documents', 'candidates', 'unit_media', 'units', 'properties', 'users'] as $table) {
             $this->pdo->exec('DELETE FROM `' . $table . '`');
         }
         $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
@@ -46,6 +50,8 @@ final class CandidatesAdminRoutesTest extends TestCase
         $this->directory = sys_get_temp_dir() . '/alquila_candidates_admin_' . bin2hex(random_bytes(6));
         mkdir($this->directory, 0700, true);
         $this->documentDirectory = $this->directory . '/candidate-documents';
+        $this->propertyDocumentDirectory = $this->directory . '/property-documents';
+        $this->householdDirectory = $this->directory . '/candidate-household';
         $this->lockPath = $this->directory . '/installed.lock';
         (new InstallationLock($this->lockPath))->write([
             'schema_version' => '1',
@@ -61,6 +67,12 @@ final class CandidatesAdminRoutesTest extends TestCase
         }
         foreach (glob($this->documentDirectory . '/*') ?: [] as $file) {
             @unlink($file);
+        }
+        foreach ([$this->propertyDocumentDirectory, $this->householdDirectory] as $directory) {
+            foreach (glob($directory . '/*') ?: [] as $file) {
+                @unlink($file);
+            }
+            @rmdir($directory);
         }
         @rmdir($this->documentDirectory);
         foreach (glob($this->directory . '/unit-media/*') ?: [] as $file) {
@@ -167,6 +179,10 @@ final class CandidatesAdminRoutesTest extends TestCase
         $manage = (string) $this->request($managerApp, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=manage')->getBody();
         self::assertStringContainsString('data-candidate-section-body="manage"', $manage);
         self::assertStringContainsString('?section=manage', $manage);
+        self::assertStringContainsString('Nueva', $manage);
+        self::assertStringContainsString('value="incomplete"', $manage);
+        self::assertStringContainsString('value="withdrawn"', $manage);
+        self::assertStringContainsString('el enlace anterior deja de funcionar', $manage);
 
         $_SESSION = [];
         $this->insertUser('contracts@example.com', 'ContractsPassword123', 'admin', ['candidates.view', 'contracts.view']);
@@ -227,6 +243,429 @@ final class CandidatesAdminRoutesTest extends TestCase
         self::assertSame(200, $this->request($allowed, 'GET', '/sub/admin/units/' . $unitId . '/media/' . $photoId)->getStatusCode());
     }
 
+    public function testHouseholdManualMetadataRequiresCandidatePropertyAndDocumentViewPermissionsTogether(): void
+    {
+        $candidateId = $this->insertCandidate('HOUSEHOLD-MANUAL-1', 'Candidato Manual');
+        $unitId = $this->candidateUnitId($candidateId);
+        $propertyId = (int) $this->pdo->query('SELECT property_id FROM units WHERE id = ' . $unitId)->fetchColumn();
+        $actorId = $this->insertUser('manual-writer@example.com', 'WriterPassword123', 'owner');
+        $documents = new DocumentService($this->pdo, $this->propertyDocumentDirectory);
+        $json = $documents->createContentVersion(
+            $propertyId,
+            null,
+            'manual_convivencia',
+            'Manual JSON superseded',
+            ['sections' => [['title' => 'Ruido', 'body' => 'Respetar los horarios de descanso.']]],
+            null,
+            $actorId,
+            time(),
+        );
+        $pdf = $documents->createFileVersion(
+            $propertyId,
+            null,
+            'manual_convivencia',
+            'Manual PDF actual',
+            $this->upload($this->pdfBytes(), 'manual.pdf', 'application/pdf'),
+            (int) $json['id'],
+            $actorId,
+            time() + 1,
+        );
+        self::assertSame([$pdf['id']], array_column(
+            array_values(array_filter($documents->listCurrentForProperty($propertyId), static fn (array $document): bool => $document['type'] === 'manual_convivencia')),
+            'id',
+        ));
+
+        $restrictedProfiles = [
+            ['manual-candidate-only@example.com', ['candidates.view']],
+            ['manual-no-property@example.com', ['candidates.view', 'documents.view']],
+            ['manual-no-documents@example.com', ['candidates.view', 'properties.view']],
+        ];
+        foreach ($restrictedProfiles as [$email, $permissions]) {
+            $_SESSION = [];
+            $this->insertUser($email, 'ViewerPassword123', 'admin', $permissions);
+            $app = $this->app('/sub');
+            $this->login($app, $email, 'ViewerPassword123', '/sub');
+            $html = (string) $this->request($app, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=household')->getBody();
+            self::assertStringContainsString('La información del manual no está disponible para este perfil.', $html);
+            self::assertStringNotContainsString('Manual PDF actual', $html);
+            self::assertStringNotContainsString('Manual JSON superseded', $html);
+            self::assertStringNotContainsString('/sub/admin/documents?scope=property', $html);
+        }
+
+        $_SESSION = [];
+        $this->insertUser('manual-complete@example.com', 'ViewerPassword123', 'admin', [
+            'candidates.view', 'properties.view', 'documents.view',
+        ]);
+        $authorized = $this->app('/sub');
+        $this->login($authorized, 'manual-complete@example.com', 'ViewerPassword123', '/sub');
+        $html = (string) $this->request($authorized, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=household')->getBody();
+        self::assertStringContainsString('Manual PDF actual', $html);
+        self::assertStringNotContainsString('Manual JSON superseded', $html);
+        self::assertStringContainsString('/sub/admin/documents?scope=property&amp;id=' . $propertyId, $html);
+        self::assertStringContainsString('Versión #' . $pdf['id'], $html);
+    }
+
+    public function testHouseholdAdminCrudAndPrivatePhotoRouteAreCandidateScoped(): void
+    {
+        $candidateId = $this->insertCandidate('HOUSEHOLD-CRUD-1', 'Candidato Hogar');
+        $otherCandidateId = $this->insertCandidate('HOUSEHOLD-CRUD-2', 'Otro Candidato');
+        $household = new CandidateHouseholdService($this->pdo, $this->householdDirectory);
+        $seedRecords = [
+            [
+                'kind' => 'occupant',
+                'name' => 'Acompañante Con Foto',
+                'table' => 'candidate_household_occupants',
+                'data' => ['full_name' => 'Acompañante Con Foto', 'relationship' => 'Hermano'],
+                'routeData' => ['full_name' => 'Nueva Ficha Ocupante', 'relationship' => 'Hermana'],
+                'photoName' => 'occupant.png',
+            ],
+            [
+                'kind' => 'pet',
+                'name' => 'Luna',
+                'table' => 'candidate_household_pets',
+                'data' => ['name' => 'Luna', 'species' => 'Gato'],
+                'routeData' => ['name' => 'Sol', 'species' => 'Perro'],
+                'photoName' => 'pet.png',
+            ],
+        ];
+        $seedRecords = array_map(function (array $record) use ($household, $candidateId): array {
+            $record['seed'] = $household->saveRecord(
+                $record['kind'],
+                $candidateId,
+                null,
+                [...$record['data'], 'photo_consent' => '1'],
+                $this->upload($this->pngBytes(), $record['photoName'], 'image/png'),
+                time(),
+            );
+            return $record;
+        }, $seedRecords);
+
+        $this->insertUser('household-viewer@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
+        $viewer = $this->app('/sub');
+        $this->login($viewer, 'household-viewer@example.com', 'ViewerPassword123', '/sub');
+        $page = (string) $this->request($viewer, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=household')->getBody();
+        self::assertStringContainsString('Acompañante Con Foto', $page);
+        self::assertStringNotContainsString('Agregar ocupante', $page);
+        self::assertStringNotContainsString('Agregar mascota', $page);
+        self::assertStringNotContainsString('data-household-action="create"', $page);
+        self::assertStringNotContainsString('data-household-action="edit"', $page);
+        foreach ($seedRecords as $record) {
+            $photoPath = '/sub/admin/candidates/' . $candidateId . '/household/' . $record['kind'] . '/' . $record['seed']['id'] . '/photo';
+            $photo = $this->request($viewer, 'GET', $photoPath);
+            self::assertSame(200, $photo->getStatusCode(), $record['kind']);
+            self::assertSame('image/png', $photo->getHeaderLine('Content-Type'), $record['kind']);
+            self::assertSame('nosniff', $photo->getHeaderLine('X-Content-Type-Options'), $record['kind']);
+            self::assertSame('private, no-store', $photo->getHeaderLine('Cache-Control'), $record['kind']);
+            self::assertGreaterThan(0, strlen((string) $photo->getBody()), $record['kind']);
+            self::assertSame(404, $this->request(
+                $viewer,
+                'GET',
+                '/sub/admin/candidates/' . $otherCandidateId . '/household/' . $record['kind'] . '/' . $record['seed']['id'] . '/photo',
+            )->getStatusCode(), $record['kind'] . ' photos must remain candidate-scoped.');
+            self::assertSame(403, $this->request($viewer, 'POST', '/sub/admin/candidates/' . $candidateId . '/household/' . $record['kind'], [
+                ...$record['routeData'],
+            ], true, ['photo' => $this->upload($this->pngBytes(), 'forbidden.png', 'image/png')])->getStatusCode(), $record['kind']);
+        }
+
+        $_SESSION = [];
+        $this->insertUser('household-no-view@example.com', 'NoViewPassword123', 'admin', ['properties.view']);
+        $noView = $this->app('/sub');
+        $this->login($noView, 'household-no-view@example.com', 'NoViewPassword123', '/sub');
+        foreach ($seedRecords as $record) {
+            self::assertSame(403, $this->request(
+                $noView,
+                'GET',
+                '/sub/admin/candidates/' . $candidateId . '/household/' . $record['kind'] . '/' . $record['seed']['id'] . '/photo',
+            )->getStatusCode(), $record['kind'] . ' photos require candidates.view.');
+        }
+
+        $_SESSION = [];
+        $this->insertUser('household-manager@example.com', 'ManagerPassword123', 'admin', ['candidates.view', 'candidates.manage']);
+        $manager = $this->app('/sub');
+        $this->login($manager, 'household-manager@example.com', 'ManagerPassword123', '/sub');
+        $managerPage = (string) $this->request($manager, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=household')->getBody();
+        self::assertStringContainsString('Agregar ocupante', $managerPage);
+        self::assertStringContainsString('Agregar mascota', $managerPage);
+        self::assertStringContainsString('data-household-action="create"', $managerPage);
+        self::assertStringContainsString('data-household-action="edit"', $managerPage);
+        self::assertStringNotContainsString('Manual PDF actual', $managerPage);
+
+        foreach ($seedRecords as $record) {
+            $collectionPath = '/sub/admin/candidates/' . $candidateId . '/household/' . $record['kind'];
+            $created = $this->request($manager, 'POST', $collectionPath, $record['routeData']);
+            self::assertSame(303, $created->getStatusCode(), $record['kind']);
+            $statement = $this->pdo->prepare('SELECT id FROM ' . $record['table'] . ' WHERE candidate_id = :candidate_id ORDER BY id DESC LIMIT 1');
+            $statement->execute(['candidate_id' => $candidateId]);
+            $createdId = (int) $statement->fetchColumn();
+            $editedField = $record['kind'] === 'occupant' ? 'full_name' : 'name';
+            $editedValue = $record['kind'] === 'occupant' ? 'Ficha Ocupante Editada' : 'Ficha Mascota Editada';
+            $editBody = [...$record['routeData'], 'record_id' => (string) $createdId, $editedField => $editedValue];
+            $edited = $this->request($manager, 'POST', $collectionPath, $editBody);
+            self::assertSame(303, $edited->getStatusCode(), $record['kind'] . ' editing must redirect.');
+            $persisted = $this->pdo->prepare(
+                'SELECT ' . $editedField . ' FROM ' . $record['table'] . ' WHERE id = :id AND candidate_id = :candidate_id',
+            );
+            $persisted->execute(['id' => $createdId, 'candidate_id' => $candidateId]);
+            self::assertSame($editedValue, $persisted->fetchColumn(), $record['kind'] . ' edited field must persist.');
+            $record['routeData'][$editedField] = $editedValue;
+            $photoPath = $collectionPath . '/' . $createdId . '/photo';
+            self::assertSame(404, $this->request($manager, 'GET', $photoPath)->getStatusCode(), $record['kind'] . ' without a photo must return 404.');
+
+            $uploadBody = [...$record['routeData'], 'record_id' => (string) $createdId, 'photo_consent' => '1'];
+            $uploaded = $this->request($manager, 'POST', $collectionPath, $uploadBody, true, [
+                'photo' => $this->upload($this->pngBytes(), $record['kind'] . '.png', 'image/png'),
+            ]);
+            self::assertSame(303, $uploaded->getStatusCode(), $record['kind'] . ' upload');
+            $stored = $this->pdo->prepare('SELECT photo_stored_name FROM ' . $record['table'] . ' WHERE id = :id AND candidate_id = :candidate_id');
+            $stored->execute(['id' => $createdId, 'candidate_id' => $candidateId]);
+            $firstStoredPath = $this->householdDirectory . '/' . $stored->fetchColumn();
+            self::assertFileExists($firstStoredPath, $record['kind'] . ' upload must create private storage.');
+
+            $replacement = $this->request($manager, 'POST', $collectionPath, $uploadBody, true, [
+                'photo' => $this->upload($this->jpegBytes(), $record['kind'] . '-replacement.jpg', 'image/jpeg'),
+            ]);
+            self::assertSame(303, $replacement->getStatusCode(), $record['kind'] . ' replacement');
+            $stored->execute(['id' => $createdId, 'candidate_id' => $candidateId]);
+            $replacementName = (string) $stored->fetchColumn();
+            $replacementPath = $this->householdDirectory . '/' . $replacementName;
+            self::assertNotSame(basename($firstStoredPath), $replacementName, $record['kind'] . ' replacement must rotate the stored file.');
+            self::assertFileDoesNotExist($firstStoredPath, $record['kind'] . ' replacement must retire the previous file.');
+            self::assertFileExists($replacementPath, $record['kind'] . ' replacement must keep the new private file.');
+            $replacementPhoto = $this->request($manager, 'GET', $photoPath);
+            self::assertSame(200, $replacementPhoto->getStatusCode(), $record['kind']);
+            self::assertSame('image/jpeg', $replacementPhoto->getHeaderLine('Content-Type'), $record['kind']);
+            self::assertSame('nosniff', $replacementPhoto->getHeaderLine('X-Content-Type-Options'), $record['kind']);
+            self::assertSame('private, no-store', $replacementPhoto->getHeaderLine('Cache-Control'), $record['kind']);
+
+            $removed = $this->request($manager, 'POST', $collectionPath, [
+                ...$record['routeData'], 'record_id' => (string) $createdId, 'remove_photo' => '1',
+            ]);
+            self::assertSame(303, $removed->getStatusCode(), $record['kind'] . ' photo removal');
+            self::assertFileDoesNotExist($replacementPath, $record['kind'] . ' removal must retire the private file.');
+            self::assertSame(404, $this->request($manager, 'GET', $photoPath)->getStatusCode(), $record['kind'] . ' removed photo');
+        }
+
+        $occupantId = (int) $this->pdo->query(
+            'SELECT id FROM candidate_household_occupants WHERE candidate_id = ' . $candidateId . ' ORDER BY id DESC LIMIT 1',
+        )->fetchColumn();
+        $deleted = $this->request($manager, 'POST', '/sub/admin/candidates/' . $candidateId . '/household/occupant', [
+            'action' => 'delete', 'record_id' => (string) $occupantId,
+        ]);
+        self::assertSame(303, $deleted->getStatusCode());
+        self::assertCount(1, $household->listOccupants($candidateId));
+    }
+
+    public function testHouseholdSaveValidationRendersFullDetailWithScopedTransientInput(): void
+    {
+        $candidateId = $this->insertCandidate('HOUSEHOLD-VALIDATION-1', 'Candidato de validación');
+        $household = new CandidateHouseholdService($this->pdo, $this->householdDirectory);
+        $occupant = $household->saveRecord('occupant', $candidateId, null, [
+            'full_name' => 'Ocupante Original',
+            'relationship' => 'Hermana',
+        ], null, time());
+        $pet = $household->saveRecord('pet', $candidateId, null, [
+            'name' => 'Mascota Original',
+            'species' => 'Gato',
+        ], null, time());
+
+        $this->insertUser('household-validation@example.com', 'ManagerPassword123', 'admin', ['candidates.view', 'candidates.manage']);
+        $app = $this->app('/sub');
+        $this->login($app, 'household-validation@example.com', 'ManagerPassword123', '/sub');
+
+        $cases = [
+            [
+                'kind' => 'occupant',
+                'record_id' => (string) $occupant['id'],
+                'field' => 'full_name',
+                'body' => [
+                    'action' => 'save',
+                    'record_id' => (string) $occupant['id'],
+                    'full_name' => '',
+                    'relationship' => 'Relación editada conservada',
+                    'notes' => 'Nota editada conservada',
+                    'request_secret' => 'NO_RENDER_SECRET_71',
+                ],
+                'preserved_field' => 'relationship',
+                'preserved_value' => 'Relación editada conservada',
+                'message' => 'El nombre del ocupante es obligatorio.',
+            ],
+            [
+                'kind' => 'occupant',
+                'record_id' => 'new',
+                'field' => 'full_name',
+                'body' => [
+                    'action' => 'save',
+                    'full_name' => '',
+                    'relationship' => 'Relación nueva conservada',
+                    'notes' => 'Nota nueva conservada',
+                ],
+                'preserved_field' => 'relationship',
+                'preserved_value' => 'Relación nueva conservada',
+                'message' => 'El nombre del ocupante es obligatorio.',
+            ],
+            [
+                'kind' => 'pet',
+                'record_id' => (string) $pet['id'],
+                'field' => 'name',
+                'body' => [
+                    'action' => 'save',
+                    'record_id' => (string) $pet['id'],
+                    'name' => '',
+                    'species' => 'Especie editada conservada',
+                    'notes' => 'Nota de mascota conservada',
+                ],
+                'preserved_field' => 'species',
+                'preserved_value' => 'Especie editada conservada',
+                'message' => 'El nombre y la especie de la mascota son obligatorios.',
+            ],
+            [
+                'kind' => 'pet',
+                'record_id' => 'new',
+                'field' => 'name',
+                'body' => [
+                    'action' => 'save',
+                    'name' => '',
+                    'species' => 'Especie nueva conservada',
+                    'notes' => 'Nota nueva de mascota conservada',
+                ],
+                'preserved_field' => 'species',
+                'preserved_value' => 'Especie nueva conservada',
+                'message' => 'El nombre y la especie de la mascota son obligatorios.',
+            ],
+        ];
+
+        foreach ($cases as $case) {
+            $response = $this->request(
+                $app,
+                'POST',
+                '/sub/admin/candidates/' . $candidateId . '/household/' . $case['kind'],
+                $case['body'],
+            );
+
+            self::assertSame(422, $response->getStatusCode(), $case['kind'] . ' validation status');
+            self::assertSame('text/html; charset=utf-8', $response->getHeaderLine('Content-Type'), $case['kind'] . ' validation response type');
+            $html = (string) $response->getBody();
+            self::assertStringContainsString('<main ', $html, $case['kind'] . ' must retain the application shell');
+            self::assertStringContainsString('Candidato de validación', $html);
+            self::assertStringContainsString('data-candidate-section-body="household"', $html);
+            self::assertStringContainsString('name="csrf_token" value="', $html);
+            self::assertStringNotContainsString('NO_RENDER_SECRET_71', $html);
+            self::assertSame(1, substr_count($html, $case['message']), $case['kind'] . ' error message should be rendered once');
+
+            $dom = new \DOMDocument();
+            @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+            $xpath = new \DOMXPath($dom);
+            $region = $case['kind'] === 'occupant' ? 'occupants' : 'pets';
+            $form = $xpath->query(
+                '//section[@data-household-region="' . $region . '"]//form[@data-household-form-kind="'
+                . $case['kind'] . '" and @data-household-form-id="' . $case['record_id'] . '"]',
+            )->item(0);
+            self::assertInstanceOf(\DOMElement::class, $form, $case['kind'] . ' validation must target the correct create/edit form');
+            self::assertSame(1, $xpath->query('ancestor::details[@open]', $form)->length, $case['kind'] . ' manager must be open');
+            self::assertSame(1, $xpath->query('.//*[@role="alert"]', $form)->length);
+            self::assertSame($case['preserved_value'], $xpath->query('.//*[@name="' . $case['preserved_field'] . '"]/@value', $form)->item(0)?->nodeValue);
+            $invalidField = $xpath->query('.//*[@name="' . $case['field'] . '"]', $form)->item(0);
+            self::assertInstanceOf(\DOMElement::class, $invalidField);
+            self::assertSame('true', $invalidField->getAttribute('aria-invalid'));
+            self::assertNotSame('', $invalidField->getAttribute('aria-describedby'));
+            self::assertTrue($invalidField->hasAttribute('autofocus'));
+        }
+
+        $detail = (string) $this->request($app, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=household')->getBody();
+        self::assertStringNotContainsString('Relación editada conservada', $detail);
+        self::assertStringNotContainsString('Relación nueva conservada', $detail);
+        self::assertStringNotContainsString('Especie editada conservada', $detail);
+        self::assertStringNotContainsString('Especie nueva conservada', $detail);
+        self::assertStringNotContainsString('data-household-validation-error', $detail);
+        self::assertSame(1, count($household->listOccupants($candidateId)), 'Invalid create must not persist an occupant.');
+        self::assertSame(1, count($household->listPets($candidateId)), 'Invalid create must not persist a pet.');
+        self::assertSame('Ocupante Original', $household->listOccupants($candidateId)[0]['full_name']);
+        self::assertSame('Mascota Original', $household->listPets($candidateId)[0]['name']);
+    }
+
+    public function testHouseholdPhotoValidationTargetsFileAndConsentWithoutRetainingUpload(): void
+    {
+        $candidateId = $this->insertCandidate('HOUSEHOLD-PHOTO-VALIDATION-1', 'Candidato foto');
+        $household = new CandidateHouseholdService($this->pdo, $this->householdDirectory);
+        $pet = $household->saveRecord('pet', $candidateId, null, [
+            'name' => 'Mascota Original',
+            'species' => 'Gato',
+        ], null, time());
+
+        $this->insertUser('household-photo-validation@example.com', 'ManagerPassword123', 'admin', ['candidates.view', 'candidates.manage']);
+        $app = $this->app('/sub');
+        $this->login($app, 'household-photo-validation@example.com', 'ManagerPassword123', '/sub');
+
+        $cases = [
+            [
+                'kind' => 'occupant',
+                'record_id' => 'new',
+                'field' => 'photo_consent',
+                'message' => 'Confirma que cuentas con autorización para guardar esta fotografía.',
+                'body' => ['full_name' => 'Ocupante Foto', 'relationship' => 'Amiga'],
+                'photo' => $this->upload($this->pngBytes(), 'DO_NOT_RENDER_CONSENT.png', 'image/png'),
+                'consent_checked' => false,
+            ],
+            [
+                'kind' => 'pet',
+                'record_id' => (string) $pet['id'],
+                'field' => 'photo',
+                'message' => 'La fotografía debe ser una imagen PNG o JPEG válida.',
+                'body' => [
+                    'record_id' => (string) $pet['id'],
+                    'name' => 'Mascota Editada',
+                    'species' => 'Gato',
+                    'photo_consent' => '1',
+                    'unlisted_secret' => 'NO_RENDER_PHOTO_SECRET',
+                ],
+                'photo' => $this->upload('not an image', 'DO_NOT_RENDER_INVALID.png', 'image/png'),
+                'consent_checked' => true,
+            ],
+        ];
+
+        foreach ($cases as $case) {
+            $response = $this->request(
+                $app,
+                'POST',
+                '/sub/admin/candidates/' . $candidateId . '/household/' . $case['kind'],
+                ['action' => 'save', ...$case['body']],
+                true,
+                ['photo' => $case['photo']],
+            );
+
+            self::assertSame(422, $response->getStatusCode());
+            $html = (string) $response->getBody();
+            self::assertSame('text/html; charset=utf-8', $response->getHeaderLine('Content-Type'));
+            self::assertSame(1, substr_count($html, $case['message']));
+            self::assertStringNotContainsString('DO_NOT_RENDER_', $html);
+            self::assertStringNotContainsString('NO_RENDER_PHOTO_SECRET', $html);
+
+            $dom = new \DOMDocument();
+            @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+            $xpath = new \DOMXPath($dom);
+            $region = $case['kind'] === 'occupant' ? 'occupants' : 'pets';
+            $form = $xpath->query(
+                '//section[@data-household-region="' . $region . '"]//form[@data-household-form-kind="'
+                . $case['kind'] . '" and @data-household-form-id="' . $case['record_id'] . '"]',
+            )->item(0);
+            self::assertInstanceOf(\DOMElement::class, $form);
+            self::assertSame(1, $xpath->query('ancestor::details[@open]', $form)->length);
+            self::assertSame(1, $xpath->query('.//*[@role="alert"]', $form)->length);
+            $invalidControl = $xpath->query('.//*[@name="' . $case['field'] . '"]', $form)->item(0);
+            self::assertInstanceOf(\DOMElement::class, $invalidControl);
+            self::assertSame('true', $invalidControl->getAttribute('aria-invalid'));
+            self::assertNotSame('', $invalidControl->getAttribute('aria-describedby'));
+            self::assertTrue($invalidControl->hasAttribute('autofocus'));
+            if ($case['field'] === 'photo_consent') {
+                self::assertSame('', $invalidControl->getAttribute('checked'));
+            }
+        }
+
+        self::assertSame([], $household->listOccupants($candidateId));
+        self::assertSame('Mascota Original', $household->listPets($candidateId)[0]['name']);
+        self::assertNull($household->privatePhoto($candidateId, 'pet', (int) $pet['id']));
+    }
+
     public function testWorkAndDocumentsFromBothBranchesRemainAccessible(): void
     {
         $candidateId = $this->insertCandidate('INTEGRATION-WORK-DOC', 'Candidato Integración');
@@ -261,13 +700,14 @@ final class CandidatesAdminRoutesTest extends TestCase
         $documentPage = (string) $this->request($app, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=documents')->getBody();
         self::assertStringContainsString('data-candidate-section-body="documents"', $documentPage);
         self::assertSame(1, substr_count($documentPage, 'data-candidate-section-body='));
-        self::assertStringContainsString('Certificación de ingresos', $documentPage);
-        self::assertStringContainsString('Pendiente de recibir', $documentPage);
-        self::assertStringContainsString('candidate-documents-layout', $documentPage);
+        self::assertStringContainsString('No hay documentos adjuntos.', $documentPage);
+        self::assertFalse(str_contains($documentPage, 'Pendiente de recibir'));
+        self::assertFalse(str_contains($documentPage, 'Certificación de ingresos'));
+        self::assertStringContainsString('candidate-documents-heading', $documentPage);
         self::assertStringNotContainsString('candidate-work-panel', $documentPage);
     }
 
-    public function testDocumentSectionUsesActiveUnitRequirementsWithoutFakeApproval(): void
+    public function testDocumentSectionShowsOnlyReceivedFilesAndTheirRequirementLabels(): void
     {
         $candidateId = $this->insertCandidate('DOC-TRUTH-01', 'Candidato Documentos');
         $unitId = $this->candidateUnitId($candidateId);
@@ -300,25 +740,18 @@ final class CandidatesAdminRoutesTest extends TestCase
         self::assertSame(200, $response->getStatusCode());
         $html = (string) $response->getBody();
 
-        self::assertStringContainsString('class="candidate-documents-layout"', $html);
+        self::assertStringContainsString('class="candidate-documents-heading"', $html);
         self::assertStringContainsString('class="candidate-document-list"', $html);
-        self::assertSame(3, substr_count($html, 'class="candidate-document-row" data-document-status='));
-        self::assertSame(1, substr_count($html, 'data-document-status="pending"'));
-        self::assertSame(1, substr_count($html, 'data-document-status="optional"'));
-        self::assertStringContainsString('aria-label="Resumen documental"', $html);
-        self::assertStringContainsString('<progress value="1" max="2"', $html);
-        self::assertStringContainsString('Requisitos pendientes', $html);
-        self::assertStringNotContainsString('class="users-grid" aria-label="Requisitos documentales activos"', $html);
-        self::assertStringContainsString('data-document-required-count="2"', $html);
-        self::assertStringContainsString('data-document-received-count="1"', $html);
-        self::assertStringContainsString('1 de 2 requisitos obligatorios recibidos', $html);
+        self::assertSame(1, substr_count($html, 'class="candidate-document-row" data-document-status="received"'));
+        self::assertFalse(str_contains($html, 'aria-label="Resumen documental"'));
+        self::assertFalse(str_contains($html, '<progress'));
+        self::assertFalse(str_contains($html, 'Requisitos pendientes'));
+        self::assertFalse(str_contains($html, 'Soporte mascota'));
+        self::assertFalse(str_contains($html, '&lt;script&gt;Ingresos&lt;/script&gt;'));
         self::assertStringContainsString('Identidad', $html);
         self::assertStringContainsString('documento-real.pdf', $html);
         self::assertStringContainsString('/sub/admin/candidates/' . $candidateId . '/documents/' . $received['id'], $html);
-        self::assertStringContainsString('&lt;script&gt;Ingresos&lt;/script&gt;', $html);
         self::assertStringNotContainsString('<script>Ingresos</script>', $html);
-        self::assertStringContainsString('Pendiente de recibir', $html);
-        self::assertStringContainsString('Opcional, no aportado', $html);
         self::assertStringNotContainsString('REQUISITO_INACTIVO_NO_MOSTRAR', $html);
         self::assertStringNotContainsString('Aprobado', $html);
         self::assertStringNotContainsString('En revisión', $html);
@@ -326,7 +759,7 @@ final class CandidatesAdminRoutesTest extends TestCase
         self::assertStringNotContainsString($this->documentDirectory, $html);
     }
 
-    public function testDocumentSectionWithoutRequirementsRetainsHonestEmptyState(): void
+    public function testDocumentSectionShowsHonestEmptyStateWithoutAttachments(): void
     {
         $candidateId = $this->insertCandidate('DOC-TRUTH-EMPTY', 'Candidato sin documentos');
         $this->insertUser('doc-empty@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
@@ -334,9 +767,9 @@ final class CandidatesAdminRoutesTest extends TestCase
         $this->login($app, 'doc-empty@example.com', 'ViewerPassword123');
 
         $html = (string) $this->request($app, 'GET', '/admin/candidates/' . $candidateId . '?section=documents')->getBody();
-        self::assertStringContainsString('No hay requisitos documentales activos configurados', $html);
         self::assertStringContainsString('No hay documentos adjuntos.', $html);
-        self::assertStringNotContainsString('de 0 requisitos obligatorios', $html);
+        self::assertFalse(str_contains($html, 'requisitos documentales'));
+        self::assertFalse(str_contains($html, 'Pendiente de recibir'));
     }
 
     public function testListAndDetailEscapeCandidateReferenceAndOriginalFilename(): void
@@ -502,11 +935,20 @@ final class CandidatesAdminRoutesTest extends TestCase
             'logo_directory' => $this->directory . '/branding',
             'unit_media_directory' => $this->directory . '/unit-media',
             'candidate_document_directory' => $this->documentDirectory,
+            'document_directory' => $this->propertyDocumentDirectory,
+            'candidate_household_media_directory' => $this->householdDirectory,
             'pdo' => $this->pdo,
         ]);
     }
 
-    private function request(App $app, string $method, string $path, array $body = [], bool $withCsrf = true): ResponseInterface
+    private function request(
+        App $app,
+        string $method,
+        string $path,
+        array $body = [],
+        bool $withCsrf = true,
+        array $uploads = [],
+    ): ResponseInterface
     {
         $request = (new ServerRequestFactory())->createServerRequest(
             $method,
@@ -517,6 +959,9 @@ final class CandidatesAdminRoutesTest extends TestCase
         }
         if ($body !== []) {
             $request = $request->withParsedBody($body);
+        }
+        if ($uploads !== []) {
+            $request = $request->withUploadedFiles($uploads);
         }
         return $app->handle($request);
     }
@@ -620,7 +1065,29 @@ final class CandidatesAdminRoutesTest extends TestCase
 
     private function pdfBytes(): string
     {
-        return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<<>>\n%%EOF\n";
+        return \AlquilaPro\Tests\Support\PdfFixtures::validPdf();
+    }
+
+    private function pngBytes(): string
+    {
+        return (string) base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
+    }
+
+    private function jpegBytes(): string
+    {
+        $image = imagecreatetruecolor(2, 2);
+        if ($image === false) {
+            throw new \RuntimeException('No fue posible generar el JPEG de prueba.');
+        }
+        ob_start();
+        $encoded = imagejpeg($image, null, 85);
+        $bytes = ob_get_clean();
+        unset($image);
+        if (!$encoded || !is_string($bytes) || $bytes === '') {
+            throw new \RuntimeException('No fue posible generar el JPEG de prueba.');
+        }
+
+        return $bytes;
     }
 
     private function candidateUnitId(int $candidateId): int

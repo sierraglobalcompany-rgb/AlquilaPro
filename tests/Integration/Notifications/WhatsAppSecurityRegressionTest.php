@@ -70,7 +70,7 @@ final class WhatsAppSecurityRegressionTest extends TestCase
             static fn (string $package): bool => $package !== 'php',
         ));
         sort($runtimePackages);
-        self::assertSame(['dompdf/dompdf', 'phpmailer/phpmailer', 'slim/psr7', 'slim/slim'], $runtimePackages);
+        self::assertSame(['dompdf/dompdf', 'phpmailer/phpmailer', 'slim/psr7', 'slim/slim', 'smalot/pdfparser'], $runtimePackages);
 
         $service = (string) file_get_contents(dirname(__DIR__, 3) . '/app/Notifications/WhatsAppService.php');
         self::assertDoesNotMatchRegularExpression(

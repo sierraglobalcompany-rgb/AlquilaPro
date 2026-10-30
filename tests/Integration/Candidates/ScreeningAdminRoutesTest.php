@@ -84,7 +84,10 @@ final class ScreeningAdminRoutesTest extends TestCase
         $managerHtml = (string) $manager->getBody();
         self::assertStringContainsString('action="/sub/admin/candidates/' . $candidateId . '/screening"', $managerHtml);
         self::assertStringContainsString('name="provider"', $managerHtml);
-        self::assertStringContainsString('value="SURA"', $managerHtml);
+        self::assertFalse(
+            str_contains($managerHtml, 'value="SURA"'),
+            'A new study must not assume a provider that has not been selected.',
+        );
         self::assertStringNotContainsString('name="screening_id"', $managerHtml);
     }
 
@@ -184,6 +187,59 @@ final class ScreeningAdminRoutesTest extends TestCase
         self::assertSame('in_progress', $updated['status']);
         self::assertSame('Arrendamiento actualizado', $updated['product']);
         self::assertSame($managerId, (int) $updated['responsible_user_id']);
+    }
+
+    public function testScreeningShowsPersistedDatesInEditableAndReadOnlyStates(): void
+    {
+        $candidateId = $this->insertCandidate('ADMIN-DATES', 'pending_screening');
+        $managerId = $this->insertUser(
+            'manager-dates@example.com',
+            'ManagerPassword123',
+            'admin',
+            ['candidates.view', 'candidates.manage'],
+        );
+        $screeningService = new ScreeningService($this->pdo, new CandidateService($this->pdo));
+        $screeningService->createForCandidate($candidateId, $managerId, [
+            'provider' => 'Aseguradora de prueba',
+            'product' => 'Producto declarado',
+        ], 1791810000);
+        $inProgress = $screeningService->updateForCandidate($candidateId, [
+            'status' => 'in_progress',
+        ], 1791813600);
+
+        $managerApp = $this->app('/sub');
+        $this->login($managerApp, 'manager-dates@example.com', 'ManagerPassword123', '/sub');
+        $editableHtml = (string) $this->request(
+            $managerApp,
+            'GET',
+            '/sub/admin/candidates/' . $candidateId . '?section=screening',
+        )->getBody();
+        $startedLabel = (new \DateTimeImmutable((string) $inProgress['started_at']))->format('d/m/Y · H:i');
+        self::assertStringContainsString('Inicio del estudio', $editableHtml);
+        self::assertStringContainsString($startedLabel, $editableHtml);
+        self::assertStringNotContainsString('Resultado registrado el', $editableHtml);
+
+        $closed = $screeningService->updateForCandidate($candidateId, [
+            'status' => 'approved',
+            'result' => 'Resultado registrado de prueba',
+        ], 1791817200);
+        $_SESSION = [];
+        $this->insertUser('viewer-dates@example.com', 'ViewerPassword123', 'admin', ['candidates.view']);
+        $viewerApp = $this->app('/sub');
+        $this->login($viewerApp, 'viewer-dates@example.com', 'ViewerPassword123', '/sub');
+        $readOnlyHtml = (string) $this->request(
+            $viewerApp,
+            'GET',
+            '/sub/admin/candidates/' . $candidateId . '?section=screening',
+        )->getBody();
+        $resultLabel = (new \DateTimeImmutable((string) $closed['result_at']))->format('d/m/Y · H:i');
+
+        self::assertStringContainsString('Inicio del estudio', $readOnlyHtml);
+        self::assertStringContainsString($startedLabel, $readOnlyHtml);
+        self::assertStringContainsString('Resultado registrado el', $readOnlyHtml);
+        self::assertStringContainsString($resultLabel, $readOnlyHtml);
+        self::assertStringContainsString('Resultado registrado de prueba', $readOnlyHtml);
+        self::assertStringNotContainsString('/sub/admin/candidates/' . $candidateId . '/screening', $readOnlyHtml);
     }
 
     public function testValidationTerminalAndWithdrawnAreFailClosedAndReadOnly(): void

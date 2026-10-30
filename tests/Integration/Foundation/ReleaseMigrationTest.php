@@ -36,6 +36,7 @@ final class ReleaseMigrationTest extends TestCase
         '021_create_lease_termination.sql',
         '022_create_audit_log.sql',
         '023_extend_users_login_identifiers.sql',
+        '024_create_candidate_household.sql',
     ];
 
     private const FINAL_TABLES = [
@@ -45,6 +46,8 @@ final class ReleaseMigrationTest extends TestCase
         'units',
         'unit_media',
         'candidates',
+        'candidate_household_occupants',
+        'candidate_household_pets',
         'candidate_references',
         'unit_application_requirements',
         'candidate_documents',
@@ -166,6 +169,7 @@ final class ReleaseMigrationTest extends TestCase
         self::assertContains('021_create_lease_termination.sql', $result['migrations']);
         self::assertContains('022_create_audit_log.sql', $result['migrations']);
         self::assertContains('023_extend_users_login_identifiers.sql', $result['migrations']);
+        self::assertContains('024_create_candidate_household.sql', $result['migrations']);
         $this->assertFinalSchema();
 
         self::assertTrue($this->columnIsNullable('notification_jobs', 'recipient_email'));
