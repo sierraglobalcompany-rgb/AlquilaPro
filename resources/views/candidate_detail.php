@@ -12,13 +12,7 @@ $activeSection = is_string($activeSection ?? null) ? $activeSection : 'overview'
 $candidateSections = is_array($candidateSections ?? null) ? array_values($candidateSections) : [
     ['key' => 'overview', 'label' => 'Solicitud'],
 ];
-$allowedTransitions = match ((string) $candidate['status']) {
-    'new' => ['incomplete', 'withdrawn'],
-    'incomplete' => ['withdrawn'],
-    'verification' => ['pending_screening', 'withdrawn'],
-    'pending_screening' => ['withdrawn'],
-    default => [],
-};
+$allowedCandidateTransitions = is_array($allowedCandidateTransitions ?? null) ? $allowedCandidateTransitions : [];
 $screening = is_array($screening ?? null) ? $screening : null;
 $screeningStatus = (string) ($screening['status'] ?? '');
 $screeningTerminal = in_array($screeningStatus, ['approved', 'rejected'], true);
@@ -741,8 +735,14 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
                     <div class="users-grid">
                         <?php foreach ($contractRows as $contractRow): ?>
                             <article class="user-card">
-                                <div class="user-card__head"><strong>Contrato #<?= $escape($contractRow['id']) ?></strong><span class="status-pill"><?= $escape($contractRow['status']) ?></span></div>
-                                <div><?= $escape($contractRow['template_name'] ?? '') ?> · <?= $escape($contractRow['unit_code'] ?? '') ?></div>
+                                <div class="user-card__head"><strong>Contrato #<?= $escape($contractRow['id']) ?></strong><span class="status-pill"><?= $escape(HumanLabels::contractStatus((string) $contractRow['status'])) ?></span></div>
+                                <?php
+                                $contractDetails = array_values(array_filter([
+                                    trim((string) ($contractRow['template_name'] ?? '')),
+                                    trim((string) ($contractRow['unit_code'] ?? '')),
+                                ], static fn (string $value): bool => $value !== ''));
+                                ?>
+                                <?php if ($contractDetails !== []): ?><div><?= $escape(implode(' · ', $contractDetails)) ?></div><?php endif; ?>
                                 <a class="button button--quiet" href="<?= $escape($basePath) ?>/admin/contracts/<?= $escape($contractRow['id']) ?>">Abrir contrato</a>
                             </article>
                         <?php endforeach; ?>
@@ -756,17 +756,23 @@ $propertyLocation = $propertyStreet === '' ? '' : $propertyStreet . ($propertyCi
         <section class="candidate-section" data-candidate-section-body="manage">
             <section class="content-card">
                 <div class="section-heading"><div><p class="eyebrow">Administración</p><h2>Administrar</h2></div></div>
-                <?php if ($allowedTransitions !== []): ?>
+                <div class="candidate-manage__status">
+                    <p><strong>Estado actual:</strong> <?= $escape(HumanLabels::candidateStatus((string) $candidate['status'])) ?></p>
+                <?php if ($allowedCandidateTransitions !== []): ?>
                     <form class="stack-form" method="post" action="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/status">
                         <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
-                        <label>Nuevo estado<select name="status" required><?php foreach ($allowedTransitions as $status): ?><option value="<?= $escape($status) ?>"><?= $escape(HumanLabels::candidateStatus((string) $status)) ?></option><?php endforeach; ?></select></label>
+                        <label>Nuevo estado<select name="status" required><?php foreach ($allowedCandidateTransitions as $status): ?><option value="<?= $escape($status) ?>"><?= $escape(HumanLabels::candidateStatus((string) $status)) ?></option><?php endforeach; ?></select></label>
                         <button type="submit">Actualizar estado</button>
                     </form>
                 <?php endif; ?>
+                </div>
+                <div class="candidate-manage__token">
+                    <p class="hint">Al regenerar el enlace, el enlace anterior deja de funcionar.</p>
                 <form method="post" action="<?= $escape($basePath) ?>/admin/candidates/<?= $escape($candidate['id']) ?>/token/regenerate">
                     <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
-                    <button type="submit">Regenerar enlace de continuación</button>
+                    <button class="button button--quiet" type="submit">Regenerar enlace de continuación</button>
                 </form>
+                </div>
             </section>
         </section>
     <?php endif; ?>

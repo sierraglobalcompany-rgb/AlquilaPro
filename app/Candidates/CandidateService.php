@@ -448,14 +448,7 @@ final class CandidateService
             throw new RuntimeException('El candidato no existe.');
         }
 
-        $allowed = match ($candidate['status']) {
-            'new' => ['incomplete', 'withdrawn'],
-            'incomplete' => ['withdrawn'],
-            'verification' => ['pending_screening', 'withdrawn'],
-            'pending_screening' => ['withdrawn'],
-            'withdrawn' => [],
-            default => [],
-        };
+        $allowed = $this->allowedTransitionsForStatus((string) $candidate['status']);
 
         if (!in_array($status, $allowed, true)) {
             throw new RuntimeException('La transición de estado no es válida.');
@@ -475,6 +468,18 @@ final class CandidateService
         }
 
         return $updated;
+    }
+
+    public function allowedTransitionsForStatus(string $status): array
+    {
+        return match ($status) {
+            'new' => ['incomplete', 'withdrawn'],
+            'incomplete' => ['withdrawn'],
+            'verification' => ['pending_screening', 'withdrawn'],
+            'pending_screening' => ['withdrawn'],
+            'withdrawn' => [],
+            default => [],
+        };
     }
 
     public function regenerateToken(int $candidateId, int $now): string

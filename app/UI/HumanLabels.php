@@ -51,4 +51,14 @@ final class HumanLabels
             default => $status,
         };
     }
+
+    public static function contractStatus(string $status): string
+    {
+        return match ($status) {
+            'draft' => 'Borrador',
+            'generated' => 'Generado',
+            'finalized' => 'Finalizado',
+            default => $status,
+        };
+    }
 }

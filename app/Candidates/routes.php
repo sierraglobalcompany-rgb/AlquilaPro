@@ -375,6 +375,9 @@ return static function (App $app, array $deps): void {
             ];
         }
         $canManageCandidates = Permissions::allows($user, 'candidates.manage');
+        $managementContext = $canManageCandidates
+            ? ['allowedCandidateTransitions' => $candidates->allowedTransitionsForStatus((string) $candidate['status'])]
+            : [];
 
         $candidateSections = [
             ['key' => 'overview', 'label' => 'Solicitud'],
@@ -413,6 +416,7 @@ return static function (App $app, array $deps): void {
             'screening' => $screening->findForCandidate($candidateId),
             'contractContext' => $contractContext,
             'canManageCandidates' => $canManageCandidates,
+            ...$managementContext,
             'candidateSections' => $candidateSections,
             'activeSection' => $activeSection,
             'householdFormError' => $householdFormError === [] ? null : $householdFormError,

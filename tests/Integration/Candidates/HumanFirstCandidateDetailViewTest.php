@@ -873,6 +873,75 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         self::assertStringContainsString('amiga@example.test', $completeReference->textContent);
     }
 
+    public function testContractsUseHumanStatusesAndEscapeUnknownStatusFallback(): void
+    {
+        $html = $this->renderOverview([], '', ['contracts' => [
+            ['id' => 31, 'status' => 'draft', 'template_name' => 'Arrendamiento base', 'unit_code' => 'A-101'],
+            ['id' => 32, 'status' => 'generated', 'template_name' => 'Arrendamiento firmado', 'unit_code' => 'A-102'],
+            ['id' => 33, 'status' => 'finalized', 'template_name' => 'Arrendamiento final', 'unit_code' => 'A-103'],
+            ['id' => 34, 'status' => '<script>alert(1)</script>', 'template_name' => null, 'unit_code' => null],
+        ], 'can_create' => false], 'contracts');
+
+        self::assertStringContainsString('data-contract-context', $html);
+        foreach ([
+            'Contrato #31', 'Borrador', 'Arrendamiento base', 'A-101',
+            'Contrato #32', 'Generado', 'Arrendamiento firmado', 'A-102',
+            'Contrato #33', 'Finalizado', 'Arrendamiento final', 'A-103',
+            'Contrato #34', '&lt;script&gt;alert(1)&lt;/script&gt;',
+            '/admin/contracts/31', '/admin/contracts/32', '/admin/contracts/33', '/admin/contracts/34',
+        ] as $fact) {
+            self::assertStringContainsString($fact, $html);
+        }
+        self::assertStringNotContainsString('<script>alert(1)</script>', $html);
+        self::assertStringNotContainsString('Crear contrato', $html);
+        foreach (['Firmas', 'Recordatorios', 'Aprobar contrato', 'Historial de firmas'] as $inventedCapability) {
+            self::assertStringNotContainsString($inventedCapability, $html);
+        }
+    }
+
+    public function testContractsAreAbsentWithoutViewContextAndCreationRequiresPermission(): void
+    {
+        $withoutView = $this->renderOverview([], '', null, 'contracts');
+        self::assertStringNotContainsString('data-contract-context', $withoutView);
+        self::assertStringNotContainsString('data-candidate-section-body="contracts"', $withoutView);
+
+        $cannotCreate = $this->renderOverview([], '', ['contracts' => [], 'can_create' => false], 'contracts');
+        self::assertStringContainsString('No hay contratos registrados para este candidato.', $cannotCreate);
+        self::assertStringNotContainsString('Crear contrato', $cannotCreate);
+
+        $canCreate = $this->renderOverview([], '/sub', ['contracts' => [], 'can_create' => true], 'contracts');
+        self::assertStringContainsString('href="/sub/admin/contracts?candidate_id=1"', $canCreate);
+        self::assertStringContainsString('Crear contrato', $canCreate);
+    }
+
+    public function testManageSectionShowsCurrentStatusOnlyRealTargetsAndTokenInvalidationWarning(): void
+    {
+        $html = $this->renderOverview([
+            'status' => 'verification',
+            'allowedCandidateTransitions' => ['pending_screening', 'withdrawn'],
+        ], '', ['contracts' => [], 'can_create' => false], 'manage');
+        $dom = new \DOMDocument();
+        @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        $xpath = new \DOMXPath($dom);
+        $manage = $xpath->query('//section[@data-candidate-section-body="manage"]')->item(0);
+        self::assertNotNull($manage);
+        self::assertStringContainsString('Estado actual', $manage->textContent);
+        self::assertStringContainsString('En verificación', $manage->textContent);
+        self::assertStringContainsString('el enlace anterior deja de funcionar', $manage->textContent);
+        self::assertSame(1, $xpath->query('.//form[@action="/admin/candidates/1/status"]', $manage)->length);
+        self::assertSame(1, $xpath->query('.//form[@action="/admin/candidates/1/token/regenerate"]', $manage)->length);
+        self::assertSame(1, $xpath->query('.//form[@action="/admin/candidates/1/token/regenerate"]/button[contains(concat(" ", normalize-space(@class), " "), " button--quiet ")]', $manage)->length);
+        $targetValues = [];
+        foreach ($xpath->query('.//form[@action="/admin/candidates/1/status"]//option', $manage) as $option) {
+            $targetValues[] = $option->getAttribute('value');
+        }
+        self::assertSame(['pending_screening', 'withdrawn'], $targetValues);
+        self::assertStringContainsString('name="csrf_token" value="csrf-demo"', $html);
+        foreach (['Aprobar candidato', 'Rechazar candidato', 'Historial', 'Archivar'] as $unownedAction) {
+            self::assertStringNotContainsString($unownedAction, $manage->textContent);
+        }
+    }
+
     private function renderOverview(array $overrides = [], string $basePath = '', ?array $contracts = ['contracts' => [], 'can_create' => false], string $section = 'overview'): string
     {
         $candidate = [
@@ -908,6 +977,9 @@ final class HumanFirstCandidateDetailViewTest extends TestCase
         $screening = null;
         $contractContext = $contracts;
         $canManageCandidates = true;
+        $allowedCandidateTransitions = is_array($overrides['allowedCandidateTransitions'] ?? null)
+            ? $overrides['allowedCandidateTransitions']
+            : [];
         $householdCanManage = ($overrides['householdCanManage'] ?? true) === true;
         $householdFormError = is_array($overrides['householdFormError'] ?? null) ? $overrides['householdFormError'] : null;
         $householdOccupants = is_array($overrides['householdOccupants'] ?? null) ? $overrides['householdOccupants'] : [];

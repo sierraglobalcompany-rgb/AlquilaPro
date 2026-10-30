@@ -179,6 +179,10 @@ final class CandidatesAdminRoutesTest extends TestCase
         $manage = (string) $this->request($managerApp, 'GET', '/sub/admin/candidates/' . $candidateId . '?section=manage')->getBody();
         self::assertStringContainsString('data-candidate-section-body="manage"', $manage);
         self::assertStringContainsString('?section=manage', $manage);
+        self::assertStringContainsString('Nueva', $manage);
+        self::assertStringContainsString('value="incomplete"', $manage);
+        self::assertStringContainsString('value="withdrawn"', $manage);
+        self::assertStringContainsString('el enlace anterior deja de funcionar', $manage);
 
         $_SESSION = [];
         $this->insertUser('contracts@example.com', 'ContractsPassword123', 'admin', ['candidates.view', 'contracts.view']);

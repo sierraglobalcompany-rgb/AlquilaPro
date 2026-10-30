@@ -225,6 +225,23 @@ final class CandidateServiceTest extends TestCase
         $service->transitionStatus((int) $third['candidate_id'], 'approved');
     }
 
+    public function testAllowedTransitionsForStatusMatchesCanonicalCandidateMatrix(): void
+    {
+        $service = $this->service();
+        self::assertTrue(is_callable([$service, 'allowedTransitionsForStatus']));
+
+        foreach ([
+            'new' => ['incomplete', 'withdrawn'],
+            'incomplete' => ['withdrawn'],
+            'verification' => ['pending_screening', 'withdrawn'],
+            'pending_screening' => ['withdrawn'],
+            'withdrawn' => [],
+            'unknown' => [],
+        ] as $status => $expected) {
+            self::assertSame($expected, $service->allowedTransitionsForStatus($status), $status);
+        }
+    }
+
     public function testFindByTokenIncludesOnlyPublicReferenceFieldsWithoutInternalIds(): void
     {
         $unit = $this->seedUnit('222222222222222222222222', true);
